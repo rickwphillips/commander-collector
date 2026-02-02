@@ -3,15 +3,22 @@
 const isDev = process.env.NODE_ENV === 'development';
 
 export const API_BASE = isDev
-  ? 'http://localhost:3000/api'
-  : '/app/projects/commander/api';
+  ? '/php-api/'
+  : '/php-api/';
 
 // Helper for API calls
 export async function apiFetch<T>(
   endpoint: string,
   options?: RequestInit
 ): Promise<T> {
-  const url = isDev ? `${API_BASE}${endpoint}` : `${API_BASE}${endpoint}.php`;
+  // Handle query strings properly - insert .php before the query string
+  let url: string;
+  if (endpoint.includes('?')) {
+    const [path, query] = endpoint.split('?');
+    url = `${API_BASE}${path}.php?${query}`;
+  } else {
+    url = `${API_BASE}${endpoint}.php`;
+  }
 
   const res = await fetch(url, {
     headers: {
@@ -71,6 +78,11 @@ export const api = {
   createGame: (data: import('./types').CreateGameInput) =>
     apiFetch<{ id: number }>('/games', {
       method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateGame: (id: number, data: { played_at?: string; winning_turn?: number | null; notes?: string | null }) =>
+    apiFetch<{ success: boolean }>(`/games?id=${id}`, {
+      method: 'PUT',
       body: JSON.stringify(data),
     }),
   deleteGame: (id: number) =>

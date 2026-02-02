@@ -220,7 +220,7 @@ export default function Dashboard() {
               <Stack spacing={2}>
                 {stats.recentGames.slice(0, 5).map((game: RecentGame) => (
                   <Card key={game.id}>
-                    <CardActionArea component={Link} href={`/games/${game.id}`}>
+                    <CardActionArea component={Link} href={`/games/detail?id=${game.id}`}>
                       <CardContent>
                         <Stack
                           direction={{ xs: 'column', sm: 'row' }}

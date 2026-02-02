@@ -95,7 +95,7 @@ export default function DecksPage() {
             <Grid key={deck.id} size={{ xs: 12, sm: 6, md: 4 }}>
               <Grow in={mounted} timeout={600 + index * 100}>
                 <Card>
-                  <CardActionArea component={Link} href={`/decks/${deck.id}`}>
+                  <CardActionArea component={Link} href={`/decks/detail?id=${deck.id}`}>
                     <CardContent>
                       <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                         <Box sx={{ flex: 1 }}>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -13,12 +13,14 @@ import {
   Grow,
   Alert,
   Button,
+  TextField,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
 } from '@mui/material';
 import Link from 'next/link';
+import EditIcon from '@mui/icons-material/Edit';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
@@ -29,23 +31,34 @@ import { EmptyState } from '../../components/EmptyState';
 import { api } from '../../lib/api';
 import type { GameWithResults } from '../../lib/types';
 
-interface GameDetailProps {
-  gameId: number;
-}
-
-export function GameDetail({ gameId }: GameDetailProps) {
+export default function GameDetailPage() {
+  const searchParams = useSearchParams();
   const router = useRouter();
+  const gameId = Number(searchParams.get('id'));
 
   const [mounted, setMounted] = useState(false);
   const [game, setGame] = useState<GameWithResults | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Edit state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editDate, setEditDate] = useState('');
+  const [editWinningTurn, setEditWinningTurn] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // Delete state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 0);
-    fetchGame();
+    if (gameId) {
+      fetchGame();
+    } else {
+      setLoading(false);
+    }
     return () => clearTimeout(timer);
   }, [gameId]);
 
@@ -53,10 +66,44 @@ export function GameDetail({ gameId }: GameDetailProps) {
     try {
       const data = await api.getGame(gameId);
       setGame(data);
+      setEditDate(data.played_at.split('T')[0]);
+      setEditWinningTurn(data.winning_turn?.toString() || '');
+      setEditNotes(data.notes || '');
     } catch {
       setError('Failed to load game');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEdit = () => {
+    setEditDate(game?.played_at.split('T')[0] || '');
+    setEditWinningTurn(game?.winning_turn?.toString() || '');
+    setEditNotes(game?.notes || '');
+    setEditDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!editDate) return;
+
+    setSaving(true);
+    try {
+      await api.updateGame(gameId, {
+        played_at: editDate,
+        winning_turn: editWinningTurn ? parseInt(editWinningTurn) : null,
+        notes: editNotes || null,
+      });
+      setGame({
+        ...game!,
+        played_at: editDate,
+        winning_turn: editWinningTurn ? parseInt(editWinningTurn) : null,
+        notes: editNotes || null,
+      } as GameWithResults);
+      setEditDialogOpen(false);
+    } catch {
+      setError('Failed to update game');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -71,6 +118,14 @@ export function GameDetail({ gameId }: GameDetailProps) {
       setDeleteDialogOpen(false);
     }
   };
+
+  if (!gameId) {
+    return (
+      <PageContainer title="Game Not Found" backHref="/games" backLabel="Back to Games">
+        <EmptyState title="No game ID provided" description="Please select a game from the list" />
+      </PageContainer>
+    );
+  }
 
   if (loading) {
     return (
@@ -94,13 +149,14 @@ export function GameDetail({ gameId }: GameDetailProps) {
       backHref="/games"
       backLabel="Back to Games"
       actions={
-        <Button
-          color="error"
-          startIcon={<DeleteIcon />}
-          onClick={() => setDeleteDialogOpen(true)}
-        >
-          Delete
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <Button startIcon={<EditIcon />} onClick={handleEdit}>
+            Edit
+          </Button>
+          <Button color="error" startIcon={<DeleteIcon />} onClick={() => setDeleteDialogOpen(true)}>
+            Delete
+          </Button>
+        </Stack>
       }
     >
       {error && (
@@ -157,7 +213,7 @@ export function GameDetail({ gameId }: GameDetailProps) {
                     borderLeft: isWinner ? '4px solid #DAA520' : undefined,
                   }}
                 >
-                  <CardActionArea component={Link} href={`/decks/${result.deck_id}`}>
+                  <CardActionArea component={Link} href={`/decks/detail?id=${result.deck_id}`}>
                     <CardContent>
                       <Stack
                         direction={{ xs: 'column', sm: 'row' }}
@@ -240,6 +296,46 @@ export function GameDetail({ gameId }: GameDetailProps) {
           </Card>
         </>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Game</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="Date Played"
+              type="date"
+              fullWidth
+              value={editDate}
+              onChange={(e) => setEditDate(e.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+            <TextField
+              label="Winning Turn"
+              type="number"
+              fullWidth
+              value={editWinningTurn}
+              onChange={(e) => setEditWinningTurn(e.target.value)}
+              placeholder="Leave empty if unknown"
+            />
+            <TextField
+              label="Notes"
+              multiline
+              rows={4}
+              fullWidth
+              value={editNotes}
+              onChange={(e) => setEditNotes(e.target.value)}
+              placeholder="Game highlights, memorable plays, etc."
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleSave} variant="contained" disabled={!editDate || saving}>
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Delete Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>

@@ -90,7 +90,7 @@ export default function GamesPage() {
             return (
               <Grow key={game.id} in={mounted} timeout={600 + index * 50}>
                 <Card>
-                  <CardActionArea component={Link} href={`/games/${game.id}`}>
+                  <CardActionArea component={Link} href={`/games/detail?id=${game.id}`}>
                     <CardContent>
                       <Stack
                         direction={{ xs: 'column', sm: 'row' }}

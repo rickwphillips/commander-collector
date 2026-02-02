@@ -133,45 +133,6 @@ switch ($method) {
         }
         break;
 
-    case 'PUT':
-        if (!$id) {
-            sendError('Game ID is required');
-        }
-
-        $data = getJSONInput();
-
-        // Build dynamic update query
-        $updates = [];
-        $params = [];
-
-        if (isset($data['played_at'])) {
-            $updates[] = 'played_at = ?';
-            $params[] = $data['played_at'];
-        }
-        if (array_key_exists('winning_turn', $data)) {
-            $updates[] = 'winning_turn = ?';
-            $params[] = $data['winning_turn'];
-        }
-        if (array_key_exists('notes', $data)) {
-            $updates[] = 'notes = ?';
-            $params[] = $data['notes'];
-        }
-
-        if (empty($updates)) {
-            sendError('No fields to update');
-        }
-
-        $params[] = $id;
-        $stmt = $pdo->prepare('UPDATE games SET ' . implode(', ', $updates) . ' WHERE id = ?');
-        $stmt->execute($params);
-
-        if ($stmt->rowCount() === 0) {
-            sendError('Game not found', 404);
-        }
-
-        sendJSON(['success' => true]);
-        break;
-
     case 'DELETE':
         if (!$id) {
             sendError('Game ID is required');

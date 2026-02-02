@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -12,8 +13,19 @@ import {
   Box,
   Grow,
   Alert,
+  Button,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormGroup,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import Link from 'next/link';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import { PageContainer } from '../../components/PageContainer';
 import { StatsCard } from '../../components/StatsCard';
@@ -23,20 +35,43 @@ import { EmptyState } from '../../components/EmptyState';
 import { api } from '../../lib/api';
 import type { DeckDetail as DeckDetailType, GameWithResults } from '../../lib/types';
 
-interface DeckDetailProps {
-  deckId: number;
-}
+const COLOR_OPTIONS = [
+  { value: 'W', label: 'White', color: '#F9FAF4' },
+  { value: 'U', label: 'Blue', color: '#0E68AB' },
+  { value: 'B', label: 'Black', color: '#150B00' },
+  { value: 'R', label: 'Red', color: '#D3202A' },
+  { value: 'G', label: 'Green', color: '#00733E' },
+];
 
-export function DeckDetail({ deckId }: DeckDetailProps) {
+export default function DeckDetailPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const deckId = Number(searchParams.get('id'));
+
   const [mounted, setMounted] = useState(false);
   const [deck, setDeck] = useState<DeckDetailType | null>(null);
   const [games, setGames] = useState<GameWithResults[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Edit state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editCommander, setEditCommander] = useState('');
+  const [editColors, setEditColors] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  // Delete state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 0);
-    fetchData();
+    if (deckId) {
+      fetchData();
+    } else {
+      setLoading(false);
+    }
     return () => clearTimeout(timer);
   }, [deckId]);
 
@@ -47,6 +82,9 @@ export function DeckDetail({ deckId }: DeckDetailProps) {
         api.getGames(),
       ]);
       setDeck(deckData);
+      setEditName(deckData.name);
+      setEditCommander(deckData.commander);
+      setEditColors(deckData.colors ? deckData.colors.split('') : []);
 
       // Filter games where this deck participated
       const deckGames = gamesData.filter((game) =>
@@ -59,6 +97,70 @@ export function DeckDetail({ deckId }: DeckDetailProps) {
       setLoading(false);
     }
   };
+
+  const handleEdit = () => {
+    setEditName(deck?.name || '');
+    setEditCommander(deck?.commander || '');
+    setEditColors(deck?.colors ? deck.colors.split('') : []);
+    setEditDialogOpen(true);
+  };
+
+  const handleColorToggle = (color: string) => {
+    setEditColors((prev) =>
+      prev.includes(color)
+        ? prev.filter((c) => c !== color)
+        : [...prev, color]
+    );
+  };
+
+  const handleSave = async () => {
+    if (!editName.trim() || !editCommander.trim()) return;
+
+    setSaving(true);
+    try {
+      const colorsString = COLOR_OPTIONS
+        .filter((c) => editColors.includes(c.value))
+        .map((c) => c.value)
+        .join('');
+
+      await api.updateDeck(deckId, {
+        name: editName.trim(),
+        commander: editCommander.trim(),
+        colors: colorsString || 'C',
+      });
+      setDeck({
+        ...deck!,
+        name: editName.trim(),
+        commander: editCommander.trim(),
+        colors: colorsString || 'C',
+      });
+      setEditDialogOpen(false);
+    } catch {
+      setError('Failed to update deck');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await api.deleteDeck(deckId);
+      router.push('/decks');
+    } catch {
+      setError('Failed to delete deck');
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
+  if (!deckId) {
+    return (
+      <PageContainer title="Deck Not Found" backHref="/decks" backLabel="Back to Decks">
+        <EmptyState title="No deck ID provided" description="Please select a deck from the list" />
+      </PageContainer>
+    );
+  }
 
   if (loading) {
     return (
@@ -82,6 +184,16 @@ export function DeckDetail({ deckId }: DeckDetailProps) {
       subtitle={deck.commander}
       backHref="/decks"
       backLabel="Back to Decks"
+      actions={
+        <Stack direction="row" spacing={1}>
+          <Button startIcon={<EditIcon />} onClick={handleEdit}>
+            Edit
+          </Button>
+          <Button color="error" startIcon={<DeleteIcon />} onClick={() => setDeleteDialogOpen(true)}>
+            Delete
+          </Button>
+        </Stack>
+      }
     >
       {error && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
@@ -161,7 +273,7 @@ export function DeckDetail({ deckId }: DeckDetailProps) {
             return (
               <Grow key={game.id} in={mounted} timeout={600 + index * 100}>
                 <Card>
-                  <CardActionArea component={Link} href={`/games/${game.id}`}>
+                  <CardActionArea component={Link} href={`/games/detail?id=${game.id}`}>
                     <CardContent>
                       <Stack
                         direction={{ xs: 'column', sm: 'row' }}
@@ -205,6 +317,76 @@ export function DeckDetail({ deckId }: DeckDetailProps) {
           })}
         </Stack>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Deck</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="Deck Name"
+              fullWidth
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+            />
+            <TextField
+              label="Commander"
+              fullWidth
+              value={editCommander}
+              onChange={(e) => setEditCommander(e.target.value)}
+            />
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Color Identity
+              </Typography>
+              <FormGroup row>
+                {COLOR_OPTIONS.map((color) => (
+                  <FormControlLabel
+                    key={color.value}
+                    control={
+                      <Checkbox
+                        checked={editColors.includes(color.value)}
+                        onChange={() => handleColorToggle(color.value)}
+                        sx={{
+                          color: color.color,
+                          '&.Mui-checked': { color: color.color },
+                        }}
+                      />
+                    }
+                    label={color.label}
+                  />
+                ))}
+              </FormGroup>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={handleSave}
+            variant="contained"
+            disabled={!editName.trim() || !editCommander.trim() || saving}
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Delete Deck?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete {deck.name}? This will also remove it from all game results.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleDelete} color="error" disabled={deleting}>
+            {deleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </PageContainer>
   );
 }

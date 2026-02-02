@@ -116,7 +116,7 @@ export default function PlayersPage() {
             <Grid key={player.id} size={{ xs: 12, sm: 6, md: 4 }}>
               <Grow in={mounted} timeout={600 + index * 100}>
                 <Card>
-                  <CardActionArea component={Link} href={`/players/${player.id}`}>
+                  <CardActionArea component={Link} href={`/players/detail?id=${player.id}`}>
                     <CardContent>
                       <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>
                         {player.name}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -12,8 +13,16 @@ import {
   Box,
   Grow,
   Alert,
+  Button,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import Link from 'next/link';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import StyleIcon from '@mui/icons-material/Style';
 import { PageContainer } from '../../components/PageContainer';
@@ -30,11 +39,11 @@ interface DeckWithStats extends Deck {
   player_name: string;
 }
 
-interface PlayerDetailProps {
-  playerId: number;
-}
+export default function PlayerDetailPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const playerId = Number(searchParams.get('id'));
 
-export function PlayerDetail({ playerId }: PlayerDetailProps) {
   const [mounted, setMounted] = useState(false);
   const [player, setPlayer] = useState<Player | null>(null);
   const [stats, setStats] = useState<PlayerStats | null>(null);
@@ -42,9 +51,22 @@ export function PlayerDetail({ playerId }: PlayerDetailProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Edit state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // Delete state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 0);
-    fetchData();
+    if (playerId) {
+      fetchData();
+    } else {
+      setLoading(false);
+    }
     return () => clearTimeout(timer);
   }, [playerId]);
 
@@ -56,6 +78,7 @@ export function PlayerDetail({ playerId }: PlayerDetailProps) {
         api.getDecksByPlayer(playerId),
       ]);
       setPlayer(playerData);
+      setEditName(playerData.name);
       setStats(statsData);
       setDecks(decksData as DeckWithStats[]);
     } catch {
@@ -64,6 +87,46 @@ export function PlayerDetail({ playerId }: PlayerDetailProps) {
       setLoading(false);
     }
   };
+
+  const handleEdit = () => {
+    setEditName(player?.name || '');
+    setEditDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!editName.trim()) return;
+
+    setSaving(true);
+    try {
+      await api.updatePlayer(playerId, { name: editName.trim() });
+      setPlayer({ ...player!, name: editName.trim() });
+      setEditDialogOpen(false);
+    } catch {
+      setError('Failed to update player');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await api.deletePlayer(playerId);
+      router.push('/players');
+    } catch {
+      setError('Failed to delete player');
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
+  if (!playerId) {
+    return (
+      <PageContainer title="Player Not Found" backHref="/players" backLabel="Back to Players">
+        <EmptyState title="No player ID provided" description="Please select a player from the list" />
+      </PageContainer>
+    );
+  }
 
   if (loading) {
     return (
@@ -86,6 +149,16 @@ export function PlayerDetail({ playerId }: PlayerDetailProps) {
       title={player.name}
       backHref="/players"
       backLabel="Back to Players"
+      actions={
+        <Stack direction="row" spacing={1}>
+          <Button startIcon={<EditIcon />} onClick={handleEdit}>
+            Edit
+          </Button>
+          <Button color="error" startIcon={<DeleteIcon />} onClick={() => setDeleteDialogOpen(true)}>
+            Delete
+          </Button>
+        </Stack>
+      }
     >
       {error && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
@@ -151,7 +224,7 @@ export function PlayerDetail({ playerId }: PlayerDetailProps) {
             <Grid key={deck.id} size={{ xs: 12, sm: 6, md: 4 }}>
               <Grow in={mounted} timeout={600 + index * 100}>
                 <Card>
-                  <CardActionArea component={Link} href={`/decks/${deck.id}`}>
+                  <CardActionArea component={Link} href={`/decks/detail?id=${deck.id}`}>
                     <CardContent>
                       <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                         <Box>
@@ -189,6 +262,44 @@ export function PlayerDetail({ playerId }: PlayerDetailProps) {
           ))}
         </Grid>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Edit Player</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            label="Player Name"
+            fullWidth
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleSave} variant="contained" disabled={!editName.trim() || saving}>
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Delete Player?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete {player.name}? This will also delete all their decks and game results.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleDelete} color="error" disabled={deleting}>
+            {deleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </PageContainer>
   );
 }
