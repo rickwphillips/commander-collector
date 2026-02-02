@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# The Commander Collector
 
-## Getting Started
+A Magic: The Gathering Commander game tracking app.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Track Commander game results (date, winning turn, notes)
+- Manage players and their decks
+- Track commanders separately from deck names
+- MTG color identity display
+- Statistics: win rates, head-to-head records, top commanders
+- Dark/light theme with autumn color palette
+
+## Tech Stack
+
+- **Frontend**: Next.js 16, React 19, TypeScript, MUI 7
+- **Backend**: PHP API (for Bluehost deployment)
+- **Database**: MySQL
+
+## Local Development
+
+### Prerequisites
+
+- Node.js 18+
+- MySQL database (on Bluehost or local)
+
+### Setup
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Set up the database by running `app/php-api/setup.sql` in phpMyAdmin
+
+3. Update `app/php-api/config.php` with your database credentials
+
+4. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+5. Open http://localhost:3000
+
+## Database Setup
+
+Run the SQL in `app/php-api/setup.sql` in phpMyAdmin to create:
+
+- `players` - Your playgroup members
+- `decks` - Each player's decks with commander and colors
+- `games` - Game records with date, winning turn, notes
+- `game_results` - Each player's result per game
+
+## PHP API Files
+
+Upload `app/php-api/` contents to Bluehost:
+
+- `config.php` - Database connection (update credentials)
+- `players.php` - CRUD for players
+- `decks.php` - CRUD for decks
+- `games.php` - CRUD for games
+- `stats.php` - Statistics queries
+- `head-to-head.php` - Head-to-head records
+- `setup.sql` - Database schema
+
+## Deployment
+
+### Recommended: Vercel + Bluehost
+
+1. Deploy Next.js app to [Vercel](https://vercel.com) (free tier)
+2. Keep PHP API and MySQL on Bluehost
+3. Update `app/lib/api.ts` API_BASE to point to your Bluehost PHP API URL
+
+### PHP API on Bluehost
+
+1. Upload `app/php-api/` files to `public_html/api/commander/`
+2. Update `config.php` with your database credentials
+3. Test endpoints: `https://yourdomain.com/api/commander/players.php`
+
+## Project Structure
+
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+app/
+├── components/          # UI components
+├── lib/                 # API client and types
+├── theme/               # MUI theme
+├── players/             # Player pages
+├── decks/               # Deck pages
+├── games/               # Game pages
+├── stats/               # Statistics page
+├── php-api/             # PHP backend
+└── page.tsx             # Dashboard
+```
