@@ -25,6 +25,7 @@ if ($player1Id && $player2Id) {
         JOIN decks d1 ON gr1.deck_id = d1.id AND d1.player_id = ?
         JOIN game_results gr2 ON gr2.game_id = g.id
         JOIN decks d2 ON gr2.deck_id = d2.id AND d2.player_id = ?
+        WHERE g.game_type != \'2hg\'
         ORDER BY g.played_at DESC
     ');
     $stmt->execute([$player1Id, $player2Id]);
@@ -65,7 +66,7 @@ $records = $pdo->query('
     JOIN game_results gr2 ON gr2.game_id = g.id AND gr2.id > gr1.id
     JOIN decks d2 ON gr2.deck_id = d2.id
     JOIN players p2 ON d2.player_id = p2.id
-    WHERE p1.id < p2.id
+    WHERE p1.id < p2.id AND g.game_type != \'2hg\'
     GROUP BY p1.id, p2.id
     ORDER BY total_games DESC
 ')->fetchAll();

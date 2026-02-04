@@ -24,12 +24,13 @@ import EditIcon from '@mui/icons-material/Edit';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import GroupsIcon from '@mui/icons-material/Groups';
 import { PageContainer } from '../../components/PageContainer';
 import { ColorIdentityChips } from '../../components/ColorIdentityChips';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
-import { api } from '../../../lib/api';
-import type { GameWithResults } from '../../../lib/types';
+import { api } from '../../lib/api';
+import type { GameWithResults } from '../../lib/types';
 
 export default function GameDetailPage() {
   const searchParams = useSearchParams();
@@ -186,6 +187,13 @@ export default function GameDetailPage() {
               </Typography>
             </Stack>
             <Stack direction="row" spacing={1}>
+              {game.game_type === '2hg' && (
+                <Chip
+                  icon={<GroupsIcon />}
+                  label="2-Headed Giant"
+                  color="secondary"
+                />
+              )}
               <Chip label={`${game.results?.length || 0} players`} />
               {game.winning_turn && (
                 <Chip label={`Turn ${game.winning_turn}`} color="primary" />
@@ -200,86 +208,142 @@ export default function GameDetailPage() {
         Results
       </Typography>
 
-      <Stack spacing={2} sx={{ mb: 4 }}>
-        {game.results
-          ?.sort((a, b) => a.finish_position - b.finish_position)
-          .map((result, index) => {
-            const isWinner = result.finish_position === 1;
+      {game.game_type === '2hg' ? (
+        <Stack spacing={3} sx={{ mb: 4 }}>
+          {[1, 2].map((teamNum) => {
+            const teamResults = game.results?.filter(r => r.team_number === teamNum) || [];
+            const isWinningTeam = teamResults.some(r => r.finish_position === 1);
 
             return (
-              <Grow key={result.id} in={mounted} timeout={600 + index * 100}>
+              <Grow key={teamNum} in={mounted} timeout={600 + teamNum * 200}>
                 <Card
                   sx={{
-                    borderLeft: isWinner ? '4px solid #DAA520' : undefined,
+                    borderLeft: isWinningTeam ? '4px solid #DAA520' : undefined,
                   }}
                 >
-                  <CardActionArea component={Link} href={`/decks/detail?id=${result.deck_id}`}>
-                    <CardContent>
-                      <Stack
-                        direction={{ xs: 'column', sm: 'row' }}
-                        justifyContent="space-between"
-                        alignItems={{ xs: 'flex-start', sm: 'center' }}
-                        spacing={2}
-                      >
-                        <Stack direction="row" alignItems="center" spacing={2}>
-                          <Box
-                            sx={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: '50%',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              backgroundColor: isWinner ? '#DAA520' : 'action.selected',
-                              color: isWinner ? 'white' : 'text.primary',
-                              fontWeight: 700,
-                            }}
-                          >
-                            {isWinner ? (
-                              <EmojiEventsIcon />
-                            ) : (
-                              result.finish_position
-                            )}
-                          </Box>
-                          <Box>
-                            <Stack direction="row" alignItems="center" spacing={1}>
-                              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                                {result.player_name}
-                              </Typography>
-                              <ColorIdentityChips colors={result.colors} size="small" />
-                            </Stack>
-                            <Typography variant="body2" color="text.secondary">
-                              {result.deck_name} - {result.commander}
-                            </Typography>
-                          </Box>
-                        </Stack>
+                  <CardContent>
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+                      {isWinningTeam && <EmojiEventsIcon sx={{ color: '#DAA520' }} />}
+                      <GroupsIcon color={isWinningTeam ? 'primary' : 'action'} />
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        Team {teamNum}
+                      </Typography>
+                      {isWinningTeam && (
+                        <Chip label="Winners" color="primary" size="small" />
+                      )}
+                    </Stack>
 
-                        <Stack direction="row" spacing={1}>
-                          {isWinner ? (
-                            <Chip label="Winner" color="primary" size="small" />
-                          ) : (
-                            <Chip
-                              label={`${result.finish_position}${getOrdinalSuffix(result.finish_position)}`}
-                              variant="outlined"
-                              size="small"
-                            />
-                          )}
-                          {result.eliminated_turn && (
-                            <Chip
-                              label={`Elim. turn ${result.eliminated_turn}`}
-                              variant="outlined"
-                              size="small"
-                            />
-                          )}
-                        </Stack>
-                      </Stack>
-                    </CardContent>
-                  </CardActionArea>
+                    <Stack spacing={2}>
+                      {teamResults.map((result) => (
+                        <Card key={result.id} variant="outlined">
+                          <CardActionArea component={Link} href={`/decks/detail?id=${result.deck_id}`}>
+                            <CardContent>
+                              <Stack direction="row" alignItems="center" spacing={2}>
+                                <Box>
+                                  <Stack direction="row" alignItems="center" spacing={1}>
+                                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                                      {result.player_name}
+                                    </Typography>
+                                    <ColorIdentityChips colors={result.colors} size="small" />
+                                  </Stack>
+                                  <Typography variant="body2" color="text.secondary">
+                                    {result.deck_name} - {result.commander}
+                                  </Typography>
+                                </Box>
+                              </Stack>
+                            </CardContent>
+                          </CardActionArea>
+                        </Card>
+                      ))}
+                    </Stack>
+                  </CardContent>
                 </Card>
               </Grow>
             );
           })}
-      </Stack>
+        </Stack>
+      ) : (
+        <Stack spacing={2} sx={{ mb: 4 }}>
+          {game.results
+            ?.sort((a, b) => a.finish_position - b.finish_position)
+            .map((result, index) => {
+              const isWinner = result.finish_position === 1;
+
+              return (
+                <Grow key={result.id} in={mounted} timeout={600 + index * 100}>
+                  <Card
+                    sx={{
+                      borderLeft: isWinner ? '4px solid #DAA520' : undefined,
+                    }}
+                  >
+                    <CardActionArea component={Link} href={`/decks/detail?id=${result.deck_id}`}>
+                      <CardContent>
+                        <Stack
+                          direction={{ xs: 'column', sm: 'row' }}
+                          justifyContent="space-between"
+                          alignItems={{ xs: 'flex-start', sm: 'center' }}
+                          spacing={2}
+                        >
+                          <Stack direction="row" alignItems="center" spacing={2}>
+                            <Box
+                              sx={{
+                                width: 40,
+                                height: 40,
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: isWinner ? '#DAA520' : 'action.selected',
+                                color: isWinner ? 'white' : 'text.primary',
+                                fontWeight: 700,
+                              }}
+                            >
+                              {isWinner ? (
+                                <EmojiEventsIcon />
+                              ) : (
+                                result.finish_position
+                              )}
+                            </Box>
+                            <Box>
+                              <Stack direction="row" alignItems="center" spacing={1}>
+                                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                                  {result.player_name}
+                                </Typography>
+                                <ColorIdentityChips colors={result.colors} size="small" />
+                              </Stack>
+                              <Typography variant="body2" color="text.secondary">
+                                {result.deck_name} - {result.commander}
+                              </Typography>
+                            </Box>
+                          </Stack>
+
+                          <Stack direction="row" spacing={1}>
+                            {isWinner ? (
+                              <Chip label="Winner" color="primary" size="small" />
+                            ) : (
+                              <Chip
+                                label={`${result.finish_position}${getOrdinalSuffix(result.finish_position)}`}
+                                variant="outlined"
+                                size="small"
+                              />
+                            )}
+                            {result.eliminated_turn && (
+                              <Chip
+                                label={`Elim. turn ${result.eliminated_turn}`}
+                                variant="outlined"
+                                size="small"
+                              />
+                            )}
+                          </Stack>
+                        </Stack>
+                      </CardContent>
+                    </CardActionArea>
+                  </Card>
+                </Grow>
+              );
+            })}
+        </Stack>
+      )}
 
       {/* Notes */}
       {game.notes && (

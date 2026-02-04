@@ -2,9 +2,9 @@
 // Database configuration for Bluehost
 // Update these values with your actual credentials
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'your_database_name');
-define('DB_USER', 'your_username');
-define('DB_PASS', 'your_password');
+define('DB_NAME', 'rickwphi_app_commander');
+define('DB_USER', 'rickwphi_app_user');
+define('DB_PASS', 'cSewi_5Kpi6p');
 
 // CORS headers for development
 header('Access-Control-Allow-Origin: *');

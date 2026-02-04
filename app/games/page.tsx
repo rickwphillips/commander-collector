@@ -20,8 +20,8 @@ import { PageContainer } from '../components/PageContainer';
 import { ColorIdentityChips } from '../components/ColorIdentityChips';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
-import { api } from '../../lib/api';
-import type { GameWithResults } from '../../lib/types';
+import { api } from '../lib/api';
+import type { GameWithResults } from '../lib/types';
 
 export default function GamesPage() {
   const [mounted, setMounted] = useState(false);
@@ -85,7 +85,9 @@ export default function GamesPage() {
       ) : (
         <Stack spacing={2}>
           {games.map((game, index) => {
-            const winner = game.results?.find((r) => r.finish_position === 1);
+            const winners = game.results?.filter((r) => r.finish_position === 1) || [];
+            const winner = winners[0];
+            const is2HG = game.game_type === '2hg';
 
             return (
               <Grow key={game.id} in={mounted} timeout={600 + index * 50}>
@@ -102,14 +104,18 @@ export default function GamesPage() {
                           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
                             <EmojiEventsIcon sx={{ color: '#DAA520', fontSize: 24 }} />
                             <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                              {winner?.player_name || 'Unknown'}
+                              {is2HG
+                                ? winners.map((w) => w.player_name).join(' & ')
+                                : winner?.player_name || 'Unknown'}
                             </Typography>
-                            {winner && (
+                            {!is2HG && winner && (
                               <ColorIdentityChips colors={winner.colors} size="small" />
                             )}
                           </Stack>
                           <Typography variant="body2" color="text.secondary">
-                            {winner?.deck_name} ({winner?.commander})
+                            {is2HG
+                              ? winners.map((w) => `${w.deck_name} (${w.commander})`).join(' & ')
+                              : `${winner?.deck_name} (${winner?.commander})`}
                           </Typography>
                           {game.results && game.results.length > 1 && (
                             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
@@ -122,6 +128,14 @@ export default function GamesPage() {
                         </Box>
 
                         <Stack direction="row" spacing={1} alignItems="center">
+                          {is2HG && (
+                            <Chip
+                              label="2HG"
+                              size="small"
+                              variant="outlined"
+                              color="secondary"
+                            />
+                          )}
                           <Chip
                             label={`${game.results?.length || 0} players`}
                             size="small"

@@ -26,8 +26,8 @@ import { DarkModeToggle } from './components/DarkModeToggle';
 import { StatsCard } from './components/StatsCard';
 import { ColorIdentityChips } from './components/ColorIdentityChips';
 import { LoadingSpinner } from './components/LoadingSpinner';
-import { api } from '../lib/api';
-import type { StatsResponse, RecentGame } from '../lib/types';
+import { api } from './lib/api';
+import type { StatsResponse, RecentGame } from './lib/types';
 import styles from './page.module.scss';
 
 const navItems = [
@@ -141,7 +141,7 @@ export default function Dashboard() {
               <Grid size={{ xs: 6, md: 3 }}>
                 <StatsCard
                   title="Avg. Turns"
-                  value={stats.overall.avg_game_length?.toFixed(1) || '-'}
+                  value={stats.overall.avg_game_length != null ? Number(stats.overall.avg_game_length).toFixed(1) : '-'}
                   color="#CD853F"
                 />
               </Grid>

@@ -30,8 +30,8 @@ import { StatsCard } from '../../components/StatsCard';
 import { ColorIdentityChips } from '../../components/ColorIdentityChips';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
-import { api } from '../../../lib/api';
-import type { Player, Deck, PlayerStats } from '../../../lib/types';
+import { api } from '../../lib/api';
+import type { Player, Deck, PlayerStats } from '../../lib/types';
 
 interface DeckWithStats extends Deck {
   total_games: number;

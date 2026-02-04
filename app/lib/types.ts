@@ -1,3 +1,6 @@
+// Game type
+export type GameType = 'standard' | '2hg';
+
 // Database row types
 export interface Player {
   id: number;
@@ -19,6 +22,7 @@ export interface Game {
   played_at: string;
   winning_turn: number | null;
   notes: string | null;
+  game_type: GameType;
   created_at: string;
 }
 
@@ -26,8 +30,9 @@ export interface GameResult {
   id: number;
   game_id: number;
   deck_id: number;
-  finish_position: number; // 1 = winner, 2-4 = order of elimination
+  finish_position: number; // 1 = winner, 2-8 = order of elimination
   eliminated_turn: number | null;
+  team_number: number | null; // 1 or 2 for 2HG, null for standard
 }
 
 // Extended types with joins
@@ -117,6 +122,7 @@ export interface RecentGame {
   winning_deck: string;
   winning_commander: string;
   winner: string;
+  game_type: GameType;
 }
 
 // MTG color identity
@@ -138,11 +144,13 @@ export interface GameResultInput {
   deck_id: number;
   finish_position: number;
   eliminated_turn: number | null;
+  team_number: number | null;
 }
 
 export interface CreateGameInput {
   played_at: string;
   winning_turn: number | null;
   notes: string | null;
+  game_type: GameType;
   results: GameResultInput[];
 }

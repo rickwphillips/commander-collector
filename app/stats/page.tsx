@@ -26,8 +26,8 @@ import { StatsCard } from '../components/StatsCard';
 import { ColorIdentityChips } from '../components/ColorIdentityChips';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
-import { api } from '../../lib/api';
-import type { StatsResponse, HeadToHeadRecord } from '../../lib/types';
+import { api } from '../lib/api';
+import type { StatsResponse, HeadToHeadRecord } from '../lib/types';
 
 export default function StatsPage() {
   const [mounted, setMounted] = useState(false);
@@ -114,7 +114,7 @@ export default function StatsPage() {
         <Grid size={{ xs: 6, sm: 3 }}>
           <StatsCard
             title="Avg. Game Length"
-            value={stats.overall.avg_game_length?.toFixed(1) || '-'}
+            value={stats.overall.avg_game_length != null ? Number(stats.overall.avg_game_length).toFixed(1) : '-'}
             subtitle="turns"
             color="#CD853F"
           />

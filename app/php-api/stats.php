@@ -148,19 +148,21 @@ $topCommanders = $pdo->query('
     LIMIT 10
 ')->fetchAll();
 
-// Recent games
+// Recent games (GROUP_CONCAT handles 2HG multi-winner)
 $recentGames = $pdo->query('
     SELECT
         g.id,
         g.played_at,
         g.winning_turn,
-        d.name as winning_deck,
-        d.commander as winning_commander,
-        p.name as winner
+        g.game_type,
+        GROUP_CONCAT(DISTINCT d.name ORDER BY d.name SEPARATOR \' & \') as winning_deck,
+        GROUP_CONCAT(DISTINCT d.commander ORDER BY d.commander SEPARATOR \' & \') as winning_commander,
+        GROUP_CONCAT(DISTINCT p.name ORDER BY p.name SEPARATOR \' & \') as winner
     FROM games g
     LEFT JOIN game_results gr ON gr.game_id = g.id AND gr.finish_position = 1
     LEFT JOIN decks d ON gr.deck_id = d.id
     LEFT JOIN players p ON d.player_id = p.id
+    GROUP BY g.id
     ORDER BY g.played_at DESC, g.id DESC
     LIMIT 10
 ')->fetchAll();
