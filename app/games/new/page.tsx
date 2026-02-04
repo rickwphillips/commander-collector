@@ -22,8 +22,8 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import { PageContainer } from '../../components/PageContainer';
 import { ColorIdentityChips } from '../../components/ColorIdentityChips';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
-import { api } from '../../lib/api';
-import type { DeckWithPlayer, GameResultInput } from '../../lib/types';
+import { api } from '../../../lib/api';
+import type { DeckWithPlayer, GameResultInput } from '../../../lib/types';
 
 interface DeckOption extends DeckWithPlayer {
   total_games?: number;

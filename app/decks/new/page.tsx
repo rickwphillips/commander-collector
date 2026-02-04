@@ -18,8 +18,8 @@ import {
 } from '@mui/material';
 import { PageContainer } from '../../components/PageContainer';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
-import { api } from '../../lib/api';
-import type { Player } from '../../lib/types';
+import { api } from '../../../lib/api';
+import type { Player } from '../../../lib/types';
 
 const mtgColors = [
   { code: 'W', name: 'White', color: '#F8E7B9', textColor: '#333' },

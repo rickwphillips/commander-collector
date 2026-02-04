@@ -26,8 +26,8 @@ import { StatsCard } from '../components/StatsCard';
 import { ColorIdentityChips } from '../components/ColorIdentityChips';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
-import { api } from '../lib/api';
-import type { StatsResponse, HeadToHeadRecord } from '../lib/types';
+import { api } from '../../lib/api';
+import type { StatsResponse, HeadToHeadRecord } from '../../lib/types';
 
 export default function StatsPage() {
   const [mounted, setMounted] = useState(false);

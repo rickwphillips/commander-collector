@@ -21,8 +21,8 @@ import { PageContainer } from '../components/PageContainer';
 import { ColorIdentityChips } from '../components/ColorIdentityChips';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
-import { api } from '../lib/api';
-import type { DeckWithPlayer } from '../lib/types';
+import { api } from '../../lib/api';
+import type { DeckWithPlayer } from '../../lib/types';
 
 interface DeckWithStats extends DeckWithPlayer {
   total_games: number;

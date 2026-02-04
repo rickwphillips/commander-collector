@@ -32,8 +32,8 @@ import { StatsCard } from '../../components/StatsCard';
 import { ColorIdentityChips } from '../../components/ColorIdentityChips';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
-import { api } from '../../lib/api';
-import type { DeckDetail as DeckDetailType, GameWithResults } from '../../lib/types';
+import { api } from '../../../lib/api';
+import type { DeckDetail as DeckDetailType, GameWithResults } from '../../../lib/types';
 
 const COLOR_OPTIONS = [
   { value: 'W', label: 'White', color: '#F9FAF4' },

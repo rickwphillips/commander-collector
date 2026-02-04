@@ -26,8 +26,8 @@ import { DarkModeToggle } from './components/DarkModeToggle';
 import { StatsCard } from './components/StatsCard';
 import { ColorIdentityChips } from './components/ColorIdentityChips';
 import { LoadingSpinner } from './components/LoadingSpinner';
-import { api } from './lib/api';
-import type { StatsResponse, RecentGame } from './lib/types';
+import { api } from '../lib/api';
+import type { StatsResponse, RecentGame } from '../lib/types';
 import styles from './page.module.scss';
 
 const navItems = [

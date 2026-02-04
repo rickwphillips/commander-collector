@@ -24,8 +24,8 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import { PageContainer } from '../components/PageContainer';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
-import { api } from '../lib/api';
-import type { Player } from '../lib/types';
+import { api } from '../../lib/api';
+import type { Player } from '../../lib/types';
 
 interface PlayerWithStats extends Player {
   total_games: number;
