@@ -242,7 +242,7 @@ export default function DeckDetailPage() {
         <Grid size={{ xs: 6, sm: 3 }}>
           <StatsCard
             title="Avg. Finish"
-            value={deck.avg_finish_position?.toFixed(2) || '-'}
+            value={deck.avg_finish_position != null ? Number(deck.avg_finish_position).toFixed(2) : '-'}
             color="#CD853F"
           />
         </Grid>

@@ -98,6 +98,6 @@ export const api = {
     const params = player1Id && player2Id
       ? `?player1=${player1Id}&player2=${player2Id}`
       : '';
-    return apiFetch<import('./types').HeadToHeadRecord[]>(`/head-to-head${params}`);
+    return apiFetch<import('./types').HeadToHeadResponse>(`/head-to-head${params}`);
   },
 };

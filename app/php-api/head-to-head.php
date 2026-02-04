@@ -21,10 +21,8 @@ if ($player1Id && $player2Id) {
             gr2.finish_position as player2_finish,
             CASE WHEN gr1.finish_position < gr2.finish_position THEN 1 ELSE 0 END as player1_won
         FROM games g
-        JOIN game_results gr1 ON gr1.game_id = g.id
-        JOIN decks d1 ON gr1.deck_id = d1.id AND d1.player_id = ?
-        JOIN game_results gr2 ON gr2.game_id = g.id
-        JOIN decks d2 ON gr2.deck_id = d2.id AND d2.player_id = ?
+        JOIN game_results gr1 ON gr1.game_id = g.id AND gr1.player_id = ?
+        JOIN game_results gr2 ON gr2.game_id = g.id AND gr2.player_id = ?
         WHERE g.game_type != \'2hg\'
         ORDER BY g.played_at DESC
     ');
@@ -49,8 +47,8 @@ if ($player1Id && $player2Id) {
     ]);
 }
 
-// All head-to-head records
-$records = $pdo->query('
+// Head-to-head records for 1v1 (2-player) games
+$twoPlayer = $pdo->query('
     SELECT
         p1.id as player1_id,
         p1.name as player1_name,
@@ -61,14 +59,37 @@ $records = $pdo->query('
         SUM(CASE WHEN gr2.finish_position < gr1.finish_position THEN 1 ELSE 0 END) as player2_wins
     FROM games g
     JOIN game_results gr1 ON gr1.game_id = g.id
-    JOIN decks d1 ON gr1.deck_id = d1.id
-    JOIN players p1 ON d1.player_id = p1.id
-    JOIN game_results gr2 ON gr2.game_id = g.id AND gr2.id > gr1.id
-    JOIN decks d2 ON gr2.deck_id = d2.id
-    JOIN players p2 ON d2.player_id = p2.id
+    JOIN players p1 ON gr1.player_id = p1.id
+    JOIN game_results gr2 ON gr2.game_id = g.id AND gr1.id != gr2.id
+    JOIN players p2 ON gr2.player_id = p2.id
     WHERE p1.id < p2.id AND g.game_type != \'2hg\'
+    AND (SELECT COUNT(*) FROM game_results gr WHERE gr.game_id = g.id) = 2
     GROUP BY p1.id, p2.id
     ORDER BY total_games DESC
 ')->fetchAll();
 
-sendJSON($records);
+// Head-to-head records for multiplayer (3+ player) games
+$multiplayer = $pdo->query('
+    SELECT
+        p1.id as player1_id,
+        p1.name as player1_name,
+        p2.id as player2_id,
+        p2.name as player2_name,
+        COUNT(*) as total_games,
+        SUM(CASE WHEN gr1.finish_position < gr2.finish_position THEN 1 ELSE 0 END) as player1_wins,
+        SUM(CASE WHEN gr2.finish_position < gr1.finish_position THEN 1 ELSE 0 END) as player2_wins
+    FROM games g
+    JOIN game_results gr1 ON gr1.game_id = g.id
+    JOIN players p1 ON gr1.player_id = p1.id
+    JOIN game_results gr2 ON gr2.game_id = g.id AND gr1.id != gr2.id
+    JOIN players p2 ON gr2.player_id = p2.id
+    WHERE p1.id < p2.id AND g.game_type != \'2hg\'
+    AND (SELECT COUNT(*) FROM game_results gr WHERE gr.game_id = g.id) >= 3
+    GROUP BY p1.id, p2.id
+    ORDER BY total_games DESC
+')->fetchAll();
+
+sendJSON([
+    'twoPlayer' => $twoPlayer,
+    'multiplayer' => $multiplayer
+]);

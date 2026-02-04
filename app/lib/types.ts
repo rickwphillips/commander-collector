@@ -30,6 +30,7 @@ export interface GameResult {
   id: number;
   game_id: number;
   deck_id: number;
+  player_id: number; // The player who piloted this deck (may differ from deck owner)
   finish_position: number; // 1 = winner, 2-8 = order of elimination
   eliminated_turn: number | null;
   team_number: number | null; // 1 or 2 for 2HG, null for standard
@@ -100,6 +101,11 @@ export interface HeadToHeadRecord {
   total_games: number;
 }
 
+export interface HeadToHeadResponse {
+  twoPlayer: HeadToHeadRecord[];
+  multiplayer: HeadToHeadRecord[];
+}
+
 export interface OverallStats {
   total_games: number;
   total_players: number;
@@ -142,6 +148,7 @@ export interface CreateDeckInput {
 
 export interface GameResultInput {
   deck_id: number;
+  player_id?: number; // Defaults to deck owner if omitted
   finish_position: number;
   eliminated_turn: number | null;
   team_number: number | null;

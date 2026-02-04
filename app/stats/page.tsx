@@ -27,12 +27,12 @@ import { ColorIdentityChips } from '../components/ColorIdentityChips';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
 import { api } from '../lib/api';
-import type { StatsResponse, HeadToHeadRecord } from '../lib/types';
+import type { StatsResponse, HeadToHeadRecord, HeadToHeadResponse } from '../lib/types';
 
 export default function StatsPage() {
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<StatsResponse | null>(null);
-  const [headToHead, setHeadToHead] = useState<HeadToHeadRecord[]>([]);
+  const [headToHead, setHeadToHead] = useState<HeadToHeadResponse>({ twoPlayer: [], multiplayer: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -178,7 +178,7 @@ export default function StatsPage() {
                               />
                             </Box>
                             <Typography variant="body2" sx={{ minWidth: 45 }}>
-                              {player.win_rate?.toFixed(1)}%
+                              {Number(player.win_rate).toFixed(1)}%
                             </Typography>
                           </Stack>
                         </TableCell>
@@ -249,7 +249,7 @@ export default function StatsPage() {
                               />
                             </Box>
                             <Typography variant="body2" sx={{ minWidth: 45 }}>
-                              {deck.win_rate?.toFixed(1)}%
+                              {Number(deck.win_rate).toFixed(1)}%
                             </Typography>
                           </Stack>
                         </TableCell>
@@ -295,7 +295,7 @@ export default function StatsPage() {
                         <TableCell align="center">{commander.total_games}</TableCell>
                         <TableCell align="center">{commander.wins}</TableCell>
                         <TableCell align="right">
-                          {commander.win_rate?.toFixed(1)}%
+                          {Number(commander.win_rate).toFixed(1)}%
                         </TableCell>
                       </TableRow>
                     ))}
@@ -307,13 +307,13 @@ export default function StatsPage() {
         </Grow>
       )}
 
-      {/* Head to Head */}
-      {headToHead.length > 0 && (
+      {/* Head to Head - 1v1 */}
+      {headToHead.twoPlayer.length > 0 && (
         <Grow in={mounted} timeout={1400}>
-          <Card>
+          <Card sx={{ mb: 4 }}>
             <CardContent>
               <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
-                Head-to-Head Records
+                Head-to-Head: 1v1
               </Typography>
 
               <TableContainer>
@@ -326,7 +326,78 @@ export default function StatsPage() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {headToHead.map((record, index) => (
+                    {headToHead.twoPlayer.map((record, index) => (
+                      <TableRow key={index}>
+                        <TableCell>
+                          <Typography>
+                            {record.player1_name} vs {record.player2_name}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">{record.total_games}</TableCell>
+                        <TableCell align="center">
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                            justifyContent="center"
+                          >
+                            <Typography
+                              sx={{
+                                fontWeight:
+                                  record.player1_wins > record.player2_wins ? 700 : 400,
+                                color:
+                                  record.player1_wins > record.player2_wins
+                                    ? 'primary.main'
+                                    : 'text.primary',
+                              }}
+                            >
+                              {record.player1_wins}
+                            </Typography>
+                            <Typography color="text.secondary">-</Typography>
+                            <Typography
+                              sx={{
+                                fontWeight:
+                                  record.player2_wins > record.player1_wins ? 700 : 400,
+                                color:
+                                  record.player2_wins > record.player1_wins
+                                    ? 'primary.main'
+                                    : 'text.primary',
+                              }}
+                            >
+                              {record.player2_wins}
+                            </Typography>
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </CardContent>
+          </Card>
+        </Grow>
+      )}
+
+      {/* Head to Head - Multiplayer */}
+      {headToHead.multiplayer.length > 0 && (
+        <Grow in={mounted} timeout={1600}>
+          <Card>
+            <CardContent>
+              <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
+                Head-to-Head: Multiplayer
+              </Typography>
+
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Matchup</TableCell>
+                      <TableCell align="center">Games</TableCell>
+                      <TableCell align="center">Record</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {headToHead.multiplayer.map((record, index) => (
                       <TableRow key={index}>
                         <TableCell>
                           <Typography>

@@ -30,8 +30,7 @@ switch ($method) {
                         1
                     ) as win_rate
                 FROM players p
-                LEFT JOIN decks d ON d.player_id = p.id
-                LEFT JOIN game_results gr ON gr.deck_id = d.id
+                LEFT JOIN game_results gr ON gr.player_id = p.id
                 GROUP BY p.id
                 ORDER BY p.name ASC
             ');

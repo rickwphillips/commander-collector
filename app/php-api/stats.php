@@ -26,8 +26,7 @@ if ($playerId) {
             ) as win_rate,
             ROUND(AVG(gr.finish_position), 2) as avg_finish_position
         FROM players p
-        LEFT JOIN decks d ON d.player_id = p.id
-        LEFT JOIN game_results gr ON gr.deck_id = d.id
+        LEFT JOIN game_results gr ON gr.player_id = p.id
         WHERE p.id = ?
         GROUP BY p.id
     ');
@@ -96,8 +95,7 @@ $topPlayers = $pdo->query('
             1
         ) as win_rate
     FROM players p
-    JOIN decks d ON d.player_id = p.id
-    JOIN game_results gr ON gr.deck_id = d.id
+    JOIN game_results gr ON gr.player_id = p.id
     GROUP BY p.id
     HAVING COUNT(DISTINCT gr.game_id) >= 3
     ORDER BY win_rate DESC, wins DESC
@@ -161,7 +159,7 @@ $recentGames = $pdo->query('
     FROM games g
     LEFT JOIN game_results gr ON gr.game_id = g.id AND gr.finish_position = 1
     LEFT JOIN decks d ON gr.deck_id = d.id
-    LEFT JOIN players p ON d.player_id = p.id
+    LEFT JOIN players p ON gr.player_id = p.id
     GROUP BY g.id
     ORDER BY g.played_at DESC, g.id DESC
     LIMIT 10

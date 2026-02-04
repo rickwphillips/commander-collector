@@ -27,7 +27,7 @@ switch ($method) {
                     p.name as player_name
                 FROM game_results gr
                 JOIN decks d ON gr.deck_id = d.id
-                JOIN players p ON d.player_id = p.id
+                JOIN players p ON gr.player_id = p.id
                 WHERE gr.game_id = ?
                 ORDER BY gr.finish_position ASC
             ');
@@ -46,7 +46,7 @@ switch ($method) {
                 FROM games g
                 LEFT JOIN game_results gr ON gr.game_id = g.id AND gr.finish_position = 1
                 LEFT JOIN decks d ON gr.deck_id = d.id
-                LEFT JOIN players p ON d.player_id = p.id
+                LEFT JOIN players p ON gr.player_id = p.id
                 GROUP BY g.id
                 ORDER BY g.played_at DESC, g.id DESC
             ');
@@ -63,7 +63,7 @@ switch ($method) {
                         p.name as player_name
                     FROM game_results gr
                     JOIN decks d ON gr.deck_id = d.id
-                    JOIN players p ON d.player_id = p.id
+                    JOIN players p ON gr.player_id = p.id
                     WHERE gr.game_id = ?
                     ORDER BY gr.finish_position ASC
                 ');
@@ -131,8 +131,8 @@ switch ($method) {
 
             // Insert results
             $resultStmt = $pdo->prepare('
-                INSERT INTO game_results (game_id, deck_id, finish_position, eliminated_turn, team_number)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO game_results (game_id, deck_id, player_id, finish_position, eliminated_turn, team_number)
+                VALUES (?, ?, ?, ?, ?, ?)
             ');
 
             foreach ($data['results'] as $result) {
@@ -140,9 +140,24 @@ switch ($method) {
                     throw new Exception('Invalid result data');
                 }
 
+                // Default player_id to deck owner if not provided
+                $playerId = null;
+                if (!empty($result['player_id'])) {
+                    $playerId = (int)$result['player_id'];
+                } else {
+                    $deckStmt = $pdo->prepare('SELECT player_id FROM decks WHERE id = ?');
+                    $deckStmt->execute([(int)$result['deck_id']]);
+                    $deck = $deckStmt->fetch();
+                    if (!$deck) {
+                        throw new Exception('Deck not found: ' . $result['deck_id']);
+                    }
+                    $playerId = (int)$deck['player_id'];
+                }
+
                 $resultStmt->execute([
                     $gameId,
                     (int)$result['deck_id'],
+                    $playerId,
                     (int)$result['finish_position'],
                     $result['eliminated_turn'] ?? null,
                     $result['team_number'] ?? null

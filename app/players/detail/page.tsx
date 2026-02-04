@@ -194,7 +194,7 @@ export default function PlayerDetailPage() {
           <Grid size={{ xs: 6, sm: 3 }}>
             <StatsCard
               title="Avg. Finish"
-              value={stats.avg_finish_position?.toFixed(2) || '-'}
+              value={stats.avg_finish_position != null ? Number(stats.avg_finish_position).toFixed(2) : '-'}
               color="#CD853F"
             />
           </Grid>

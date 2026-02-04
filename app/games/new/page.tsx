@@ -22,11 +22,12 @@ import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import GroupsIcon from '@mui/icons-material/Groups';
+import ListSubheader from '@mui/material/ListSubheader';
 import { PageContainer } from '../../components/PageContainer';
 import { ColorIdentityChips } from '../../components/ColorIdentityChips';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { api } from '../../lib/api';
-import type { DeckWithPlayer, GameResultInput, GameType } from '../../lib/types';
+import type { Player, DeckWithPlayer, GameResultInput, GameType } from '../../lib/types';
 
 interface DeckOption extends DeckWithPlayer {
   total_games?: number;
@@ -34,6 +35,7 @@ interface DeckOption extends DeckWithPlayer {
 }
 
 interface PlayerResult {
+  player_id: number | '';
   deck_id: number | '';
   finish_position: number;
   eliminated_turn: number | '';
@@ -41,22 +43,23 @@ interface PlayerResult {
 }
 
 const defaultResults: PlayerResult[] = [
-  { deck_id: '', finish_position: 1, eliminated_turn: '', team_number: null },
-  { deck_id: '', finish_position: 2, eliminated_turn: '', team_number: null },
-  { deck_id: '', finish_position: 3, eliminated_turn: '', team_number: null },
-  { deck_id: '', finish_position: 4, eliminated_turn: '', team_number: null },
+  { player_id: '', deck_id: '', finish_position: 1, eliminated_turn: '', team_number: null },
+  { player_id: '', deck_id: '', finish_position: 2, eliminated_turn: '', team_number: null },
+  { player_id: '', deck_id: '', finish_position: 3, eliminated_turn: '', team_number: null },
+  { player_id: '', deck_id: '', finish_position: 4, eliminated_turn: '', team_number: null },
 ];
 
 const default2hgResults: PlayerResult[] = [
-  { deck_id: '', finish_position: 1, eliminated_turn: '', team_number: 1 },
-  { deck_id: '', finish_position: 1, eliminated_turn: '', team_number: 1 },
-  { deck_id: '', finish_position: 2, eliminated_turn: '', team_number: 2 },
-  { deck_id: '', finish_position: 2, eliminated_turn: '', team_number: 2 },
+  { player_id: '', deck_id: '', finish_position: 1, eliminated_turn: '', team_number: 1 },
+  { player_id: '', deck_id: '', finish_position: 1, eliminated_turn: '', team_number: 1 },
+  { player_id: '', deck_id: '', finish_position: 2, eliminated_turn: '', team_number: 2 },
+  { player_id: '', deck_id: '', finish_position: 2, eliminated_turn: '', team_number: 2 },
 ];
 
 export default function NewGamePage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [players, setPlayers] = useState<Player[]>([]);
   const [decks, setDecks] = useState<DeckOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -73,16 +76,20 @@ export default function NewGamePage() {
 
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 0);
-    fetchDecks();
+    fetchData();
     return () => clearTimeout(timer);
   }, []);
 
-  const fetchDecks = async () => {
+  const fetchData = async () => {
     try {
-      const data = await api.getDecks();
-      setDecks(data as DeckOption[]);
+      const [deckData, playerData] = await Promise.all([
+        api.getDecks(),
+        api.getPlayers(),
+      ]);
+      setDecks(deckData as DeckOption[]);
+      setPlayers(playerData);
     } catch {
-      setError('Failed to load decks. Make sure you have decks created first.');
+      setError('Failed to load data. Make sure you have players and decks created first.');
     } finally {
       setLoading(false);
     }
@@ -92,7 +99,7 @@ export default function NewGamePage() {
     if (gameType === 'standard' && results.length < 8) {
       setResults([
         ...results,
-        { deck_id: '', finish_position: results.length + 1, eliminated_turn: '', team_number: null },
+        { player_id: '', deck_id: '', finish_position: results.length + 1, eliminated_turn: '', team_number: null },
       ]);
     }
   };
@@ -113,8 +120,17 @@ export default function NewGamePage() {
     value: number | string | null
   ) => {
     const newResults = [...results];
-    if (field === 'deck_id') {
+    if (field === 'player_id') {
+      newResults[index].player_id = value as number | '';
+    } else if (field === 'deck_id') {
       newResults[index].deck_id = value as number | '';
+      // Auto-fill player to deck owner if no player selected
+      if (value !== '' && newResults[index].player_id === '') {
+        const deck = decks.find(d => d.id === value);
+        if (deck) {
+          newResults[index].player_id = deck.player_id;
+        }
+      }
     } else if (field === 'finish_position') {
       newResults[index].finish_position = value as number;
     } else if (field === 'eliminated_turn') {
@@ -179,6 +195,19 @@ export default function NewGamePage() {
       return;
     }
 
+    // Check for duplicate players
+    const playerIds = validResults.map((r) => r.player_id).filter(id => id !== '');
+    if (new Set(playerIds).size !== playerIds.length) {
+      setError('Each player can only appear once per game');
+      return;
+    }
+
+    // Ensure all slots have a player selected
+    if (validResults.some(r => r.player_id === '')) {
+      setError('Please select a player for each slot');
+      return;
+    }
+
     // 2HG-specific validation
     if (gameType === '2hg') {
       if (validResults.length !== 4) {
@@ -199,6 +228,7 @@ export default function NewGamePage() {
     try {
       const gameResults: GameResultInput[] = validResults.map((r, index) => ({
         deck_id: r.deck_id as number,
+        player_id: r.player_id as number,
         finish_position: gameType === '2hg' ? r.finish_position : index + 1,
         eliminated_turn: r.eliminated_turn === '' ? null : Number(r.eliminated_turn),
         team_number: gameType === '2hg' ? r.team_number : null,
@@ -228,42 +258,91 @@ export default function NewGamePage() {
   if (loading) {
     return (
       <PageContainer title="Log New Game" backHref="/games" backLabel="Back to Games">
-        <LoadingSpinner message="Loading decks..." />
+        <LoadingSpinner message="Loading players and decks..." />
       </PageContainer>
     );
   }
 
-  const renderDeckSelector = (result: PlayerResult, index: number) => {
+  const renderPlayerAndDeckSelector = (result: PlayerResult, index: number) => {
     const selectedDeck = getSelectedDeck(result.deck_id);
+    const selectedPlayerId = result.player_id;
+
+    // Group decks: selected player's decks first, then others
+    const playerDecks = selectedPlayerId !== ''
+      ? decks.filter(d => d.player_id === selectedPlayerId)
+      : [];
+    const otherDecks = selectedPlayerId !== ''
+      ? decks.filter(d => d.player_id !== selectedPlayerId)
+      : decks;
+
     return (
       <>
-        <TextField
-          select
-          label="Deck"
-          value={result.deck_id}
-          onChange={(e) =>
-            updateResult(index, 'deck_id', Number(e.target.value))
-          }
-          fullWidth
-          required
-        >
-          <MenuItem value="">Select a deck</MenuItem>
-          {decks.map((deck) => (
-            <MenuItem
-              key={deck.id}
-              value={deck.id}
-              disabled={results.some(
-                (r, i) => i !== index && r.deck_id === deck.id
-              )}
-            >
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <span>
-                  {deck.name} ({deck.player_name}) - {deck.commander}
-                </span>
-              </Stack>
-            </MenuItem>
-          ))}
-        </TextField>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <TextField
+            select
+            label="Player"
+            value={result.player_id}
+            onChange={(e) =>
+              updateResult(index, 'player_id', e.target.value === '' ? '' : Number(e.target.value))
+            }
+            sx={{ minWidth: 180 }}
+            required
+          >
+            <MenuItem value="">Select a player</MenuItem>
+            {players.map((player) => (
+              <MenuItem
+                key={player.id}
+                value={player.id}
+                disabled={results.some(
+                  (r, i) => i !== index && r.player_id === player.id
+                )}
+              >
+                {player.name}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            select
+            label="Deck"
+            value={result.deck_id}
+            onChange={(e) =>
+              updateResult(index, 'deck_id', Number(e.target.value))
+            }
+            fullWidth
+            required
+          >
+            <MenuItem value="">Select a deck</MenuItem>
+            {playerDecks.length > 0 && (
+              <ListSubheader>Your Decks</ListSubheader>
+            )}
+            {playerDecks.map((deck) => (
+              <MenuItem
+                key={deck.id}
+                value={deck.id}
+                disabled={results.some(
+                  (r, i) => i !== index && r.deck_id === deck.id
+                )}
+              >
+                {deck.name} - {deck.commander}
+              </MenuItem>
+            ))}
+            {playerDecks.length > 0 && otherDecks.length > 0 && (
+              <ListSubheader>Other Decks</ListSubheader>
+            )}
+            {otherDecks.map((deck) => (
+              <MenuItem
+                key={deck.id}
+                value={deck.id}
+                disabled={results.some(
+                  (r, i) => i !== index && r.deck_id === deck.id
+                )}
+              >
+                {deck.name} ({deck.player_name}) - {deck.commander}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Stack>
 
         {selectedDeck && (
           <Stack direction="row" alignItems="center" spacing={2} sx={{ mt: 1 }}>
@@ -335,7 +414,7 @@ export default function NewGamePage() {
 
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                       <Box sx={{ flex: 1 }}>
-                        {renderDeckSelector(result, index)}
+                        {renderPlayerAndDeckSelector(result, index)}
                       </Box>
 
                       {!isWinner && (
@@ -413,7 +492,7 @@ export default function NewGamePage() {
           <Stack spacing={2}>
             {teamResults.map((result) => (
               <Box key={result.originalIndex}>
-                {renderDeckSelector(result, result.originalIndex)}
+                {renderPlayerAndDeckSelector(result, result.originalIndex)}
               </Box>
             ))}
           </Stack>
@@ -468,7 +547,7 @@ export default function NewGamePage() {
                       <MenuItem value={2}>Team 2</MenuItem>
                     </TextField>
                     <Box sx={{ flex: 1 }}>
-                      {renderDeckSelector(result, index)}
+                      {renderPlayerAndDeckSelector(result, index)}
                     </Box>
                   </Stack>
                 </CardContent>
