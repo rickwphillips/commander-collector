@@ -313,7 +313,7 @@ export default function StatsPage() {
           <Card sx={{ mb: 4 }}>
             <CardContent>
               <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
-                Head-to-Head: 1v1
+                Head-to-Head
               </Typography>
 
               <TableContainer>
@@ -384,7 +384,7 @@ export default function StatsPage() {
           <Card>
             <CardContent>
               <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
-                Head-to-Head: Multiplayer
+                Multiplayer
               </Typography>
 
               <TableContainer>
@@ -448,6 +448,31 @@ export default function StatsPage() {
           </Card>
         </Grow>
       )}
+
+      <Grow in={mounted} timeout={1400}>
+          <Card sx={{ mb: 4 }}>
+            <CardContent>
+              <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
+                Coming Soon! 2HG
+              </Typography>
+
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Matchup</TableCell>
+                      <TableCell align="center">Games</TableCell>
+                      <TableCell align="center">Record</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </CardContent>
+          </Card>
+        </Grow>
     </PageContainer>
   );
 }

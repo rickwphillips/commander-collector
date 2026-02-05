@@ -207,7 +207,7 @@ export default function DeckDetailPage() {
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Box>
               <Typography variant="body1" color="text.secondary">
-                Piloted by <strong>{deck.player_name}</strong>
+                Created by <strong>{deck.player_name}</strong>
               </Typography>
             </Box>
             <ColorIdentityChips colors={deck.colors} size="large" />
