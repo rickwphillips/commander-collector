@@ -12,6 +12,7 @@ import {
   Box,
   Grow,
   Alert,
+  Tooltip,
 } from '@mui/material';
 import Link from 'next/link';
 import AddIcon from '@mui/icons-material/Add';
@@ -91,9 +92,15 @@ export default function GamesPage() {
 
             return (
               <Grow key={game.id} in={mounted} timeout={600 + index * 50}>
-                <Card>
-                  <CardActionArea component={Link} href={`/games/detail?id=${game.id}`}>
-                    <CardContent>
+                <Tooltip
+                  title={game.notes || ''}
+                  placement="top"
+                  arrow
+                  disableHoverListener={!game.notes}
+                >
+                  <Card>
+                    <CardActionArea component={Link} href={`/games/detail?id=${game.id}`}>
+                      <CardContent>
                       <Stack
                         direction={{ xs: 'column', sm: 'row' }}
                         justifyContent="space-between"
@@ -153,10 +160,11 @@ export default function GamesPage() {
                             {new Date(game.played_at).toLocaleDateString()}
                           </Typography>
                         </Stack>
-                      </Stack>
-                    </CardContent>
-                  </CardActionArea>
-                </Card>
+                        </Stack>
+                      </CardContent>
+                    </CardActionArea>
+                  </Card>
+                </Tooltip>
               </Grow>
             );
           })}

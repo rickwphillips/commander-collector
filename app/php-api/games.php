@@ -180,36 +180,83 @@ switch ($method) {
 
         $data = getJSONInput();
 
-        // Build dynamic update query
-        $updates = [];
-        $params = [];
+        try {
+            $pdo->beginTransaction();
 
-        if (isset($data['played_at'])) {
-            $updates[] = 'played_at = ?';
-            $params[] = $data['played_at'];
-        }
-        if (array_key_exists('winning_turn', $data)) {
-            $updates[] = 'winning_turn = ?';
-            $params[] = $data['winning_turn'];
-        }
-        if (array_key_exists('notes', $data)) {
-            $updates[] = 'notes = ?';
-            $params[] = $data['notes'];
-        }
+            // Update game fields
+            $updates = [];
+            $params = [];
 
-        if (empty($updates)) {
-            sendError('No fields to update');
+            if (isset($data['played_at'])) {
+                $updates[] = 'played_at = ?';
+                $params[] = $data['played_at'];
+            }
+            if (array_key_exists('winning_turn', $data)) {
+                $updates[] = 'winning_turn = ?';
+                $params[] = $data['winning_turn'];
+            }
+            if (array_key_exists('notes', $data)) {
+                $updates[] = 'notes = ?';
+                $params[] = $data['notes'];
+            }
+            if (isset($data['game_type'])) {
+                $updates[] = 'game_type = ?';
+                $params[] = $data['game_type'];
+            }
+
+            if (!empty($updates)) {
+                $params[] = $id;
+                $stmt = $pdo->prepare('UPDATE games SET ' . implode(', ', $updates) . ' WHERE id = ?');
+                $stmt->execute($params);
+            }
+
+            // If results are provided, replace all existing results
+            if (isset($data['results']) && is_array($data['results'])) {
+                // Delete existing results
+                $deleteStmt = $pdo->prepare('DELETE FROM game_results WHERE game_id = ?');
+                $deleteStmt->execute([$id]);
+
+                // Insert new results
+                $resultStmt = $pdo->prepare('
+                    INSERT INTO game_results (game_id, deck_id, player_id, finish_position, eliminated_turn, team_number)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ');
+
+                foreach ($data['results'] as $result) {
+                    if (empty($result['deck_id']) || !isset($result['finish_position'])) {
+                        throw new Exception('Invalid result data');
+                    }
+
+                    $playerId = null;
+                    if (!empty($result['player_id'])) {
+                        $playerId = (int)$result['player_id'];
+                    } else {
+                        $deckStmt = $pdo->prepare('SELECT player_id FROM decks WHERE id = ?');
+                        $deckStmt->execute([(int)$result['deck_id']]);
+                        $deck = $deckStmt->fetch();
+                        if ($deck) {
+                            $playerId = (int)$deck['player_id'];
+                        }
+                    }
+
+                    $resultStmt->execute([
+                        $id,
+                        (int)$result['deck_id'],
+                        $playerId,
+                        (int)$result['finish_position'],
+                        $result['eliminated_turn'] ?? null,
+                        $result['team_number'] ?? null
+                    ]);
+                }
+            }
+
+            $pdo->commit();
+            sendJSON(['success' => true]);
+
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            sendError('Failed to update game: ' . $e->getMessage(), 500);
         }
-
-        $params[] = $id;
-        $stmt = $pdo->prepare('UPDATE games SET ' . implode(', ', $updates) . ' WHERE id = ?');
-        $stmt->execute($params);
-
-        if ($stmt->rowCount() === 0) {
-            sendError('Game not found', 404);
-        }
-
-        sendJSON(['success' => true]);
         break;
 
     case 'DELETE':

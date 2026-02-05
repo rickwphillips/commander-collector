@@ -1,10 +1,5 @@
-// API base URL - change this for production
-// In production on Bluehost, this will be relative to /projects/commander/api
-const isDev = process.env.NODE_ENV === 'development';
-
-export const API_BASE = isDev
-  ? '/app/php-api/'
-  : '/php-api/';
+// API base URL - works for both dev (proxied via Next.js rewrites) and production
+export const API_BASE = '/php-api/';
 
 // Helper for API calls
 export async function apiFetch<T>(
@@ -80,7 +75,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  updateGame: (id: number, data: { played_at?: string; winning_turn?: number | null; notes?: string | null }) =>
+  updateGame: (id: number, data: Partial<import('./types').CreateGameInput> & { played_at?: string; winning_turn?: number | null; notes?: string | null }) =>
     apiFetch<{ success: boolean }>(`/games?id=${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),

@@ -1,10 +1,22 @@
 <?php
-// Database configuration for Bluehost
-// Update these values with your actual credentials
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'rickwphi_app_commander');
-define('DB_USER', 'rickwphi_app_user');
-define('DB_PASS', 'cSewi_5Kpi6p');
+// Database configuration
+// Detects local dev (PHP built-in server) vs production (Bluehost)
+$isLocalDev = php_sapi_name() === 'cli-server';
+
+if ($isLocalDev) {
+    // Local development - requires local MySQL
+    // Run: mysql -u root < scripts/setup-local-db.sql
+    define('DB_HOST', '127.0.0.1');
+    define('DB_NAME', 'commander_collector');
+    define('DB_USER', 'commander_dev');
+    define('DB_PASS', 'devpassword');
+} else {
+    // Production (Bluehost)
+    define('DB_HOST', 'localhost');
+    define('DB_NAME', 'rickwphi_app_commander');
+    define('DB_USER', 'rickwphi_app_user');
+    define('DB_PASS', 'cSewi_5Kpi6p');
+}
 
 // CORS headers for development
 header('Access-Control-Allow-Origin: *');
