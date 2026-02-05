@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "local-start": "bash ./scripts/start-dev.sh",
+    "local-stop": "bash ./scripts/stop-dev.sh"
+  
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
