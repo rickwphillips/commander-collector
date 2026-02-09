@@ -18,8 +18,8 @@ function getAuthHeaders(): Record<string, string> {
 function redirectToLogin() {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(AUTH_TOKEN_KEY);
-  const currentPath = window.location.pathname;
-  window.location.href = `${LOGIN_URL}?redirect=${encodeURIComponent(currentPath)}`;
+  const currentUrl = window.location.href;
+  window.location.href = `${LOGIN_URL}?redirect=${encodeURIComponent(currentUrl)}`;
 }
 
 // Helper for API calls

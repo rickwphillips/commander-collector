@@ -56,7 +56,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem(AUTH_TOKEN_KEY);
-    const currentPath = window.location.pathname;
+    const currentPath = window.location.href;
     window.location.href = `${LOGIN_URL}?redirect=${encodeURIComponent(currentPath)}`;
   };
 
@@ -78,7 +78,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
 
     if (!token || isTokenExpired(token)) {
       // No valid token - redirect to login
-      const currentPath = window.location.pathname;
+      const currentPath = window.location.href;
       window.location.href = `${LOGIN_URL}?redirect=${encodeURIComponent(currentPath)}`;
       return;
     }

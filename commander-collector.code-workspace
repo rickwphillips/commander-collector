@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "../website/rickwphillips.com"
+		},
+		{
+			"path": ".."
 		}
 	],
 	"settings": {}
