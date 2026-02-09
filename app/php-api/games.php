@@ -1,5 +1,7 @@
 <?php
 require_once 'config.php';
+require_once __DIR__ . '/auth/middleware.php';
+requireAuth();
 
 $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];

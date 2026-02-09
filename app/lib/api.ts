@@ -1,6 +1,27 @@
 // API base URL - works for both dev (proxied via Next.js rewrites) and production
 export const API_BASE = '/php-api/';
 
+// Auth token key (shared with portfolio login page)
+const AUTH_TOKEN_KEY = 'auth_token';
+
+// Login page URL (lives in the portfolio site)
+const LOGIN_URL = process.env.NODE_ENV === 'development'
+  ? 'http://localhost:3000/login/'
+  : '/app/login/';
+
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function redirectToLogin() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  const currentPath = window.location.pathname;
+  window.location.href = `${LOGIN_URL}?redirect=${encodeURIComponent(currentPath)}`;
+}
+
 // Helper for API calls
 export async function apiFetch<T>(
   endpoint: string,
@@ -18,10 +39,16 @@ export async function apiFetch<T>(
   const res = await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
       ...options?.headers,
     },
     ...options,
   });
+
+  if (res.status === 401) {
+    redirectToLogin();
+    throw new Error('Authentication required');
+  }
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: 'Request failed' }));

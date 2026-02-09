@@ -2,3 +2,8 @@
 Order allow,deny
 Allow from all
 </FilesMatch>
+
+# Pass Authorization header to PHP (required for Bluehost/Apache)
+RewriteEngine On
+RewriteCond %{HTTP:Authorization} ^(.*)
+RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]

@@ -1,27 +1,60 @@
 <?php
 // Database configuration
-// Detects local dev (PHP built-in server) vs production (Bluehost)
+// Loads credentials from secrets file outside web root
 $isLocalDev = php_sapi_name() === 'cli-server';
 
-if ($isLocalDev) {
-    // Local development - requires local MySQL
-    // Run: mysql -u root < scripts/setup-local-db.sql
-    define('DB_HOST', '127.0.0.1');
-    define('DB_NAME', 'commander_collector');
-    define('DB_USER', 'commander_dev');
-    define('DB_PASS', 'devpassword');
-} else {
-    // Production (Bluehost)
-    define('DB_HOST', 'localhost');
-    define('DB_NAME', 'rickwphi_app_commander');
-    define('DB_USER', 'rickwphi_app_user');
-    define('DB_PASS', 'cSewi_5Kpi6p');
+// Resolve home directory (HOME not always set under LiteSpeed/Apache)
+$homeDir = $_SERVER['HOME'] ?? getenv('HOME') ?: null;
+if (!$homeDir && isset($_SERVER['DOCUMENT_ROOT'])) {
+    $homeDir = dirname($_SERVER['DOCUMENT_ROOT']);
 }
 
-// CORS headers for development
-header('Access-Control-Allow-Origin: *');
+$secretsFile = $isLocalDev
+    ? $homeDir . '/auth_secrets_dev.php'
+    : $homeDir . '/auth_secrets.php';
+
+if (file_exists($secretsFile)) {
+    require_once $secretsFile;
+} else {
+    // Fallback for backwards compatibility during migration
+    if ($isLocalDev) {
+        define('DB_HOST', '127.0.0.1');
+        define('DB_NAME', 'commander_collector');
+        define('DB_USER', 'commander_dev');
+        define('DB_PASS', 'devpassword');
+        define('AUTH_DB_HOST', '127.0.0.1');
+        define('AUTH_DB_NAME', 'rickwphillips_auth');
+        define('AUTH_DB_USER', 'commander_dev');
+        define('AUTH_DB_PASS', 'devpassword');
+        define('JWT_SECRET', 'local-dev-jwt-secret-change-in-production');
+        define('ALLOWED_ORIGINS', 'http://localhost:3000');
+    } else {
+        // Production should always use secrets file
+        http_response_code(500);
+        echo json_encode(['error' => 'Server configuration error']);
+        exit();
+    }
+}
+
+// Dynamic CORS - check origin against allowed list
+$allowedOrigins = array_map('trim', explode(',', ALLOWED_ORIGINS));
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+
+// Always allow localhost in dev
+if ($isLocalDev) {
+    $allowedOrigins[] = 'http://localhost:3000';
+    $allowedOrigins[] = 'http://localhost:8080';
+}
+
+if (in_array($origin, $allowedOrigins)) {
+    header('Access-Control-Allow-Origin: ' . $origin);
+} elseif ($isLocalDev) {
+    header('Access-Control-Allow-Origin: *');
+}
+
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Credentials: true');
 header('Content-Type: application/json');
 
 // Handle preflight requests

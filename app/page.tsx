@@ -23,6 +23,7 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import AddIcon from '@mui/icons-material/Add';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import { DarkModeToggle } from './components/DarkModeToggle';
+import { LogoutButton } from './components/LogoutButton';
 import { StatsCard } from './components/StatsCard';
 import { ColorIdentityChips } from './components/ColorIdentityChips';
 import { LoadingSpinner } from './components/LoadingSpinner';
@@ -86,6 +87,7 @@ export default function Dashboard() {
 
   return (
     <>
+      <LogoutButton />
       <DarkModeToggle />
       <Container maxWidth="lg" sx={{ py: 4 }}>
         {/* Hero Section */}

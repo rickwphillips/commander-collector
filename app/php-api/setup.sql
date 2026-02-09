@@ -66,3 +66,6 @@ CREATE INDEX idx_games_played_at ON games(played_at);
 
 -- Optional: Insert initial players (customize with your playgroup names)
 -- INSERT INTO players (name) VALUES ('Rick'), ('Player 2'), ('Player 3'), ('Player 4');
+
+-- NOTE: Authentication tables live in a separate database (rickwphi_auth).
+-- See auth/setup.sql for the auth schema.
