@@ -6,7 +6,7 @@ const AUTH_TOKEN_KEY = 'auth_token';
 
 // Login page URL (lives in the portfolio site)
 const LOGIN_URL = process.env.NODE_ENV === 'development'
-  ? 'http://localhost:3000/login/'
+  ? 'http://localhost:3000/app/login/'
   : '/app/login/';
 
 function getAuthHeaders(): Record<string, string> {

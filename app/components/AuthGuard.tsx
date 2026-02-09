@@ -5,7 +5,7 @@ import { Box, CircularProgress, Typography } from '@mui/material';
 
 const AUTH_TOKEN_KEY = 'auth_token';
 const LOGIN_URL = process.env.NODE_ENV === 'development'
-  ? 'http://localhost:3000/login/'
+  ? 'http://localhost:3000/app/login/'
   : '/app/login/';
 
 interface AuthUser {
@@ -61,7 +61,20 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    // Check for token passed via URL param (needed for cross-origin dev flow)
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get('token');
+    if (urlToken) {
+      localStorage.setItem(AUTH_TOKEN_KEY, urlToken);
+      // Clean token from URL without reload
+      params.delete('token');
+      const cleanUrl = params.toString()
+        ? `${window.location.pathname}?${params}`
+        : window.location.pathname;
+      window.history.replaceState({}, '', cleanUrl);
+    }
+
+    const token = urlToken || localStorage.getItem(AUTH_TOKEN_KEY);
 
     if (!token || isTokenExpired(token)) {
       // No valid token - redirect to login
