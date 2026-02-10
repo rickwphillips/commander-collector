@@ -68,7 +68,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  updatePlayer: (id: number, data: Partial<import('./types').CreatePlayerInput>) =>
+  updatePlayer: (id: number, data: Partial<import('./types').CreatePlayerInput> & { user_id?: number | null }) =>
     apiFetch<{ success: boolean }>(`/players?id=${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -122,4 +122,7 @@ export const api = {
       : '';
     return apiFetch<import('./types').HeadToHeadResponse>(`/head-to-head${params}`);
   },
+
+  // Users (admin)
+  getUsers: () => apiFetch<{ id: number; username: string; display_name: string; role: string }[]>('/auth/users'),
 };

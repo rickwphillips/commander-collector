@@ -70,6 +70,14 @@ try {
     sendError('Registration failed', 500);
 }
 
+// Link to player if player_id provided
+$playerId = isset($data['player_id']) ? (int)$data['player_id'] : null;
+if ($playerId) {
+    $appPdo = getDB();
+    $stmt = $appPdo->prepare('UPDATE players SET user_id = ? WHERE id = ? AND user_id IS NULL');
+    $stmt->execute([$userId, $playerId]);
+}
+
 // Auto-login: generate token
 $user = [
     'id' => $userId,

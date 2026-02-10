@@ -26,3 +26,8 @@ CREATE TABLE IF NOT EXISTS auth_invite_codes (
 );
 
 CREATE INDEX idx_auth_invite_codes_code ON auth_invite_codes(code);
+
+-- Migration: Link players to auth users
+-- Run on app DB (rickwphi_app_commander / commander_collector):
+-- ALTER TABLE players ADD COLUMN user_id INT NULL;
+-- UPDATE players SET user_id = 1 WHERE name = "Paul's Mom";

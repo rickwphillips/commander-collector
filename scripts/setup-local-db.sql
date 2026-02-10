@@ -8,6 +8,7 @@ USE commander_collector;
 CREATE TABLE IF NOT EXISTS players (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
+  user_id INT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

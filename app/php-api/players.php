@@ -68,11 +68,25 @@ switch ($method) {
             sendError('Name is required');
         }
 
-        $stmt = $pdo->prepare('UPDATE players SET name = ? WHERE id = ?');
-        $stmt->execute([trim($data['name']), $id]);
+        $fields = ['name = ?'];
+        $params = [trim($data['name'])];
+
+        if (array_key_exists('user_id', $data)) {
+            $fields[] = 'user_id = ?';
+            $params[] = $data['user_id'] !== null ? (int)$data['user_id'] : null;
+        }
+
+        $params[] = $id;
+        $stmt = $pdo->prepare('UPDATE players SET ' . implode(', ', $fields) . ' WHERE id = ?');
+        $stmt->execute($params);
 
         if ($stmt->rowCount() === 0) {
-            sendError('Player not found', 404);
+            // Check if player exists (row may exist but values unchanged)
+            $check = $pdo->prepare('SELECT id FROM players WHERE id = ?');
+            $check->execute([$id]);
+            if (!$check->fetch()) {
+                sendError('Player not found', 404);
+            }
         }
 
         sendJSON(['success' => true]);

@@ -13,6 +13,7 @@ interface AuthUser {
   username: string;
   display_name: string;
   role: 'admin' | 'user';
+  player?: { id: number; name: string } | null;
 }
 
 interface AuthContextType {

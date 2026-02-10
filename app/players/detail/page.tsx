@@ -19,6 +19,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Autocomplete,
 } from '@mui/material';
 import Link from 'next/link';
 import EditIcon from '@mui/icons-material/Edit';
@@ -30,6 +31,7 @@ import { StatsCard } from '../../components/StatsCard';
 import { ColorIdentityChips } from '../../components/ColorIdentityChips';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
+import { useAuth } from '../../components/AuthGuard';
 import { api } from '../../lib/api';
 import type { Player, Deck, PlayerStats } from '../../lib/types';
 
@@ -39,9 +41,17 @@ interface DeckWithStats extends Deck {
   player_name: string;
 }
 
+interface UserOption {
+  id: number;
+  username: string;
+  display_name: string;
+  role: string;
+}
+
 export default function PlayerDetailPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user: currentUser } = useAuth();
   const playerId = Number(searchParams.get('id'));
 
   const [mounted, setMounted] = useState(false);
@@ -54,6 +64,8 @@ export default function PlayerDetailPage() {
   // Edit state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editName, setEditName] = useState('');
+  const [editUserId, setEditUserId] = useState<number | null>(null);
+  const [users, setUsers] = useState<UserOption[]>([]);
   const [saving, setSaving] = useState(false);
 
   // Delete state
@@ -67,8 +79,12 @@ export default function PlayerDetailPage() {
     } else {
       setLoading(false);
     }
+    // Fetch users list for admin user dropdown
+    if (currentUser?.role === 'admin') {
+      api.getUsers().then(setUsers).catch(() => {});
+    }
     return () => clearTimeout(timer);
-  }, [playerId]);
+  }, [playerId, currentUser?.role]);
 
   const fetchData = async () => {
     try {
@@ -90,6 +106,7 @@ export default function PlayerDetailPage() {
 
   const handleEdit = () => {
     setEditName(player?.name || '');
+    setEditUserId(player?.user_id ?? null);
     setEditDialogOpen(true);
   };
 
@@ -98,8 +115,12 @@ export default function PlayerDetailPage() {
 
     setSaving(true);
     try {
-      await api.updatePlayer(playerId, { name: editName.trim() });
-      setPlayer({ ...player!, name: editName.trim() });
+      const updateData: { name: string; user_id?: number | null } = { name: editName.trim() };
+      if (currentUser?.role === 'admin') {
+        updateData.user_id = editUserId;
+      }
+      await api.updatePlayer(playerId, updateData);
+      setPlayer({ ...player!, name: editName.trim(), user_id: editUserId });
       setEditDialogOpen(false);
     } catch {
       setError('Failed to update player');
@@ -276,6 +297,22 @@ export default function PlayerDetailPage() {
             onKeyDown={(e) => e.key === 'Enter' && handleSave()}
             sx={{ mt: 1 }}
           />
+          {currentUser?.role === 'admin' && users.length > 0 && (
+            <Autocomplete
+              options={users}
+              getOptionLabel={(option) => `${option.display_name} (${option.username})`}
+              value={users.find((u) => u.id === editUserId) || null}
+              onChange={(_, newValue) => setEditUserId(newValue ? newValue.id : null)}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Associated User"
+                  helperText="Link this player to an auth user account"
+                />
+              )}
+              sx={{ mt: 2 }}
+            />
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>

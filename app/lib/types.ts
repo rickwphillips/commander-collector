@@ -5,6 +5,7 @@ export type GameType = 'standard' | '2hg';
 export interface Player {
   id: number;
   name: string;
+  user_id: number | null;
   created_at: string;
 }
 

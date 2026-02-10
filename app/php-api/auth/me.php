@@ -18,13 +18,26 @@ if (!$dbUser) {
     sendError('User not found or inactive', 401);
 }
 
-sendJSON([
-    'user' => [
-        'id' => (int)$dbUser['id'],
-        'username' => $dbUser['username'],
-        'display_name' => $dbUser['display_name'],
-        'role' => $dbUser['role'],
-        'created_at' => $dbUser['created_at'],
-        'last_login' => $dbUser['last_login'],
-    ],
-]);
+// Check for linked player in app DB
+$appPdo = getDB();
+$playerStmt = $appPdo->prepare('SELECT id, name FROM players WHERE user_id = ?');
+$playerStmt->execute([(int)$dbUser['id']]);
+$linkedPlayer = $playerStmt->fetch();
+
+$userData = [
+    'id' => (int)$dbUser['id'],
+    'username' => $dbUser['username'],
+    'display_name' => $dbUser['display_name'],
+    'role' => $dbUser['role'],
+    'created_at' => $dbUser['created_at'],
+    'last_login' => $dbUser['last_login'],
+];
+
+if ($linkedPlayer) {
+    $userData['player'] = [
+        'id' => (int)$linkedPlayer['id'],
+        'name' => $linkedPlayer['name'],
+    ];
+}
+
+sendJSON(['user' => $userData]);
