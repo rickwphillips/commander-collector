@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
       ? [
           {
             source: '/php-api/:path*',
-            destination: 'http://localhost:8080/php-api/:path*',
+            destination: 'http://localhost:8081/php-api/:path*',
           },
         ]
       : [];
