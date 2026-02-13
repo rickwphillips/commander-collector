@@ -27,6 +27,7 @@ import AcUnitIcon from '@mui/icons-material/AcUnit';
 import PaletteIcon from '@mui/icons-material/Palette';
 import GroupsIcon from '@mui/icons-material/Groups';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import HandshakeIcon from '@mui/icons-material/Handshake';
 import { PageContainer } from '../components/PageContainer';
 import { StatsCard } from '../components/StatsCard';
 import { ColorIdentityChips } from '../components/ColorIdentityChips';
@@ -462,30 +463,154 @@ export default function StatsPage() {
         </Grow>
       )}
 
-      <Grow in={mounted} timeout={1400}>
+      {/* Two-Headed Giant */}
+      {advancedStats && advancedStats.twoHgStats && advancedStats.twoHgStats.teamPairings.length > 0 && (
+        <Grow in={mounted} timeout={1800}>
           <Card sx={{ mb: 4 }}>
             <CardContent>
-              <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
-                Coming Soon! 2HG
-              </Typography>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
+                <HandshakeIcon color="primary" />
+                <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                  Two-Headed Giant
+                </Typography>
+              </Stack>
 
-              <TableContainer>
+              {/* Team Pairings */}
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                Team Records
+              </Typography>
+              <TableContainer sx={{ mb: 3 }}>
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Matchup</TableCell>
+                      <TableCell>Team</TableCell>
                       <TableCell align="center">Games</TableCell>
-                      <TableCell align="center">Record</TableCell>
+                      <TableCell align="center">Wins</TableCell>
+                      <TableCell align="right">Win Rate</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
+                    {advancedStats.twoHgStats.teamPairings.map((team, i) => (
+                      <TableRow key={`${team.player1_id}-${team.player2_id}`}>
+                        <TableCell>
+                          <Stack direction="row" alignItems="center" spacing={0.5}>
+                            {i === 0 && (
+                              <EmojiEventsIcon sx={{ color: '#DAA520', fontSize: 20 }} />
+                            )}
+                            <Typography sx={{ fontWeight: i === 0 ? 600 : 400 }}>
+                              {team.player1_name} & {team.player2_name}
+                            </Typography>
+                          </Stack>
+                        </TableCell>
+                        <TableCell align="center">{team.total_games}</TableCell>
+                        <TableCell align="center">{team.wins}</TableCell>
+                        <TableCell align="right">
+                          <Stack direction="row" alignItems="center" spacing={1} justifyContent="flex-end">
+                            <Box sx={{ width: 60 }}>
+                              <LinearProgress
+                                variant="determinate"
+                                value={Number(team.win_rate) || 0}
+                                sx={{
+                                  height: 8,
+                                  borderRadius: 4,
+                                  backgroundColor: 'action.hover',
+                                  '& .MuiLinearProgress-bar': {
+                                    backgroundColor: '#DAA520',
+                                  },
+                                }}
+                              />
+                            </Box>
+                            <Typography variant="body2" sx={{ minWidth: 45 }}>
+                              {Number(team.win_rate).toFixed(1)}%
+                            </Typography>
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
 
+              {/* Individual 2HG Records */}
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                Individual 2HG Records
+              </Typography>
+              <TableContainer sx={{ mb: 3 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Player</TableCell>
+                      <TableCell align="center">Games</TableCell>
+                      <TableCell align="center">Wins</TableCell>
+                      <TableCell align="right">Win Rate</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {advancedStats.twoHgStats.players.map((p) => (
+                      <TableRow key={p.player_id}>
+                        <TableCell>
+                          <Typography sx={{ fontWeight: 500 }}>{p.player_name}</Typography>
+                        </TableCell>
+                        <TableCell align="center">{p.total_games}</TableCell>
+                        <TableCell align="center">{p.wins}</TableCell>
+                        <TableCell align="right">
+                          {Number(p.win_rate).toFixed(1)}%
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+
+              {/* Recent 2HG Games */}
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                Recent 2HG Games
+              </Typography>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Date</TableCell>
+                      <TableCell>Winning Team</TableCell>
+                      <TableCell>Decks</TableCell>
+                      <TableCell align="center">Turn</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {advancedStats.twoHgStats.recentGames.map((game) => (
+                      <TableRow key={game.id}>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {new Date(game.played_at).toLocaleDateString()}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Stack direction="row" alignItems="center" spacing={0.5}>
+                            <EmojiEventsIcon sx={{ color: '#DAA520', fontSize: 16 }} />
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {game.winners}
+                            </Typography>
+                          </Stack>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" color="text.secondary">
+                            {game.winning_decks}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          {game.winning_turn && (
+                            <Chip label={`T${game.winning_turn}`} size="small" variant="outlined" />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </TableContainer>
             </CardContent>
           </Card>
         </Grow>
+      )}
 
       {/* === ADVANCED STATS === */}
 

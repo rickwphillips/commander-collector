@@ -40,6 +40,18 @@ const changeTypeConfig: Record<ChangeType, { label: string; color: string; icon:
 
 const releases: Release[] = [
   {
+    version: '1.3.0',
+    date: '2026-02-12',
+    title: 'Two-Headed Giant Stats',
+    changes: [
+      { type: 'added', text: 'Two-Headed Giant stats section on stats page' },
+      { type: 'added', text: 'Team pairing records — wins, games, and win rate per duo' },
+      { type: 'added', text: 'Individual player 2HG records' },
+      { type: 'added', text: 'Recent 2HG game history with winning team and decks' },
+      { type: 'changed', text: 'Replaced "Coming Soon! 2HG" placeholder with live data' },
+    ],
+  },
+  {
     version: '1.2.0',
     date: '2026-02-12',
     title: 'Deck Filtering & Advanced Stats',

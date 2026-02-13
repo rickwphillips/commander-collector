@@ -187,11 +187,45 @@ export interface DeckStreak {
   trend: 'hot' | 'cold' | 'steady';
 }
 
+export interface TwoHgPlayerStats {
+  player_id: number;
+  player_name: string;
+  total_games: number;
+  wins: number;
+  win_rate: number;
+}
+
+export interface TwoHgTeamPairing {
+  player1_id: number;
+  player1_name: string;
+  player2_id: number;
+  player2_name: string;
+  total_games: number;
+  wins: number;
+  win_rate: number;
+}
+
+export interface TwoHgRecentGame {
+  id: number;
+  played_at: string;
+  winning_turn: number | null;
+  notes: string | null;
+  winners: string;
+  winning_decks: string;
+}
+
+export interface TwoHgStats {
+  players: TwoHgPlayerStats[];
+  teamPairings: TwoHgTeamPairing[];
+  recentGames: TwoHgRecentGame[];
+}
+
 export interface AdvancedStatsResponse {
   colorMeta: ColorMetaStats[];
   gameSizeStats: GameSizeStats[];
   playerStreaks: PlayerStreak[];
   deckStreaks: DeckStreak[];
+  twoHgStats: TwoHgStats;
 }
 
 // MTG color identity
