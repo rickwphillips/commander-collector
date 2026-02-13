@@ -41,7 +41,7 @@ const changeTypeConfig: Record<ChangeType, { label: string; color: string; icon:
 const releases: Release[] = [
   {
     version: '1.3.0',
-    date: '2026-02-12',
+    date: '2026-02-13',
     title: 'Two-Headed Giant Stats',
     changes: [
       { type: 'added', text: 'Two-Headed Giant stats section on stats page' },
