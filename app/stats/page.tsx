@@ -17,22 +17,33 @@ import {
   TableHead,
   TableRow,
   LinearProgress,
+  Chip,
 } from '@mui/material';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import StyleIcon from '@mui/icons-material/Style';
 import PeopleIcon from '@mui/icons-material/People';
+import WhatshotIcon from '@mui/icons-material/Whatshot';
+import AcUnitIcon from '@mui/icons-material/AcUnit';
+import PaletteIcon from '@mui/icons-material/Palette';
+import GroupsIcon from '@mui/icons-material/Groups';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { PageContainer } from '../components/PageContainer';
 import { StatsCard } from '../components/StatsCard';
 import { ColorIdentityChips } from '../components/ColorIdentityChips';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
 import { api } from '../lib/api';
-import type { StatsResponse, HeadToHeadRecord, HeadToHeadResponse } from '../lib/types';
+import type {
+  StatsResponse,
+  HeadToHeadResponse,
+  AdvancedStatsResponse,
+} from '../lib/types';
 
 export default function StatsPage() {
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [headToHead, setHeadToHead] = useState<HeadToHeadResponse>({ twoPlayer: [], multiplayer: [] });
+  const [advancedStats, setAdvancedStats] = useState<AdvancedStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,12 +55,14 @@ export default function StatsPage() {
 
   const fetchStats = async () => {
     try {
-      const [statsData, h2hData] = await Promise.all([
+      const [statsData, h2hData, advData] = await Promise.all([
         api.getStats(),
         api.getHeadToHead(),
+        api.getAdvancedStats(),
       ]);
       setStats(statsData);
       setHeadToHead(h2hData);
+      setAdvancedStats(advData);
     } catch {
       setError('Failed to load stats');
     } finally {
@@ -381,7 +394,7 @@ export default function StatsPage() {
       {/* Head to Head - Multiplayer */}
       {headToHead.multiplayer.length > 0 && (
         <Grow in={mounted} timeout={1600}>
-          <Card>
+          <Card sx={{ mb: 4 }}>
             <CardContent>
               <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
                 Multiplayer
@@ -466,13 +479,345 @@ export default function StatsPage() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    
+
                   </TableBody>
                 </Table>
               </TableContainer>
             </CardContent>
           </Card>
         </Grow>
+
+      {/* === ADVANCED STATS === */}
+
+      {/* Color Meta Analysis */}
+      {advancedStats && advancedStats.colorMeta.length > 0 && (
+        <Grow in={mounted} timeout={1800}>
+          <Card sx={{ mb: 4 }}>
+            <CardContent>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
+                <PaletteIcon color="primary" />
+                <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                  Color Meta Analysis
+                </Typography>
+              </Stack>
+
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Colors</TableCell>
+                      <TableCell align="center">Decks</TableCell>
+                      <TableCell align="center">Games</TableCell>
+                      <TableCell align="center">Wins</TableCell>
+                      <TableCell align="right">Win Rate</TableCell>
+                      <TableCell align="right">Avg Position</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {advancedStats.colorMeta.map((row) => (
+                      <TableRow key={row.colors}>
+                        <TableCell>
+                          <ColorIdentityChips colors={row.colors} size="small" />
+                        </TableCell>
+                        <TableCell align="center">{row.deck_count}</TableCell>
+                        <TableCell align="center">{row.total_games}</TableCell>
+                        <TableCell align="center">{row.wins}</TableCell>
+                        <TableCell align="right">
+                          <Stack direction="row" alignItems="center" spacing={1} justifyContent="flex-end">
+                            <Box sx={{ width: 60 }}>
+                              <LinearProgress
+                                variant="determinate"
+                                value={Number(row.win_rate) || 0}
+                                sx={{
+                                  height: 8,
+                                  borderRadius: 4,
+                                  backgroundColor: 'action.hover',
+                                  '& .MuiLinearProgress-bar': {
+                                    backgroundColor: '#D2691E',
+                                  },
+                                }}
+                              />
+                            </Box>
+                            <Typography variant="body2" sx={{ minWidth: 45 }}>
+                              {Number(row.win_rate).toFixed(1)}%
+                            </Typography>
+                          </Stack>
+                        </TableCell>
+                        <TableCell align="right">
+                          {Number(row.avg_finish_position).toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </CardContent>
+          </Card>
+        </Grow>
+      )}
+
+      {/* Performance by Pod Size */}
+      {advancedStats && advancedStats.gameSizeStats.length > 0 && (
+        <Grow in={mounted} timeout={2000}>
+          <Card sx={{ mb: 4 }}>
+            <CardContent>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
+                <GroupsIcon color="primary" />
+                <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                  Performance by Pod Size
+                </Typography>
+              </Stack>
+
+              {advancedStats.gameSizeStats.map((pod) => (
+                <Box key={pod.pod_size} sx={{ mb: 3 }}>
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+                    <Chip
+                      label={`${pod.pod_size}-Player`}
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                    />
+                    <Typography variant="body2" color="text.secondary">
+                      ({pod.total_games} games)
+                    </Typography>
+                  </Stack>
+
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Player</TableCell>
+                          <TableCell align="center">Games</TableCell>
+                          <TableCell align="center">Wins</TableCell>
+                          <TableCell align="right">Win Rate</TableCell>
+                          <TableCell align="right">Avg Position</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {pod.entries.map((entry) => (
+                          <TableRow key={entry.player_id}>
+                            <TableCell>{entry.player_name}</TableCell>
+                            <TableCell align="center">{entry.games_played}</TableCell>
+                            <TableCell align="center">{entry.wins}</TableCell>
+                            <TableCell align="right">
+                              <Stack direction="row" alignItems="center" spacing={1} justifyContent="flex-end">
+                                <Box sx={{ width: 50 }}>
+                                  <LinearProgress
+                                    variant="determinate"
+                                    value={Number(entry.win_rate) || 0}
+                                    sx={{
+                                      height: 6,
+                                      borderRadius: 3,
+                                      backgroundColor: 'action.hover',
+                                      '& .MuiLinearProgress-bar': {
+                                        backgroundColor: '#CD853F',
+                                      },
+                                    }}
+                                  />
+                                </Box>
+                                <Typography variant="body2" sx={{ minWidth: 40 }}>
+                                  {Number(entry.win_rate).toFixed(1)}%
+                                </Typography>
+                              </Stack>
+                            </TableCell>
+                            <TableCell align="right">
+                              {Number(entry.avg_finish_position).toFixed(2)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              ))}
+            </CardContent>
+          </Card>
+        </Grow>
+      )}
+
+      {/* Player Streaks & Form */}
+      {advancedStats && advancedStats.playerStreaks.length > 0 && (
+        <Grow in={mounted} timeout={2200}>
+          <Card sx={{ mb: 4 }}>
+            <CardContent>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
+                <TrendingUpIcon color="primary" />
+                <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                  Player Streaks & Form
+                </Typography>
+              </Stack>
+
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Player</TableCell>
+                      <TableCell align="center">Streak</TableCell>
+                      <TableCell align="center">Best Streak</TableCell>
+                      <TableCell align="center">Last 5</TableCell>
+                      <TableCell align="right">Overall</TableCell>
+                      <TableCell align="center">Trend</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {advancedStats.playerStreaks.map((p) => (
+                      <TableRow key={p.player_id}>
+                        <TableCell>
+                          <Typography sx={{ fontWeight: 500 }}>{p.player_name}</Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={`${p.current_streak_type}${p.current_streak}`}
+                            size="small"
+                            sx={{
+                              fontWeight: 700,
+                              backgroundColor: p.current_streak_type === 'W' ? '#2e7d32' : '#c62828',
+                              color: '#fff',
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            icon={<EmojiEventsIcon sx={{ fontSize: 16 }} />}
+                            label={`W${p.longest_win_streak}`}
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          {p.last_5_wins}/{p.last_5_games}
+                        </TableCell>
+                        <TableCell align="right">
+                          {Number(p.overall_win_rate).toFixed(1)}%
+                        </TableCell>
+                        <TableCell align="center">
+                          {p.trend === 'hot' && (
+                            <Chip
+                              icon={<WhatshotIcon sx={{ fontSize: 16 }} />}
+                              label="Hot"
+                              size="small"
+                              sx={{ backgroundColor: '#ff5722', color: '#fff' }}
+                            />
+                          )}
+                          {p.trend === 'cold' && (
+                            <Chip
+                              icon={<AcUnitIcon sx={{ fontSize: 16 }} />}
+                              label="Cold"
+                              size="small"
+                              sx={{ backgroundColor: '#1565c0', color: '#fff' }}
+                            />
+                          )}
+                          {p.trend === 'steady' && (
+                            <Chip label="Steady" size="small" variant="outlined" />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </CardContent>
+          </Card>
+        </Grow>
+      )}
+
+      {/* Deck Streaks & Form */}
+      {advancedStats && advancedStats.deckStreaks.length > 0 && (
+        <Grow in={mounted} timeout={2400}>
+          <Card sx={{ mb: 4 }}>
+            <CardContent>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
+                <TrendingUpIcon color="primary" />
+                <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                  Deck Streaks & Form
+                </Typography>
+              </Stack>
+
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Deck</TableCell>
+                      <TableCell>Player</TableCell>
+                      <TableCell align="center">Streak</TableCell>
+                      <TableCell align="center">Best Streak</TableCell>
+                      <TableCell align="center">Last 5</TableCell>
+                      <TableCell align="right">Overall</TableCell>
+                      <TableCell align="center">Trend</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {advancedStats.deckStreaks.map((d) => (
+                      <TableRow key={d.deck_id}>
+                        <TableCell>
+                          <Stack direction="row" alignItems="center" spacing={1}>
+                            <ColorIdentityChips colors={d.colors} size="small" />
+                            <Box>
+                              <Typography sx={{ fontWeight: 500 }}>{d.deck_name}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {d.commander}
+                              </Typography>
+                            </Box>
+                          </Stack>
+                        </TableCell>
+                        <TableCell>{d.player_name}</TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={`${d.current_streak_type}${d.current_streak}`}
+                            size="small"
+                            sx={{
+                              fontWeight: 700,
+                              backgroundColor: d.current_streak_type === 'W' ? '#2e7d32' : '#c62828',
+                              color: '#fff',
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            icon={<EmojiEventsIcon sx={{ fontSize: 16 }} />}
+                            label={`W${d.longest_win_streak}`}
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          {d.last_5_wins}/{d.last_5_games}
+                        </TableCell>
+                        <TableCell align="right">
+                          {Number(d.overall_win_rate).toFixed(1)}%
+                        </TableCell>
+                        <TableCell align="center">
+                          {d.trend === 'hot' && (
+                            <Chip
+                              icon={<WhatshotIcon sx={{ fontSize: 16 }} />}
+                              label="Hot"
+                              size="small"
+                              sx={{ backgroundColor: '#ff5722', color: '#fff' }}
+                            />
+                          )}
+                          {d.trend === 'cold' && (
+                            <Chip
+                              icon={<AcUnitIcon sx={{ fontSize: 16 }} />}
+                              label="Cold"
+                              size="small"
+                              sx={{ backgroundColor: '#1565c0', color: '#fff' }}
+                            />
+                          )}
+                          {d.trend === 'steady' && (
+                            <Chip label="Steady" size="small" variant="outlined" />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </CardContent>
+          </Card>
+        </Grow>
+      )}
     </PageContainer>
   );
 }

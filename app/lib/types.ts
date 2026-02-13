@@ -132,6 +132,68 @@ export interface RecentGame {
   game_type: GameType;
 }
 
+// Advanced stats types
+export interface ColorMetaStats {
+  colors: string;
+  color_count: number;
+  deck_count: number;
+  total_games: number;
+  wins: number;
+  win_rate: number;
+  avg_finish_position: number;
+}
+
+export interface GameSizeEntry {
+  player_id: number;
+  player_name: string;
+  games_played: number;
+  wins: number;
+  win_rate: number;
+  avg_finish_position: number;
+}
+
+export interface GameSizeStats {
+  pod_size: number;
+  total_games: number;
+  entries: GameSizeEntry[];
+}
+
+export interface PlayerStreak {
+  player_id: number;
+  player_name: string;
+  current_streak: number;
+  current_streak_type: 'W' | 'L';
+  longest_win_streak: number;
+  last_5_wins: number;
+  last_5_games: number;
+  overall_win_rate: number;
+  recent_win_rate: number;
+  trend: 'hot' | 'cold' | 'steady';
+}
+
+export interface DeckStreak {
+  deck_id: number;
+  deck_name: string;
+  commander: string;
+  colors: string;
+  player_name: string;
+  current_streak: number;
+  current_streak_type: 'W' | 'L';
+  longest_win_streak: number;
+  last_5_wins: number;
+  last_5_games: number;
+  overall_win_rate: number;
+  recent_win_rate: number;
+  trend: 'hot' | 'cold' | 'steady';
+}
+
+export interface AdvancedStatsResponse {
+  colorMeta: ColorMetaStats[];
+  gameSizeStats: GameSizeStats[];
+  playerStreaks: PlayerStreak[];
+  deckStreaks: DeckStreak[];
+}
+
 // MTG color identity
 export type MtgColor = 'W' | 'U' | 'B' | 'R' | 'G';
 

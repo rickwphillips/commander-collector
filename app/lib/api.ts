@@ -123,6 +123,9 @@ export const api = {
     return apiFetch<import('./types').HeadToHeadResponse>(`/head-to-head${params}`);
   },
 
+  // Advanced Stats
+  getAdvancedStats: () => apiFetch<import('./types').AdvancedStatsResponse>('/advanced-stats'),
+
   // Users (admin)
   getUsers: () => apiFetch<{ id: number; username: string; display_name: string; role: string }[]>('/auth/users'),
 };
