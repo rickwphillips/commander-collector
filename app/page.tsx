@@ -112,6 +112,18 @@ export default function Dashboard() {
             <Typography variant="h6" color="text.secondary">
               Track your Magic: The Gathering Commander games
             </Typography>
+            <Chip
+              component={Link}
+              href="/changelog"
+              label="v1.2.0"
+              size="small"
+              clickable
+              sx={{
+                mt: 1,
+                fontWeight: 600,
+                backgroundColor: 'action.selected',
+              }}
+            />
           </Box>
         </Fade>
 
