@@ -16,7 +16,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  LinearProgress,
+  TableSortLabel,
   Chip,
 } from '@mui/material';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
@@ -40,6 +40,9 @@ import type {
   AdvancedStatsResponse,
 } from '../lib/types';
 
+type SortDirection = 'asc' | 'desc';
+type SortConfig = { key: string; direction: SortDirection };
+
 export default function StatsPage() {
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<StatsResponse | null>(null);
@@ -47,6 +50,7 @@ export default function StatsPage() {
   const [advancedStats, setAdvancedStats] = useState<AdvancedStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortConfigs, setSortConfigs] = useState<Record<string, SortConfig>>({});
 
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 0);
@@ -70,6 +74,45 @@ export default function StatsPage() {
       setLoading(false);
     }
   };
+
+  const handleSort = (table: string, key: string) => {
+    setSortConfigs(prev => ({
+      ...prev,
+      [table]: {
+        key,
+        direction: prev[table]?.key === key && prev[table]?.direction === 'desc' ? 'asc' : 'desc',
+      },
+    }));
+  };
+
+  const sortData = <T,>(table: string, data: T[]): T[] => {
+    const config = sortConfigs[table];
+    if (!config) return data;
+    return [...data].sort((a, b) => {
+      const rec = a as Record<string, unknown>;
+      const rec2 = b as Record<string, unknown>;
+      const aVal = rec[config.key];
+      const bVal = rec2[config.key];
+      const aNum = Number(aVal);
+      const bNum = Number(bVal);
+      if (!isNaN(aNum) && !isNaN(bNum) && aVal !== '' && aVal !== null && bVal !== '' && bVal !== null) {
+        return config.direction === 'asc' ? aNum - bNum : bNum - aNum;
+      }
+      const aStr = String(aVal ?? '');
+      const bStr = String(bVal ?? '');
+      return config.direction === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
+    });
+  };
+
+  const sortHeader = (table: string, key: string, label: string) => (
+    <TableSortLabel
+      active={sortConfigs[table]?.key === key}
+      direction={sortConfigs[table]?.key === key ? sortConfigs[table].direction : 'desc'}
+      onClick={() => handleSort(table, key)}
+    >
+      {label}
+    </TableSortLabel>
+  );
 
   if (loading) {
     return (
@@ -154,21 +197,21 @@ export default function StatsPage() {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Player</TableCell>
-                      <TableCell align="center">Games</TableCell>
-                      <TableCell align="center">Wins</TableCell>
-                      <TableCell align="right">Win Rate</TableCell>
+                      <TableCell>{sortHeader('players', 'player_name', 'Player')}</TableCell>
+                      <TableCell align="center">{sortHeader('players', 'total_games', 'Games')}</TableCell>
+                      <TableCell align="center">{sortHeader('players', 'wins', 'Wins')}</TableCell>
+                      <TableCell align="right">{sortHeader('players', 'win_rate', 'Win Rate')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {stats.topPlayers.map((player, index) => (
+                    {sortData('players', stats.topPlayers).map((player, index) => (
                       <TableRow key={player.player_id}>
                         <TableCell>
                           <Stack direction="row" alignItems="center" spacing={1}>
-                            {index === 0 && (
+                            {index === 0 && !sortConfigs['players'] && (
                               <EmojiEventsIcon sx={{ color: '#DAA520', fontSize: 20 }} />
                             )}
-                            <Typography sx={{ fontWeight: index === 0 ? 600 : 400 }}>
+                            <Typography sx={{ fontWeight: index === 0 && !sortConfigs['players'] ? 600 : 400 }}>
                               {player.player_name}
                             </Typography>
                           </Stack>
@@ -176,25 +219,7 @@ export default function StatsPage() {
                         <TableCell align="center">{player.total_games}</TableCell>
                         <TableCell align="center">{player.wins}</TableCell>
                         <TableCell align="right">
-                          <Stack direction="row" alignItems="center" spacing={1} justifyContent="flex-end">
-                            <Box sx={{ width: 60 }}>
-                              <LinearProgress
-                                variant="determinate"
-                                value={player.win_rate || 0}
-                                sx={{
-                                  height: 8,
-                                  borderRadius: 4,
-                                  backgroundColor: 'action.hover',
-                                  '& .MuiLinearProgress-bar': {
-                                    backgroundColor: '#DAA520',
-                                  },
-                                }}
-                              />
-                            </Box>
-                            <Typography variant="body2" sx={{ minWidth: 45 }}>
-                              {Number(player.win_rate).toFixed(1)}%
-                            </Typography>
-                          </Stack>
+                          {Number(player.win_rate).toFixed(1)}%
                         </TableCell>
                       </TableRow>
                     ))}
@@ -225,20 +250,20 @@ export default function StatsPage() {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Deck</TableCell>
-                      <TableCell>Commander</TableCell>
-                      <TableCell>Player</TableCell>
-                      <TableCell align="center">Games</TableCell>
-                      <TableCell align="right">Win Rate</TableCell>
+                      <TableCell>{sortHeader('decks', 'deck_name', 'Deck')}</TableCell>
+                      <TableCell>{sortHeader('decks', 'commander', 'Commander')}</TableCell>
+                      <TableCell>{sortHeader('decks', 'player_name', 'Player')}</TableCell>
+                      <TableCell align="center">{sortHeader('decks', 'total_games', 'Games')}</TableCell>
+                      <TableCell align="right">{sortHeader('decks', 'win_rate', 'Win Rate')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {stats.topDecks.map((deck, index) => (
+                    {sortData('decks', stats.topDecks).map((deck, index) => (
                       <TableRow key={deck.deck_id}>
                         <TableCell>
                           <Stack direction="row" alignItems="center" spacing={1}>
                             <ColorIdentityChips colors={deck.colors} size="small" />
-                            <Typography sx={{ fontWeight: index === 0 ? 600 : 400 }}>
+                            <Typography sx={{ fontWeight: index === 0 && !sortConfigs['decks'] ? 600 : 400 }}>
                               {deck.deck_name}
                             </Typography>
                           </Stack>
@@ -247,25 +272,7 @@ export default function StatsPage() {
                         <TableCell>{deck.player_name}</TableCell>
                         <TableCell align="center">{deck.total_games}</TableCell>
                         <TableCell align="right">
-                          <Stack direction="row" alignItems="center" spacing={1} justifyContent="flex-end">
-                            <Box sx={{ width: 60 }}>
-                              <LinearProgress
-                                variant="determinate"
-                                value={deck.win_rate || 0}
-                                sx={{
-                                  height: 8,
-                                  borderRadius: 4,
-                                  backgroundColor: 'action.hover',
-                                  '& .MuiLinearProgress-bar': {
-                                    backgroundColor: '#8B4513',
-                                  },
-                                }}
-                              />
-                            </Box>
-                            <Typography variant="body2" sx={{ minWidth: 45 }}>
-                              {Number(deck.win_rate).toFixed(1)}%
-                            </Typography>
-                          </Stack>
+                          {Number(deck.win_rate).toFixed(1)}%
                         </TableCell>
                       </TableRow>
                     ))}
@@ -290,15 +297,15 @@ export default function StatsPage() {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Commander</TableCell>
-                      <TableCell align="center">Decks Using</TableCell>
-                      <TableCell align="center">Games</TableCell>
-                      <TableCell align="center">Wins</TableCell>
-                      <TableCell align="right">Win Rate</TableCell>
+                      <TableCell>{sortHeader('commanders', 'commander', 'Commander')}</TableCell>
+                      <TableCell align="center">{sortHeader('commanders', 'decks_using', 'Decks Using')}</TableCell>
+                      <TableCell align="center">{sortHeader('commanders', 'total_games', 'Games')}</TableCell>
+                      <TableCell align="center">{sortHeader('commanders', 'wins', 'Wins')}</TableCell>
+                      <TableCell align="right">{sortHeader('commanders', 'win_rate', 'Win Rate')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {stats.topCommanders.map((commander) => (
+                    {sortData('commanders', stats.topCommanders).map((commander) => (
                       <TableRow key={commander.commander}>
                         <TableCell>
                           <Typography sx={{ fontWeight: 500 }}>
@@ -334,13 +341,13 @@ export default function StatsPage() {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Matchup</TableCell>
-                      <TableCell align="center">Games</TableCell>
-                      <TableCell align="center">Record</TableCell>
+                      <TableCell>{sortHeader('h2h', 'player1_name', 'Matchup')}</TableCell>
+                      <TableCell align="center">{sortHeader('h2h', 'total_games', 'Games')}</TableCell>
+                      <TableCell align="center">{sortHeader('h2h', 'player1_wins', 'Record')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {headToHead.twoPlayer.map((record, index) => (
+                    {sortData('h2h', headToHead.twoPlayer).map((record, index) => (
                       <TableRow key={index}>
                         <TableCell>
                           <Typography>
@@ -405,13 +412,13 @@ export default function StatsPage() {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Matchup</TableCell>
-                      <TableCell align="center">Games</TableCell>
-                      <TableCell align="center">Record</TableCell>
+                      <TableCell>{sortHeader('mp', 'player1_name', 'Matchup')}</TableCell>
+                      <TableCell align="center">{sortHeader('mp', 'total_games', 'Games')}</TableCell>
+                      <TableCell align="center">{sortHeader('mp', 'player1_wins', 'Record')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {headToHead.multiplayer.map((record, index) => (
+                    {sortData('mp', headToHead.multiplayer).map((record, index) => (
                       <TableRow key={index}>
                         <TableCell>
                           <Typography>
@@ -483,21 +490,21 @@ export default function StatsPage() {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Team</TableCell>
-                      <TableCell align="center">Games</TableCell>
-                      <TableCell align="center">Wins</TableCell>
-                      <TableCell align="right">Win Rate</TableCell>
+                      <TableCell>{sortHeader('2hgTeam', 'player1_name', 'Team')}</TableCell>
+                      <TableCell align="center">{sortHeader('2hgTeam', 'total_games', 'Games')}</TableCell>
+                      <TableCell align="center">{sortHeader('2hgTeam', 'wins', 'Wins')}</TableCell>
+                      <TableCell align="right">{sortHeader('2hgTeam', 'win_rate', 'Win Rate')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {advancedStats.twoHgStats.teamPairings.map((team, i) => (
+                    {sortData('2hgTeam', advancedStats.twoHgStats.teamPairings).map((team, i) => (
                       <TableRow key={`${team.player1_id}-${team.player2_id}`}>
                         <TableCell>
                           <Stack direction="row" alignItems="center" spacing={0.5}>
-                            {i === 0 && (
+                            {i === 0 && !sortConfigs['2hgTeam'] && (
                               <EmojiEventsIcon sx={{ color: '#DAA520', fontSize: 20 }} />
                             )}
-                            <Typography sx={{ fontWeight: i === 0 ? 600 : 400 }}>
+                            <Typography sx={{ fontWeight: i === 0 && !sortConfigs['2hgTeam'] ? 600 : 400 }}>
                               {team.player1_name} & {team.player2_name}
                             </Typography>
                           </Stack>
@@ -505,25 +512,7 @@ export default function StatsPage() {
                         <TableCell align="center">{team.total_games}</TableCell>
                         <TableCell align="center">{team.wins}</TableCell>
                         <TableCell align="right">
-                          <Stack direction="row" alignItems="center" spacing={1} justifyContent="flex-end">
-                            <Box sx={{ width: 60 }}>
-                              <LinearProgress
-                                variant="determinate"
-                                value={Number(team.win_rate) || 0}
-                                sx={{
-                                  height: 8,
-                                  borderRadius: 4,
-                                  backgroundColor: 'action.hover',
-                                  '& .MuiLinearProgress-bar': {
-                                    backgroundColor: '#DAA520',
-                                  },
-                                }}
-                              />
-                            </Box>
-                            <Typography variant="body2" sx={{ minWidth: 45 }}>
-                              {Number(team.win_rate).toFixed(1)}%
-                            </Typography>
-                          </Stack>
+                          {Number(team.win_rate).toFixed(1)}%
                         </TableCell>
                       </TableRow>
                     ))}
@@ -539,14 +528,14 @@ export default function StatsPage() {
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Player</TableCell>
-                      <TableCell align="center">Games</TableCell>
-                      <TableCell align="center">Wins</TableCell>
-                      <TableCell align="right">Win Rate</TableCell>
+                      <TableCell>{sortHeader('2hgPlayer', 'player_name', 'Player')}</TableCell>
+                      <TableCell align="center">{sortHeader('2hgPlayer', 'total_games', 'Games')}</TableCell>
+                      <TableCell align="center">{sortHeader('2hgPlayer', 'wins', 'Wins')}</TableCell>
+                      <TableCell align="right">{sortHeader('2hgPlayer', 'win_rate', 'Win Rate')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {advancedStats.twoHgStats.players.map((p) => (
+                    {sortData('2hgPlayer', advancedStats.twoHgStats.players).map((p) => (
                       <TableRow key={p.player_id}>
                         <TableCell>
                           <Typography sx={{ fontWeight: 500 }}>{p.player_name}</Typography>
@@ -570,14 +559,14 @@ export default function StatsPage() {
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Date</TableCell>
-                      <TableCell>Winning Team</TableCell>
-                      <TableCell>Decks</TableCell>
-                      <TableCell align="center">Turn</TableCell>
+                      <TableCell>{sortHeader('2hgRecent', 'played_at', 'Date')}</TableCell>
+                      <TableCell>{sortHeader('2hgRecent', 'winners', 'Winning Team')}</TableCell>
+                      <TableCell>{sortHeader('2hgRecent', 'winning_decks', 'Decks')}</TableCell>
+                      <TableCell align="center">{sortHeader('2hgRecent', 'winning_turn', 'Turn')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {advancedStats.twoHgStats.recentGames.map((game) => (
+                    {sortData('2hgRecent', advancedStats.twoHgStats.recentGames).map((game) => (
                       <TableRow key={game.id}>
                         <TableCell>
                           <Typography variant="body2">
@@ -630,16 +619,16 @@ export default function StatsPage() {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Colors</TableCell>
-                      <TableCell align="center">Decks</TableCell>
-                      <TableCell align="center">Games</TableCell>
-                      <TableCell align="center">Wins</TableCell>
-                      <TableCell align="right">Win Rate</TableCell>
-                      <TableCell align="right">Avg Position</TableCell>
+                      <TableCell>{sortHeader('colorMeta', 'colors', 'Colors')}</TableCell>
+                      <TableCell align="center">{sortHeader('colorMeta', 'deck_count', 'Decks')}</TableCell>
+                      <TableCell align="center">{sortHeader('colorMeta', 'total_games', 'Games')}</TableCell>
+                      <TableCell align="center">{sortHeader('colorMeta', 'wins', 'Wins')}</TableCell>
+                      <TableCell align="right">{sortHeader('colorMeta', 'win_rate', 'Win Rate')}</TableCell>
+                      <TableCell align="right">{sortHeader('colorMeta', 'avg_finish_position', 'Avg Position')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {advancedStats.colorMeta.map((row) => (
+                    {sortData('colorMeta', advancedStats.colorMeta).map((row) => (
                       <TableRow key={row.colors}>
                         <TableCell>
                           <ColorIdentityChips colors={row.colors} size="small" />
@@ -648,25 +637,7 @@ export default function StatsPage() {
                         <TableCell align="center">{row.total_games}</TableCell>
                         <TableCell align="center">{row.wins}</TableCell>
                         <TableCell align="right">
-                          <Stack direction="row" alignItems="center" spacing={1} justifyContent="flex-end">
-                            <Box sx={{ width: 60 }}>
-                              <LinearProgress
-                                variant="determinate"
-                                value={Number(row.win_rate) || 0}
-                                sx={{
-                                  height: 8,
-                                  borderRadius: 4,
-                                  backgroundColor: 'action.hover',
-                                  '& .MuiLinearProgress-bar': {
-                                    backgroundColor: '#D2691E',
-                                  },
-                                }}
-                              />
-                            </Box>
-                            <Typography variant="body2" sx={{ minWidth: 45 }}>
-                              {Number(row.win_rate).toFixed(1)}%
-                            </Typography>
-                          </Stack>
+                          {Number(row.win_rate).toFixed(1)}%
                         </TableCell>
                         <TableCell align="right">
                           {Number(row.avg_finish_position).toFixed(2)}
@@ -711,39 +682,21 @@ export default function StatsPage() {
                     <Table size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell>Player</TableCell>
-                          <TableCell align="center">Games</TableCell>
-                          <TableCell align="center">Wins</TableCell>
-                          <TableCell align="right">Win Rate</TableCell>
-                          <TableCell align="right">Avg Position</TableCell>
+                          <TableCell>{sortHeader(`pod_${pod.pod_size}`, 'player_name', 'Player')}</TableCell>
+                          <TableCell align="center">{sortHeader(`pod_${pod.pod_size}`, 'games_played', 'Games')}</TableCell>
+                          <TableCell align="center">{sortHeader(`pod_${pod.pod_size}`, 'wins', 'Wins')}</TableCell>
+                          <TableCell align="right">{sortHeader(`pod_${pod.pod_size}`, 'win_rate', 'Win Rate')}</TableCell>
+                          <TableCell align="right">{sortHeader(`pod_${pod.pod_size}`, 'avg_finish_position', 'Avg Position')}</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {pod.entries.map((entry) => (
+                        {sortData(`pod_${pod.pod_size}`, pod.entries).map((entry) => (
                           <TableRow key={entry.player_id}>
                             <TableCell>{entry.player_name}</TableCell>
                             <TableCell align="center">{entry.games_played}</TableCell>
                             <TableCell align="center">{entry.wins}</TableCell>
                             <TableCell align="right">
-                              <Stack direction="row" alignItems="center" spacing={1} justifyContent="flex-end">
-                                <Box sx={{ width: 50 }}>
-                                  <LinearProgress
-                                    variant="determinate"
-                                    value={Number(entry.win_rate) || 0}
-                                    sx={{
-                                      height: 6,
-                                      borderRadius: 3,
-                                      backgroundColor: 'action.hover',
-                                      '& .MuiLinearProgress-bar': {
-                                        backgroundColor: '#CD853F',
-                                      },
-                                    }}
-                                  />
-                                </Box>
-                                <Typography variant="body2" sx={{ minWidth: 40 }}>
-                                  {Number(entry.win_rate).toFixed(1)}%
-                                </Typography>
-                              </Stack>
+                              {Number(entry.win_rate).toFixed(1)}%
                             </TableCell>
                             <TableCell align="right">
                               {Number(entry.avg_finish_position).toFixed(2)}
@@ -776,16 +729,16 @@ export default function StatsPage() {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Player</TableCell>
-                      <TableCell align="center">Streak</TableCell>
-                      <TableCell align="center">Best Streak</TableCell>
-                      <TableCell align="center">Last 5</TableCell>
-                      <TableCell align="right">Overall</TableCell>
-                      <TableCell align="center">Trend</TableCell>
+                      <TableCell>{sortHeader('pStreaks', 'player_name', 'Player')}</TableCell>
+                      <TableCell align="center">{sortHeader('pStreaks', 'current_streak', 'Streak')}</TableCell>
+                      <TableCell align="center">{sortHeader('pStreaks', 'longest_win_streak', 'Best Streak')}</TableCell>
+                      <TableCell align="center">{sortHeader('pStreaks', 'last_5_wins', 'Last 5')}</TableCell>
+                      <TableCell align="right">{sortHeader('pStreaks', 'overall_win_rate', 'Overall')}</TableCell>
+                      <TableCell align="center">{sortHeader('pStreaks', 'trend', 'Trend')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {advancedStats.playerStreaks.map((p) => (
+                    {sortData('pStreaks', advancedStats.playerStreaks).map((p) => (
                       <TableRow key={p.player_id}>
                         <TableCell>
                           <Typography sx={{ fontWeight: 500 }}>{p.player_name}</Typography>
@@ -863,17 +816,17 @@ export default function StatsPage() {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Deck</TableCell>
-                      <TableCell>Player</TableCell>
-                      <TableCell align="center">Streak</TableCell>
-                      <TableCell align="center">Best Streak</TableCell>
-                      <TableCell align="center">Last 5</TableCell>
-                      <TableCell align="right">Overall</TableCell>
-                      <TableCell align="center">Trend</TableCell>
+                      <TableCell>{sortHeader('dStreaks', 'deck_name', 'Deck')}</TableCell>
+                      <TableCell>{sortHeader('dStreaks', 'player_name', 'Player')}</TableCell>
+                      <TableCell align="center">{sortHeader('dStreaks', 'current_streak', 'Streak')}</TableCell>
+                      <TableCell align="center">{sortHeader('dStreaks', 'longest_win_streak', 'Best Streak')}</TableCell>
+                      <TableCell align="center">{sortHeader('dStreaks', 'last_5_wins', 'Last 5')}</TableCell>
+                      <TableCell align="right">{sortHeader('dStreaks', 'overall_win_rate', 'Overall')}</TableCell>
+                      <TableCell align="center">{sortHeader('dStreaks', 'trend', 'Trend')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {advancedStats.deckStreaks.map((d) => (
+                    {sortData('dStreaks', advancedStats.deckStreaks).map((d) => (
                       <TableRow key={d.deck_id}>
                         <TableCell>
                           <Stack direction="row" alignItems="center" spacing={1}>
