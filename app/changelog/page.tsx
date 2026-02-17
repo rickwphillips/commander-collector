@@ -40,6 +40,22 @@ const changeTypeConfig: Record<ChangeType, { label: string; color: string; icon:
 
 const releases: Release[] = [
   {
+    version: '1.4.0',
+    date: '2026-02-17',
+    title: 'Stats Customization & Sharing',
+    changes: [
+      { type: 'added', text: 'Hide stats sections — click the eye icon on any section to hide it' },
+      { type: 'added', text: 'Settings drawer — toggle all section visibility with Show All / Hide All' },
+      { type: 'added', text: 'Custom panels — save named views with your preferred sections and order' },
+      { type: 'added', text: 'Drag-and-drop panel builder at Stats > Customize' },
+      { type: 'added', text: 'Panel sharing — toggle a panel to shared and copy the link for others' },
+      { type: 'added', text: 'Shared panel URL support — open a shared link to load that panel view' },
+      { type: 'added', text: 'View selector dropdown on stats page to switch between default and custom panels' },
+      { type: 'added', text: 'Hide shared panels from your view selector via settings drawer' },
+      { type: 'improved', text: 'Stats page refactored for dynamic section rendering and ordering' },
+    ],
+  },
+  {
     version: '1.3.0',
     date: '2026-02-13',
     title: 'Two-Headed Giant Stats',

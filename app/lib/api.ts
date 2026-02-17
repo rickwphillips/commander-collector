@@ -126,6 +126,23 @@ export const api = {
   // Advanced Stats
   getAdvancedStats: () => apiFetch<import('./types').AdvancedStatsResponse>('/advanced-stats'),
 
+  // Stat Panels
+  getStatPanels: () => apiFetch<import('./types').StatPanelsResponse>('/stat-panels'),
+  getStatPanel: (id: number) => apiFetch<import('./types').StatPanel>(`/stat-panels?id=${id}`),
+  getStatPanelByCode: (code: string) => apiFetch<import('./types').StatPanel>(`/stat-panels?share_code=${code}`),
+  createStatPanel: (data: import('./types').CreateStatPanelInput) =>
+    apiFetch<import('./types').StatPanel>('/stat-panels', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateStatPanel: (id: number, data: import('./types').UpdateStatPanelInput) =>
+    apiFetch<import('./types').StatPanel>(`/stat-panels?id=${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteStatPanel: (id: number) =>
+    apiFetch<{ success: boolean }>(`/stat-panels?id=${id}`, { method: 'DELETE' }),
+
   // Users (admin)
   getUsers: () => apiFetch<{ id: number; username: string; display_name: string; role: string }[]>('/auth/users'),
 };

@@ -231,6 +231,35 @@ export interface AdvancedStatsResponse {
 // MTG color identity
 export type MtgColor = 'W' | 'U' | 'B' | 'R' | 'G';
 
+// Stat Panel types
+export interface StatPanel {
+  id: number;
+  user_id: number;
+  name: string;
+  sections: string[];
+  is_shared: boolean;
+  share_code: string | null;
+  created_at: string;
+  updated_at: string;
+  owner_name?: string;
+}
+
+export interface CreateStatPanelInput {
+  name: string;
+  sections: string[];
+}
+
+export interface UpdateStatPanelInput {
+  name?: string;
+  sections?: string[];
+  is_shared?: boolean;
+}
+
+export interface StatPanelsResponse {
+  own: StatPanel[];
+  shared: StatPanel[];
+}
+
 // Form input types
 export interface CreatePlayerInput {
   name: string;
