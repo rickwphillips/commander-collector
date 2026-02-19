@@ -275,7 +275,7 @@ export default function Dashboard() {
             <Chip
               component={Link}
               href="/changelog"
-              label="v1.4.0"
+              label="v1.5.0"
               size="small"
               clickable
               variant="outlined"

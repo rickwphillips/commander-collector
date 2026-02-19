@@ -40,6 +40,21 @@ const changeTypeConfig: Record<ChangeType, { label: string; color: string; icon:
 
 const releases: Release[] = [
   {
+    version: '1.5.0',
+    date: '2026-02-19',
+    title: 'Comparison Builder',
+    changes: [
+      { type: 'added', text: 'Comparison Builder — create custom stat queries with conditions, group-by, entity filters, and metrics' },
+      { type: 'added', text: '12 group-by types: Player, Deck, Commander, Color, Deck Age, Pod Size, Game Length, Game Type, Month, Year, Season, Day of Week' },
+      { type: 'added', text: '9 metrics: Win Rate, Wins, Total Games, Avg Finish Position, Recent Win Rate, Avg Survival Turns, Avg Turns to Win, Top-2 Rate, Elimination Rate' },
+      { type: 'added', text: 'Condition filters: game type, pod size, game length, required player/commander in pod, finish position, date range, min games threshold' },
+      { type: 'added', text: 'Color identity chips in comparison results for deck and color group-bys' },
+      { type: 'added', text: 'Panel preview button on the Customize page with inline results' },
+      { type: 'added', text: 'Inline panel toggle — show any panel directly on the Stats page from the settings drawer' },
+      { type: 'improved', text: 'Section Visibility drawer now includes Your Panels and Shared Panels sections' },
+    ],
+  },
+  {
     version: '1.4.0',
     date: '2026-02-17',
     title: 'Stats Customization & Sharing',

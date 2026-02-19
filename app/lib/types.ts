@@ -231,12 +231,77 @@ export interface AdvancedStatsResponse {
 // MTG color identity
 export type MtgColor = 'W' | 'U' | 'B' | 'R' | 'G';
 
+// Comparison Builder types
+export type PanelType = 'predefined' | 'comparison';
+
+export type ComparisonGroupBy =
+  | 'player' | 'deck' | 'commander' | 'color' | 'deck_age'
+  | 'pod_size' | 'game_length' | 'game_type'
+  | 'month' | 'year' | 'season' | 'day_of_week';
+
+export type ComparisonMetric =
+  | 'win_rate' | 'total_games' | 'wins'
+  | 'avg_finish_position' | 'recent_win_rate'
+  | 'avg_survival_turns' | 'avg_turns_to_win'
+  | 'top2_rate' | 'elimination_rate';
+
+export interface ComparisonConditions {
+  game_type?: 'all' | 'standard' | '2hg';
+  pod_size?: number;
+  min_winning_turn?: number;
+  min_finish_position?: number;
+  required_player_ids?: number[];
+  required_commanders?: string[];
+  date_from?: string;
+  date_to?: string;
+  min_games?: number;
+}
+
+export interface ComparisonEntityFilter {
+  player_ids?: number[];
+  deck_ids?: number[];
+  commanders?: string[];
+  colors?: string[];
+}
+
+export interface ComparisonConfig {
+  groupBy: ComparisonGroupBy;
+  conditions: ComparisonConditions;
+  entityFilter?: ComparisonEntityFilter;
+  metrics: ComparisonMetric[];
+}
+
+export interface ComparisonEntityResult {
+  id: number | string;
+  label: string;
+  sublabel?: string;
+  colors?: string | null;
+  total_games: number;
+  wins: number;
+  win_rate: number | null;
+  avg_finish_position: number | null;
+  recent_win_rate: number | null;
+  avg_survival_turns: number | null;
+  avg_turns_to_win: number | null;
+  top2_rate: number | null;
+  elimination_rate: number | null;
+}
+
+export interface ComparisonResult {
+  groupBy: ComparisonGroupBy;
+  metrics: ComparisonMetric[];
+  conditions: ComparisonConditions;
+  entities: ComparisonEntityResult[];
+}
+
 // Stat Panel types
 export interface StatPanel {
   id: number;
   user_id: number;
   name: string;
   sections: string[];
+  panel_type: PanelType;
+  config: ComparisonConfig | null;
   is_shared: boolean;
   share_code: string | null;
   created_at: string;
@@ -246,12 +311,15 @@ export interface StatPanel {
 
 export interface CreateStatPanelInput {
   name: string;
-  sections: string[];
+  panel_type: PanelType;
+  sections?: string[];
+  config?: ComparisonConfig;
 }
 
 export interface UpdateStatPanelInput {
   name?: string;
   sections?: string[];
+  config?: ComparisonConfig;
   is_shared?: boolean;
 }
 

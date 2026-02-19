@@ -31,11 +31,14 @@ function formatPanel($row) {
     if (is_string($sections)) {
         $sections = json_decode($sections, true) ?? [];
     }
+    $config = isset($row['config']) ? (is_string($row['config']) ? json_decode($row['config'], true) : $row['config']) : null;
     return [
         'id' => (int)$row['id'],
         'user_id' => (int)$row['user_id'],
         'name' => $row['name'],
         'sections' => $sections,
+        'panel_type' => $row['panel_type'] ?? 'predefined',
+        'config' => $config,
         'is_shared' => (bool)$row['is_shared'],
         'share_code' => $row['share_code'],
         'created_at' => $row['created_at'],
@@ -99,15 +102,40 @@ switch ($method) {
         if (empty($data['name'])) {
             sendError('Panel name is required');
         }
-        if (empty($data['sections']) || !is_array($data['sections'])) {
-            sendError('At least one section is required');
+
+        $panelType = $data['panel_type'] ?? 'predefined';
+        if (!in_array($panelType, ['predefined', 'comparison'], true)) {
+            sendError('Invalid panel_type');
         }
 
-        // Validate section IDs
-        foreach ($data['sections'] as $s) {
-            if (!in_array($s, $validSections, true)) {
-                sendError("Invalid section: $s");
+        $sections = [];
+        $config   = null;
+
+        if ($panelType === 'comparison') {
+            // Validate comparison config
+            if (empty($data['config']) || !is_array($data['config'])) {
+                sendError('Comparison panel requires a config object');
             }
+            $cfg = $data['config'];
+            if (empty($cfg['groupBy'])) {
+                sendError('config.groupBy is required');
+            }
+            if (empty($cfg['metrics']) || !is_array($cfg['metrics'])) {
+                sendError('config.metrics must be a non-empty array');
+            }
+            $config = json_encode($cfg);
+            $sections = [];
+        } else {
+            // Predefined panel validation
+            if (empty($data['sections']) || !is_array($data['sections'])) {
+                sendError('At least one section is required');
+            }
+            foreach ($data['sections'] as $s) {
+                if (!in_array($s, $validSections, true)) {
+                    sendError("Invalid section: $s");
+                }
+            }
+            $sections = array_values($data['sections']);
         }
 
         // Enforce 10-panel limit
@@ -117,11 +145,13 @@ switch ($method) {
             sendError('Maximum of 10 panels allowed', 400);
         }
 
-        $stmt = $pdo->prepare('INSERT INTO stat_panels (user_id, name, sections) VALUES (?, ?, ?)');
+        $stmt = $pdo->prepare('INSERT INTO stat_panels (user_id, name, sections, panel_type, config) VALUES (?, ?, ?, ?, ?)');
         $stmt->execute([
             $user['sub'],
             trim($data['name']),
-            json_encode(array_values($data['sections'])),
+            json_encode($sections),
+            $panelType,
+            $config,
         ]);
 
         $newId = (int)$pdo->lastInsertId();
@@ -163,6 +193,20 @@ switch ($method) {
             }
             $fields[] = 'sections = ?';
             $params[] = json_encode(array_values($data['sections']));
+        }
+
+        if (isset($data['config'])) {
+            if (!is_array($data['config'])) {
+                sendError('config must be an object');
+            }
+            if (empty($data['config']['groupBy'])) {
+                sendError('config.groupBy is required');
+            }
+            if (empty($data['config']['metrics'])) {
+                sendError('config.metrics is required');
+            }
+            $fields[] = 'config = ?';
+            $params[] = json_encode($data['config']);
         }
 
         if (isset($data['is_shared'])) {

@@ -69,3 +69,8 @@ CREATE INDEX idx_games_played_at ON games(played_at);
 
 -- NOTE: Authentication tables live in a separate database (rickwphi_auth).
 -- See auth/setup.sql for the auth schema.
+
+-- Migration: Add comparison panel support to stat_panels
+-- Run in phpMyAdmin on rickwphi_app_commander (prod) and grandkid_arcade/dev DB:
+-- ALTER TABLE stat_panels ADD COLUMN panel_type ENUM('predefined','comparison') NOT NULL DEFAULT 'predefined';
+-- ALTER TABLE stat_panels ADD COLUMN config JSON NULL;

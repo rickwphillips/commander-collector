@@ -58,7 +58,9 @@ import type {
   AdvancedStatsResponse,
   StatPanel,
   StatPanelsResponse,
+  ComparisonResult,
 } from '../lib/types';
+import { ComparisonPanel, ComparisonPanelSkeleton } from './ComparisonPanel';
 
 type SortDirection = 'asc' | 'desc';
 type SortConfig = { key: string; direction: SortDirection };
@@ -66,6 +68,7 @@ type SortConfig = { key: string; direction: SortDirection };
 function StatsPageInner() {
   const searchParams = useSearchParams();
   const panelCode = searchParams.get('panel');
+  const panelIdParam = searchParams.get('panel_id');
 
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<StatsResponse | null>(null);
@@ -82,6 +85,14 @@ function StatsPageInner() {
   const [panels, setPanels] = useState<StatPanelsResponse>({ own: [], shared: [] });
   const [activePanelData, setActivePanelData] = useState<StatPanel | null>(null);
 
+  // Comparison panel state (for URL-param / ViewSelector activation)
+  const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+
+  // Inline panels (drawer toggles)
+  const [shownPanelIds, setShownPanelIds] = useState<Set<number>>(new Set());
+  const [inlinePanelData, setInlinePanelData] = useState<Record<number, ComparisonResult>>({});
+
   const { hiddenSections, toggleSection, showAll, hideAll, hiddenPanelIds, togglePanelVisibility, loaded: hiddenLoaded } = useHiddenStats();
 
   useEffect(() => {
@@ -90,6 +101,46 @@ function StatsPageInner() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Helper: activate a panel (handles comparison data fetch)
+  const activatePanel = useCallback((panel: StatPanel) => {
+    setActiveView(panel.id);
+    setActivePanelData(panel);
+    setComparisonResult(null);
+    if (panel.panel_type === 'comparison' && panel.config) {
+      setComparisonLoading(true);
+      api.getComparison(panel.config)
+        .then(r => setComparisonResult(r))
+        .catch(() => setSnackbar('Failed to load comparison data'))
+        .finally(() => setComparisonLoading(false));
+    }
+  }, []);
+
+  const toggleInlinePanel = useCallback((panel: StatPanel) => {
+    setShownPanelIds(prev => {
+      const next = new Set(prev);
+      if (next.has(panel.id)) {
+        next.delete(panel.id);
+      } else {
+        next.add(panel.id);
+        if (panel.panel_type === 'comparison' && panel.config && !inlinePanelData[panel.id]) {
+          api.getComparison(panel.config!)
+            .then(r => setInlinePanelData(p => ({ ...p, [panel.id]: r })))
+            .catch(() => setSnackbar('Failed to load panel data'));
+        }
+      }
+      return next;
+    });
+  }, [inlinePanelData]);
+
+  // Handle ?panel_id=<id> URL param (own panels by numeric ID)
+  useEffect(() => {
+    if (!panelIdParam || loading) return;
+    const id = parseInt(panelIdParam, 10);
+    if (isNaN(id)) return;
+    const match = panels.own.find(p => p.id === id);
+    if (match) activatePanel(match);
+  }, [panelIdParam, panels.own, loading, activatePanel]);
+
   // Handle ?panel=<code> URL param
   useEffect(() => {
     if (panelCode && panels.own.length + panels.shared.length > 0) {
@@ -97,26 +148,23 @@ function StatsPageInner() {
       const allPanels = [...panels.own, ...panels.shared];
       const match = allPanels.find(p => p.share_code === panelCode);
       if (match) {
-        setActiveView(match.id);
-        setActivePanelData(match);
+        activatePanel(match);
       } else {
         // Try fetching by code
         api.getStatPanelByCode(panelCode).then(p => {
-          setActiveView(p.id);
-          setActivePanelData(p);
+          activatePanel(p);
         }).catch(() => {
           setSnackbar('Shared panel not found');
         });
       }
     } else if (panelCode && !loading) {
       api.getStatPanelByCode(panelCode).then(p => {
-        setActiveView(p.id);
-        setActivePanelData(p);
+        activatePanel(p);
       }).catch(() => {
         setSnackbar('Shared panel not found');
       });
     }
-  }, [panelCode, panels, loading]);
+  }, [panelCode, panels, loading, activatePanel]);
 
   const fetchData = async () => {
     try {
@@ -177,15 +225,18 @@ function StatsPageInner() {
   );
 
   const handleViewChange = useCallback((view: 'default' | number) => {
-    setActiveView(view);
     if (view === 'default') {
+      setActiveView('default');
       setActivePanelData(null);
+      setComparisonResult(null);
     } else {
       const allPanels = [...panels.own, ...panels.shared];
       const panel = allPanels.find(p => p.id === view);
-      setActivePanelData(panel || null);
+      if (panel) {
+        activatePanel(panel);
+      }
     }
-  }, [panels]);
+  }, [panels, activatePanel]);
 
   // Build section renderers
   const sectionRenderers: Record<StatsSectionId, () => React.ReactNode> = {
@@ -872,8 +923,17 @@ function StatsPageInner() {
         </Alert>
       )}
 
-      {/* Rendered sections */}
-      {visibleSections.map((id, i) => {
+      {/* Comparison panel rendering */}
+      {!isDefaultView && activePanelData?.panel_type === 'comparison' && (
+        comparisonLoading
+          ? <ComparisonPanelSkeleton />
+          : comparisonResult
+            ? <ComparisonPanel result={comparisonResult} />
+            : null
+      )}
+
+      {/* Rendered sections (predefined panels and default view) */}
+      {(isDefaultView || activePanelData?.panel_type !== 'comparison') && visibleSections.map((id, i) => {
         const node = sectionRenderers[id]?.();
         if (!node) return null;
         return (
@@ -903,11 +963,36 @@ function StatsPageInner() {
         );
       })}
 
-      {isDefaultView && visibleSections.length === 0 && (
+      {isDefaultView && visibleSections.length === 0 && shownPanelIds.size === 0 && (
         <Alert severity="info" sx={{ mt: 2 }}>
-          All sections are hidden. Use the settings gear to show sections, or switch to a custom panel.
+          All sections are hidden. Use the settings gear to show sections or panels.
         </Alert>
       )}
+
+      {/* Inline panels toggled on from the settings drawer */}
+      {[...panels.own, ...panels.shared]
+        .filter(p => shownPanelIds.has(p.id))
+        .map(panel => (
+          <Box key={panel.id} sx={{ mb: 4 }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+              <Typography variant="h5" sx={{ fontWeight: 600 }}>{panel.name}</Typography>
+              {panel.owner_name && (
+                <Typography variant="body2" color="text.secondary">by {panel.owner_name}</Typography>
+              )}
+            </Stack>
+            {panel.panel_type === 'comparison' ? (
+              inlinePanelData[panel.id]
+                ? <ComparisonPanel result={inlinePanelData[panel.id]} />
+                : <ComparisonPanelSkeleton />
+            ) : (
+              (panel.sections as StatsSectionId[]).map(id => {
+                const node = sectionRenderers[id]?.();
+                return node ? <Box key={id} sx={{ mb: 3 }}>{node}</Box> : null;
+              })
+            )}
+          </Box>
+        ))
+      }
 
       {/* Settings Drawer */}
       <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
@@ -933,20 +1018,38 @@ function StatsPageInner() {
             />
           ))}
 
+          {panels.own.length > 0 && (
+            <>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Your Panels</Typography>
+              {panels.own.map(panel => (
+                <FormControlLabel
+                  key={panel.id}
+                  control={
+                    <Switch
+                      checked={shownPanelIds.has(panel.id)}
+                      onChange={() => toggleInlinePanel(panel)}
+                      size="small"
+                    />
+                  }
+                  label={panel.name}
+                  sx={{ display: 'flex', mb: 0.5 }}
+                />
+              ))}
+            </>
+          )}
+
           {panels.shared.length > 0 && (
             <>
               <Divider sx={{ my: 2 }} />
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Shared Panels</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Toggle off to hide shared panels from the view selector.
-              </Typography>
               {panels.shared.map(panel => (
                 <FormControlLabel
                   key={panel.id}
                   control={
                     <Switch
-                      checked={!hiddenPanelIds.has(panel.id)}
-                      onChange={() => togglePanelVisibility(panel.id)}
+                      checked={shownPanelIds.has(panel.id)}
+                      onChange={() => toggleInlinePanel(panel)}
                       size="small"
                     />
                   }

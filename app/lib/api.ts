@@ -145,4 +145,40 @@ export const api = {
 
   // Users (admin)
   getUsers: () => apiFetch<{ id: number; username: string; display_name: string; role: string }[]>('/auth/users'),
+
+  // Comparison Builder
+  getComparison: (config: import('./types').ComparisonConfig) => {
+    const params = buildComparisonParams(config);
+    return apiFetch<import('./types').ComparisonResult>(`/comparison?${params}`);
+  },
 };
+
+function buildComparisonParams(config: import('./types').ComparisonConfig): string {
+  const parts: string[] = [];
+  parts.push(`group_by=${encodeURIComponent(config.groupBy)}`);
+  parts.push(`metrics=${encodeURIComponent(config.metrics.join(','))}`);
+
+  const c = config.conditions;
+  if (c.game_type && c.game_type !== 'all') parts.push(`game_type=${encodeURIComponent(c.game_type)}`);
+  if (c.pod_size != null) parts.push(`pod_size=${c.pod_size}`);
+  if (c.min_winning_turn != null) parts.push(`min_winning_turn=${c.min_winning_turn}`);
+  if (c.min_finish_position != null) parts.push(`min_finish_position=${c.min_finish_position}`);
+  if (c.date_from) parts.push(`date_from=${encodeURIComponent(c.date_from)}`);
+  if (c.date_to) parts.push(`date_to=${encodeURIComponent(c.date_to)}`);
+  if (c.min_games != null) parts.push(`min_games=${c.min_games}`);
+
+  if (c.required_player_ids?.length) {
+    c.required_player_ids.forEach(id => parts.push(`required_player_ids[]=${id}`));
+  }
+  if (c.required_commanders?.length) {
+    c.required_commanders.forEach(cmd => parts.push(`required_commanders[]=${encodeURIComponent(cmd)}`));
+  }
+
+  const ef = config.entityFilter;
+  if (ef?.player_ids?.length) ef.player_ids.forEach(id => parts.push(`filter_player_ids[]=${id}`));
+  if (ef?.deck_ids?.length) ef.deck_ids.forEach(id => parts.push(`filter_deck_ids[]=${id}`));
+  if (ef?.commanders?.length) ef.commanders.forEach(cmd => parts.push(`filter_commanders[]=${encodeURIComponent(cmd)}`));
+  if (ef?.colors?.length) ef.colors.forEach(c => parts.push(`filter_colors[]=${encodeURIComponent(c)}`));
+
+  return parts.join('&');
+}
