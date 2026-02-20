@@ -40,6 +40,16 @@ const changeTypeConfig: Record<ChangeType, { label: string; color: string; icon:
 
 const releases: Release[] = [
   {
+    version: '1.6.0',
+    date: '2026-02-20',
+    title: 'Auth & Security',
+    changes: [
+      { type: 'fixed', text: 'Logout now works correctly when switching between apps — login page clears its own stored token on explicit logout' },
+      { type: 'fixed', text: 'Auth user IDs upgraded to UUIDs — removed integer casts that would break after the ID type migration' },
+      { type: 'improved', text: 'User registration and bootstrap generate a UUID before insert rather than relying on lastInsertId()' },
+    ],
+  },
+  {
     version: '1.5.0',
     date: '2026-02-19',
     title: 'Comparison Builder',

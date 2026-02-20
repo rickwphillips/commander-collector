@@ -33,7 +33,7 @@ $token = createToken($user);
 sendJSON([
     'token' => $token,
     'user' => [
-        'id' => (int)$user['id'],
+        'id' => $user['id'],
         'username' => $user['username'],
         'display_name' => $user['display_name'],
         'role' => $user['role'],

@@ -53,12 +53,12 @@ if ($stmt->fetch()) {
 
 // Create user
 $passwordHash = password_hash($password, PASSWORD_BCRYPT);
+$userId = generateUUID();
 
 $pdo->beginTransaction();
 try {
-    $stmt = $pdo->prepare('INSERT INTO auth_users (username, display_name, password_hash) VALUES (?, ?, ?)');
-    $stmt->execute([$username, $displayName, $passwordHash]);
-    $userId = (int)$pdo->lastInsertId();
+    $stmt = $pdo->prepare('INSERT INTO auth_users (id, username, display_name, password_hash) VALUES (?, ?, ?, ?)');
+    $stmt->execute([$userId, $username, $displayName, $passwordHash]);
 
     // Mark invite code as used
     $stmt = $pdo->prepare('UPDATE auth_invite_codes SET used_by = ?, used_at = CURRENT_TIMESTAMP WHERE id = ?');

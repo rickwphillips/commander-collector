@@ -21,11 +21,11 @@ if (!$dbUser) {
 // Check for linked player in app DB
 $appPdo = getDB();
 $playerStmt = $appPdo->prepare('SELECT id, name FROM players WHERE user_id = ?');
-$playerStmt->execute([(int)$dbUser['id']]);
+$playerStmt->execute([$dbUser['id']]);
 $linkedPlayer = $playerStmt->fetch();
 
 $userData = [
-    'id' => (int)$dbUser['id'],
+    'id' => $dbUser['id'],
     'username' => $dbUser['username'],
     'display_name' => $dbUser['display_name'],
     'role' => $dbUser['role'],

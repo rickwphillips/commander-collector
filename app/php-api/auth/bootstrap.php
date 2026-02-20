@@ -30,15 +30,15 @@ if (strlen($data['password']) < 8) {
 
 $passwordHash = password_hash($data['password'], PASSWORD_BCRYPT);
 
-$stmt = $pdo->prepare('INSERT INTO auth_users (username, display_name, password_hash, role) VALUES (?, ?, ?, ?)');
+$userId = generateUUID();
+$stmt = $pdo->prepare('INSERT INTO auth_users (id, username, display_name, password_hash, role) VALUES (?, ?, ?, ?, ?)');
 $stmt->execute([
+    $userId,
     trim($data['username']),
     trim($data['display_name']),
     $passwordHash,
     'admin'
 ]);
-
-$userId = (int)$pdo->lastInsertId();
 
 $user = [
     'id' => $userId,
