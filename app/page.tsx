@@ -28,6 +28,7 @@ import { StatsCard } from './components/StatsCard';
 import { ColorIdentityChips } from './components/ColorIdentityChips';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { api } from './lib/api';
+import { APP_VERSION } from './lib/version';
 import type { StatsResponse, RecentGame } from './lib/types';
 import styles from './page.module.scss';
 
@@ -275,7 +276,7 @@ export default function Dashboard() {
             <Chip
               component={Link}
               href="/changelog"
-              label="v1.5.0"
+              label={`v${APP_VERSION}`}
               size="small"
               clickable
               variant="outlined"
