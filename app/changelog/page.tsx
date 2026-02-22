@@ -40,6 +40,18 @@ const changeTypeConfig: Record<ChangeType, { label: string; color: string; icon:
 
 const releases: Release[] = [
   {
+    version: '1.7.0',
+    date: '2026-02-22',
+    title: 'Test Suite',
+    changes: [
+      { type: 'added', text: 'Vitest test suite — 58 tests across 5 files' },
+      { type: 'added', text: 'Unit tests for statsSections: getSectionDef lookups, VALID_SECTION_IDS membership, DEFAULT_SECTION_ORDER' },
+      { type: 'added', text: 'Hook tests for useHiddenStats: toggle, showAll, hideAll, panel visibility, localStorage persistence' },
+      { type: 'added', text: 'API tests: auth headers, .php endpoint insertion, 401 handling, typed method endpoints' },
+      { type: 'added', text: 'Component tests for ColorIdentityChips and StatsCard' },
+    ],
+  },
+  {
     version: '1.6.0',
     date: '2026-02-20',
     title: 'Auth & Security',
