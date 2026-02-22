@@ -40,6 +40,15 @@ const changeTypeConfig: Record<ChangeType, { label: string; color: string; icon:
 
 const releases: Release[] = [
   {
+    version: '1.7.1',
+    date: '2026-02-22',
+    title: 'Coverage Reporting',
+    changes: [
+      { type: 'added', text: 'V8 coverage reporting — npm run test:coverage shows per-file line/branch/function percentages' },
+      { type: 'improved', text: 'Tested files hit 95–100% line coverage; statsSections, ColorIdentityChips, and StatsCard at 100%' },
+    ],
+  },
+  {
     version: '1.7.0',
     date: '2026-02-22',
     title: 'Test Suite',
