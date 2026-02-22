@@ -1,14 +1,14 @@
 {
-	"folders": [
-		{
-			"path": "."
-		},
-		{
-			"path": "../website/rickwphillips.com"
-		},
-		{
-			"path": ".."
-		}
-	],
-	"settings": {}
+  "folders": [
+    {
+      "path": ".",
+    },
+    {
+      "path": "../website/rickwphillips.com",
+    },
+    {
+      "path": "..",
+    },
+  ],
+  "settings": {},
 }

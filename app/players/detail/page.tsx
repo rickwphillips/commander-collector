@@ -81,7 +81,10 @@ export default function PlayerDetailPage() {
     }
     // Fetch users list for admin user dropdown
     if (currentUser?.role === 'admin') {
-      api.getUsers().then(setUsers).catch(() => {});
+      api
+        .getUsers()
+        .then(setUsers)
+        .catch(() => {});
     }
     return () => clearTimeout(timer);
   }, [playerId, currentUser?.role]);
@@ -144,7 +147,10 @@ export default function PlayerDetailPage() {
   if (!playerId) {
     return (
       <PageContainer title="Player Not Found" backHref="/players" backLabel="Back to Players">
-        <EmptyState title="No player ID provided" description="Please select a player from the list" />
+        <EmptyState
+          title="No player ID provided"
+          description="Please select a player from the list"
+        />
       </PageContainer>
     );
   }
@@ -175,7 +181,11 @@ export default function PlayerDetailPage() {
           <Button startIcon={<EditIcon />} onClick={handleEdit}>
             Edit
           </Button>
-          <Button color="error" startIcon={<DeleteIcon />} onClick={() => setDeleteDialogOpen(true)}>
+          <Button
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={() => setDeleteDialogOpen(true)}
+          >
             Delete
           </Button>
         </Stack>
@@ -191,19 +201,10 @@ export default function PlayerDetailPage() {
       {stats && (
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid size={{ xs: 6, sm: 3 }}>
-            <StatsCard
-              title="Total Games"
-              value={stats.total_games}
-              color="#D2691E"
-            />
+            <StatsCard title="Total Games" value={stats.total_games} color="#D2691E" />
           </Grid>
           <Grid size={{ xs: 6, sm: 3 }}>
-            <StatsCard
-              title="Wins"
-              value={stats.wins}
-              icon={<EmojiEventsIcon />}
-              color="#DAA520"
-            />
+            <StatsCard title="Wins" value={stats.wins} icon={<EmojiEventsIcon />} color="#DAA520" />
           </Grid>
           <Grid size={{ xs: 6, sm: 3 }}>
             <StatsCard
@@ -215,7 +216,11 @@ export default function PlayerDetailPage() {
           <Grid size={{ xs: 6, sm: 3 }}>
             <StatsCard
               title="Avg. Finish"
-              value={stats.avg_finish_position != null ? Number(stats.avg_finish_position).toFixed(2) : '-'}
+              value={
+                stats.avg_finish_position != null
+                  ? Number(stats.avg_finish_position).toFixed(2)
+                  : '-'
+              }
               color="#CD853F"
             />
           </Grid>
@@ -269,11 +274,7 @@ export default function PlayerDetailPage() {
                             variant="outlined"
                           />
                         )}
-                        <Chip
-                          label={`${deck.total_games} games`}
-                          size="small"
-                          variant="outlined"
-                        />
+                        <Chip label={`${deck.total_games} games`} size="small" variant="outlined" />
                       </Stack>
                     </CardContent>
                   </CardActionArea>
@@ -285,7 +286,12 @@ export default function PlayerDetailPage() {
       )}
 
       {/* Edit Dialog */}
-      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="xs" fullWidth>
+      <Dialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
         <DialogTitle>Edit Player</DialogTitle>
         <DialogContent>
           <TextField
@@ -327,7 +333,8 @@ export default function PlayerDetailPage() {
         <DialogTitle>Delete Player?</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete {player.name}? This will also delete all their decks and game results.
+            Are you sure you want to delete {player.name}? This will also delete all their decks and
+            game results.
           </Typography>
         </DialogContent>
         <DialogActions>

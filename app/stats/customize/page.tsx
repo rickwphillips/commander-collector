@@ -90,7 +90,11 @@ const METRIC_OPTIONS: { id: ComparisonMetric; label: string; description: string
   { id: 'total_games', label: 'Total Games', description: 'Games played' },
   { id: 'avg_finish_position', label: 'Avg Finish Position', description: 'Lower is better' },
   { id: 'recent_win_rate', label: 'Recent Win Rate', description: 'Last 5 matching games' },
-  { id: 'avg_survival_turns', label: 'Avg Survival Turns', description: 'How long when not winning' },
+  {
+    id: 'avg_survival_turns',
+    label: 'Avg Survival Turns',
+    description: 'How long when not winning',
+  },
   { id: 'avg_turns_to_win', label: 'Avg Turns to Win', description: 'Fast vs slow wins' },
   { id: 'top2_rate', label: 'Top-2 Rate', description: 'Finish 1st or 2nd' },
   { id: 'elimination_rate', label: 'Elimination Rate', description: 'How often knocked out' },
@@ -114,12 +118,26 @@ const GROUP_BY_PROPERTY: { id: ComparisonGroupBy; label: string }[] = [
   { id: 'day_of_week', label: 'Day of Week' },
 ];
 
-const ENTITY_GROUP_BYS = new Set<ComparisonGroupBy>(['player', 'deck', 'commander', 'color', 'deck_age']);
+const ENTITY_GROUP_BYS = new Set<ComparisonGroupBy>([
+  'player',
+  'deck',
+  'commander',
+  'color',
+  'deck_age',
+]);
 
 // ---- Sortable section for predefined builder ----
-function SortableSection({ id, onRemove }: { id: StatsSectionId; onRemove: (id: StatsSectionId) => void }) {
+function SortableSection({
+  id,
+  onRemove,
+}: {
+  id: StatsSectionId;
+  onRemove: (id: StatsSectionId) => void;
+}) {
   const def = getSectionDef(id);
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -134,7 +152,13 @@ function SortableSection({ id, onRemove }: { id: StatsSectionId; onRemove: (id: 
     <ListItem
       ref={setNodeRef}
       style={style}
-      sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, mb: 1, bgcolor: 'background.paper' }}
+      sx={{
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 1,
+        mb: 1,
+        bgcolor: 'background.paper',
+      }}
     >
       <ListItemIcon sx={{ minWidth: 36, cursor: 'grab' }} {...attributes} {...listeners}>
         <DragIndicatorIcon color="action" />
@@ -170,7 +194,7 @@ function ChipGroup<T extends string | number>({
         {label}
       </Typography>
       <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-        {options.map(opt => (
+        {options.map((opt) => (
           <Chip
             key={String(opt.value)}
             label={opt.label}
@@ -201,11 +225,16 @@ interface ComparisonBuilderProps {
 }
 
 function ComparisonBuilder({
-  groupBy, setGroupBy,
-  conditions, setConditions,
-  entityFilter, setEntityFilter,
-  metrics, setMetrics,
-  players, decks,
+  groupBy,
+  setGroupBy,
+  conditions,
+  setConditions,
+  entityFilter,
+  setEntityFilter,
+  metrics,
+  setMetrics,
+  players,
+  decks,
 }: ComparisonBuilderProps) {
   const isEntityGroup = ENTITY_GROUP_BYS.has(groupBy);
 
@@ -213,12 +242,15 @@ function ComparisonBuilder({
     setConditions({ ...conditions, [key]: val });
   }
 
-  function setFilter<K extends keyof ComparisonEntityFilter>(key: K, val: ComparisonEntityFilter[K]) {
+  function setFilter<K extends keyof ComparisonEntityFilter>(
+    key: K,
+    val: ComparisonEntityFilter[K]
+  ) {
     setEntityFilter({ ...entityFilter, [key]: val });
   }
 
   function toggleMetric(m: ComparisonMetric) {
-    setMetrics(metrics.includes(m) ? metrics.filter(x => x !== m) : [...metrics, m]);
+    setMetrics(metrics.includes(m) ? metrics.filter((x) => x !== m) : [...metrics, m]);
   }
 
   return (
@@ -237,7 +269,7 @@ function ComparisonBuilder({
             { value: 'standard', label: 'Standard' },
             { value: '2hg', label: '2HG' },
           ]}
-          onChange={v => setCond('game_type', v as 'all' | 'standard' | '2hg')}
+          onChange={(v) => setCond('game_type', v as 'all' | 'standard' | '2hg')}
         />
 
         <ChipGroup
@@ -249,7 +281,7 @@ function ComparisonBuilder({
             { value: 4, label: '4-player' },
             { value: 5, label: '5+' },
           ]}
-          onChange={v => setCond('pod_size', v === 0 ? undefined : (v as number))}
+          onChange={(v) => setCond('pod_size', v === 0 ? undefined : (v as number))}
         />
 
         <ChipGroup
@@ -261,7 +293,7 @@ function ComparisonBuilder({
             { value: 8, label: '8+ turns' },
             { value: 10, label: '10+ turns' },
           ]}
-          onChange={v => setCond('min_winning_turn', v === 0 ? undefined : (v as number))}
+          onChange={(v) => setCond('min_winning_turn', v === 0 ? undefined : (v as number))}
         />
 
         <ChipGroup
@@ -271,7 +303,7 @@ function ComparisonBuilder({
             { value: 1, label: '1st place only' },
             { value: 2, label: 'Top-2 finishes' },
           ]}
-          onChange={v => setCond('min_finish_position', v === 1 ? undefined : (v as number))}
+          onChange={(v) => setCond('min_finish_position', v === 1 ? undefined : (v as number))}
         />
 
         <Box sx={{ mb: 2 }}>
@@ -282,10 +314,15 @@ function ComparisonBuilder({
             multiple
             size="small"
             options={players}
-            getOptionLabel={p => p.name}
-            value={players.filter(p => conditions.required_player_ids?.includes(p.id) ?? false)}
-            onChange={(_, v) => setCond('required_player_ids', v.map(p => p.id))}
-            renderInput={params => <TextField {...params} placeholder="Any player" />}
+            getOptionLabel={(p) => p.name}
+            value={players.filter((p) => conditions.required_player_ids?.includes(p.id) ?? false)}
+            onChange={(_, v) =>
+              setCond(
+                'required_player_ids',
+                v.map((p) => p.id)
+              )
+            }
+            renderInput={(params) => <TextField {...params} placeholder="Any player" />}
             isOptionEqualToValue={(o, v) => o.id === v.id}
           />
         </Box>
@@ -301,7 +338,9 @@ function ComparisonBuilder({
             options={[] as string[]}
             value={conditions.required_commanders ?? []}
             onChange={(_, v) => setCond('required_commanders', v as string[])}
-            renderInput={params => <TextField {...params} placeholder="Type commander name + Enter" />}
+            renderInput={(params) => (
+              <TextField {...params} placeholder="Type commander name + Enter" />
+            )}
           />
         </Box>
 
@@ -311,7 +350,7 @@ function ComparisonBuilder({
             type="date"
             size="small"
             value={conditions.date_from ?? ''}
-            onChange={e => setCond('date_from', e.target.value || undefined)}
+            onChange={(e) => setCond('date_from', e.target.value || undefined)}
             InputLabelProps={{ shrink: true }}
             sx={{ flex: 1 }}
           />
@@ -320,7 +359,7 @@ function ComparisonBuilder({
             type="date"
             size="small"
             value={conditions.date_to ?? ''}
-            onChange={e => setCond('date_to', e.target.value || undefined)}
+            onChange={(e) => setCond('date_to', e.target.value || undefined)}
             InputLabelProps={{ shrink: true }}
             sx={{ flex: 1 }}
           />
@@ -331,7 +370,9 @@ function ComparisonBuilder({
           type="number"
           size="small"
           value={conditions.min_games ?? ''}
-          onChange={e => setCond('min_games', e.target.value ? parseInt(e.target.value) : undefined)}
+          onChange={(e) =>
+            setCond('min_games', e.target.value ? parseInt(e.target.value) : undefined)
+          }
           helperText="Exclude entities with fewer games"
           inputProps={{ min: 1, max: 50 }}
           sx={{ maxWidth: 220 }}
@@ -350,7 +391,7 @@ function ComparisonBuilder({
           Entity
         </Typography>
         <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
-          {GROUP_BY_ENTITY.map(opt => (
+          {GROUP_BY_ENTITY.map((opt) => (
             <Chip
               key={opt.id}
               label={opt.label}
@@ -367,7 +408,7 @@ function ComparisonBuilder({
           Game Property
         </Typography>
         <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-          {GROUP_BY_PROPERTY.map(opt => (
+          {GROUP_BY_PROPERTY.map((opt) => (
             <Chip
               key={opt.id}
               label={opt.label}
@@ -386,18 +427,28 @@ function ComparisonBuilder({
       {/* C — Narrow to */}
       <Box sx={{ mb: 3 }}>
         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
-          C — Narrow to <Typography component="span" variant="caption" color="text.secondary">(optional — leave empty for all)</Typography>
+          C — Narrow to{' '}
+          <Typography component="span" variant="caption" color="text.secondary">
+            (optional — leave empty for all)
+          </Typography>
         </Typography>
 
-        {(groupBy === 'player') && (
+        {groupBy === 'player' && (
           <Autocomplete
             multiple
             size="small"
             options={players}
-            getOptionLabel={p => p.name}
-            value={players.filter(p => entityFilter.player_ids?.includes(p.id) ?? false)}
-            onChange={(_, v) => setFilter('player_ids', v.map(p => p.id))}
-            renderInput={params => <TextField {...params} label="Specific players" placeholder="All players" />}
+            getOptionLabel={(p) => p.name}
+            value={players.filter((p) => entityFilter.player_ids?.includes(p.id) ?? false)}
+            onChange={(_, v) =>
+              setFilter(
+                'player_ids',
+                v.map((p) => p.id)
+              )
+            }
+            renderInput={(params) => (
+              <TextField {...params} label="Specific players" placeholder="All players" />
+            )}
             isOptionEqualToValue={(o, v) => o.id === v.id}
           />
         )}
@@ -408,22 +459,37 @@ function ComparisonBuilder({
               multiple
               size="small"
               options={players}
-              getOptionLabel={p => p.name}
-              value={players.filter(p => entityFilter.player_ids?.includes(p.id) ?? false)}
-              onChange={(_, v) => setFilter('player_ids', v.map(p => p.id))}
-              renderInput={params => <TextField {...params} label="Filter decks by player" placeholder="All players" />}
+              getOptionLabel={(p) => p.name}
+              value={players.filter((p) => entityFilter.player_ids?.includes(p.id) ?? false)}
+              onChange={(_, v) =>
+                setFilter(
+                  'player_ids',
+                  v.map((p) => p.id)
+                )
+              }
+              renderInput={(params) => (
+                <TextField {...params} label="Filter decks by player" placeholder="All players" />
+              )}
               isOptionEqualToValue={(o, v) => o.id === v.id}
             />
             <Autocomplete
               multiple
               size="small"
-              options={decks.filter(d =>
-                !entityFilter.player_ids?.length || entityFilter.player_ids.includes(d.player_id)
+              options={decks.filter(
+                (d) =>
+                  !entityFilter.player_ids?.length || entityFilter.player_ids.includes(d.player_id)
               )}
-              getOptionLabel={d => `${d.name} (${d.player_name})`}
-              value={decks.filter(d => entityFilter.deck_ids?.includes(d.id) ?? false)}
-              onChange={(_, v) => setFilter('deck_ids', v.map(d => d.id))}
-              renderInput={params => <TextField {...params} label="Specific decks" placeholder="All decks" />}
+              getOptionLabel={(d) => `${d.name} (${d.player_name})`}
+              value={decks.filter((d) => entityFilter.deck_ids?.includes(d.id) ?? false)}
+              onChange={(_, v) =>
+                setFilter(
+                  'deck_ids',
+                  v.map((d) => d.id)
+                )
+              }
+              renderInput={(params) => (
+                <TextField {...params} label="Specific decks" placeholder="All decks" />
+              )}
               isOptionEqualToValue={(o, v) => o.id === v.id}
             />
           </Stack>
@@ -437,7 +503,9 @@ function ComparisonBuilder({
             options={[] as string[]}
             value={entityFilter.commanders ?? []}
             onChange={(_, v) => setFilter('commanders', v as string[])}
-            renderInput={params => <TextField {...params} label="Specific commanders" placeholder="All commanders" />}
+            renderInput={(params) => (
+              <TextField {...params} label="Specific commanders" placeholder="All commanders" />
+            )}
           />
         )}
 
@@ -446,10 +514,45 @@ function ComparisonBuilder({
             multiple
             freeSolo
             size="small"
-            options={['W', 'U', 'B', 'R', 'G', 'WU', 'WB', 'WR', 'WG', 'UB', 'UR', 'UG', 'BR', 'BG', 'RG', 'WUB', 'WUR', 'WUG', 'WBR', 'WBG', 'WRG', 'UBR', 'UBG', 'URG', 'BRG', 'WUBR', 'WUBG', 'WURG', 'WBRG', 'UBRG', 'WUBRG', 'C']}
+            options={[
+              'W',
+              'U',
+              'B',
+              'R',
+              'G',
+              'WU',
+              'WB',
+              'WR',
+              'WG',
+              'UB',
+              'UR',
+              'UG',
+              'BR',
+              'BG',
+              'RG',
+              'WUB',
+              'WUR',
+              'WUG',
+              'WBR',
+              'WBG',
+              'WRG',
+              'UBR',
+              'UBG',
+              'URG',
+              'BRG',
+              'WUBR',
+              'WUBG',
+              'WURG',
+              'WBRG',
+              'UBRG',
+              'WUBRG',
+              'C',
+            ]}
             value={entityFilter.colors ?? []}
             onChange={(_, v) => setFilter('colors', v as string[])}
-            renderInput={params => <TextField {...params} label="Specific color identities" placeholder="All colors" />}
+            renderInput={(params) => (
+              <TextField {...params} label="Specific color identities" placeholder="All colors" />
+            )}
           />
         )}
 
@@ -462,10 +565,17 @@ function ComparisonBuilder({
               multiple
               size="small"
               options={players}
-              getOptionLabel={p => p.name}
-              value={players.filter(p => entityFilter.player_ids?.includes(p.id) ?? false)}
-              onChange={(_, v) => setFilter('player_ids', v.map(p => p.id))}
-              renderInput={params => <TextField {...params} label="Specific players" placeholder="All players" />}
+              getOptionLabel={(p) => p.name}
+              value={players.filter((p) => entityFilter.player_ids?.includes(p.id) ?? false)}
+              onChange={(_, v) =>
+                setFilter(
+                  'player_ids',
+                  v.map((p) => p.id)
+                )
+              }
+              renderInput={(params) => (
+                <TextField {...params} label="Specific players" placeholder="All players" />
+              )}
               isOptionEqualToValue={(o, v) => o.id === v.id}
             />
           </Box>
@@ -476,10 +586,17 @@ function ComparisonBuilder({
             multiple
             size="small"
             options={players}
-            getOptionLabel={p => p.name}
-            value={players.filter(p => entityFilter.player_ids?.includes(p.id) ?? false)}
-            onChange={(_, v) => setFilter('player_ids', v.map(p => p.id))}
-            renderInput={params => <TextField {...params} label="Specific players" placeholder="All players" />}
+            getOptionLabel={(p) => p.name}
+            value={players.filter((p) => entityFilter.player_ids?.includes(p.id) ?? false)}
+            onChange={(_, v) =>
+              setFilter(
+                'player_ids',
+                v.map((p) => p.id)
+              )
+            }
+            renderInput={(params) => (
+              <TextField {...params} label="Specific players" placeholder="All players" />
+            )}
             isOptionEqualToValue={(o, v) => o.id === v.id}
           />
         )}
@@ -490,11 +607,14 @@ function ComparisonBuilder({
       {/* D — Metrics */}
       <Box>
         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-          D — Metrics <Typography component="span" variant="caption" color="text.secondary">(select at least one)</Typography>
+          D — Metrics{' '}
+          <Typography component="span" variant="caption" color="text.secondary">
+            (select at least one)
+          </Typography>
         </Typography>
         <FormGroup>
           <Stack direction="row" flexWrap="wrap" useFlexGap gap={0}>
-            {METRIC_OPTIONS.map(m => (
+            {METRIC_OPTIONS.map((m) => (
               <FormControlLabel
                 key={m.id}
                 sx={{ width: { xs: '100%', sm: '50%' }, mr: 0 }}
@@ -508,7 +628,9 @@ function ComparisonBuilder({
                 label={
                   <Box>
                     <Typography variant="body2">{m.label}</Typography>
-                    <Typography variant="caption" color="text.secondary">{m.description}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {m.description}
+                    </Typography>
                   </Box>
                 }
               />
@@ -538,7 +660,11 @@ export default function CustomizePage() {
   const [compGroupBy, setCompGroupBy] = useState<ComparisonGroupBy>('player');
   const [compConditions, setCompConditions] = useState<ComparisonConditions>({});
   const [compEntityFilter, setCompEntityFilter] = useState<ComparisonEntityFilter>({});
-  const [compMetrics, setCompMetrics] = useState<ComparisonMetric[]>(['win_rate', 'total_games', 'wins']);
+  const [compMetrics, setCompMetrics] = useState<ComparisonMetric[]>([
+    'win_rate',
+    'total_games',
+    'wins',
+  ]);
 
   // Entity data for pickers
   const [players, setPlayers] = useState<Player[]>([]);
@@ -554,16 +680,20 @@ export default function CustomizePage() {
 
   const sensors = useSensors(
     useSensor(PointerSensor),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   useEffect(() => {
     fetchPanels();
     // Load players and decks for pickers
-    Promise.all([api.getPlayers(), api.getDecks()]).then(([p, d]) => {
-      setPlayers(p);
-      setDecks(d);
-    }).catch(() => {/* non-fatal */});
+    Promise.all([api.getPlayers(), api.getDecks()])
+      .then(([p, d]) => {
+        setPlayers(p);
+        setDecks(d);
+      })
+      .catch(() => {
+        /* non-fatal */
+      });
   }, []);
 
   const fetchPanels = async () => {
@@ -577,20 +707,20 @@ export default function CustomizePage() {
     }
   };
 
-  const availableSections = STATS_SECTIONS.filter(s => !selectedSections.includes(s.id));
+  const availableSections = STATS_SECTIONS.filter((s) => !selectedSections.includes(s.id));
 
   const handleAddSection = (id: StatsSectionId) => {
-    setSelectedSections(prev => [...prev, id]);
+    setSelectedSections((prev) => [...prev, id]);
   };
 
   const handleRemoveSection = useCallback((id: StatsSectionId) => {
-    setSelectedSections(prev => prev.filter(s => s !== id));
+    setSelectedSections((prev) => prev.filter((s) => s !== id));
   }, []);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      setSelectedSections(prev => {
+      setSelectedSections((prev) => {
         const oldIndex = prev.indexOf(active.id as StatsSectionId);
         const newIndex = prev.indexOf(over.id as StatsSectionId);
         return arrayMove(prev, oldIndex, newIndex);
@@ -673,7 +803,10 @@ export default function CustomizePage() {
           };
           await api.updateStatPanel(editingId, { name: panelName.trim(), config });
         } else {
-          await api.updateStatPanel(editingId, { name: panelName.trim(), sections: selectedSections });
+          await api.updateStatPanel(editingId, {
+            name: panelName.trim(),
+            sections: selectedSections,
+          });
         }
         setSnackbar('Panel updated');
       } else {
@@ -686,7 +819,11 @@ export default function CustomizePage() {
           };
           await api.createStatPanel({ name: panelName.trim(), panel_type: 'comparison', config });
         } else {
-          await api.createStatPanel({ name: panelName.trim(), panel_type: 'predefined', sections: selectedSections });
+          await api.createStatPanel({
+            name: panelName.trim(),
+            panel_type: 'predefined',
+            sections: selectedSections,
+          });
         }
         setSnackbar('Panel created');
       }
@@ -707,11 +844,18 @@ export default function CustomizePage() {
     setPreviewId(panel.id);
     // Comparison panels: fetch data if not already cached
     if (panel.panel_type === 'comparison' && panel.config && !previewData[panel.id]) {
-      setPreviewLoading(prev => new Set(prev).add(panel.id));
-      api.getComparison(panel.config)
-        .then(result => setPreviewData(prev => ({ ...prev, [panel.id]: result })))
-        .catch(() => setPreviewData(prev => ({ ...prev, [panel.id]: 'error' })))
-        .finally(() => setPreviewLoading(prev => { const s = new Set(prev); s.delete(panel.id); return s; }));
+      setPreviewLoading((prev) => new Set(prev).add(panel.id));
+      api
+        .getComparison(panel.config)
+        .then((result) => setPreviewData((prev) => ({ ...prev, [panel.id]: result })))
+        .catch(() => setPreviewData((prev) => ({ ...prev, [panel.id]: 'error' })))
+        .finally(() =>
+          setPreviewLoading((prev) => {
+            const s = new Set(prev);
+            s.delete(panel.id);
+            return s;
+          })
+        );
     }
   };
 
@@ -730,7 +874,7 @@ export default function CustomizePage() {
   const handleShareToggle = async (panel: StatPanel) => {
     try {
       const updated = await api.updateStatPanel(panel.id, { is_shared: !panel.is_shared });
-      setPanels(prev => prev.map(p => p.id === panel.id ? updated : p));
+      setPanels((prev) => prev.map((p) => (p.id === panel.id ? updated : p)));
       setSnackbar(updated.is_shared ? 'Panel shared' : 'Panel unshared');
     } catch {
       setSnackbar('Failed to update sharing');
@@ -740,35 +884,52 @@ export default function CustomizePage() {
   const copyShareLink = (panel: StatPanel) => {
     if (!panel.share_code) return;
     const url = `https://rickwphillips.com/app/projects/commander/stats?panel=${panel.share_code}`;
-    navigator.clipboard.writeText(url).then(() => {
-      setSnackbar('Share link copied to clipboard');
-    }).catch(() => {
-      setSnackbar('Failed to copy link');
-    });
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        setSnackbar('Share link copied to clipboard');
+      })
+      .catch(() => {
+        setSnackbar('Failed to copy link');
+      });
   };
 
   const groupByLabel = (gb: ComparisonGroupBy) =>
-    [...GROUP_BY_ENTITY, ...GROUP_BY_PROPERTY].find(o => o.id === gb)?.label ?? gb;
+    [...GROUP_BY_ENTITY, ...GROUP_BY_PROPERTY].find((o) => o.id === gb)?.label ?? gb;
 
-  const isSaveDisabled = saving || !panelName.trim() ||
+  const isSaveDisabled =
+    saving ||
+    !panelName.trim() ||
     (builderTab === 0 && selectedSections.length === 0) ||
     (builderTab === 1 && compMetrics.length === 0);
 
   if (loading) {
     return (
-      <PageContainer title="Customize Stats" subtitle="Create and manage custom stat panels" backHref="/stats" backLabel="Stats">
+      <PageContainer
+        title="Customize Stats"
+        subtitle="Create and manage custom stat panels"
+        backHref="/stats"
+        backLabel="Stats"
+      >
         <LoadingSpinner message="Loading panels..." />
       </PageContainer>
     );
   }
 
   return (
-    <PageContainer title="Customize Stats" subtitle="Create and manage custom stat panels" backHref="/stats" backLabel="Stats">
+    <PageContainer
+      title="Customize Stats"
+      subtitle="Create and manage custom stat panels"
+      backHref="/stats"
+      backLabel="Stats"
+    >
       {/* Your Panels */}
       <Card sx={{ mb: 4 }}>
         <CardContent>
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-            <Typography variant="h5" sx={{ fontWeight: 600 }}>Your Panels</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 600 }}>
+              Your Panels
+            </Typography>
             <Button
               variant="contained"
               startIcon={<AddIcon />}
@@ -781,7 +942,9 @@ export default function CustomizePage() {
           </Stack>
 
           {panels.length >= 10 && (
-            <Alert severity="info" sx={{ mb: 2 }}>Maximum of 10 panels reached.</Alert>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Maximum of 10 panels reached.
+            </Alert>
           )}
 
           {panels.length === 0 && !showBuilder && (
@@ -790,7 +953,7 @@ export default function CustomizePage() {
             </Typography>
           )}
 
-          {panels.map(panel => {
+          {panels.map((panel) => {
             const isPreviewing = previewId === panel.id;
             const isLoadingPreview = previewLoading.has(panel.id);
             const previewResult = previewData[panel.id];
@@ -801,7 +964,9 @@ export default function CustomizePage() {
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
                     <Box>
                       <Stack direction="row" alignItems="center" spacing={1}>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{panel.name}</Typography>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                          {panel.name}
+                        </Typography>
                         {panel.panel_type === 'comparison' && (
                           <Chip
                             icon={<CompareArrowsIcon sx={{ fontSize: 14 }} />}
@@ -821,7 +986,7 @@ export default function CustomizePage() {
                             color="primary"
                           />
                         ) : (
-                          panel.sections.map(s => {
+                          panel.sections.map((s) => {
                             const def = getSectionDef(s as StatsSectionId);
                             return def ? (
                               <Chip key={s} label={def.label} size="small" variant="outlined" />
@@ -837,7 +1002,11 @@ export default function CustomizePage() {
                           onClick={() => handleTogglePreview(panel)}
                           color={isPreviewing ? 'primary' : 'default'}
                         >
-                          {isPreviewing ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                          {isPreviewing ? (
+                            <VisibilityOffIcon fontSize="small" />
+                          ) : (
+                            <VisibilityIcon fontSize="small" />
+                          )}
                         </IconButton>
                       </Tooltip>
                       <FormControlLabel
@@ -848,7 +1017,12 @@ export default function CustomizePage() {
                             size="small"
                           />
                         }
-                        label={<ShareIcon fontSize="small" color={panel.is_shared ? 'primary' : 'action'} />}
+                        label={
+                          <ShareIcon
+                            fontSize="small"
+                            color={panel.is_shared ? 'primary' : 'action'}
+                          />
+                        }
                         sx={{ mr: 0 }}
                       />
                       {panel.is_shared && panel.share_code && (
@@ -859,12 +1033,20 @@ export default function CustomizePage() {
                         </Tooltip>
                       )}
                       <Tooltip title="Edit">
-                        <IconButton size="small" onClick={() => startEdit(panel)} disabled={showBuilder}>
+                        <IconButton
+                          size="small"
+                          onClick={() => startEdit(panel)}
+                          disabled={showBuilder}
+                        >
                           <EditIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Delete">
-                        <IconButton size="small" onClick={() => setDeleteTarget(panel)} color="error">
+                        <IconButton
+                          size="small"
+                          onClick={() => setDeleteTarget(panel)}
+                          color="error"
+                        >
                           <DeleteIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
@@ -879,13 +1061,15 @@ export default function CustomizePage() {
                           <CircularProgress size={24} />
                         </Stack>
                       ) : previewResult === 'error' ? (
-                        <Alert severity="error" sx={{ mb: 1 }}>Failed to load preview.</Alert>
+                        <Alert severity="error" sx={{ mb: 1 }}>
+                          Failed to load preview.
+                        </Alert>
                       ) : previewResult ? (
                         <ComparisonPanel result={previewResult} />
                       ) : null
                     ) : (
                       <List dense disablePadding>
-                        {panel.sections.map(s => {
+                        {panel.sections.map((s) => {
                           const def = getSectionDef(s as StatsSectionId);
                           if (!def) return null;
                           const Icon = def.icon;
@@ -934,7 +1118,7 @@ export default function CustomizePage() {
             <TextField
               label="Panel Name"
               value={panelName}
-              onChange={e => setPanelName(e.target.value)}
+              onChange={(e) => setPanelName(e.target.value)}
               fullWidth
               size="small"
               sx={{ mb: 2 }}
@@ -948,7 +1132,11 @@ export default function CustomizePage() {
               sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
             >
               <Tab label="Pre-built Sections" />
-              <Tab label="Custom Comparison" icon={<CompareArrowsIcon fontSize="small" />} iconPosition="start" />
+              <Tab
+                label="Custom Comparison"
+                icon={<CompareArrowsIcon fontSize="small" />}
+                iconPosition="start"
+              />
             </Tabs>
 
             {/* Predefined builder */}
@@ -960,10 +1148,12 @@ export default function CustomizePage() {
                     Available Sections
                   </Typography>
                   {availableSections.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary">All sections added</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      All sections added
+                    </Typography>
                   ) : (
                     <List dense>
-                      {availableSections.map(section => {
+                      {availableSections.map((section) => {
                         const Icon = section.icon;
                         return (
                           <ListItem
@@ -991,7 +1181,11 @@ export default function CustomizePage() {
                   )}
                 </Box>
 
-                <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' } }} />
+                <Divider
+                  orientation="vertical"
+                  flexItem
+                  sx={{ display: { xs: 'none', md: 'block' } }}
+                />
 
                 {/* Selected Sections (sortable) */}
                 <Box sx={{ flex: 1 }}>
@@ -1003,10 +1197,17 @@ export default function CustomizePage() {
                       Click sections from the left to add them
                     </Typography>
                   ) : (
-                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                      <SortableContext items={selectedSections} strategy={verticalListSortingStrategy}>
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext
+                        items={selectedSections}
+                        strategy={verticalListSortingStrategy}
+                      >
                         <List dense>
-                          {selectedSections.map(id => (
+                          {selectedSections.map((id) => (
                             <SortableSection key={id} id={id} onRemove={handleRemoveSection} />
                           ))}
                         </List>
@@ -1061,7 +1262,9 @@ export default function CustomizePage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
-          <Button onClick={handleDelete} color="error" variant="contained">Delete</Button>
+          <Button onClick={handleDelete} color="error" variant="contained">
+            Delete
+          </Button>
         </DialogActions>
       </Dialog>
 

@@ -111,14 +111,14 @@ export default function GameDetailPage() {
       backLabel="Back to Games"
       actions={
         <Stack direction="row" spacing={1}>
-          <Button
-            startIcon={<EditIcon />}
-            component={Link}
-            href={`/games/edit?id=${gameId}`}
-          >
+          <Button startIcon={<EditIcon />} component={Link} href={`/games/edit?id=${gameId}`}>
             Edit
           </Button>
-          <Button color="error" startIcon={<DeleteIcon />} onClick={() => setDeleteDialogOpen(true)}>
+          <Button
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={() => setDeleteDialogOpen(true)}
+          >
             Delete
           </Button>
         </Stack>
@@ -160,9 +160,7 @@ export default function GameDetailPage() {
                 />
               )}
               <Chip label={`${game.results?.length || 0} players`} />
-              {game.winning_turn && (
-                <Chip label={`Turn ${game.winning_turn}`} color="primary" />
-              )}
+              {game.winning_turn && <Chip label={`Turn ${game.winning_turn}`} color="primary" />}
             </Stack>
           </Stack>
         </CardContent>
@@ -208,11 +206,7 @@ export default function GameDetailPage() {
                               fontWeight: 700,
                             }}
                           >
-                            {isWinner ? (
-                              <EmojiEventsIcon />
-                            ) : (
-                              result.finish_position
-                            )}
+                            {isWinner ? <EmojiEventsIcon /> : result.finish_position}
                           </Box>
                           <Box>
                             <Stack direction="row" alignItems="center" spacing={1}>

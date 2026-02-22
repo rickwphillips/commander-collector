@@ -3,12 +3,14 @@
 ## Local Development
 
 ### 1. Start PHP server (Terminal 1)
+
 ```bash
 cd /Users/rick/FreddyRhetorickProjects/commander-collector/app
 php -S localhost:8080
 ```
 
 ### 2. Start Next.js dev server (Terminal 2)
+
 ```bash
 cd /Users/rick/FreddyRhetorickProjects/commander-collector
 npm run dev
@@ -23,6 +25,7 @@ Then open http://localhost:3000
 Bluehost restricts MySQL to localhost-only connections, so SSH tunneling won't work. You need a local MySQL database.
 
 **Setup Local MySQL:**
+
 ```bash
 # Install MySQL if needed
 brew install mysql
@@ -41,17 +44,20 @@ The PHP config auto-detects local vs production and uses the appropriate credent
 ## Commander Collector App
 
 ### Build
+
 ```bash
 cd /Users/rick/FreddyRhetorickProjects/commander-collector
 npm run build
 ```
 
 ### Deploy Static Files
+
 ```bash
 rsync -avz --delete --exclude '.DS_Store' /Users/rick/FreddyRhetorickProjects/commander-collector/out/ rickwphillips:~/public_html/app/projects/commander/
 ```
 
 ### Deploy PHP API
+
 ```bash
 rsync -avz --exclude '.DS_Store' /Users/rick/FreddyRhetorickProjects/commander-collector/app/php-api/ rickwphillips:~/public_html/php-api/
 ```
@@ -63,12 +69,14 @@ rsync -avz --exclude '.DS_Store' /Users/rick/FreddyRhetorickProjects/commander-c
 ## Main Portfolio Website
 
 ### Build
+
 ```bash
 cd /Users/rick/FreddyRhetorickProjects/website/rickwphillips.com
 npm run build
 ```
 
 ### Deploy Static Files
+
 ```bash
 rsync -avz --delete --exclude '.DS_Store' --exclude 'projects/commander' --exclude 'php-api' /Users/rick/FreddyRhetorickProjects/website/rickwphillips.com/out/ rickwphillips:~/public_html/app/
 ```
@@ -108,11 +116,11 @@ EOF"
 
 ## Server Paths
 
-| Local | Server |
-|-------|--------|
+| Local                  | Server                                  |
+| ---------------------- | --------------------------------------- |
 | Commander static files | `~/public_html/app/projects/commander/` |
-| Commander PHP API | `~/public_html/php-api/` |
-| Portfolio website | `~/public_html/app/` |
+| Commander PHP API      | `~/public_html/php-api/`                |
+| Portfolio website      | `~/public_html/app/`                    |
 
 ## URLs
 

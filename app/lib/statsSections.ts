@@ -30,23 +30,73 @@ export interface StatsSectionDef {
 }
 
 export const STATS_SECTIONS: StatsSectionDef[] = [
-  { id: 'overall', label: 'Overall Stats', description: 'Total games, players, decks, and average game length', icon: BarChartIcon },
-  { id: 'topPlayers', label: 'Top Players', description: 'Player win rates and rankings', icon: EmojiEventsIcon },
-  { id: 'topDecks', label: 'Top Decks', description: 'Deck win rates and rankings', icon: StyleIcon },
-  { id: 'topCommanders', label: 'Top Commanders', description: 'Commander popularity and win rates', icon: PeopleIcon },
+  {
+    id: 'overall',
+    label: 'Overall Stats',
+    description: 'Total games, players, decks, and average game length',
+    icon: BarChartIcon,
+  },
+  {
+    id: 'topPlayers',
+    label: 'Top Players',
+    description: 'Player win rates and rankings',
+    icon: EmojiEventsIcon,
+  },
+  {
+    id: 'topDecks',
+    label: 'Top Decks',
+    description: 'Deck win rates and rankings',
+    icon: StyleIcon,
+  },
+  {
+    id: 'topCommanders',
+    label: 'Top Commanders',
+    description: 'Commander popularity and win rates',
+    icon: PeopleIcon,
+  },
   { id: 'h2h', label: 'Head-to-Head', description: '1v1 matchup records', icon: CompareArrowsIcon },
-  { id: 'multiplayer', label: 'Multiplayer', description: 'Multiplayer matchup records', icon: GroupsIcon },
-  { id: 'twoHg', label: 'Two-Headed Giant', description: 'Team records, pairings, and recent games', icon: HandshakeIcon },
-  { id: 'colorMeta', label: 'Color Meta Analysis', description: 'Win rates by color identity', icon: PaletteIcon },
-  { id: 'podSize', label: 'Performance by Pod Size', description: 'Player stats broken down by pod size', icon: GroupsIcon },
-  { id: 'playerStreaks', label: 'Player Streaks & Form', description: 'Current streaks, best streaks, and trends', icon: TrendingUpIcon },
-  { id: 'deckStreaks', label: 'Deck Streaks & Form', description: 'Deck streaks, best streaks, and trends', icon: TrendingUpIcon },
+  {
+    id: 'multiplayer',
+    label: 'Multiplayer',
+    description: 'Multiplayer matchup records',
+    icon: GroupsIcon,
+  },
+  {
+    id: 'twoHg',
+    label: 'Two-Headed Giant',
+    description: 'Team records, pairings, and recent games',
+    icon: HandshakeIcon,
+  },
+  {
+    id: 'colorMeta',
+    label: 'Color Meta Analysis',
+    description: 'Win rates by color identity',
+    icon: PaletteIcon,
+  },
+  {
+    id: 'podSize',
+    label: 'Performance by Pod Size',
+    description: 'Player stats broken down by pod size',
+    icon: GroupsIcon,
+  },
+  {
+    id: 'playerStreaks',
+    label: 'Player Streaks & Form',
+    description: 'Current streaks, best streaks, and trends',
+    icon: TrendingUpIcon,
+  },
+  {
+    id: 'deckStreaks',
+    label: 'Deck Streaks & Form',
+    description: 'Deck streaks, best streaks, and trends',
+    icon: TrendingUpIcon,
+  },
 ];
 
-export const DEFAULT_SECTION_ORDER: StatsSectionId[] = STATS_SECTIONS.map(s => s.id);
+export const DEFAULT_SECTION_ORDER: StatsSectionId[] = STATS_SECTIONS.map((s) => s.id);
 
 export const VALID_SECTION_IDS = new Set<string>(DEFAULT_SECTION_ORDER);
 
 export function getSectionDef(id: StatsSectionId): StatsSectionDef | undefined {
-  return STATS_SECTIONS.find(s => s.id === id);
+  return STATS_SECTIONS.find((s) => s.id === id);
 }

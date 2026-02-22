@@ -5,9 +5,8 @@ export const API_BASE = '/php-api/';
 const AUTH_TOKEN_KEY = 'auth_token';
 
 // Login page URL (lives in the portfolio site)
-const LOGIN_URL = process.env.NODE_ENV === 'development'
-  ? 'http://localhost:3000/app/login/'
-  : '/app/login/';
+const LOGIN_URL =
+  process.env.NODE_ENV === 'development' ? 'http://localhost:3000/app/login/' : '/app/login/';
 
 function getAuthHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return {};
@@ -23,10 +22,7 @@ function redirectToLogin() {
 }
 
 // Helper for API calls
-export async function apiFetch<T>(
-  endpoint: string,
-  options?: RequestInit
-): Promise<T> {
+export async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
   // Handle query strings properly - insert .php before the query string
   let url: string;
   if (endpoint.includes('?')) {
@@ -68,7 +64,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  updatePlayer: (id: number, data: Partial<import('./types').CreatePlayerInput> & { user_id?: number | null }) =>
+  updatePlayer: (
+    id: number,
+    data: Partial<import('./types').CreatePlayerInput> & { user_id?: number | null }
+  ) =>
     apiFetch<{ success: boolean }>(`/players?id=${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -102,7 +101,14 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  updateGame: (id: number, data: Partial<import('./types').CreateGameInput> & { played_at?: string; winning_turn?: number | null; notes?: string | null }) =>
+  updateGame: (
+    id: number,
+    data: Partial<import('./types').CreateGameInput> & {
+      played_at?: string;
+      winning_turn?: number | null;
+      notes?: string | null;
+    }
+  ) =>
     apiFetch<{ success: boolean }>(`/games?id=${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -112,14 +118,10 @@ export const api = {
 
   // Stats
   getStats: () => apiFetch<import('./types').StatsResponse>('/stats'),
-  getPlayerStats: (id: number) =>
-    apiFetch<import('./types').PlayerStats>(`/stats?player_id=${id}`),
-  getDeckStats: (id: number) =>
-    apiFetch<import('./types').DeckStats>(`/stats?deck_id=${id}`),
+  getPlayerStats: (id: number) => apiFetch<import('./types').PlayerStats>(`/stats?player_id=${id}`),
+  getDeckStats: (id: number) => apiFetch<import('./types').DeckStats>(`/stats?deck_id=${id}`),
   getHeadToHead: (player1Id?: number, player2Id?: number) => {
-    const params = player1Id && player2Id
-      ? `?player1=${player1Id}&player2=${player2Id}`
-      : '';
+    const params = player1Id && player2Id ? `?player1=${player1Id}&player2=${player2Id}` : '';
     return apiFetch<import('./types').HeadToHeadResponse>(`/head-to-head${params}`);
   },
 
@@ -129,7 +131,8 @@ export const api = {
   // Stat Panels
   getStatPanels: () => apiFetch<import('./types').StatPanelsResponse>('/stat-panels'),
   getStatPanel: (id: number) => apiFetch<import('./types').StatPanel>(`/stat-panels?id=${id}`),
-  getStatPanelByCode: (code: string) => apiFetch<import('./types').StatPanel>(`/stat-panels?share_code=${code}`),
+  getStatPanelByCode: (code: string) =>
+    apiFetch<import('./types').StatPanel>(`/stat-panels?share_code=${code}`),
   createStatPanel: (data: import('./types').CreateStatPanelInput) =>
     apiFetch<import('./types').StatPanel>('/stat-panels', {
       method: 'POST',
@@ -144,7 +147,8 @@ export const api = {
     apiFetch<{ success: boolean }>(`/stat-panels?id=${id}`, { method: 'DELETE' }),
 
   // Users (admin)
-  getUsers: () => apiFetch<{ id: number; username: string; display_name: string; role: string }[]>('/auth/users'),
+  getUsers: () =>
+    apiFetch<{ id: number; username: string; display_name: string; role: string }[]>('/auth/users'),
 
   // Comparison Builder
   getComparison: (config: import('./types').ComparisonConfig) => {
@@ -159,7 +163,8 @@ function buildComparisonParams(config: import('./types').ComparisonConfig): stri
   parts.push(`metrics=${encodeURIComponent(config.metrics.join(','))}`);
 
   const c = config.conditions;
-  if (c.game_type && c.game_type !== 'all') parts.push(`game_type=${encodeURIComponent(c.game_type)}`);
+  if (c.game_type && c.game_type !== 'all')
+    parts.push(`game_type=${encodeURIComponent(c.game_type)}`);
   if (c.pod_size != null) parts.push(`pod_size=${c.pod_size}`);
   if (c.min_winning_turn != null) parts.push(`min_winning_turn=${c.min_winning_turn}`);
   if (c.min_finish_position != null) parts.push(`min_finish_position=${c.min_finish_position}`);
@@ -168,17 +173,22 @@ function buildComparisonParams(config: import('./types').ComparisonConfig): stri
   if (c.min_games != null) parts.push(`min_games=${c.min_games}`);
 
   if (c.required_player_ids?.length) {
-    c.required_player_ids.forEach(id => parts.push(`required_player_ids[]=${id}`));
+    c.required_player_ids.forEach((id) => parts.push(`required_player_ids[]=${id}`));
   }
   if (c.required_commanders?.length) {
-    c.required_commanders.forEach(cmd => parts.push(`required_commanders[]=${encodeURIComponent(cmd)}`));
+    c.required_commanders.forEach((cmd) =>
+      parts.push(`required_commanders[]=${encodeURIComponent(cmd)}`)
+    );
   }
 
   const ef = config.entityFilter;
-  if (ef?.player_ids?.length) ef.player_ids.forEach(id => parts.push(`filter_player_ids[]=${id}`));
-  if (ef?.deck_ids?.length) ef.deck_ids.forEach(id => parts.push(`filter_deck_ids[]=${id}`));
-  if (ef?.commanders?.length) ef.commanders.forEach(cmd => parts.push(`filter_commanders[]=${encodeURIComponent(cmd)}`));
-  if (ef?.colors?.length) ef.colors.forEach(c => parts.push(`filter_colors[]=${encodeURIComponent(c)}`));
+  if (ef?.player_ids?.length)
+    ef.player_ids.forEach((id) => parts.push(`filter_player_ids[]=${id}`));
+  if (ef?.deck_ids?.length) ef.deck_ids.forEach((id) => parts.push(`filter_deck_ids[]=${id}`));
+  if (ef?.commanders?.length)
+    ef.commanders.forEach((cmd) => parts.push(`filter_commanders[]=${encodeURIComponent(cmd)}`));
+  if (ef?.colors?.length)
+    ef.colors.forEach((c) => parts.push(`filter_colors[]=${encodeURIComponent(c)}`));
 
   return parts.join('&');
 }

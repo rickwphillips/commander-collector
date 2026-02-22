@@ -121,30 +121,22 @@ export default function Dashboard() {
           <Fade in={mounted} timeout={1000}>
             <Grid container spacing={3} sx={{ mb: 4 }}>
               <Grid size={{ xs: 6, md: 3 }}>
-                <StatsCard
-                  title="Total Games"
-                  value={stats.overall.total_games}
-                  color="#D2691E"
-                />
+                <StatsCard title="Total Games" value={stats.overall.total_games} color="#D2691E" />
               </Grid>
               <Grid size={{ xs: 6, md: 3 }}>
-                <StatsCard
-                  title="Players"
-                  value={stats.overall.total_players}
-                  color="#8B4513"
-                />
+                <StatsCard title="Players" value={stats.overall.total_players} color="#8B4513" />
               </Grid>
               <Grid size={{ xs: 6, md: 3 }}>
-                <StatsCard
-                  title="Decks"
-                  value={stats.overall.total_decks}
-                  color="#DAA520"
-                />
+                <StatsCard title="Decks" value={stats.overall.total_decks} color="#DAA520" />
               </Grid>
               <Grid size={{ xs: 6, md: 3 }}>
                 <StatsCard
                   title="Avg. Turns"
-                  value={stats.overall.avg_game_length != null ? Number(stats.overall.avg_game_length).toFixed(1) : '-'}
+                  value={
+                    stats.overall.avg_game_length != null
+                      ? Number(stats.overall.avg_game_length).toFixed(1)
+                      : '-'
+                  }
                   color="#CD853F"
                 />
               </Grid>
@@ -190,11 +182,7 @@ export default function Dashboard() {
             <Grid key={item.title} size={{ xs: 6, md: 3 }}>
               <Grow in={mounted} timeout={800 + index * 150}>
                 <Card className={styles.navCard}>
-                  <CardActionArea
-                    component={Link}
-                    href={item.href}
-                    sx={{ height: '100%' }}
-                  >
+                  <CardActionArea component={Link} href={item.href} sx={{ height: '100%' }}>
                     <CardContent sx={{ textAlign: 'center', py: 3 }}>
                       <Box sx={{ color: item.color, mb: 2 }}>{item.icon}</Box>
                       <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
@@ -233,9 +221,7 @@ export default function Dashboard() {
                         >
                           <Box>
                             <Stack direction="row" alignItems="center" spacing={1}>
-                              <EmojiEventsIcon
-                                sx={{ color: '#DAA520', fontSize: 20 }}
-                              />
+                              <EmojiEventsIcon sx={{ color: '#DAA520', fontSize: 20 }} />
                               <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                                 {game.winner}
                               </Typography>
@@ -244,11 +230,7 @@ export default function Dashboard() {
                               {game.winning_deck} ({game.winning_commander})
                             </Typography>
                           </Box>
-                          <Stack
-                            direction="row"
-                            spacing={1}
-                            alignItems="center"
-                          >
+                          <Stack direction="row" spacing={1} alignItems="center">
                             {game.winning_turn && (
                               <Chip
                                 label={`Turn ${game.winning_turn}`}

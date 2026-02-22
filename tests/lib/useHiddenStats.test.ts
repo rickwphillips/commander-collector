@@ -30,22 +30,30 @@ describe('useHiddenStats', () => {
   it('toggleSection hides a visible section', async () => {
     const { result } = renderHook(() => useHiddenStats());
     await waitFor(() => expect(result.current.loaded).toBe(true));
-    act(() => { result.current.toggleSection('overall'); });
+    act(() => {
+      result.current.toggleSection('overall');
+    });
     expect(result.current.hiddenSections.has('overall')).toBe(true);
   });
 
   it('toggleSection shows a previously hidden section', async () => {
     const { result } = renderHook(() => useHiddenStats());
     await waitFor(() => expect(result.current.loaded).toBe(true));
-    act(() => { result.current.toggleSection('overall'); });
-    act(() => { result.current.toggleSection('overall'); });
+    act(() => {
+      result.current.toggleSection('overall');
+    });
+    act(() => {
+      result.current.toggleSection('overall');
+    });
     expect(result.current.hiddenSections.has('overall')).toBe(false);
   });
 
   it('toggleSection persists to localStorage', async () => {
     const { result } = renderHook(() => useHiddenStats());
     await waitFor(() => expect(result.current.loaded).toBe(true));
-    act(() => { result.current.toggleSection('topPlayers'); });
+    act(() => {
+      result.current.toggleSection('topPlayers');
+    });
     const stored = JSON.parse(localStorage.getItem(HIDDEN_SECTIONS_KEY)!);
     expect(stored).toContain('topPlayers');
   });
@@ -53,24 +61,36 @@ describe('useHiddenStats', () => {
   it('showAll clears hiddenSections', async () => {
     const { result } = renderHook(() => useHiddenStats());
     await waitFor(() => expect(result.current.loaded).toBe(true));
-    act(() => { result.current.toggleSection('overall'); });
-    act(() => { result.current.toggleSection('h2h'); });
-    act(() => { result.current.showAll(); });
+    act(() => {
+      result.current.toggleSection('overall');
+    });
+    act(() => {
+      result.current.toggleSection('h2h');
+    });
+    act(() => {
+      result.current.showAll();
+    });
     expect(result.current.hiddenSections.size).toBe(0);
   });
 
   it('showAll persists empty set to localStorage', async () => {
     const { result } = renderHook(() => useHiddenStats());
     await waitFor(() => expect(result.current.loaded).toBe(true));
-    act(() => { result.current.toggleSection('overall'); });
-    act(() => { result.current.showAll(); });
+    act(() => {
+      result.current.toggleSection('overall');
+    });
+    act(() => {
+      result.current.showAll();
+    });
     expect(localStorage.getItem(HIDDEN_SECTIONS_KEY)).toBe('[]');
   });
 
   it('hideAll hides specified sections', async () => {
     const { result } = renderHook(() => useHiddenStats());
     await waitFor(() => expect(result.current.loaded).toBe(true));
-    act(() => { result.current.hideAll(['overall', 'h2h', 'colorMeta']); });
+    act(() => {
+      result.current.hideAll(['overall', 'h2h', 'colorMeta']);
+    });
     expect(result.current.hiddenSections.has('overall')).toBe(true);
     expect(result.current.hiddenSections.has('h2h')).toBe(true);
     expect(result.current.hiddenSections.has('colorMeta')).toBe(true);
@@ -80,22 +100,30 @@ describe('useHiddenStats', () => {
   it('togglePanelVisibility hides a panel', async () => {
     const { result } = renderHook(() => useHiddenStats());
     await waitFor(() => expect(result.current.loaded).toBe(true));
-    act(() => { result.current.togglePanelVisibility(42); });
+    act(() => {
+      result.current.togglePanelVisibility(42);
+    });
     expect(result.current.hiddenPanelIds.has(42)).toBe(true);
   });
 
   it('togglePanelVisibility shows a hidden panel when toggled again', async () => {
     const { result } = renderHook(() => useHiddenStats());
     await waitFor(() => expect(result.current.loaded).toBe(true));
-    act(() => { result.current.togglePanelVisibility(42); });
-    act(() => { result.current.togglePanelVisibility(42); });
+    act(() => {
+      result.current.togglePanelVisibility(42);
+    });
+    act(() => {
+      result.current.togglePanelVisibility(42);
+    });
     expect(result.current.hiddenPanelIds.has(42)).toBe(false);
   });
 
   it('togglePanelVisibility persists to localStorage', async () => {
     const { result } = renderHook(() => useHiddenStats());
     await waitFor(() => expect(result.current.loaded).toBe(true));
-    act(() => { result.current.togglePanelVisibility(7); });
+    act(() => {
+      result.current.togglePanelVisibility(7);
+    });
     const stored = JSON.parse(localStorage.getItem(HIDDEN_PANELS_KEY)!);
     expect(stored).toContain(7);
   });

@@ -235,15 +235,29 @@ export type MtgColor = 'W' | 'U' | 'B' | 'R' | 'G';
 export type PanelType = 'predefined' | 'comparison';
 
 export type ComparisonGroupBy =
-  | 'player' | 'deck' | 'commander' | 'color' | 'deck_age'
-  | 'pod_size' | 'game_length' | 'game_type'
-  | 'month' | 'year' | 'season' | 'day_of_week';
+  | 'player'
+  | 'deck'
+  | 'commander'
+  | 'color'
+  | 'deck_age'
+  | 'pod_size'
+  | 'game_length'
+  | 'game_type'
+  | 'month'
+  | 'year'
+  | 'season'
+  | 'day_of_week';
 
 export type ComparisonMetric =
-  | 'win_rate' | 'total_games' | 'wins'
-  | 'avg_finish_position' | 'recent_win_rate'
-  | 'avg_survival_turns' | 'avg_turns_to_win'
-  | 'top2_rate' | 'elimination_rate';
+  | 'win_rate'
+  | 'total_games'
+  | 'wins'
+  | 'avg_finish_position'
+  | 'recent_win_rate'
+  | 'avg_survival_turns'
+  | 'avg_turns_to_win'
+  | 'top2_rate'
+  | 'elimination_rate';
 
 export interface ComparisonConditions {
   game_type?: 'all' | 'standard' | '2hg';

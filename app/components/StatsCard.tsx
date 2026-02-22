@@ -11,13 +11,7 @@ interface StatsCardProps {
   color?: string;
 }
 
-export function StatsCard({
-  title,
-  value,
-  subtitle,
-  icon,
-  color = '#D2691E'
-}: StatsCardProps) {
+export function StatsCard({ title, value, subtitle, icon, color = '#D2691E' }: StatsCardProps) {
   return (
     <Card
       sx={{
@@ -31,9 +25,7 @@ export function StatsCard({
         '&:hover': {
           transform: 'translateY(-4px)',
           boxShadow: (theme) =>
-            theme.palette.mode === 'dark'
-              ? `0 8px 24px ${color}30`
-              : `0 8px 24px ${color}20`,
+            theme.palette.mode === 'dark' ? `0 8px 24px ${color}30` : `0 8px 24px ${color}20`,
         },
       }}
     >

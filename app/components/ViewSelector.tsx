@@ -21,12 +21,17 @@ interface ViewSelectorProps {
   sharedPanels: StatPanel[];
 }
 
-export function ViewSelector({ activeView, onViewChange, ownPanels, sharedPanels }: ViewSelectorProps) {
+export function ViewSelector({
+  activeView,
+  onViewChange,
+  ownPanels,
+  sharedPanels,
+}: ViewSelectorProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
 
   const allPanels = [...ownPanels, ...sharedPanels];
-  const activePanel = activeView !== 'default' ? allPanels.find(p => p.id === activeView) : null;
+  const activePanel = activeView !== 'default' ? allPanels.find((p) => p.id === activeView) : null;
   const label = activePanel ? activePanel.name : 'Default View';
 
   return (
@@ -51,7 +56,10 @@ export function ViewSelector({ activeView, onViewChange, ownPanels, sharedPanels
       >
         <MenuItem
           selected={activeView === 'default'}
-          onClick={() => { onViewChange('default'); setAnchorEl(null); }}
+          onClick={() => {
+            onViewChange('default');
+            setAnchorEl(null);
+          }}
         >
           <ListItemText primary="Default View" secondary="All sections" />
         </MenuItem>
@@ -59,16 +67,16 @@ export function ViewSelector({ activeView, onViewChange, ownPanels, sharedPanels
         {ownPanels.length > 0 && [
           <Divider key="own-divider" />,
           <ListSubheader key="own-header">My Panels</ListSubheader>,
-          ...ownPanels.map(panel => (
+          ...ownPanels.map((panel) => (
             <MenuItem
               key={panel.id}
               selected={activeView === panel.id}
-              onClick={() => { onViewChange(panel.id); setAnchorEl(null); }}
+              onClick={() => {
+                onViewChange(panel.id);
+                setAnchorEl(null);
+              }}
             >
-              <ListItemText
-                primary={panel.name}
-                secondary={`${panel.sections.length} sections`}
-              />
+              <ListItemText primary={panel.name} secondary={`${panel.sections.length} sections`} />
             </MenuItem>
           )),
         ]}
@@ -76,15 +84,20 @@ export function ViewSelector({ activeView, onViewChange, ownPanels, sharedPanels
         {sharedPanels.length > 0 && [
           <Divider key="shared-divider" />,
           <ListSubheader key="shared-header">Shared</ListSubheader>,
-          ...sharedPanels.map(panel => (
+          ...sharedPanels.map((panel) => (
             <MenuItem
               key={panel.id}
               selected={activeView === panel.id}
-              onClick={() => { onViewChange(panel.id); setAnchorEl(null); }}
+              onClick={() => {
+                onViewChange(panel.id);
+                setAnchorEl(null);
+              }}
             >
               <ListItemText
                 primary={panel.name}
-                secondary={panel.owner_name ? `by ${panel.owner_name}` : `${panel.sections.length} sections`}
+                secondary={
+                  panel.owner_name ? `by ${panel.owner_name}` : `${panel.sections.length} sections`
+                }
               />
             </MenuItem>
           )),

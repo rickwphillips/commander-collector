@@ -59,10 +59,7 @@ export default function NewDeckPage() {
     }
   };
 
-  const handleColorsChange = (
-    _event: React.MouseEvent<HTMLElement>,
-    newColors: string[]
-  ) => {
+  const handleColorsChange = (_event: React.MouseEvent<HTMLElement>, newColors: string[]) => {
     setColors(newColors);
   };
 
@@ -163,12 +160,8 @@ export default function NewDeckPage() {
                       sx={{
                         width: 48,
                         height: 48,
-                        backgroundColor: colors.includes(color.code)
-                          ? color.color
-                          : 'transparent',
-                        color: colors.includes(color.code)
-                          ? color.textColor
-                          : 'text.primary',
+                        backgroundColor: colors.includes(color.code) ? color.color : 'transparent',
+                        color: colors.includes(color.code) ? color.textColor : 'text.primary',
                         border: `2px solid ${color.color}`,
                         '&:hover': {
                           backgroundColor: color.color,
@@ -185,14 +178,16 @@ export default function NewDeckPage() {
                       }}
                     >
                       <Tooltip title={color.name}>
-                        <span style={{ fontWeight: 700, fontSize: 18 }}>
-                          {color.code}
-                        </span>
+                        <span style={{ fontWeight: 700, fontSize: 18 }}>{color.code}</span>
                       </Tooltip>
                     </ToggleButton>
                   ))}
                 </ToggleButtonGroup>
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ mt: 1, display: 'block' }}
+                >
                   {colors.length === 0
                     ? 'Leave empty for colorless'
                     : `Selected: ${colors.join('')}`}

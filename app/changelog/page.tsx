@@ -1,16 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  Card,
-  CardContent,
-  Typography,
-  Stack,
-  Box,
-  Chip,
-  Grow,
-  Divider,
-} from '@mui/material';
+import { Card, CardContent, Typography, Stack, Box, Chip, Grow, Divider } from '@mui/material';
 import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import BuildIcon from '@mui/icons-material/Build';
 import BugReportIcon from '@mui/icons-material/BugReport';
@@ -31,11 +22,18 @@ interface Release {
   changes: Change[];
 }
 
-const changeTypeConfig: Record<ChangeType, { label: string; color: string; icon: React.ReactElement }> = {
+const changeTypeConfig: Record<
+  ChangeType,
+  { label: string; color: string; icon: React.ReactElement }
+> = {
   added: { label: 'Added', color: '#2e7d32', icon: <NewReleasesIcon sx={{ fontSize: 14 }} /> },
   changed: { label: 'Changed', color: '#ed6c02', icon: <BuildIcon sx={{ fontSize: 14 }} /> },
   fixed: { label: 'Fixed', color: '#d32f2f', icon: <BugReportIcon sx={{ fontSize: 14 }} /> },
-  improved: { label: 'Improved', color: '#0288d1', icon: <AutoAwesomeIcon sx={{ fontSize: 14 }} /> },
+  improved: {
+    label: 'Improved',
+    color: '#0288d1',
+    icon: <AutoAwesomeIcon sx={{ fontSize: 14 }} />,
+  },
 };
 
 const releases: Release[] = [
@@ -44,8 +42,14 @@ const releases: Release[] = [
     date: '2026-02-22',
     title: 'Coverage Reporting',
     changes: [
-      { type: 'added', text: 'V8 coverage reporting — npm run test:coverage shows per-file line/branch/function percentages' },
-      { type: 'improved', text: 'Tested files hit 95–100% line coverage; statsSections, ColorIdentityChips, and StatsCard at 100%' },
+      {
+        type: 'added',
+        text: 'V8 coverage reporting — npm run test:coverage shows per-file line/branch/function percentages',
+      },
+      {
+        type: 'improved',
+        text: 'Tested files hit 95–100% line coverage; statsSections, ColorIdentityChips, and StatsCard at 100%',
+      },
     ],
   },
   {
@@ -54,9 +58,18 @@ const releases: Release[] = [
     title: 'Test Suite',
     changes: [
       { type: 'added', text: 'Vitest test suite — 58 tests across 5 files' },
-      { type: 'added', text: 'Unit tests for statsSections: getSectionDef lookups, VALID_SECTION_IDS membership, DEFAULT_SECTION_ORDER' },
-      { type: 'added', text: 'Hook tests for useHiddenStats: toggle, showAll, hideAll, panel visibility, localStorage persistence' },
-      { type: 'added', text: 'API tests: auth headers, .php endpoint insertion, 401 handling, typed method endpoints' },
+      {
+        type: 'added',
+        text: 'Unit tests for statsSections: getSectionDef lookups, VALID_SECTION_IDS membership, DEFAULT_SECTION_ORDER',
+      },
+      {
+        type: 'added',
+        text: 'Hook tests for useHiddenStats: toggle, showAll, hideAll, panel visibility, localStorage persistence',
+      },
+      {
+        type: 'added',
+        text: 'API tests: auth headers, .php endpoint insertion, 401 handling, typed method endpoints',
+      },
       { type: 'added', text: 'Component tests for ColorIdentityChips and StatsCard' },
     ],
   },
@@ -65,9 +78,18 @@ const releases: Release[] = [
     date: '2026-02-20',
     title: 'Auth & Security',
     changes: [
-      { type: 'fixed', text: 'Logout now works correctly when switching between apps — login page clears its own stored token on explicit logout' },
-      { type: 'fixed', text: 'Auth user IDs upgraded to UUIDs — removed integer casts that would break after the ID type migration' },
-      { type: 'improved', text: 'User registration and bootstrap generate a UUID before insert rather than relying on lastInsertId()' },
+      {
+        type: 'fixed',
+        text: 'Logout now works correctly when switching between apps — login page clears its own stored token on explicit logout',
+      },
+      {
+        type: 'fixed',
+        text: 'Auth user IDs upgraded to UUIDs — removed integer casts that would break after the ID type migration',
+      },
+      {
+        type: 'improved',
+        text: 'User registration and bootstrap generate a UUID before insert rather than relying on lastInsertId()',
+      },
     ],
   },
   {
@@ -75,14 +97,35 @@ const releases: Release[] = [
     date: '2026-02-19',
     title: 'Comparison Builder',
     changes: [
-      { type: 'added', text: 'Comparison Builder — create custom stat queries with conditions, group-by, entity filters, and metrics' },
-      { type: 'added', text: '12 group-by types: Player, Deck, Commander, Color, Deck Age, Pod Size, Game Length, Game Type, Month, Year, Season, Day of Week' },
-      { type: 'added', text: '9 metrics: Win Rate, Wins, Total Games, Avg Finish Position, Recent Win Rate, Avg Survival Turns, Avg Turns to Win, Top-2 Rate, Elimination Rate' },
-      { type: 'added', text: 'Condition filters: game type, pod size, game length, required player/commander in pod, finish position, date range, min games threshold' },
-      { type: 'added', text: 'Color identity chips in comparison results for deck and color group-bys' },
+      {
+        type: 'added',
+        text: 'Comparison Builder — create custom stat queries with conditions, group-by, entity filters, and metrics',
+      },
+      {
+        type: 'added',
+        text: '12 group-by types: Player, Deck, Commander, Color, Deck Age, Pod Size, Game Length, Game Type, Month, Year, Season, Day of Week',
+      },
+      {
+        type: 'added',
+        text: '9 metrics: Win Rate, Wins, Total Games, Avg Finish Position, Recent Win Rate, Avg Survival Turns, Avg Turns to Win, Top-2 Rate, Elimination Rate',
+      },
+      {
+        type: 'added',
+        text: 'Condition filters: game type, pod size, game length, required player/commander in pod, finish position, date range, min games threshold',
+      },
+      {
+        type: 'added',
+        text: 'Color identity chips in comparison results for deck and color group-bys',
+      },
       { type: 'added', text: 'Panel preview button on the Customize page with inline results' },
-      { type: 'added', text: 'Inline panel toggle — show any panel directly on the Stats page from the settings drawer' },
-      { type: 'improved', text: 'Section Visibility drawer now includes Your Panels and Shared Panels sections' },
+      {
+        type: 'added',
+        text: 'Inline panel toggle — show any panel directly on the Stats page from the settings drawer',
+      },
+      {
+        type: 'improved',
+        text: 'Section Visibility drawer now includes Your Panels and Shared Panels sections',
+      },
     ],
   },
   {
@@ -91,14 +134,32 @@ const releases: Release[] = [
     title: 'Stats Customization & Sharing',
     changes: [
       { type: 'added', text: 'Hide stats sections — click the eye icon on any section to hide it' },
-      { type: 'added', text: 'Settings drawer — toggle all section visibility with Show All / Hide All' },
-      { type: 'added', text: 'Custom panels — save named views with your preferred sections and order' },
+      {
+        type: 'added',
+        text: 'Settings drawer — toggle all section visibility with Show All / Hide All',
+      },
+      {
+        type: 'added',
+        text: 'Custom panels — save named views with your preferred sections and order',
+      },
       { type: 'added', text: 'Drag-and-drop panel builder at Stats > Customize' },
-      { type: 'added', text: 'Panel sharing — toggle a panel to shared and copy the link for others' },
-      { type: 'added', text: 'Shared panel URL support — open a shared link to load that panel view' },
-      { type: 'added', text: 'View selector dropdown on stats page to switch between default and custom panels' },
+      {
+        type: 'added',
+        text: 'Panel sharing — toggle a panel to shared and copy the link for others',
+      },
+      {
+        type: 'added',
+        text: 'Shared panel URL support — open a shared link to load that panel view',
+      },
+      {
+        type: 'added',
+        text: 'View selector dropdown on stats page to switch between default and custom panels',
+      },
       { type: 'added', text: 'Hide shared panels from your view selector via settings drawer' },
-      { type: 'improved', text: 'Stats page refactored for dynamic section rendering and ordering' },
+      {
+        type: 'improved',
+        text: 'Stats page refactored for dynamic section rendering and ordering',
+      },
     ],
   },
   {
@@ -124,7 +185,10 @@ const releases: Release[] = [
       { type: 'added', text: 'Deck page sort options — name, win rate, games played' },
       { type: 'added', text: 'Color Meta Analysis on stats page — win rates by color identity' },
       { type: 'added', text: 'Performance by Pod Size — player breakdowns for 2-6 player games' },
-      { type: 'added', text: 'Player Streaks & Form — current streak, best streak, hot/cold/steady trend' },
+      {
+        type: 'added',
+        text: 'Player Streaks & Form — current streak, best streak, hot/cold/steady trend',
+      },
       { type: 'added', text: 'Deck Streaks & Form — same streak tracking per deck' },
       { type: 'added', text: 'Changelog page' },
     ],

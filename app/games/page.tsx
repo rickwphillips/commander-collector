@@ -60,12 +60,7 @@ export default function GamesPage() {
       title="Games"
       subtitle="View your game history"
       actions={
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          component={Link}
-          href="/games/new"
-        >
+        <Button variant="contained" startIcon={<AddIcon />} component={Link} href="/games/new">
           Log Game
         </Button>
       }
@@ -101,65 +96,61 @@ export default function GamesPage() {
                   <Card>
                     <CardActionArea component={Link} href={`/games/detail?id=${game.id}`}>
                       <CardContent>
-                      <Stack
-                        direction={{ xs: 'column', sm: 'row' }}
-                        justifyContent="space-between"
-                        alignItems={{ xs: 'flex-start', sm: 'center' }}
-                        spacing={2}
-                      >
-                        <Box sx={{ flex: 1 }}>
-                          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-                            <EmojiEventsIcon sx={{ color: '#DAA520', fontSize: 24 }} />
-                            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        <Stack
+                          direction={{ xs: 'column', sm: 'row' }}
+                          justifyContent="space-between"
+                          alignItems={{ xs: 'flex-start', sm: 'center' }}
+                          spacing={2}
+                        >
+                          <Box sx={{ flex: 1 }}>
+                            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                              <EmojiEventsIcon sx={{ color: '#DAA520', fontSize: 24 }} />
+                              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                                {is2HG
+                                  ? winners.map((w) => w.player_name).join(' & ')
+                                  : winner?.player_name || 'Unknown'}
+                              </Typography>
+                              {!is2HG && winner && (
+                                <ColorIdentityChips colors={winner.colors} size="small" />
+                              )}
+                            </Stack>
+                            <Typography variant="body2" color="text.secondary">
                               {is2HG
-                                ? winners.map((w) => w.player_name).join(' & ')
-                                : winner?.player_name || 'Unknown'}
+                                ? winners.map((w) => `${w.deck_name} (${w.commander})`).join(' & ')
+                                : `${winner?.deck_name} (${winner?.commander})`}
                             </Typography>
-                            {!is2HG && winner && (
-                              <ColorIdentityChips colors={winner.colors} size="small" />
+                            {game.results && game.results.length > 1 && (
+                              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                vs{' '}
+                                {game.results
+                                  .filter((r) => r.finish_position !== 1)
+                                  .map((r) => r.player_name)
+                                  .join(', ')}
+                              </Typography>
                             )}
-                          </Stack>
-                          <Typography variant="body2" color="text.secondary">
-                            {is2HG
-                              ? winners.map((w) => `${w.deck_name} (${w.commander})`).join(' & ')
-                              : `${winner?.deck_name} (${winner?.commander})`}
-                          </Typography>
-                          {game.results && game.results.length > 1 && (
-                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                              vs {game.results
-                                .filter((r) => r.finish_position !== 1)
-                                .map((r) => r.player_name)
-                                .join(', ')}
-                            </Typography>
-                          )}
-                        </Box>
+                          </Box>
 
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          {is2HG && (
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            {is2HG && (
+                              <Chip label="2HG" size="small" variant="outlined" color="secondary" />
+                            )}
                             <Chip
-                              label="2HG"
+                              label={`${game.results?.length || 0} players`}
                               size="small"
                               variant="outlined"
-                              color="secondary"
                             />
-                          )}
-                          <Chip
-                            label={`${game.results?.length || 0} players`}
-                            size="small"
-                            variant="outlined"
-                          />
-                          {game.winning_turn && (
-                            <Chip
-                              label={`Turn ${game.winning_turn}`}
-                              size="small"
-                              variant="outlined"
-                              color="primary"
-                            />
-                          )}
-                          <Typography variant="body2" color="text.secondary">
-                            {new Date(game.played_at).toLocaleDateString()}
-                          </Typography>
-                        </Stack>
+                            {game.winning_turn && (
+                              <Chip
+                                label={`Turn ${game.winning_turn}`}
+                                size="small"
+                                variant="outlined"
+                                color="primary"
+                              />
+                            )}
+                            <Typography variant="body2" color="text.secondary">
+                              {new Date(game.played_at).toLocaleDateString()}
+                            </Typography>
+                          </Stack>
                         </Stack>
                       </CardContent>
                     </CardActionArea>

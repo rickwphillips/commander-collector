@@ -12,13 +12,7 @@ interface EmptyStateProps {
   actionHref?: string;
 }
 
-export function EmptyState({
-  icon,
-  title,
-  description,
-  actionLabel,
-  actionHref,
-}: EmptyStateProps) {
+export function EmptyState({ icon, title, description, actionLabel, actionHref }: EmptyStateProps) {
   return (
     <Box
       sx={{
@@ -30,11 +24,7 @@ export function EmptyState({
         textAlign: 'center',
       }}
     >
-      {icon && (
-        <Box sx={{ color: 'text.secondary', mb: 2, fontSize: 64 }}>
-          {icon}
-        </Box>
-      )}
+      {icon && <Box sx={{ color: 'text.secondary', mb: 2, fontSize: 64 }}>{icon}</Box>}
       <Typography variant="h6" sx={{ mb: 1 }}>
         {title}
       </Typography>

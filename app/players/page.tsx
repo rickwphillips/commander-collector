@@ -88,11 +88,7 @@ export default function PlayersPage() {
       title="Players"
       subtitle="Manage your playgroup"
       actions={
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setDialogOpen(true)}
-        >
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialogOpen(true)}>
           Add Player
         </Button>
       }

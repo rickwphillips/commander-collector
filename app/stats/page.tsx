@@ -72,7 +72,10 @@ function StatsPageInner() {
 
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<StatsResponse | null>(null);
-  const [headToHead, setHeadToHead] = useState<HeadToHeadResponse>({ twoPlayer: [], multiplayer: [] });
+  const [headToHead, setHeadToHead] = useState<HeadToHeadResponse>({
+    twoPlayer: [],
+    multiplayer: [],
+  });
   const [advancedStats, setAdvancedStats] = useState<AdvancedStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +96,15 @@ function StatsPageInner() {
   const [shownPanelIds, setShownPanelIds] = useState<Set<number>>(new Set());
   const [inlinePanelData, setInlinePanelData] = useState<Record<number, ComparisonResult>>({});
 
-  const { hiddenSections, toggleSection, showAll, hideAll, hiddenPanelIds, togglePanelVisibility, loaded: hiddenLoaded } = useHiddenStats();
+  const {
+    hiddenSections,
+    toggleSection,
+    showAll,
+    hideAll,
+    hiddenPanelIds,
+    togglePanelVisibility,
+    loaded: hiddenLoaded,
+  } = useHiddenStats();
 
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 0);
@@ -108,36 +119,41 @@ function StatsPageInner() {
     setComparisonResult(null);
     if (panel.panel_type === 'comparison' && panel.config) {
       setComparisonLoading(true);
-      api.getComparison(panel.config)
-        .then(r => setComparisonResult(r))
+      api
+        .getComparison(panel.config)
+        .then((r) => setComparisonResult(r))
         .catch(() => setSnackbar('Failed to load comparison data'))
         .finally(() => setComparisonLoading(false));
     }
   }, []);
 
-  const toggleInlinePanel = useCallback((panel: StatPanel) => {
-    setShownPanelIds(prev => {
-      const next = new Set(prev);
-      if (next.has(panel.id)) {
-        next.delete(panel.id);
-      } else {
-        next.add(panel.id);
-        if (panel.panel_type === 'comparison' && panel.config && !inlinePanelData[panel.id]) {
-          api.getComparison(panel.config!)
-            .then(r => setInlinePanelData(p => ({ ...p, [panel.id]: r })))
-            .catch(() => setSnackbar('Failed to load panel data'));
+  const toggleInlinePanel = useCallback(
+    (panel: StatPanel) => {
+      setShownPanelIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(panel.id)) {
+          next.delete(panel.id);
+        } else {
+          next.add(panel.id);
+          if (panel.panel_type === 'comparison' && panel.config && !inlinePanelData[panel.id]) {
+            api
+              .getComparison(panel.config!)
+              .then((r) => setInlinePanelData((p) => ({ ...p, [panel.id]: r })))
+              .catch(() => setSnackbar('Failed to load panel data'));
+          }
         }
-      }
-      return next;
-    });
-  }, [inlinePanelData]);
+        return next;
+      });
+    },
+    [inlinePanelData]
+  );
 
   // Handle ?panel_id=<id> URL param (own panels by numeric ID)
   useEffect(() => {
     if (!panelIdParam || loading) return;
     const id = parseInt(panelIdParam, 10);
     if (isNaN(id)) return;
-    const match = panels.own.find(p => p.id === id);
+    const match = panels.own.find((p) => p.id === id);
     if (match) activatePanel(match);
   }, [panelIdParam, panels.own, loading, activatePanel]);
 
@@ -146,23 +162,29 @@ function StatsPageInner() {
     if (panelCode && panels.own.length + panels.shared.length > 0) {
       // Check own panels first, then shared
       const allPanels = [...panels.own, ...panels.shared];
-      const match = allPanels.find(p => p.share_code === panelCode);
+      const match = allPanels.find((p) => p.share_code === panelCode);
       if (match) {
         activatePanel(match);
       } else {
         // Try fetching by code
-        api.getStatPanelByCode(panelCode).then(p => {
-          activatePanel(p);
-        }).catch(() => {
-          setSnackbar('Shared panel not found');
-        });
+        api
+          .getStatPanelByCode(panelCode)
+          .then((p) => {
+            activatePanel(p);
+          })
+          .catch(() => {
+            setSnackbar('Shared panel not found');
+          });
       }
     } else if (panelCode && !loading) {
-      api.getStatPanelByCode(panelCode).then(p => {
-        activatePanel(p);
-      }).catch(() => {
-        setSnackbar('Shared panel not found');
-      });
+      api
+        .getStatPanelByCode(panelCode)
+        .then((p) => {
+          activatePanel(p);
+        })
+        .catch(() => {
+          setSnackbar('Shared panel not found');
+        });
     }
   }, [panelCode, panels, loading, activatePanel]);
 
@@ -172,7 +194,7 @@ function StatsPageInner() {
         api.getStats(),
         api.getHeadToHead(),
         api.getAdvancedStats(),
-        api.getStatPanels().catch(() => ({ own: [], shared: [] } as StatPanelsResponse)),
+        api.getStatPanels().catch(() => ({ own: [], shared: [] }) as StatPanelsResponse),
       ]);
       setStats(statsData);
       setHeadToHead(h2hData);
@@ -186,7 +208,7 @@ function StatsPageInner() {
   };
 
   const handleSort = (table: string, key: string) => {
-    setSortConfigs(prev => ({
+    setSortConfigs((prev) => ({
       ...prev,
       [table]: {
         key,
@@ -205,7 +227,14 @@ function StatsPageInner() {
       const bVal = rec2[config.key];
       const aNum = Number(aVal);
       const bNum = Number(bVal);
-      if (!isNaN(aNum) && !isNaN(bNum) && aVal !== '' && aVal !== null && bVal !== '' && bVal !== null) {
+      if (
+        !isNaN(aNum) &&
+        !isNaN(bNum) &&
+        aVal !== '' &&
+        aVal !== null &&
+        bVal !== '' &&
+        bVal !== null
+      ) {
         return config.direction === 'asc' ? aNum - bNum : bNum - aNum;
       }
       const aStr = String(aVal ?? '');
@@ -224,19 +253,22 @@ function StatsPageInner() {
     </TableSortLabel>
   );
 
-  const handleViewChange = useCallback((view: 'default' | number) => {
-    if (view === 'default') {
-      setActiveView('default');
-      setActivePanelData(null);
-      setComparisonResult(null);
-    } else {
-      const allPanels = [...panels.own, ...panels.shared];
-      const panel = allPanels.find(p => p.id === view);
-      if (panel) {
-        activatePanel(panel);
+  const handleViewChange = useCallback(
+    (view: 'default' | number) => {
+      if (view === 'default') {
+        setActiveView('default');
+        setActivePanelData(null);
+        setComparisonResult(null);
+      } else {
+        const allPanels = [...panels.own, ...panels.shared];
+        const panel = allPanels.find((p) => p.id === view);
+        if (panel) {
+          activatePanel(panel);
+        }
       }
-    }
-  }, [panels, activatePanel]);
+    },
+    [panels, activatePanel]
+  );
 
   // Build section renderers
   const sectionRenderers: Record<StatsSectionId, () => React.ReactNode> = {
@@ -248,15 +280,29 @@ function StatsPageInner() {
             <StatsCard title="Total Games" value={stats.overall.total_games} color="#D2691E" />
           </Grid>
           <Grid size={{ xs: 6, sm: 3 }}>
-            <StatsCard title="Players" value={stats.overall.total_players} icon={<PeopleIcon />} color="#8B4513" />
+            <StatsCard
+              title="Players"
+              value={stats.overall.total_players}
+              icon={<PeopleIcon />}
+              color="#8B4513"
+            />
           </Grid>
           <Grid size={{ xs: 6, sm: 3 }}>
-            <StatsCard title="Decks" value={stats.overall.total_decks} icon={<StyleIcon />} color="#DAA520" />
+            <StatsCard
+              title="Decks"
+              value={stats.overall.total_decks}
+              icon={<StyleIcon />}
+              color="#DAA520"
+            />
           </Grid>
           <Grid size={{ xs: 6, sm: 3 }}>
             <StatsCard
               title="Avg. Game Length"
-              value={stats.overall.avg_game_length != null ? Number(stats.overall.avg_game_length).toFixed(1) : '-'}
+              value={
+                stats.overall.avg_game_length != null
+                  ? Number(stats.overall.avg_game_length).toFixed(1)
+                  : '-'
+              }
               subtitle="turns"
               color="#CD853F"
             />
@@ -272,17 +318,25 @@ function StatsPageInner() {
           <CardContent>
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
               <EmojiEventsIcon color="primary" />
-              <Typography variant="h5" sx={{ fontWeight: 600 }}>Top Players</Typography>
-              <Typography variant="body2" color="text.secondary">(min 3 games)</Typography>
+              <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                Top Players
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                (min 3 games)
+              </Typography>
             </Stack>
             <TableContainer>
               <Table>
                 <TableHead>
                   <TableRow>
                     <TableCell>{sortHeader('players', 'player_name', 'Player')}</TableCell>
-                    <TableCell align="center">{sortHeader('players', 'total_games', 'Games')}</TableCell>
+                    <TableCell align="center">
+                      {sortHeader('players', 'total_games', 'Games')}
+                    </TableCell>
                     <TableCell align="center">{sortHeader('players', 'wins', 'Wins')}</TableCell>
-                    <TableCell align="right">{sortHeader('players', 'win_rate', 'Win Rate')}</TableCell>
+                    <TableCell align="right">
+                      {sortHeader('players', 'win_rate', 'Win Rate')}
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -293,7 +347,9 @@ function StatsPageInner() {
                           {index === 0 && !sortConfigs['players'] && (
                             <EmojiEventsIcon sx={{ color: '#DAA520', fontSize: 20 }} />
                           )}
-                          <Typography sx={{ fontWeight: index === 0 && !sortConfigs['players'] ? 600 : 400 }}>
+                          <Typography
+                            sx={{ fontWeight: index === 0 && !sortConfigs['players'] ? 600 : 400 }}
+                          >
                             {player.player_name}
                           </Typography>
                         </Stack>
@@ -318,8 +374,12 @@ function StatsPageInner() {
           <CardContent>
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
               <StyleIcon color="primary" />
-              <Typography variant="h5" sx={{ fontWeight: 600 }}>Top Decks</Typography>
-              <Typography variant="body2" color="text.secondary">(min 3 games)</Typography>
+              <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                Top Decks
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                (min 3 games)
+              </Typography>
             </Stack>
             <TableContainer>
               <Table>
@@ -328,8 +388,12 @@ function StatsPageInner() {
                     <TableCell>{sortHeader('decks', 'deck_name', 'Deck')}</TableCell>
                     <TableCell>{sortHeader('decks', 'commander', 'Commander')}</TableCell>
                     <TableCell>{sortHeader('decks', 'player_name', 'Player')}</TableCell>
-                    <TableCell align="center">{sortHeader('decks', 'total_games', 'Games')}</TableCell>
-                    <TableCell align="right">{sortHeader('decks', 'win_rate', 'Win Rate')}</TableCell>
+                    <TableCell align="center">
+                      {sortHeader('decks', 'total_games', 'Games')}
+                    </TableCell>
+                    <TableCell align="right">
+                      {sortHeader('decks', 'win_rate', 'Win Rate')}
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -338,7 +402,9 @@ function StatsPageInner() {
                       <TableCell>
                         <Stack direction="row" alignItems="center" spacing={1}>
                           <ColorIdentityChips colors={deck.colors} size="small" />
-                          <Typography sx={{ fontWeight: index === 0 && !sortConfigs['decks'] ? 600 : 400 }}>
+                          <Typography
+                            sx={{ fontWeight: index === 0 && !sortConfigs['decks'] ? 600 : 400 }}
+                          >
                             {deck.deck_name}
                           </Typography>
                         </Stack>
@@ -362,16 +428,24 @@ function StatsPageInner() {
       return (
         <Card sx={{ mb: 4 }}>
           <CardContent>
-            <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>Top Commanders</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
+              Top Commanders
+            </Typography>
             <TableContainer>
               <Table>
                 <TableHead>
                   <TableRow>
                     <TableCell>{sortHeader('commanders', 'commander', 'Commander')}</TableCell>
-                    <TableCell align="center">{sortHeader('commanders', 'decks_using', 'Decks Using')}</TableCell>
-                    <TableCell align="center">{sortHeader('commanders', 'total_games', 'Games')}</TableCell>
+                    <TableCell align="center">
+                      {sortHeader('commanders', 'decks_using', 'Decks Using')}
+                    </TableCell>
+                    <TableCell align="center">
+                      {sortHeader('commanders', 'total_games', 'Games')}
+                    </TableCell>
                     <TableCell align="center">{sortHeader('commanders', 'wins', 'Wins')}</TableCell>
-                    <TableCell align="right">{sortHeader('commanders', 'win_rate', 'Win Rate')}</TableCell>
+                    <TableCell align="right">
+                      {sortHeader('commanders', 'win_rate', 'Win Rate')}
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -399,36 +473,59 @@ function StatsPageInner() {
       return (
         <Card sx={{ mb: 4 }}>
           <CardContent>
-            <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>Head-to-Head</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
+              Head-to-Head
+            </Typography>
             <TableContainer>
               <Table>
                 <TableHead>
                   <TableRow>
                     <TableCell>{sortHeader('h2h', 'player1_name', 'Matchup')}</TableCell>
-                    <TableCell align="center">{sortHeader('h2h', 'total_games', 'Games')}</TableCell>
-                    <TableCell align="center">{sortHeader('h2h', 'player1_wins', 'Record')}</TableCell>
+                    <TableCell align="center">
+                      {sortHeader('h2h', 'total_games', 'Games')}
+                    </TableCell>
+                    <TableCell align="center">
+                      {sortHeader('h2h', 'player1_wins', 'Record')}
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {sortData('h2h', headToHead.twoPlayer).map((record, index) => (
                     <TableRow key={index}>
                       <TableCell>
-                        <Typography>{record.player1_name} vs {record.player2_name}</Typography>
+                        <Typography>
+                          {record.player1_name} vs {record.player2_name}
+                        </Typography>
                       </TableCell>
                       <TableCell align="center">{record.total_games}</TableCell>
                       <TableCell align="center">
-                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
-                          <Typography sx={{
-                            fontWeight: record.player1_wins > record.player2_wins ? 700 : 400,
-                            color: record.player1_wins > record.player2_wins ? 'primary.main' : 'text.primary',
-                          }}>
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          alignItems="center"
+                          justifyContent="center"
+                        >
+                          <Typography
+                            sx={{
+                              fontWeight: record.player1_wins > record.player2_wins ? 700 : 400,
+                              color:
+                                record.player1_wins > record.player2_wins
+                                  ? 'primary.main'
+                                  : 'text.primary',
+                            }}
+                          >
                             {record.player1_wins}
                           </Typography>
                           <Typography color="text.secondary">-</Typography>
-                          <Typography sx={{
-                            fontWeight: record.player2_wins > record.player1_wins ? 700 : 400,
-                            color: record.player2_wins > record.player1_wins ? 'primary.main' : 'text.primary',
-                          }}>
+                          <Typography
+                            sx={{
+                              fontWeight: record.player2_wins > record.player1_wins ? 700 : 400,
+                              color:
+                                record.player2_wins > record.player1_wins
+                                  ? 'primary.main'
+                                  : 'text.primary',
+                            }}
+                          >
                             {record.player2_wins}
                           </Typography>
                         </Stack>
@@ -448,36 +545,57 @@ function StatsPageInner() {
       return (
         <Card sx={{ mb: 4 }}>
           <CardContent>
-            <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>Multiplayer</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
+              Multiplayer
+            </Typography>
             <TableContainer>
               <Table>
                 <TableHead>
                   <TableRow>
                     <TableCell>{sortHeader('mp', 'player1_name', 'Matchup')}</TableCell>
                     <TableCell align="center">{sortHeader('mp', 'total_games', 'Games')}</TableCell>
-                    <TableCell align="center">{sortHeader('mp', 'player1_wins', 'Record')}</TableCell>
+                    <TableCell align="center">
+                      {sortHeader('mp', 'player1_wins', 'Record')}
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {sortData('mp', headToHead.multiplayer).map((record, index) => (
                     <TableRow key={index}>
                       <TableCell>
-                        <Typography>{record.player1_name} vs {record.player2_name}</Typography>
+                        <Typography>
+                          {record.player1_name} vs {record.player2_name}
+                        </Typography>
                       </TableCell>
                       <TableCell align="center">{record.total_games}</TableCell>
                       <TableCell align="center">
-                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
-                          <Typography sx={{
-                            fontWeight: record.player1_wins > record.player2_wins ? 700 : 400,
-                            color: record.player1_wins > record.player2_wins ? 'primary.main' : 'text.primary',
-                          }}>
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          alignItems="center"
+                          justifyContent="center"
+                        >
+                          <Typography
+                            sx={{
+                              fontWeight: record.player1_wins > record.player2_wins ? 700 : 400,
+                              color:
+                                record.player1_wins > record.player2_wins
+                                  ? 'primary.main'
+                                  : 'text.primary',
+                            }}
+                          >
                             {record.player1_wins}
                           </Typography>
                           <Typography color="text.secondary">-</Typography>
-                          <Typography sx={{
-                            fontWeight: record.player2_wins > record.player1_wins ? 700 : 400,
-                            color: record.player2_wins > record.player1_wins ? 'primary.main' : 'text.primary',
-                          }}>
+                          <Typography
+                            sx={{
+                              fontWeight: record.player2_wins > record.player1_wins ? 700 : 400,
+                              color:
+                                record.player2_wins > record.player1_wins
+                                  ? 'primary.main'
+                                  : 'text.primary',
+                            }}
+                          >
                             {record.player2_wins}
                           </Typography>
                         </Stack>
@@ -493,24 +611,33 @@ function StatsPageInner() {
     },
 
     twoHg: () => {
-      if (!advancedStats?.twoHgStats || advancedStats.twoHgStats.teamPairings.length === 0) return null;
+      if (!advancedStats?.twoHgStats || advancedStats.twoHgStats.teamPairings.length === 0)
+        return null;
       return (
         <Card sx={{ mb: 4 }}>
           <CardContent>
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
               <HandshakeIcon color="primary" />
-              <Typography variant="h5" sx={{ fontWeight: 600 }}>Two-Headed Giant</Typography>
+              <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                Two-Headed Giant
+              </Typography>
             </Stack>
 
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Team Records</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+              Team Records
+            </Typography>
             <TableContainer sx={{ mb: 3 }}>
               <Table>
                 <TableHead>
                   <TableRow>
                     <TableCell>{sortHeader('2hgTeam', 'player1_name', 'Team')}</TableCell>
-                    <TableCell align="center">{sortHeader('2hgTeam', 'total_games', 'Games')}</TableCell>
+                    <TableCell align="center">
+                      {sortHeader('2hgTeam', 'total_games', 'Games')}
+                    </TableCell>
                     <TableCell align="center">{sortHeader('2hgTeam', 'wins', 'Wins')}</TableCell>
-                    <TableCell align="right">{sortHeader('2hgTeam', 'win_rate', 'Win Rate')}</TableCell>
+                    <TableCell align="right">
+                      {sortHeader('2hgTeam', 'win_rate', 'Win Rate')}
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -521,7 +648,9 @@ function StatsPageInner() {
                           {i === 0 && !sortConfigs['2hgTeam'] && (
                             <EmojiEventsIcon sx={{ color: '#DAA520', fontSize: 20 }} />
                           )}
-                          <Typography sx={{ fontWeight: i === 0 && !sortConfigs['2hgTeam'] ? 600 : 400 }}>
+                          <Typography
+                            sx={{ fontWeight: i === 0 && !sortConfigs['2hgTeam'] ? 600 : 400 }}
+                          >
                             {team.player1_name} & {team.player2_name}
                           </Typography>
                         </Stack>
@@ -535,15 +664,21 @@ function StatsPageInner() {
               </Table>
             </TableContainer>
 
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Individual 2HG Records</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+              Individual 2HG Records
+            </Typography>
             <TableContainer sx={{ mb: 3 }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
                     <TableCell>{sortHeader('2hgPlayer', 'player_name', 'Player')}</TableCell>
-                    <TableCell align="center">{sortHeader('2hgPlayer', 'total_games', 'Games')}</TableCell>
+                    <TableCell align="center">
+                      {sortHeader('2hgPlayer', 'total_games', 'Games')}
+                    </TableCell>
                     <TableCell align="center">{sortHeader('2hgPlayer', 'wins', 'Wins')}</TableCell>
-                    <TableCell align="right">{sortHeader('2hgPlayer', 'win_rate', 'Win Rate')}</TableCell>
+                    <TableCell align="right">
+                      {sortHeader('2hgPlayer', 'win_rate', 'Win Rate')}
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -561,7 +696,9 @@ function StatsPageInner() {
               </Table>
             </TableContainer>
 
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Recent 2HG Games</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+              Recent 2HG Games
+            </Typography>
             <TableContainer>
               <Table size="small">
                 <TableHead>
@@ -569,7 +706,9 @@ function StatsPageInner() {
                     <TableCell>{sortHeader('2hgRecent', 'played_at', 'Date')}</TableCell>
                     <TableCell>{sortHeader('2hgRecent', 'winners', 'Winning Team')}</TableCell>
                     <TableCell>{sortHeader('2hgRecent', 'winning_decks', 'Decks')}</TableCell>
-                    <TableCell align="center">{sortHeader('2hgRecent', 'winning_turn', 'Turn')}</TableCell>
+                    <TableCell align="center">
+                      {sortHeader('2hgRecent', 'winning_turn', 'Turn')}
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -583,11 +722,15 @@ function StatsPageInner() {
                       <TableCell>
                         <Stack direction="row" alignItems="center" spacing={0.5}>
                           <EmojiEventsIcon sx={{ color: '#DAA520', fontSize: 16 }} />
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>{game.winners}</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            {game.winners}
+                          </Typography>
                         </Stack>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" color="text.secondary">{game.winning_decks}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {game.winning_decks}
+                        </Typography>
                       </TableCell>
                       <TableCell align="center">
                         {game.winning_turn && (
@@ -611,18 +754,28 @@ function StatsPageInner() {
           <CardContent>
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
               <PaletteIcon color="primary" />
-              <Typography variant="h5" sx={{ fontWeight: 600 }}>Color Meta Analysis</Typography>
+              <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                Color Meta Analysis
+              </Typography>
             </Stack>
             <TableContainer>
               <Table>
                 <TableHead>
                   <TableRow>
                     <TableCell>{sortHeader('colorMeta', 'colors', 'Colors')}</TableCell>
-                    <TableCell align="center">{sortHeader('colorMeta', 'deck_count', 'Decks')}</TableCell>
-                    <TableCell align="center">{sortHeader('colorMeta', 'total_games', 'Games')}</TableCell>
+                    <TableCell align="center">
+                      {sortHeader('colorMeta', 'deck_count', 'Decks')}
+                    </TableCell>
+                    <TableCell align="center">
+                      {sortHeader('colorMeta', 'total_games', 'Games')}
+                    </TableCell>
                     <TableCell align="center">{sortHeader('colorMeta', 'wins', 'Wins')}</TableCell>
-                    <TableCell align="right">{sortHeader('colorMeta', 'win_rate', 'Win Rate')}</TableCell>
-                    <TableCell align="right">{sortHeader('colorMeta', 'avg_finish_position', 'Avg Position')}</TableCell>
+                    <TableCell align="right">
+                      {sortHeader('colorMeta', 'win_rate', 'Win Rate')}
+                    </TableCell>
+                    <TableCell align="right">
+                      {sortHeader('colorMeta', 'avg_finish_position', 'Avg Position')}
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -635,7 +788,9 @@ function StatsPageInner() {
                       <TableCell align="center">{row.total_games}</TableCell>
                       <TableCell align="center">{row.wins}</TableCell>
                       <TableCell align="right">{Number(row.win_rate).toFixed(1)}%</TableCell>
-                      <TableCell align="right">{Number(row.avg_finish_position).toFixed(2)}</TableCell>
+                      <TableCell align="right">
+                        {Number(row.avg_finish_position).toFixed(2)}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -653,23 +808,42 @@ function StatsPageInner() {
           <CardContent>
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
               <GroupsIcon color="primary" />
-              <Typography variant="h5" sx={{ fontWeight: 600 }}>Performance by Pod Size</Typography>
+              <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                Performance by Pod Size
+              </Typography>
             </Stack>
             {advancedStats.gameSizeStats.map((pod) => (
               <Box key={pod.pod_size} sx={{ mb: 3 }}>
                 <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
-                  <Chip label={`${pod.pod_size}-Player`} size="small" color="primary" variant="outlined" />
-                  <Typography variant="body2" color="text.secondary">({pod.total_games} games)</Typography>
+                  <Chip
+                    label={`${pod.pod_size}-Player`}
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                  />
+                  <Typography variant="body2" color="text.secondary">
+                    ({pod.total_games} games)
+                  </Typography>
                 </Stack>
                 <TableContainer>
                   <Table size="small">
                     <TableHead>
                       <TableRow>
-                        <TableCell>{sortHeader(`pod_${pod.pod_size}`, 'player_name', 'Player')}</TableCell>
-                        <TableCell align="center">{sortHeader(`pod_${pod.pod_size}`, 'games_played', 'Games')}</TableCell>
-                        <TableCell align="center">{sortHeader(`pod_${pod.pod_size}`, 'wins', 'Wins')}</TableCell>
-                        <TableCell align="right">{sortHeader(`pod_${pod.pod_size}`, 'win_rate', 'Win Rate')}</TableCell>
-                        <TableCell align="right">{sortHeader(`pod_${pod.pod_size}`, 'avg_finish_position', 'Avg Position')}</TableCell>
+                        <TableCell>
+                          {sortHeader(`pod_${pod.pod_size}`, 'player_name', 'Player')}
+                        </TableCell>
+                        <TableCell align="center">
+                          {sortHeader(`pod_${pod.pod_size}`, 'games_played', 'Games')}
+                        </TableCell>
+                        <TableCell align="center">
+                          {sortHeader(`pod_${pod.pod_size}`, 'wins', 'Wins')}
+                        </TableCell>
+                        <TableCell align="right">
+                          {sortHeader(`pod_${pod.pod_size}`, 'win_rate', 'Win Rate')}
+                        </TableCell>
+                        <TableCell align="right">
+                          {sortHeader(`pod_${pod.pod_size}`, 'avg_finish_position', 'Avg Position')}
+                        </TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -679,7 +853,9 @@ function StatsPageInner() {
                           <TableCell align="center">{entry.games_played}</TableCell>
                           <TableCell align="center">{entry.wins}</TableCell>
                           <TableCell align="right">{Number(entry.win_rate).toFixed(1)}%</TableCell>
-                          <TableCell align="right">{Number(entry.avg_finish_position).toFixed(2)}</TableCell>
+                          <TableCell align="right">
+                            {Number(entry.avg_finish_position).toFixed(2)}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -699,17 +875,27 @@ function StatsPageInner() {
           <CardContent>
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
               <TrendingUpIcon color="primary" />
-              <Typography variant="h5" sx={{ fontWeight: 600 }}>Player Streaks & Form</Typography>
+              <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                Player Streaks & Form
+              </Typography>
             </Stack>
             <TableContainer>
               <Table>
                 <TableHead>
                   <TableRow>
                     <TableCell>{sortHeader('pStreaks', 'player_name', 'Player')}</TableCell>
-                    <TableCell align="center">{sortHeader('pStreaks', 'current_streak', 'Streak')}</TableCell>
-                    <TableCell align="center">{sortHeader('pStreaks', 'longest_win_streak', 'Best Streak')}</TableCell>
-                    <TableCell align="center">{sortHeader('pStreaks', 'last_5_wins', 'Last 5')}</TableCell>
-                    <TableCell align="right">{sortHeader('pStreaks', 'overall_win_rate', 'Overall')}</TableCell>
+                    <TableCell align="center">
+                      {sortHeader('pStreaks', 'current_streak', 'Streak')}
+                    </TableCell>
+                    <TableCell align="center">
+                      {sortHeader('pStreaks', 'longest_win_streak', 'Best Streak')}
+                    </TableCell>
+                    <TableCell align="center">
+                      {sortHeader('pStreaks', 'last_5_wins', 'Last 5')}
+                    </TableCell>
+                    <TableCell align="right">
+                      {sortHeader('pStreaks', 'overall_win_rate', 'Overall')}
+                    </TableCell>
                     <TableCell align="center">{sortHeader('pStreaks', 'trend', 'Trend')}</TableCell>
                   </TableRow>
                 </TableHead>
@@ -739,14 +925,26 @@ function StatsPageInner() {
                           color="primary"
                         />
                       </TableCell>
-                      <TableCell align="center">{p.last_5_wins}/{p.last_5_games}</TableCell>
+                      <TableCell align="center">
+                        {p.last_5_wins}/{p.last_5_games}
+                      </TableCell>
                       <TableCell align="right">{Number(p.overall_win_rate).toFixed(1)}%</TableCell>
                       <TableCell align="center">
                         {p.trend === 'hot' && (
-                          <Chip icon={<WhatshotIcon sx={{ fontSize: 16 }} />} label="Hot" size="small" sx={{ backgroundColor: '#ff5722', color: '#fff' }} />
+                          <Chip
+                            icon={<WhatshotIcon sx={{ fontSize: 16 }} />}
+                            label="Hot"
+                            size="small"
+                            sx={{ backgroundColor: '#ff5722', color: '#fff' }}
+                          />
                         )}
                         {p.trend === 'cold' && (
-                          <Chip icon={<AcUnitIcon sx={{ fontSize: 16 }} />} label="Cold" size="small" sx={{ backgroundColor: '#1565c0', color: '#fff' }} />
+                          <Chip
+                            icon={<AcUnitIcon sx={{ fontSize: 16 }} />}
+                            label="Cold"
+                            size="small"
+                            sx={{ backgroundColor: '#1565c0', color: '#fff' }}
+                          />
                         )}
                         {p.trend === 'steady' && (
                           <Chip label="Steady" size="small" variant="outlined" />
@@ -769,7 +967,9 @@ function StatsPageInner() {
           <CardContent>
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
               <TrendingUpIcon color="primary" />
-              <Typography variant="h5" sx={{ fontWeight: 600 }}>Deck Streaks & Form</Typography>
+              <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                Deck Streaks & Form
+              </Typography>
             </Stack>
             <TableContainer>
               <Table>
@@ -777,10 +977,18 @@ function StatsPageInner() {
                   <TableRow>
                     <TableCell>{sortHeader('dStreaks', 'deck_name', 'Deck')}</TableCell>
                     <TableCell>{sortHeader('dStreaks', 'player_name', 'Player')}</TableCell>
-                    <TableCell align="center">{sortHeader('dStreaks', 'current_streak', 'Streak')}</TableCell>
-                    <TableCell align="center">{sortHeader('dStreaks', 'longest_win_streak', 'Best Streak')}</TableCell>
-                    <TableCell align="center">{sortHeader('dStreaks', 'last_5_wins', 'Last 5')}</TableCell>
-                    <TableCell align="right">{sortHeader('dStreaks', 'overall_win_rate', 'Overall')}</TableCell>
+                    <TableCell align="center">
+                      {sortHeader('dStreaks', 'current_streak', 'Streak')}
+                    </TableCell>
+                    <TableCell align="center">
+                      {sortHeader('dStreaks', 'longest_win_streak', 'Best Streak')}
+                    </TableCell>
+                    <TableCell align="center">
+                      {sortHeader('dStreaks', 'last_5_wins', 'Last 5')}
+                    </TableCell>
+                    <TableCell align="right">
+                      {sortHeader('dStreaks', 'overall_win_rate', 'Overall')}
+                    </TableCell>
                     <TableCell align="center">{sortHeader('dStreaks', 'trend', 'Trend')}</TableCell>
                   </TableRow>
                 </TableHead>
@@ -792,7 +1000,9 @@ function StatsPageInner() {
                           <ColorIdentityChips colors={d.colors} size="small" />
                           <Box>
                             <Typography sx={{ fontWeight: 500 }}>{d.deck_name}</Typography>
-                            <Typography variant="caption" color="text.secondary">{d.commander}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {d.commander}
+                            </Typography>
                           </Box>
                         </Stack>
                       </TableCell>
@@ -817,14 +1027,26 @@ function StatsPageInner() {
                           color="primary"
                         />
                       </TableCell>
-                      <TableCell align="center">{d.last_5_wins}/{d.last_5_games}</TableCell>
+                      <TableCell align="center">
+                        {d.last_5_wins}/{d.last_5_games}
+                      </TableCell>
                       <TableCell align="right">{Number(d.overall_win_rate).toFixed(1)}%</TableCell>
                       <TableCell align="center">
                         {d.trend === 'hot' && (
-                          <Chip icon={<WhatshotIcon sx={{ fontSize: 16 }} />} label="Hot" size="small" sx={{ backgroundColor: '#ff5722', color: '#fff' }} />
+                          <Chip
+                            icon={<WhatshotIcon sx={{ fontSize: 16 }} />}
+                            label="Hot"
+                            size="small"
+                            sx={{ backgroundColor: '#ff5722', color: '#fff' }}
+                          />
                         )}
                         {d.trend === 'cold' && (
-                          <Chip icon={<AcUnitIcon sx={{ fontSize: 16 }} />} label="Cold" size="small" sx={{ backgroundColor: '#1565c0', color: '#fff' }} />
+                          <Chip
+                            icon={<AcUnitIcon sx={{ fontSize: 16 }} />}
+                            label="Cold"
+                            size="small"
+                            sx={{ backgroundColor: '#1565c0', color: '#fff' }}
+                          />
                         )}
                         {d.trend === 'steady' && (
                           <Chip label="Steady" size="small" variant="outlined" />
@@ -846,11 +1068,11 @@ function StatsPageInner() {
     if (activeView !== 'default' && activePanelData) {
       return activePanelData.sections as StatsSectionId[];
     }
-    return DEFAULT_SECTION_ORDER.filter(id => !hiddenSections.has(id));
+    return DEFAULT_SECTION_ORDER.filter((id) => !hiddenSections.has(id));
   };
 
   // Filter shared panels by hidden state
-  const visibleSharedPanels = panels.shared.filter(p => !hiddenPanelIds.has(p.id));
+  const visibleSharedPanels = panels.shared.filter((p) => !hiddenPanelIds.has(p.id));
 
   if (loading || !hiddenLoaded) {
     return (
@@ -924,44 +1146,45 @@ function StatsPageInner() {
       )}
 
       {/* Comparison panel rendering */}
-      {!isDefaultView && activePanelData?.panel_type === 'comparison' && (
-        comparisonLoading
-          ? <ComparisonPanelSkeleton />
-          : comparisonResult
-            ? <ComparisonPanel result={comparisonResult} />
-            : null
-      )}
+      {!isDefaultView &&
+        activePanelData?.panel_type === 'comparison' &&
+        (comparisonLoading ? (
+          <ComparisonPanelSkeleton />
+        ) : comparisonResult ? (
+          <ComparisonPanel result={comparisonResult} />
+        ) : null)}
 
       {/* Rendered sections (predefined panels and default view) */}
-      {(isDefaultView || activePanelData?.panel_type !== 'comparison') && visibleSections.map((id, i) => {
-        const node = sectionRenderers[id]?.();
-        if (!node) return null;
-        return (
-          <Grow in={mounted} timeout={800 + i * 200} key={id}>
-            <Box sx={{ position: 'relative' }}>
-              {isDefaultView && (
-                <Tooltip title="Hide this section">
-                  <IconButton
-                    size="small"
-                    onClick={() => toggleSection(id)}
-                    sx={{
-                      position: 'absolute',
-                      top: 8,
-                      right: 8,
-                      zIndex: 1,
-                      opacity: 0.3,
-                      '&:hover': { opacity: 1 },
-                    }}
-                  >
-                    <VisibilityOffIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              )}
-              {node}
-            </Box>
-          </Grow>
-        );
-      })}
+      {(isDefaultView || activePanelData?.panel_type !== 'comparison') &&
+        visibleSections.map((id, i) => {
+          const node = sectionRenderers[id]?.();
+          if (!node) return null;
+          return (
+            <Grow in={mounted} timeout={800 + i * 200} key={id}>
+              <Box sx={{ position: 'relative' }}>
+                {isDefaultView && (
+                  <Tooltip title="Hide this section">
+                    <IconButton
+                      size="small"
+                      onClick={() => toggleSection(id)}
+                      sx={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        zIndex: 1,
+                        opacity: 0.3,
+                        '&:hover': { opacity: 1 },
+                      }}
+                    >
+                      <VisibilityOffIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                {node}
+              </Box>
+            </Grow>
+          );
+        })}
 
       {isDefaultView && visibleSections.length === 0 && shownPanelIds.size === 0 && (
         <Alert severity="info" sx={{ mt: 2 }}>
@@ -971,39 +1194,59 @@ function StatsPageInner() {
 
       {/* Inline panels toggled on from the settings drawer */}
       {[...panels.own, ...panels.shared]
-        .filter(p => shownPanelIds.has(p.id))
-        .map(panel => (
+        .filter((p) => shownPanelIds.has(p.id))
+        .map((panel) => (
           <Box key={panel.id} sx={{ mb: 4 }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-              <Typography variant="h5" sx={{ fontWeight: 600 }}>{panel.name}</Typography>
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              sx={{ mb: 2 }}
+            >
+              <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                {panel.name}
+              </Typography>
               {panel.owner_name && (
-                <Typography variant="body2" color="text.secondary">by {panel.owner_name}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  by {panel.owner_name}
+                </Typography>
               )}
             </Stack>
             {panel.panel_type === 'comparison' ? (
-              inlinePanelData[panel.id]
-                ? <ComparisonPanel result={inlinePanelData[panel.id]} />
-                : <ComparisonPanelSkeleton />
+              inlinePanelData[panel.id] ? (
+                <ComparisonPanel result={inlinePanelData[panel.id]} />
+              ) : (
+                <ComparisonPanelSkeleton />
+              )
             ) : (
-              (panel.sections as StatsSectionId[]).map(id => {
+              (panel.sections as StatsSectionId[]).map((id) => {
                 const node = sectionRenderers[id]?.();
-                return node ? <Box key={id} sx={{ mb: 3 }}>{node}</Box> : null;
+                return node ? (
+                  <Box key={id} sx={{ mb: 3 }}>
+                    {node}
+                  </Box>
+                ) : null;
               })
             )}
           </Box>
-        ))
-      }
+        ))}
 
       {/* Settings Drawer */}
       <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
         <Box sx={{ width: 320, p: 3 }}>
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Section Visibility</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+            Section Visibility
+          </Typography>
           <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-            <Button size="small" variant="outlined" onClick={showAll}>Show All</Button>
-            <Button size="small" variant="outlined" onClick={() => hideAll(DEFAULT_SECTION_ORDER)}>Hide All</Button>
+            <Button size="small" variant="outlined" onClick={showAll}>
+              Show All
+            </Button>
+            <Button size="small" variant="outlined" onClick={() => hideAll(DEFAULT_SECTION_ORDER)}>
+              Hide All
+            </Button>
           </Stack>
 
-          {STATS_SECTIONS.map(section => (
+          {STATS_SECTIONS.map((section) => (
             <FormControlLabel
               key={section.id}
               control={
@@ -1021,8 +1264,10 @@ function StatsPageInner() {
           {panels.own.length > 0 && (
             <>
               <Divider sx={{ my: 2 }} />
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Your Panels</Typography>
-              {panels.own.map(panel => (
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                Your Panels
+              </Typography>
+              {panels.own.map((panel) => (
                 <FormControlLabel
                   key={panel.id}
                   control={
@@ -1042,8 +1287,10 @@ function StatsPageInner() {
           {panels.shared.length > 0 && (
             <>
               <Divider sx={{ my: 2 }} />
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Shared Panels</Typography>
-              {panels.shared.map(panel => (
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                Shared Panels
+              </Typography>
+              {panels.shared.map((panel) => (
                 <FormControlLabel
                   key={panel.id}
                   control={
@@ -1074,11 +1321,13 @@ function StatsPageInner() {
 
 export default function StatsPage() {
   return (
-    <Suspense fallback={
-      <PageContainer title="Statistics" subtitle="Win rates and analytics">
-        <LoadingSpinner message="Loading statistics..." />
-      </PageContainer>
-    }>
+    <Suspense
+      fallback={
+        <PageContainer title="Statistics" subtitle="Win rates and analytics">
+          <LoadingSpinner message="Loading statistics..." />
+        </PageContainer>
+      }
+    >
       <StatsPageInner />
     </Suspense>
   );

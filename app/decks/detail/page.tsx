@@ -77,19 +77,14 @@ export default function DeckDetailPage() {
 
   const fetchData = async () => {
     try {
-      const [deckData, gamesData] = await Promise.all([
-        api.getDeck(deckId),
-        api.getGames(),
-      ]);
+      const [deckData, gamesData] = await Promise.all([api.getDeck(deckId), api.getGames()]);
       setDeck(deckData);
       setEditName(deckData.name);
       setEditCommander(deckData.commander);
       setEditColors(deckData.colors ? deckData.colors.split('') : []);
 
       // Filter games where this deck participated
-      const deckGames = gamesData.filter((game) =>
-        game.results?.some((r) => r.deck_id === deckId)
-      );
+      const deckGames = gamesData.filter((game) => game.results?.some((r) => r.deck_id === deckId));
       setGames(deckGames);
     } catch {
       setError('Failed to load deck data');
@@ -107,9 +102,7 @@ export default function DeckDetailPage() {
 
   const handleColorToggle = (color: string) => {
     setEditColors((prev) =>
-      prev.includes(color)
-        ? prev.filter((c) => c !== color)
-        : [...prev, color]
+      prev.includes(color) ? prev.filter((c) => c !== color) : [...prev, color]
     );
   };
 
@@ -118,8 +111,7 @@ export default function DeckDetailPage() {
 
     setSaving(true);
     try {
-      const colorsString = COLOR_OPTIONS
-        .filter((c) => editColors.includes(c.value))
+      const colorsString = COLOR_OPTIONS.filter((c) => editColors.includes(c.value))
         .map((c) => c.value)
         .join('');
 
@@ -189,7 +181,11 @@ export default function DeckDetailPage() {
           <Button startIcon={<EditIcon />} onClick={handleEdit}>
             Edit
           </Button>
-          <Button color="error" startIcon={<DeleteIcon />} onClick={() => setDeleteDialogOpen(true)}>
+          <Button
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={() => setDeleteDialogOpen(true)}
+          >
             Delete
           </Button>
         </Stack>
@@ -218,19 +214,10 @@ export default function DeckDetailPage() {
       {/* Stats */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid size={{ xs: 6, sm: 3 }}>
-          <StatsCard
-            title="Total Games"
-            value={deck.total_games}
-            color="#D2691E"
-          />
+          <StatsCard title="Total Games" value={deck.total_games} color="#D2691E" />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
-          <StatsCard
-            title="Wins"
-            value={deck.wins}
-            icon={<EmojiEventsIcon />}
-            color="#DAA520"
-          />
+          <StatsCard title="Wins" value={deck.wins} icon={<EmojiEventsIcon />} color="#DAA520" />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
           <StatsCard
@@ -242,7 +229,9 @@ export default function DeckDetailPage() {
         <Grid size={{ xs: 6, sm: 3 }}>
           <StatsCard
             title="Avg. Finish"
-            value={deck.avg_finish_position != null ? Number(deck.avg_finish_position).toFixed(2) : '-'}
+            value={
+              deck.avg_finish_position != null ? Number(deck.avg_finish_position).toFixed(2) : '-'
+            }
             color="#CD853F"
           />
         </Grid>
@@ -283,11 +272,11 @@ export default function DeckDetailPage() {
                       >
                         <Box>
                           <Stack direction="row" alignItems="center" spacing={1}>
-                            {isWin && (
-                              <EmojiEventsIcon sx={{ color: '#DAA520', fontSize: 20 }} />
-                            )}
+                            {isWin && <EmojiEventsIcon sx={{ color: '#DAA520', fontSize: 20 }} />}
                             <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                              {isWin ? 'Victory!' : `Finished ${deckResult?.finish_position}${getOrdinalSuffix(deckResult?.finish_position || 0)}`}
+                              {isWin
+                                ? 'Victory!'
+                                : `Finished ${deckResult?.finish_position}${getOrdinalSuffix(deckResult?.finish_position || 0)}`}
                             </Typography>
                           </Stack>
                           {deckResult?.eliminated_turn && (
@@ -319,7 +308,12 @@ export default function DeckDetailPage() {
       )}
 
       {/* Edit Dialog */}
-      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>Edit Deck</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
@@ -377,7 +371,8 @@ export default function DeckDetailPage() {
         <DialogTitle>Delete Deck?</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete {deck.name}? This will also remove it from all game results.
+            Are you sure you want to delete {deck.name}? This will also remove it from all game
+            results.
           </Typography>
         </DialogContent>
         <DialogActions>

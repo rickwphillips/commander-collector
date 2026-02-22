@@ -18,7 +18,12 @@ import {
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import { ColorIdentityChips } from '../components/ColorIdentityChips';
-import type { ComparisonResult, ComparisonMetric, ComparisonConditions, ComparisonGroupBy } from '../lib/types';
+import type {
+  ComparisonResult,
+  ComparisonMetric,
+  ComparisonConditions,
+  ComparisonGroupBy,
+} from '../lib/types';
 
 // ---- Metric labels ----
 const METRIC_LABELS: Record<ComparisonMetric, string> = {
@@ -34,10 +39,19 @@ const METRIC_LABELS: Record<ComparisonMetric, string> = {
 };
 
 // Metrics where lower = better (for winner highlighting)
-const LOWER_IS_BETTER = new Set<ComparisonMetric>(['avg_finish_position', 'avg_turns_to_win', 'elimination_rate']);
+const LOWER_IS_BETTER = new Set<ComparisonMetric>([
+  'avg_finish_position',
+  'avg_turns_to_win',
+  'elimination_rate',
+]);
 
 // Metrics that are percentages
-const PCT_METRICS = new Set<ComparisonMetric>(['win_rate', 'recent_win_rate', 'top2_rate', 'elimination_rate']);
+const PCT_METRICS = new Set<ComparisonMetric>([
+  'win_rate',
+  'recent_win_rate',
+  'top2_rate',
+  'elimination_rate',
+]);
 
 function formatMetricValue(metric: ComparisonMetric, value: number | null): string {
   if (value === null || value === undefined) return '—';
@@ -48,7 +62,12 @@ function formatMetricValue(metric: ComparisonMetric, value: number | null): stri
 }
 
 // ---- Conditions summary bar ----
-function ConditionsSummary({ conditions }: { conditions: ComparisonConditions; groupBy?: ComparisonGroupBy }) {
+function ConditionsSummary({
+  conditions,
+}: {
+  conditions: ComparisonConditions;
+  groupBy?: ComparisonGroupBy;
+}) {
   const chips: string[] = [];
 
   if (conditions.game_type && conditions.game_type !== 'all') {
@@ -76,7 +95,7 @@ function ConditionsSummary({ conditions }: { conditions: ComparisonConditions; g
 
   return (
     <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
-      {chips.map(c => (
+      {chips.map((c) => (
         <Chip key={c} label={c} size="small" variant="outlined" color="primary" />
       ))}
     </Stack>
@@ -97,7 +116,9 @@ export function ComparisonPanel({ result }: ComparisonPanelProps) {
         <CardContent>
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
             <CompareArrowsIcon color="primary" />
-            <Typography variant="h5" sx={{ fontWeight: 600 }}>Custom Comparison</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 600 }}>
+              Custom Comparison
+            </Typography>
           </Stack>
           <ConditionsSummary conditions={conditions} groupBy={groupBy} />
           <Typography color="text.secondary">
@@ -109,9 +130,14 @@ export function ComparisonPanel({ result }: ComparisonPanelProps) {
   }
 
   // Find best value per metric (for highlighting)
-  const bestValues: Record<ComparisonMetric, number | null> = {} as Record<ComparisonMetric, number | null>;
+  const bestValues: Record<ComparisonMetric, number | null> = {} as Record<
+    ComparisonMetric,
+    number | null
+  >;
   for (const metric of metrics) {
-    const values = entities.map(e => e[metric] as number | null).filter((v): v is number => v !== null);
+    const values = entities
+      .map((e) => e[metric] as number | null)
+      .filter((v): v is number => v !== null);
     if (values.length === 0) {
       bestValues[metric] = null;
     } else {
@@ -124,7 +150,9 @@ export function ComparisonPanel({ result }: ComparisonPanelProps) {
       <CardContent>
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
           <CompareArrowsIcon color="primary" />
-          <Typography variant="h5" sx={{ fontWeight: 600 }}>Custom Comparison</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 600 }}>
+            Custom Comparison
+          </Typography>
         </Stack>
 
         <ConditionsSummary conditions={conditions} groupBy={groupBy} />
@@ -136,7 +164,7 @@ export function ComparisonPanel({ result }: ComparisonPanelProps) {
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 600 }}>Metric</TableCell>
-                  {entities.map(e => (
+                  {entities.map((e) => (
                     <TableCell key={String(e.id)} align="center" sx={{ fontWeight: 600 }}>
                       <Box>
                         {groupBy === 'color' && e.colors ? (
@@ -150,11 +178,15 @@ export function ComparisonPanel({ result }: ComparisonPanelProps) {
                                 <ColorIdentityChips colors={e.colors} size="small" />
                               </Box>
                             )}
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{e.label}</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {e.label}
+                            </Typography>
                           </>
                         )}
                         {e.sublabel && (
-                          <Typography variant="caption" color="text.secondary">{e.sublabel}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {e.sublabel}
+                          </Typography>
                         )}
                       </Box>
                     </TableCell>
@@ -162,15 +194,21 @@ export function ComparisonPanel({ result }: ComparisonPanelProps) {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {metrics.map(metric => (
+                {metrics.map((metric) => (
                   <TableRow key={metric}>
                     <TableCell sx={{ fontWeight: 500 }}>{METRIC_LABELS[metric]}</TableCell>
-                    {entities.map(e => {
+                    {entities.map((e) => {
                       const val = e[metric] as number | null;
-                      const isWinner = val !== null && bestValues[metric] !== null && val === bestValues[metric];
+                      const isWinner =
+                        val !== null && bestValues[metric] !== null && val === bestValues[metric];
                       return (
                         <TableCell key={String(e.id)} align="center">
-                          <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.5}>
+                          <Stack
+                            direction="row"
+                            alignItems="center"
+                            justifyContent="center"
+                            spacing={0.5}
+                          >
                             {isWinner && entities.length > 1 && (
                               <EmojiEventsIcon sx={{ color: '#DAA520', fontSize: 14 }} />
                             )}
@@ -178,7 +216,8 @@ export function ComparisonPanel({ result }: ComparisonPanelProps) {
                               variant="body2"
                               sx={{
                                 fontWeight: isWinner && entities.length > 1 ? 700 : 400,
-                                color: isWinner && entities.length > 1 ? 'primary.main' : 'text.primary',
+                                color:
+                                  isWinner && entities.length > 1 ? 'primary.main' : 'text.primary',
                               }}
                             >
                               {formatMetricValue(metric, val)}
@@ -199,7 +238,7 @@ export function ComparisonPanel({ result }: ComparisonPanelProps) {
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 600 }}>Entity</TableCell>
-                  {metrics.map(m => (
+                  {metrics.map((m) => (
                     <TableCell key={m} align="right" sx={{ fontWeight: 600 }}>
                       {METRIC_LABELS[m]}
                     </TableCell>
@@ -207,27 +246,37 @@ export function ComparisonPanel({ result }: ComparisonPanelProps) {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {entities.map(e => (
+                {entities.map((e) => (
                   <TableRow key={String(e.id)}>
                     <TableCell>
                       <Stack direction="row" alignItems="center" spacing={1}>
                         {e.colors && <ColorIdentityChips colors={e.colors} size="small" />}
                         <Box>
                           {groupBy !== 'color' && (
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>{e.label}</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {e.label}
+                            </Typography>
                           )}
                           {e.sublabel && (
-                            <Typography variant="caption" color="text.secondary">{e.sublabel}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {e.sublabel}
+                            </Typography>
                           )}
                         </Box>
                       </Stack>
                     </TableCell>
-                    {metrics.map(metric => {
+                    {metrics.map((metric) => {
                       const val = e[metric] as number | null;
-                      const isWinner = val !== null && bestValues[metric] !== null && val === bestValues[metric];
+                      const isWinner =
+                        val !== null && bestValues[metric] !== null && val === bestValues[metric];
                       return (
                         <TableCell key={metric} align="right">
-                          <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={0.5}>
+                          <Stack
+                            direction="row"
+                            alignItems="center"
+                            justifyContent="flex-end"
+                            spacing={0.5}
+                          >
                             {isWinner && entities.length > 1 && (
                               <EmojiEventsIcon sx={{ color: '#DAA520', fontSize: 14 }} />
                             )}
@@ -235,7 +284,8 @@ export function ComparisonPanel({ result }: ComparisonPanelProps) {
                               variant="body2"
                               sx={{
                                 fontWeight: isWinner && entities.length > 1 ? 700 : 400,
-                                color: isWinner && entities.length > 1 ? 'primary.main' : 'text.primary',
+                                color:
+                                  isWinner && entities.length > 1 ? 'primary.main' : 'text.primary',
                               }}
                             >
                               {formatMetricValue(metric, val)}

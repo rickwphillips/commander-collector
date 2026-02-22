@@ -33,7 +33,7 @@ export function useHiddenStats() {
   }, []);
 
   const toggleSection = useCallback((id: StatsSectionId) => {
-    setHiddenSections(prev => {
+    setHiddenSections((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -55,7 +55,7 @@ export function useHiddenStats() {
   }, []);
 
   const togglePanelVisibility = useCallback((panelId: number) => {
-    setHiddenPanelIds(prev => {
+    setHiddenPanelIds((prev) => {
       const next = new Set(prev);
       if (next.has(panelId)) next.delete(panelId);
       else next.add(panelId);
@@ -64,5 +64,13 @@ export function useHiddenStats() {
     });
   }, []);
 
-  return { hiddenSections, toggleSection, showAll, hideAll, hiddenPanelIds, togglePanelVisibility, loaded };
+  return {
+    hiddenSections,
+    toggleSection,
+    showAll,
+    hideAll,
+    hiddenPanelIds,
+    togglePanelVisibility,
+    loaded,
+  };
 }

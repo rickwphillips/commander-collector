@@ -3,10 +3,10 @@ import { createTheme, ThemeOptions } from '@mui/material/styles';
 // Autumn color palette
 const autumnColors = {
   light: {
-    primary: '#D2691E',        // Chocolate/burnt orange
-    secondary: '#8B4513',      // Saddle brown
-    accent: '#DAA520',         // Goldenrod
-    background: '#FFF8F0',     // Warm cream
+    primary: '#D2691E', // Chocolate/burnt orange
+    secondary: '#8B4513', // Saddle brown
+    accent: '#DAA520', // Goldenrod
+    background: '#FFF8F0', // Warm cream
     paper: '#FFFFFF',
     text: {
       primary: '#2C1810',
@@ -15,11 +15,11 @@ const autumnColors = {
     divider: '#E0C9B0',
   },
   dark: {
-    primary: '#FF8C00',        // Dark orange (brighter for dark mode)
-    secondary: '#CD853F',      // Peru
-    accent: '#F4A460',         // Sandy brown
-    background: '#1A1410',     // Very dark brown
-    paper: '#2D1F1A',          // Dark brown paper
+    primary: '#FF8C00', // Dark orange (brighter for dark mode)
+    secondary: '#CD853F', // Peru
+    accent: '#F4A460', // Sandy brown
+    background: '#1A1410', // Very dark brown
+    paper: '#2D1F1A', // Dark brown paper
     text: {
       primary: '#F5E6D3',
       secondary: '#D4BFA0',
@@ -96,9 +96,10 @@ export const createAppTheme = (mode: 'light' | 'dark') => {
             transition: 'transform 0.2s, box-shadow 0.2s',
             '&:hover': {
               transform: 'translateY(-2px)',
-              boxShadow: mode === 'light'
-                ? '0 4px 12px rgba(0, 0, 0, 0.1)'
-                : '0 4px 12px rgba(0, 0, 0, 0.5)',
+              boxShadow:
+                mode === 'light'
+                  ? '0 4px 12px rgba(0, 0, 0, 0.1)'
+                  : '0 4px 12px rgba(0, 0, 0, 0.5)',
             },
           },
         },

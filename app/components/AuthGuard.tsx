@@ -4,9 +4,8 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { Box, CircularProgress, Typography } from '@mui/material';
 
 const AUTH_TOKEN_KEY = 'auth_token';
-const LOGIN_URL = process.env.NODE_ENV === 'development'
-  ? 'http://localhost:3000/app/login/'
-  : '/app/login/';
+const LOGIN_URL =
+  process.env.NODE_ENV === 'development' ? 'http://localhost:3000/app/login/' : '/app/login/';
 
 interface AuthUser {
   id: string;
@@ -92,7 +91,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
 
     setUser(tokenUser);
     setChecking(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (checking) {
@@ -115,9 +114,5 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     );
   }
 
-  return (
-    <AuthContext.Provider value={{ user, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ user, logout }}>{children}</AuthContext.Provider>;
 }

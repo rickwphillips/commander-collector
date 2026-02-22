@@ -25,7 +25,13 @@ import ListSubheader from '@mui/material/ListSubheader';
 import { ColorIdentityChips } from './ColorIdentityChips';
 import { LoadingSpinner } from './LoadingSpinner';
 import { api } from '../lib/api';
-import type { Player, DeckWithPlayer, GameResultInput, GameType, GameWithResults } from '../lib/types';
+import type {
+  Player,
+  DeckWithPlayer,
+  GameResultInput,
+  GameType,
+  GameWithResults,
+} from '../lib/types';
 
 interface DeckOption extends DeckWithPlayer {
   total_games?: number;
@@ -83,10 +89,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
 
   const fetchData = async () => {
     try {
-      const [deckData, playerData] = await Promise.all([
-        api.getDecks(),
-        api.getPlayers(),
-      ]);
+      const [deckData, playerData] = await Promise.all([api.getDecks(), api.getPlayers()]);
       setDecks(deckData as DeckOption[]);
       setPlayers(playerData);
 
@@ -111,7 +114,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
     if (gameData.results && gameData.results.length > 0) {
       const formResults: PlayerResult[] = gameData.results
         .sort((a, b) => a.finish_position - b.finish_position)
-        .map(r => ({
+        .map((r) => ({
           player_id: r.player_id ?? '',
           deck_id: r.deck_id,
           finish_position: r.finish_position,
@@ -121,7 +124,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
       setResults(formResults);
 
       if (gameData.game_type === '2hg') {
-        const winner = gameData.results.find(r => r.finish_position === 1);
+        const winner = gameData.results.find((r) => r.finish_position === 1);
         if (winner?.team_number) {
           setWinningTeam(winner.team_number);
         }
@@ -133,7 +136,13 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
     if (gameType === 'standard' && results.length < 8) {
       setResults([
         ...results,
-        { player_id: '', deck_id: '', finish_position: results.length + 1, eliminated_turn: '', team_number: null },
+        {
+          player_id: '',
+          deck_id: '',
+          finish_position: results.length + 1,
+          eliminated_turn: '',
+          team_number: null,
+        },
       ]);
     }
   };
@@ -145,14 +154,18 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
     }
   };
 
-  const updateResult = (index: number, field: keyof PlayerResult, value: number | string | null) => {
+  const updateResult = (
+    index: number,
+    field: keyof PlayerResult,
+    value: number | string | null
+  ) => {
     const newResults = [...results];
     if (field === 'player_id') {
       newResults[index].player_id = value as number | '';
     } else if (field === 'deck_id') {
       newResults[index].deck_id = value as number | '';
       if (value !== '' && newResults[index].player_id === '') {
-        const deck = decks.find(d => d.id === value);
+        const deck = decks.find((d) => d.id === value);
         if (deck) {
           newResults[index].player_id = deck.player_id;
         }
@@ -164,7 +177,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
     } else if (field === 'team_number') {
       newResults[index].team_number = value as number | null;
       if (gameType === '2hg') {
-        newResults.forEach(r => {
+        newResults.forEach((r) => {
           if (r.team_number === winningTeam) {
             r.finish_position = 1;
           } else if (r.team_number !== null) {
@@ -190,8 +203,8 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
   const handleWinningTeamChange = (_: React.MouseEvent<HTMLElement>, team: number | null) => {
     if (team === null) return;
     setWinningTeam(team);
-    setResults(prev =>
-      prev.map(r => ({
+    setResults((prev) =>
+      prev.map((r) => ({
         ...r,
         finish_position: r.team_number === team ? 1 : 2,
       }))
@@ -213,13 +226,13 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
       return;
     }
 
-    const playerIds = validResults.map((r) => r.player_id).filter(id => id !== '');
+    const playerIds = validResults.map((r) => r.player_id).filter((id) => id !== '');
     if (new Set(playerIds).size !== playerIds.length) {
       setError('Each player can only appear once per game');
       return;
     }
 
-    if (validResults.some(r => r.player_id === '')) {
+    if (validResults.some((r) => r.player_id === '')) {
       setError('Please select a player for each slot');
       return;
     }
@@ -229,8 +242,8 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
         setError('2-Headed Giant requires exactly 4 players');
         return;
       }
-      const team1 = validResults.filter(r => r.team_number === 1);
-      const team2 = validResults.filter(r => r.team_number === 2);
+      const team1 = validResults.filter((r) => r.team_number === 1);
+      const team2 = validResults.filter((r) => r.team_number === 2);
       if (team1.length !== 2 || team2.length !== 2) {
         setError('Each team must have exactly 2 players');
         return;
@@ -299,8 +312,10 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
     const selectedDeck = getSelectedDeck(result.deck_id);
     const selectedPlayerId = result.player_id;
 
-    const playerDecks = selectedPlayerId !== '' ? decks.filter(d => d.player_id === selectedPlayerId) : [];
-    const otherDecks = selectedPlayerId !== '' ? decks.filter(d => d.player_id !== selectedPlayerId) : decks;
+    const playerDecks =
+      selectedPlayerId !== '' ? decks.filter((d) => d.player_id === selectedPlayerId) : [];
+    const otherDecks =
+      selectedPlayerId !== '' ? decks.filter((d) => d.player_id !== selectedPlayerId) : decks;
 
     return (
       <>
@@ -309,7 +324,9 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
             select
             label="Player"
             value={result.player_id}
-            onChange={(e) => updateResult(index, 'player_id', e.target.value === '' ? '' : Number(e.target.value))}
+            onChange={(e) =>
+              updateResult(index, 'player_id', e.target.value === '' ? '' : Number(e.target.value))
+            }
             sx={{ minWidth: 180 }}
             required
           >
@@ -344,7 +361,9 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
                 {deck.name} - {deck.commander}
               </MenuItem>
             ))}
-            {playerDecks.length > 0 && otherDecks.length > 0 && <ListSubheader>Other Decks</ListSubheader>}
+            {playerDecks.length > 0 && otherDecks.length > 0 && (
+              <ListSubheader>Other Decks</ListSubheader>
+            )}
             {otherDecks.map((deck) => (
               <MenuItem
                 key={deck.id}
@@ -372,8 +391,12 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
   const renderStandardResults = () => (
     <>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>Players & Results</Typography>
-        <Typography variant="body2" color="text.secondary">Order from winner (1st) to last eliminated</Typography>
+        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          Players & Results
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Order from winner (1st) to last eliminated
+        </Typography>
       </Stack>
 
       <Stack spacing={2}>
@@ -381,13 +404,25 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
           const isWinner = index === 0;
           return (
             <Grow key={index} in={mounted} timeout={600 + index * 100}>
-              <Card variant="outlined" sx={{ borderColor: isWinner ? 'primary.main' : 'divider', borderWidth: isWinner ? 2 : 1 }}>
+              <Card
+                variant="outlined"
+                sx={{
+                  borderColor: isWinner ? 'primary.main' : 'divider',
+                  borderWidth: isWinner ? 2 : 1,
+                }}
+              >
                 <CardContent>
                   <Stack spacing={2}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center">
                       <Stack direction="row" alignItems="center" spacing={1}>
                         {isWinner && <EmojiEventsIcon sx={{ color: '#DAA520' }} />}
-                        <Typography variant="subtitle1" sx={{ fontWeight: 600, color: isWinner ? 'primary.main' : 'text.primary' }}>
+                        <Typography
+                          variant="subtitle1"
+                          sx={{
+                            fontWeight: 600,
+                            color: isWinner ? 'primary.main' : 'text.primary',
+                          }}
+                        >
                           {isWinner ? 'Winner' : `${index + 1}${getOrdinalSuffix(index + 1)} Place`}
                         </Typography>
                       </Stack>
@@ -405,7 +440,13 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
                           label="Eliminated Turn"
                           type="number"
                           value={result.eliminated_turn}
-                          onChange={(e) => updateResult(index, 'eliminated_turn', e.target.value === '' ? '' : Number(e.target.value))}
+                          onChange={(e) =>
+                            updateResult(
+                              index,
+                              'eliminated_turn',
+                              e.target.value === '' ? '' : Number(e.target.value)
+                            )
+                          }
                           sx={{ minWidth: 150 }}
                           inputProps={{ min: 1 }}
                         />
@@ -420,28 +461,46 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
       </Stack>
 
       {results.length < 8 && (
-        <Button startIcon={<AddIcon />} onClick={addPlayer} sx={{ mt: 2 }}>Add Player</Button>
+        <Button startIcon={<AddIcon />} onClick={addPlayer} sx={{ mt: 2 }}>
+          Add Player
+        </Button>
       )}
     </>
   );
 
   const render2hgResults = () => {
-    const team1Results = results.map((r, i) => ({ ...r, originalIndex: i })).filter(r => r.team_number === 1);
-    const team2Results = results.map((r, i) => ({ ...r, originalIndex: i })).filter(r => r.team_number === 2);
+    const team1Results = results
+      .map((r, i) => ({ ...r, originalIndex: i }))
+      .filter((r) => r.team_number === 1);
+    const team2Results = results
+      .map((r, i) => ({ ...r, originalIndex: i }))
+      .filter((r) => r.team_number === 2);
 
-    const renderTeamSection = (teamNum: number, teamResults: (PlayerResult & { originalIndex: number })[], isWinning: boolean) => (
-      <Card variant="outlined" sx={{ borderColor: isWinning ? '#DAA520' : 'divider', borderWidth: isWinning ? 2 : 1 }}>
+    const renderTeamSection = (
+      teamNum: number,
+      teamResults: (PlayerResult & { originalIndex: number })[],
+      isWinning: boolean
+    ) => (
+      <Card
+        variant="outlined"
+        sx={{ borderColor: isWinning ? '#DAA520' : 'divider', borderWidth: isWinning ? 2 : 1 }}
+      >
         <CardContent>
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
             {isWinning && <EmojiEventsIcon sx={{ color: '#DAA520' }} />}
             <GroupsIcon color={isWinning ? 'primary' : 'action'} />
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: isWinning ? 'primary.main' : 'text.primary' }}>
+            <Typography
+              variant="subtitle1"
+              sx={{ fontWeight: 600, color: isWinning ? 'primary.main' : 'text.primary' }}
+            >
               Team {teamNum} {isWinning ? '(Winners)' : ''}
             </Typography>
           </Stack>
           <Stack spacing={2}>
             {teamResults.map((result) => (
-              <Box key={result.originalIndex}>{renderPlayerAndDeckSelector(result, result.originalIndex)}</Box>
+              <Box key={result.originalIndex}>
+                {renderPlayerAndDeckSelector(result, result.originalIndex)}
+              </Box>
             ))}
           </Stack>
         </CardContent>
@@ -451,24 +510,39 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
     return (
       <>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>Teams & Results</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            Teams & Results
+          </Typography>
         </Stack>
 
         <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 3 }}>
-          <Typography variant="body2" color="text.secondary">Winning Team:</Typography>
-          <ToggleButtonGroup value={winningTeam} exclusive onChange={handleWinningTeamChange} size="small">
+          <Typography variant="body2" color="text.secondary">
+            Winning Team:
+          </Typography>
+          <ToggleButtonGroup
+            value={winningTeam}
+            exclusive
+            onChange={handleWinningTeamChange}
+            size="small"
+          >
             <ToggleButton value={1}>Team 1</ToggleButton>
             <ToggleButton value={2}>Team 2</ToggleButton>
           </ToggleButtonGroup>
         </Stack>
 
         <Stack spacing={2} sx={{ mb: 2 }}>
-          <Typography variant="body2" color="text.secondary">Assign each player to a team:</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Assign each player to a team:
+          </Typography>
           {results.map((result, index) => (
             <Grow key={index} in={mounted} timeout={600 + index * 100}>
               <Card variant="outlined">
                 <CardContent>
-                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={2}
+                    alignItems={{ sm: 'center' }}
+                  >
                     <TextField
                       select
                       label="Team"
@@ -490,7 +564,9 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
         {team1Results.length > 0 && team2Results.length > 0 && (
           <>
             <Divider sx={{ my: 2 }} />
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Team Preview</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Team Preview
+            </Typography>
             <Stack spacing={2}>
               {renderTeamSection(1, team1Results, winningTeam === 1)}
               {renderTeamSection(2, team2Results, winningTeam === 2)}
@@ -513,7 +589,9 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
         <Stack spacing={3}>
           <Card>
             <CardContent>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Game Details</Typography>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                Game Details
+              </Typography>
               <Stack spacing={3}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3}>
                   <TextField
@@ -529,7 +607,9 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
                     label="Winning Turn"
                     type="number"
                     value={winningTurn}
-                    onChange={(e) => setWinningTurn(e.target.value === '' ? '' : Number(e.target.value))}
+                    onChange={(e) =>
+                      setWinningTurn(e.target.value === '' ? '' : Number(e.target.value))
+                    }
                     fullWidth
                     placeholder="e.g., 8"
                     inputProps={{ min: 1 }}
@@ -537,8 +617,15 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
                 </Stack>
 
                 <Stack direction="row" alignItems="center" spacing={2}>
-                  <Typography variant="body2" color="text.secondary">Game Mode:</Typography>
-                  <ToggleButtonGroup value={gameType} exclusive onChange={handleGameTypeChange} size="small">
+                  <Typography variant="body2" color="text.secondary">
+                    Game Mode:
+                  </Typography>
+                  <ToggleButtonGroup
+                    value={gameType}
+                    exclusive
+                    onChange={handleGameTypeChange}
+                    size="small"
+                  >
                     <ToggleButton value="standard">Standard</ToggleButton>
                     <ToggleButton value="2hg">
                       <GroupsIcon sx={{ mr: 0.5, fontSize: 18 }} />
@@ -558,7 +645,9 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
 
           <Card>
             <CardContent>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Notes</Typography>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                Notes
+              </Typography>
               <TextField
                 label="Game Notes"
                 value={notes}

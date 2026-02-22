@@ -47,7 +47,13 @@ const MTG_COLORS: { code: MtgColor; name: string; color: string; bg: string }[] 
   { code: 'G', name: 'Green', color: '#00733E', bg: '#A3C095' },
 ];
 
-type SortOption = 'name-asc' | 'name-desc' | 'winrate-desc' | 'winrate-asc' | 'games-desc' | 'games-asc';
+type SortOption =
+  | 'name-asc'
+  | 'name-desc'
+  | 'winrate-desc'
+  | 'winrate-asc'
+  | 'games-desc'
+  | 'games-asc';
 
 export default function DecksPage() {
   const [mounted, setMounted] = useState(false);
@@ -102,9 +108,7 @@ export default function DecksPage() {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
-        (d) =>
-          d.name.toLowerCase().includes(q) ||
-          d.commander.toLowerCase().includes(q)
+        (d) => d.name.toLowerCase().includes(q) || d.commander.toLowerCase().includes(q)
       );
     }
 
@@ -171,12 +175,7 @@ export default function DecksPage() {
       title="Decks"
       subtitle="Track your commanders and decks"
       actions={
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          component={Link}
-          href="/decks/new"
-        >
+        <Button variant="contained" startIcon={<AddIcon />} component={Link} href="/decks/new">
           Add Deck
         </Button>
       }
@@ -281,7 +280,12 @@ export default function DecksPage() {
                 </Grid>
               </Grid>
               {hasActiveFilters && (
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 1.5 }}>
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  sx={{ mt: 1.5 }}
+                >
                   <Typography variant="body2" color="text.secondary">
                     Showing {filteredDecks.length} of {decks.length} decks
                   </Typography>
@@ -344,11 +348,7 @@ export default function DecksPage() {
                             variant="outlined"
                           />
                         )}
-                        <Chip
-                          label={`${deck.total_games} games`}
-                          size="small"
-                          variant="outlined"
-                        />
+                        <Chip label={`${deck.total_games} games`} size="small" variant="outlined" />
                         {deck.win_rate !== null && deck.total_games > 0 && (
                           <Chip
                             label={`${deck.win_rate}%`}

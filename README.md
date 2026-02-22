@@ -27,6 +27,7 @@ A Magic: The Gathering Commander game tracking app.
 ### Setup
 
 1. Install dependencies:
+
    ```bash
    npm install
    ```
@@ -36,6 +37,7 @@ A Magic: The Gathering Commander game tracking app.
 3. Update `app/php-api/config.php` with your database credentials
 
 4. Start the development server:
+
    ```bash
    npm run dev
    ```

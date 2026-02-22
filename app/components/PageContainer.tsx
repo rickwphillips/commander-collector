@@ -36,18 +36,21 @@ export function PageContainer({
       <LogoutButton />
       <DarkModeToggle />
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Button
-          component={Link}
-          href={backHref}
-          startIcon={<ArrowBackIcon />}
-          sx={{ mb: 3 }}
-        >
+        <Button component={Link} href={backHref} startIcon={<ArrowBackIcon />} sx={{ mb: 3 }}>
           {backLabel}
         </Button>
 
         <Fade in={mounted} timeout={800}>
           <Box sx={{ mb: 4 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                flexWrap: 'wrap',
+                gap: 2,
+              }}
+            >
               <Box>
                 <Typography
                   variant="h3"
