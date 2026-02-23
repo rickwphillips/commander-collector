@@ -238,6 +238,17 @@ function ComparisonBuilder({
 }: ComparisonBuilderProps) {
   const isEntityGroup = ENTITY_GROUP_BYS.has(groupBy);
 
+  // Local state for the game length number input
+  const [glValue, setGlValue] = useState(
+    conditions.min_winning_turn ?? conditions.max_winning_turn ?? 5
+  );
+  const glDirection =
+    conditions.min_winning_turn != null
+      ? 'gte'
+      : conditions.max_winning_turn != null
+        ? 'lte'
+        : null;
+
   function setCond<K extends keyof ComparisonConditions>(key: K, val: ComparisonConditions[K]) {
     setConditions({ ...conditions, [key]: val });
   }
@@ -284,17 +295,79 @@ function ComparisonBuilder({
           onChange={(v) => setCond('pod_size', v === 0 ? undefined : (v as number))}
         />
 
-        <ChipGroup
-          label="Game Length"
-          value={conditions.min_winning_turn ?? 0}
-          options={[
-            { value: 0, label: 'Any' },
-            { value: 5, label: '5+ turns' },
-            { value: 8, label: '8+ turns' },
-            { value: 10, label: '10+ turns' },
-          ]}
-          onChange={(v) => setCond('min_winning_turn', v === 0 ? undefined : (v as number))}
-        />
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+            Game Length
+          </Typography>
+          <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap>
+            <TextField
+              type="number"
+              size="small"
+              value={glValue}
+              disabled={glDirection === null}
+              onChange={(e) => {
+                const n = Math.max(1, parseInt(e.target.value) || 1);
+                setGlValue(n);
+                if (glDirection === 'gte') setCond('min_winning_turn', n);
+                else if (glDirection === 'lte') setCond('max_winning_turn', n);
+              }}
+              inputProps={{ min: 1, max: 99 }}
+              sx={{ width: 70 }}
+            />
+            <Typography variant="body2" color={glDirection === null ? 'text.disabled' : 'text.primary'}>
+              turns
+            </Typography>
+            <FormControlLabel
+              sx={{ mr: 0 }}
+              control={
+                <Checkbox
+                  size="small"
+                  checked={glDirection === 'gte'}
+                  onChange={() => {
+                    if (glDirection === 'gte') {
+                      setCond('min_winning_turn', undefined);
+                    } else {
+                      setConditions({ ...conditions, min_winning_turn: glValue, max_winning_turn: undefined });
+                    }
+                  }}
+                />
+              }
+              label="or more"
+            />
+            <FormControlLabel
+              sx={{ mr: 0 }}
+              control={
+                <Checkbox
+                  size="small"
+                  checked={glDirection === 'lte'}
+                  onChange={() => {
+                    if (glDirection === 'lte') {
+                      setCond('max_winning_turn', undefined);
+                    } else {
+                      setConditions({ ...conditions, min_winning_turn: undefined, max_winning_turn: glValue });
+                    }
+                  }}
+                />
+              }
+              label="or less"
+            />
+            <FormControlLabel
+              sx={{ mr: 0 }}
+              control={
+                <Checkbox
+                  size="small"
+                  checked={glDirection === null}
+                  onChange={() => {
+                    if (glDirection !== null) {
+                      setConditions({ ...conditions, min_winning_turn: undefined, max_winning_turn: undefined });
+                    }
+                  }}
+                />
+              }
+              label="Any"
+            />
+          </Stack>
+        </Box>
 
         <ChipGroup
           label="Count As Win"

@@ -288,6 +288,7 @@ export interface ComparisonConditions {
   game_type?: 'all' | 'standard' | '2hg';
   pod_size?: number;
   min_winning_turn?: number;
+  max_winning_turn?: number;
   min_finish_position?: number;
   required_player_ids?: number[];
   required_commanders?: string[];

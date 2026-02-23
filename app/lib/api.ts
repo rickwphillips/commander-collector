@@ -167,6 +167,7 @@ function buildComparisonParams(config: import('./types').ComparisonConfig): stri
     parts.push(`game_type=${encodeURIComponent(c.game_type)}`);
   if (c.pod_size != null) parts.push(`pod_size=${c.pod_size}`);
   if (c.min_winning_turn != null) parts.push(`min_winning_turn=${c.min_winning_turn}`);
+  if (c.max_winning_turn != null) parts.push(`max_winning_turn=${c.max_winning_turn}`);
   if (c.min_finish_position != null) parts.push(`min_finish_position=${c.min_finish_position}`);
   if (c.date_from) parts.push(`date_from=${encodeURIComponent(c.date_from)}`);
   if (c.date_to) parts.push(`date_to=${encodeURIComponent(c.date_to)}`);

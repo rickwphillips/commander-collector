@@ -18,6 +18,7 @@ $metrics        = array_filter(explode(',', $metricsParam));
 $gameType        = $_GET['game_type'] ?? null;        // 'standard' or '2hg'
 $podSize         = isset($_GET['pod_size']) ? (int)$_GET['pod_size'] : null;
 $minWinTurn      = isset($_GET['min_winning_turn']) ? (int)$_GET['min_winning_turn'] : null;
+$maxWinTurn      = isset($_GET['max_winning_turn']) ? (int)$_GET['max_winning_turn'] : null;
 $minFinishPos    = isset($_GET['min_finish_position']) ? (int)$_GET['min_finish_position'] : null;
 $dateFrom        = $_GET['date_from'] ?? null;
 $dateTo          = $_GET['date_to'] ?? null;
@@ -75,6 +76,11 @@ if ($podSize !== null) {
 if ($minWinTurn !== null) {
     $where[] = 'g.winning_turn >= ?';
     $params[] = $minWinTurn;
+}
+
+if ($maxWinTurn !== null) {
+    $where[] = 'g.winning_turn <= ?';
+    $params[] = $maxWinTurn;
 }
 
 if ($minFinishPos !== null) {
@@ -486,6 +492,7 @@ $conditions = array_filter([
     'game_type'            => ($gameType && $gameType !== 'all') ? $gameType : null,
     'pod_size'             => $podSize,
     'min_winning_turn'     => $minWinTurn,
+    'max_winning_turn'     => $maxWinTurn,
     'min_finish_position'  => $minFinishPos,
     'required_player_ids'  => $reqPlayerIds ?: null,
     'required_commanders'  => $reqCommanders ?: null,
