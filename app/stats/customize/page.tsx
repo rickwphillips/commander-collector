@@ -308,6 +308,31 @@ function ComparisonBuilder({
 
         <Box sx={{ mb: 2 }}>
           <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+            Deck must include colors
+          </Typography>
+          <Stack direction="row" spacing={0.5}>
+            {(['W', 'U', 'B', 'R', 'G'] as const).map((color) => {
+              const active = conditions.must_include_colors?.includes(color) ?? false;
+              return (
+                <Chip
+                  key={color}
+                  label={color}
+                  size="small"
+                  onClick={() => {
+                    const current = conditions.must_include_colors ?? [];
+                    const next = active ? current.filter((c) => c !== color) : [...current, color];
+                    setCond('must_include_colors', next.length ? next : undefined);
+                  }}
+                  color={active ? 'primary' : 'default'}
+                  variant={active ? 'filled' : 'outlined'}
+                />
+              );
+            })}
+          </Stack>
+        </Box>
+
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
             Player must be in pod (required_players)
           </Typography>
           <Autocomplete

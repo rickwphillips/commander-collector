@@ -180,6 +180,11 @@ function buildComparisonParams(config: import('./types').ComparisonConfig): stri
       parts.push(`required_commanders[]=${encodeURIComponent(cmd)}`)
     );
   }
+  if (c.must_include_colors?.length) {
+    c.must_include_colors.forEach((color) =>
+      parts.push(`must_include_colors[]=${encodeURIComponent(color)}`)
+    );
+  }
 
   const ef = config.entityFilter;
   if (ef?.player_ids?.length)

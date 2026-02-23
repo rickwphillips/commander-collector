@@ -28,6 +28,11 @@ $reqPlayerIds    = isset($_GET['required_player_ids']) && is_array($_GET['requir
     ? array_map('intval', $_GET['required_player_ids']) : [];
 $reqCommanders   = isset($_GET['required_commanders']) && is_array($_GET['required_commanders'])
     ? array_map('strval', $_GET['required_commanders']) : [];
+$mustIncludeColors = isset($_GET['must_include_colors']) && is_array($_GET['must_include_colors'])
+    ? array_values(array_filter(
+        array_map('strtoupper', array_map('strval', $_GET['must_include_colors'])),
+        fn($c) => in_array($c, ['W', 'U', 'B', 'R', 'G'], true)
+    )) : [];
 
 // Entity filter
 $filterPlayerIds  = isset($_GET['filter_player_ids']) && is_array($_GET['filter_player_ids'])
@@ -98,6 +103,12 @@ foreach ($reqCommanders as $cmd) {
     $params[] = $cmd;
 }
 
+// Deck must contain all listed colors (uses boolean columns)
+$colorColumnMap = ['W' => 'has_w', 'U' => 'has_u', 'B' => 'has_b', 'R' => 'has_r', 'G' => 'has_g'];
+foreach ($mustIncludeColors as $color) {
+    $where[] = 'd.' . $colorColumnMap[$color] . ' = 1';
+}
+
 // --- Metric expressions ---
 function metricExpression(string $metric): string {
     switch ($metric) {
@@ -142,17 +153,7 @@ function buildQuery(
             break;
 
         case 'deck':
-            $deckNormColors = "CASE
-                WHEN d.colors = '' OR d.colors IS NULL OR d.colors = 'C' THEN 'C'
-                ELSE CONCAT(
-                    IF(LOCATE('W', d.colors) > 0, 'W', ''),
-                    IF(LOCATE('U', d.colors) > 0, 'U', ''),
-                    IF(LOCATE('B', d.colors) > 0, 'B', ''),
-                    IF(LOCATE('R', d.colors) > 0, 'R', ''),
-                    IF(LOCATE('G', d.colors) > 0, 'G', '')
-                )
-              END";
-            $select  = "gr.deck_id AS id, d.name AS label, p.name AS sublabel, ($deckNormColors) AS colors";
+            $select  = "gr.deck_id AS id, d.name AS label, p.name AS sublabel, IF(d.colors IS NULL OR d.colors = '', 'C', d.colors) AS colors";
             $joins   = "JOIN decks d ON gr.deck_id = d.id JOIN players p ON d.player_id = p.id JOIN $podSubquery ON pod.game_id = g.id";
             $groupSql = 'gr.deck_id';
             $orderBy = 'win_rate DESC';
@@ -181,28 +182,20 @@ function buildQuery(
             break;
 
         case 'color':
-            // Normalize to WUBRG order; empty string → 'C' for colorless
-            $normColors = "CASE
-                WHEN d.colors = '' OR d.colors IS NULL OR d.colors = 'C' THEN 'C'
-                ELSE CONCAT(
-                    IF(LOCATE('W', d.colors) > 0, 'W', ''),
-                    IF(LOCATE('U', d.colors) > 0, 'U', ''),
-                    IF(LOCATE('B', d.colors) > 0, 'B', ''),
-                    IF(LOCATE('R', d.colors) > 0, 'R', ''),
-                    IF(LOCATE('G', d.colors) > 0, 'G', '')
-                )
-              END";
+            // colors column is canonical WUBRG order since migration; empty/null → 'C'
+            $normColors = "IF(d.colors IS NULL OR d.colors = '', 'C', d.colors)";
             $select  = "$normColors AS id, $normColors AS label, NULL AS sublabel, $normColors AS colors";
             $joins   = "JOIN decks d ON gr.deck_id = d.id JOIN players p ON gr.player_id = p.id JOIN $podSubquery ON pod.game_id = g.id";
             $groupSql = $normColors;
             $orderBy = 'win_rate DESC';
             if ($filterColors) {
-                // Normalize the filter values too
                 foreach ($filterColors as $fc) {
-                    $normalized = 'C';
-                    if ($fc !== '' && $fc !== 'C') {
+                    // Normalize filter value to canonical WUBRG order
+                    if ($fc === '' || $fc === 'C') {
+                        $normalized = 'C';
+                    } else {
                         $normalized = '';
-                        foreach (['W','U','B','R','G'] as $c) {
+                        foreach (['W', 'U', 'B', 'R', 'G'] as $c) {
                             if (strpos($fc, $c) !== false) $normalized .= $c;
                         }
                         if ($normalized === '') $normalized = 'C';
@@ -421,17 +414,7 @@ function computeRecentWinRate(
                 $localParams[] = $entityId;
                 break;
             case 'color':
-                // Match against normalized colors (entity ID is already normalized)
-                $localWhere[] = "CASE
-                    WHEN d.colors = '' OR d.colors IS NULL OR d.colors = 'C' THEN 'C'
-                    ELSE CONCAT(
-                        IF(LOCATE('W', d.colors) > 0, 'W', ''),
-                        IF(LOCATE('U', d.colors) > 0, 'U', ''),
-                        IF(LOCATE('B', d.colors) > 0, 'B', ''),
-                        IF(LOCATE('R', d.colors) > 0, 'R', ''),
-                        IF(LOCATE('G', d.colors) > 0, 'G', '')
-                    )
-                  END = ?";
+                $localWhere[] = "IF(d.colors IS NULL OR d.colors = '', 'C', d.colors) = ?";
                 $localParams[] = $entityId;
                 break;
             default:
@@ -500,15 +483,16 @@ $entities = array_map(function($row) use ($needsRecent, $recentRates) {
 
 // Build conditions object for response (only non-null fields)
 $conditions = array_filter([
-    'game_type'           => ($gameType && $gameType !== 'all') ? $gameType : null,
-    'pod_size'            => $podSize,
-    'min_winning_turn'    => $minWinTurn,
-    'min_finish_position' => $minFinishPos,
-    'required_player_ids' => $reqPlayerIds ?: null,
-    'required_commanders' => $reqCommanders ?: null,
-    'date_from'           => $dateFrom,
-    'date_to'             => $dateTo,
-    'min_games'           => $minGames > 1 ? $minGames : null,
+    'game_type'            => ($gameType && $gameType !== 'all') ? $gameType : null,
+    'pod_size'             => $podSize,
+    'min_winning_turn'     => $minWinTurn,
+    'min_finish_position'  => $minFinishPos,
+    'required_player_ids'  => $reqPlayerIds ?: null,
+    'required_commanders'  => $reqCommanders ?: null,
+    'date_from'            => $dateFrom,
+    'date_to'              => $dateTo,
+    'min_games'            => $minGames > 1 ? $minGames : null,
+    'must_include_colors'  => $mustIncludeColors ?: null,
 ], fn($v) => $v !== null);
 
 sendJSON([

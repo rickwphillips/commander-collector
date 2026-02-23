@@ -294,6 +294,7 @@ export interface ComparisonConditions {
   date_from?: string;
   date_to?: string;
   min_games?: number;
+  must_include_colors?: string[]; // deck must contain ALL listed colors (W/U/B/R/G)
 }
 
 export interface ComparisonEntityFilter {
