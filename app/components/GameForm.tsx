@@ -75,11 +75,11 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
   const [error, setError] = useState<string | null>(null);
 
   const [playedAt, setPlayedAt] = useState(new Date().toISOString().split('T')[0]);
-  const [winningTurn, setWinningTurn] = useState<number | ''>('');
   const [notes, setNotes] = useState('');
   const [results, setResults] = useState<PlayerResult[]>(defaultResults);
   const [gameType, setGameType] = useState<GameType>('standard');
   const [winningTeam, setWinningTeam] = useState<number>(1);
+  const [teamElimTurns, setTeamElimTurns] = useState<Record<number, number | ''>>({ 2: '' });
 
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 0);
@@ -107,7 +107,6 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
 
   const populateFromGame = (gameData: GameWithResults) => {
     setPlayedAt(gameData.played_at.split('T')[0]);
-    setWinningTurn(gameData.winning_turn ?? '');
     setNotes(gameData.notes ?? '');
     setGameType((gameData.game_type as GameType) || 'standard');
 
@@ -125,9 +124,21 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
 
       if (gameData.game_type === '2hg') {
         const winner = gameData.results.find((r) => r.finish_position === 1);
-        if (winner?.team_number) {
-          setWinningTeam(winner.team_number);
+        const winTeam = winner?.team_number ?? 1;
+        setWinningTeam(winTeam);
+        const allTeamNums = [
+          ...new Set(gameData.results.map((r) => r.team_number).filter(Boolean)),
+        ] as number[];
+        const elimTurns: Record<number, number | ''> = {};
+        for (const teamNum of allTeamNums) {
+          if (teamNum !== winTeam) {
+            const loser = gameData.results.find(
+              (r) => r.team_number === teamNum && r.eliminated_turn != null
+            );
+            elimTurns[teamNum] = loser?.eliminated_turn ?? '';
+          }
         }
+        setTeamElimTurns(elimTurns);
       }
     }
   };
@@ -195,6 +206,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
     if (newType === '2hg') {
       setResults(default2hgResults);
       setWinningTeam(1);
+      setTeamElimTurns({ 2: '' });
     } else {
       setResults(defaultResults);
     }
@@ -202,6 +214,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
 
   const handleWinningTeamChange = (_: React.MouseEvent<HTMLElement>, team: number | null) => {
     if (team === null) return;
+    const prevWinner = winningTeam;
     setWinningTeam(team);
     setResults((prev) =>
       prev.map((r) => ({
@@ -209,6 +222,12 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
         finish_position: r.team_number === team ? 1 : 2,
       }))
     );
+    setTeamElimTurns((prev) => {
+      const updated = { ...prev };
+      updated[prevWinner] = ''; // old winner now needs an elim turn
+      delete updated[team]; // new winner no longer needs one
+      return updated;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -238,15 +257,18 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
     }
 
     if (gameType === '2hg') {
-      if (validResults.length !== 4) {
-        setError('2-Headed Giant requires exactly 4 players');
+      const teamNums = [
+        ...new Set(validResults.map((r) => r.team_number).filter(Boolean)),
+      ] as number[];
+      if (teamNums.length < 2) {
+        setError('2HG requires at least 2 teams');
         return;
       }
-      const team1 = validResults.filter((r) => r.team_number === 1);
-      const team2 = validResults.filter((r) => r.team_number === 2);
-      if (team1.length !== 2 || team2.length !== 2) {
-        setError('Each team must have exactly 2 players');
-        return;
+      for (const teamNum of teamNums) {
+        if (validResults.filter((r) => r.team_number === teamNum).length !== 2) {
+          setError('Each team must have exactly 2 players');
+          return;
+        }
       }
     }
 
@@ -254,17 +276,37 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
     setError(null);
 
     try {
+      // For 2HG: compute finish_position per team (winner=1, others ordered by elim turn desc)
+      const teamPositions: Record<number, number> = {};
+      if (gameType === '2hg') {
+        teamPositions[winningTeam] = 1;
+        const losingTeams = [
+          ...new Set(validResults.map((r) => r.team_number).filter((n) => n !== winningTeam)),
+        ] as number[];
+        losingTeams
+          .sort((a, b) => Number(teamElimTurns[b] || 0) - Number(teamElimTurns[a] || 0))
+          .forEach((teamNum, idx) => {
+            teamPositions[teamNum] = idx + 2;
+          });
+      }
+
       const gameResults: GameResultInput[] = validResults.map((r, index) => ({
         deck_id: r.deck_id as number,
         player_id: r.player_id as number,
-        finish_position: gameType === '2hg' ? r.finish_position : index + 1,
-        eliminated_turn: r.eliminated_turn === '' ? null : Number(r.eliminated_turn),
+        finish_position: gameType === '2hg' ? (teamPositions[r.team_number ?? 0] ?? 2) : index + 1,
+        eliminated_turn:
+          gameType === '2hg'
+            ? r.team_number !== winningTeam
+              ? (teamElimTurns[r.team_number ?? 0] ?? '') === ''
+                ? null
+                : Number(teamElimTurns[r.team_number ?? 0])
+              : null
+            : r.eliminated_turn === '' ? null : Number(r.eliminated_turn),
         team_number: gameType === '2hg' ? r.team_number : null,
       }));
 
       const gameData = {
         played_at: playedAt,
-        winning_turn: winningTurn === '' ? null : Number(winningTurn),
         notes: notes.trim() || null,
         game_type: gameType,
         results: gameResults,
@@ -469,43 +511,19 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
   );
 
   const render2hgResults = () => {
-    const team1Results = results
-      .map((r, i) => ({ ...r, originalIndex: i }))
-      .filter((r) => r.team_number === 1);
-    const team2Results = results
-      .map((r, i) => ({ ...r, originalIndex: i }))
-      .filter((r) => r.team_number === 2);
+    const teamNumbers = [
+      ...new Set(results.map((r) => r.team_number).filter((n) => n !== null)),
+    ].sort() as number[];
 
-    const renderTeamSection = (
-      teamNum: number,
-      teamResults: (PlayerResult & { originalIndex: number })[],
-      isWinning: boolean
-    ) => (
-      <Card
-        variant="outlined"
-        sx={{ borderColor: isWinning ? '#DAA520' : 'divider', borderWidth: isWinning ? 2 : 1 }}
-      >
-        <CardContent>
-          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-            {isWinning && <EmojiEventsIcon sx={{ color: '#DAA520' }} />}
-            <GroupsIcon color={isWinning ? 'primary' : 'action'} />
-            <Typography
-              variant="subtitle1"
-              sx={{ fontWeight: 600, color: isWinning ? 'primary.main' : 'text.primary' }}
-            >
-              Team {teamNum} {isWinning ? '(Winners)' : ''}
-            </Typography>
-          </Stack>
-          <Stack spacing={2}>
-            {teamResults.map((result) => (
-              <Box key={result.originalIndex}>
-                {renderPlayerAndDeckSelector(result, result.originalIndex)}
-              </Box>
-            ))}
-          </Stack>
-        </CardContent>
-      </Card>
-    );
+    const addTeam = () => {
+      const newTeamNum = Math.max(...teamNumbers) + 1;
+      setResults((prev) => [
+        ...prev,
+        { player_id: '', deck_id: '', finish_position: 2, eliminated_turn: '', team_number: newTeamNum },
+        { player_id: '', deck_id: '', finish_position: 2, eliminated_turn: '', team_number: newTeamNum },
+      ]);
+      setTeamElimTurns((prev) => ({ ...prev, [newTeamNum]: '' }));
+    };
 
     return (
       <>
@@ -525,53 +543,73 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
             onChange={handleWinningTeamChange}
             size="small"
           >
-            <ToggleButton value={1}>Team 1</ToggleButton>
-            <ToggleButton value={2}>Team 2</ToggleButton>
+            {teamNumbers.map((n) => (
+              <ToggleButton key={n} value={n}>
+                Team {n}
+              </ToggleButton>
+            ))}
           </ToggleButtonGroup>
         </Stack>
 
-        <Stack spacing={2} sx={{ mb: 2 }}>
-          <Typography variant="body2" color="text.secondary">
-            Assign each player to a team:
-          </Typography>
-          {results.map((result, index) => (
-            <Grow key={index} in={mounted} timeout={600 + index * 100}>
-              <Card variant="outlined">
-                <CardContent>
-                  <Stack
-                    direction={{ xs: 'column', sm: 'row' }}
-                    spacing={2}
-                    alignItems={{ sm: 'center' }}
-                  >
-                    <TextField
-                      select
-                      label="Team"
-                      value={result.team_number ?? ''}
-                      onChange={(e) => updateResult(index, 'team_number', Number(e.target.value))}
-                      sx={{ minWidth: 120 }}
-                    >
-                      <MenuItem value={1}>Team 1</MenuItem>
-                      <MenuItem value={2}>Team 2</MenuItem>
-                    </TextField>
-                    <Box sx={{ flex: 1 }}>{renderPlayerAndDeckSelector(result, index)}</Box>
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Grow>
-          ))}
+        <Stack spacing={2}>
+          {teamNumbers.map((teamNum, idx) => {
+            const isWinning = teamNum === winningTeam;
+            const teamResults = results
+              .map((r, i) => ({ ...r, originalIndex: i }))
+              .filter((r) => r.team_number === teamNum);
+
+            return (
+              <Grow key={teamNum} in={mounted} timeout={500 + idx * 150}>
+                <Card
+                  variant="outlined"
+                  sx={{ borderColor: isWinning ? '#DAA520' : 'divider', borderWidth: isWinning ? 2 : 1 }}
+                >
+                  <CardContent>
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+                      {isWinning && <EmojiEventsIcon sx={{ color: '#DAA520' }} />}
+                      <GroupsIcon color={isWinning ? 'primary' : 'action'} />
+                      <Typography
+                        variant="subtitle1"
+                        sx={{ fontWeight: 600, color: isWinning ? 'primary.main' : 'text.primary' }}
+                      >
+                        Team {teamNum} {isWinning ? '(Winners)' : ''}
+                      </Typography>
+                    </Stack>
+
+                    <Stack spacing={2}>
+                      {teamResults.map((result) => (
+                        <Box key={result.originalIndex}>
+                          {renderPlayerAndDeckSelector(result, result.originalIndex)}
+                        </Box>
+                      ))}
+                    </Stack>
+
+                    {!isWinning && (
+                      <TextField
+                        label="Eliminated Turn"
+                        type="number"
+                        value={teamElimTurns[teamNum] ?? ''}
+                        onChange={(e) =>
+                          setTeamElimTurns((prev) => ({
+                            ...prev,
+                            [teamNum]: e.target.value === '' ? '' : Number(e.target.value),
+                          }))
+                        }
+                        sx={{ mt: 2, minWidth: 160 }}
+                        inputProps={{ min: 1 }}
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+              </Grow>
+            );
+          })}
         </Stack>
 
-        {team1Results.length > 0 && team2Results.length > 0 && (
-          <>
-            <Divider sx={{ my: 2 }} />
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Team Preview
-            </Typography>
-            <Stack spacing={2}>
-              {renderTeamSection(1, team1Results, winningTeam === 1)}
-              {renderTeamSection(2, team2Results, winningTeam === 2)}
-            </Stack>
-          </>
+        {teamNumbers.length < 4 && (
+          <Button startIcon={<AddIcon />} onClick={addTeam} sx={{ mt: 2 }}>
+            Add Team
+          </Button>
         )}
       </>
     );
@@ -593,28 +631,14 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
                 Game Details
               </Typography>
               <Stack spacing={3}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3}>
-                  <TextField
-                    label="Date Played"
-                    type="date"
-                    value={playedAt}
-                    onChange={(e) => setPlayedAt(e.target.value)}
-                    required
-                    fullWidth
-                    InputLabelProps={{ shrink: true }}
-                  />
-                  <TextField
-                    label="Winning Turn"
-                    type="number"
-                    value={winningTurn}
-                    onChange={(e) =>
-                      setWinningTurn(e.target.value === '' ? '' : Number(e.target.value))
-                    }
-                    fullWidth
-                    placeholder="e.g., 8"
-                    inputProps={{ min: 1 }}
-                  />
-                </Stack>
+                <TextField
+                  label="Date Played"
+                  type="date"
+                  value={playedAt}
+                  onChange={(e) => setPlayedAt(e.target.value)}
+                  required
+                  InputLabelProps={{ shrink: true }}
+                />
 
                 <Stack direction="row" alignItems="center" spacing={2}>
                   <Typography variant="body2" color="text.secondary">

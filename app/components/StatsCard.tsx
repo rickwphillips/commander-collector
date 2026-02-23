@@ -1,6 +1,7 @@
 'use client';
 
 import { Card, CardContent, Typography, Box } from '@mui/material';
+import NextLink from 'next/link';
 import { ReactNode } from 'react';
 
 interface StatsCardProps {
@@ -9,9 +10,10 @@ interface StatsCardProps {
   subtitle?: string;
   icon?: ReactNode;
   color?: string;
+  href?: string;
 }
 
-export function StatsCard({ title, value, subtitle, icon, color = '#D2691E' }: StatsCardProps) {
+export function StatsCard({ title, value, subtitle, icon, color = '#D2691E', href }: StatsCardProps) {
   return (
     <Card
       sx={{
@@ -36,7 +38,11 @@ export function StatsCard({ title, value, subtitle, icon, color = '#D2691E' }: S
             {title}
           </Typography>
         </Box>
-        <Typography variant="h3" sx={{ fontWeight: 700, color }}>
+        <Typography
+          variant="h3"
+          sx={{ fontWeight: 700, color }}
+          {...(href ? { component: NextLink, href } : {})}
+        >
           {value}
         </Typography>
         {subtitle && (

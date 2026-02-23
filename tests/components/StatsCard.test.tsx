@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { StatsCard } from '@/app/components/StatsCard';
 
 describe('StatsCard', () => {
@@ -37,5 +38,27 @@ describe('StatsCard', () => {
   it('does not render icon slot when icon is omitted', () => {
     render(<StatsCard title="Wins" value={10} />);
     expect(screen.queryByTestId('test-icon')).not.toBeInTheDocument();
+  });
+
+  it('renders value as a link when href is provided', () => {
+    render(<StatsCard title="Games" value={42} href="/games" />);
+    const link = screen.getByRole('link');
+    expect(link).toHaveAttribute('href', '/games');
+    expect(link).toHaveTextContent('42');
+  });
+
+  it('does not render a link when href is omitted', () => {
+    render(<StatsCard title="Games" value={42} />);
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('renders correctly in dark mode', () => {
+    const darkTheme = createTheme({ palette: { mode: 'dark' } });
+    render(
+      <ThemeProvider theme={darkTheme}>
+        <StatsCard title="Games" value={42} />
+      </ThemeProvider>
+    );
+    expect(screen.getByText('42')).toBeInTheDocument();
   });
 });

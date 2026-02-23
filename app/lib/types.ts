@@ -391,7 +391,6 @@ export interface GameResultInput {
 
 export interface CreateGameInput {
   played_at: string;
-  winning_turn: number | null;
   notes: string | null;
   game_type: GameType;
   results: GameResultInput[];

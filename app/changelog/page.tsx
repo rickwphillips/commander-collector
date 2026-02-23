@@ -38,6 +38,53 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.8.0',
+    date: '2026-02-23',
+    title: 'Color Stats, 2HG Overhaul & UX Polish',
+    changes: [
+      {
+        type: 'added',
+        text: 'Color Presence stats — win rates for all decks containing each color (W/U/B/R/G), regardless of other colors in the identity',
+      },
+      {
+        type: 'added',
+        text: 'Color Complexity stats — performance breakdown by number of colors (Colorless through Five-color)',
+      },
+      {
+        type: 'added',
+        text: 'Must Include Colors condition in comparison builder — filter results to decks containing all specified colors',
+      },
+      {
+        type: 'changed',
+        text: '2HG game form redesigned — replaced per-player team assignment with direct team cards; each non-winning team has its own Eliminated Turn field',
+      },
+      {
+        type: 'added',
+        text: 'Add Team button in 2HG form — supports up to 4 teams with finish positions ordered by elimination turn',
+      },
+      {
+        type: 'changed',
+        text: 'Game Length (winning turn) is now auto-derived from the last-eliminated player\'s turn — no longer a manual input field',
+      },
+      {
+        type: 'changed',
+        text: 'Game Length filter on custom panel form replaced with number input plus "or more" / "or less" / "Any" controls; supports both min and max turn bounds',
+      },
+      {
+        type: 'changed',
+        text: 'Game Type filter label updated from "Standard" to "Commander" on the comparison builder',
+      },
+      {
+        type: 'improved',
+        text: 'Overall stats cards on home and stats pages link to their respective pages; Avg Turns links to Stats',
+      },
+      {
+        type: 'improved',
+        text: 'Test coverage: api.ts at 94%+ branch coverage (31 new tests); StatsCard at 100% across all metrics; 92 total tests',
+      },
+    ],
+  },
+  {
     version: '1.7.1',
     date: '2026-02-22',
     title: 'Coverage Reporting',

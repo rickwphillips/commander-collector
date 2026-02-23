@@ -98,20 +98,35 @@ switch ($method) {
             sendError('Maximum 8 players allowed');
         }
         if ($gameType === '2hg') {
-            if (count($data['results']) !== 4) {
-                sendError('2-Headed Giant requires exactly 4 players');
+            if (count($data['results']) < 4 || count($data['results']) % 2 !== 0) {
+                sendError('2HG requires at least 4 players in pairs');
             }
-            $team1Count = 0;
-            $team2Count = 0;
+            $teamCounts = [];
             foreach ($data['results'] as $result) {
-                if (!isset($result['team_number']) || !in_array($result['team_number'], [1, 2])) {
-                    sendError('Each player in 2HG must be assigned to Team 1 or Team 2');
+                if (!isset($result['team_number']) || !is_numeric($result['team_number']) || (int)$result['team_number'] < 1) {
+                    sendError('Each player in 2HG must be assigned to a team');
                 }
-                if ($result['team_number'] === 1) $team1Count++;
-                else $team2Count++;
+                $tn = (int)$result['team_number'];
+                $teamCounts[$tn] = ($teamCounts[$tn] ?? 0) + 1;
             }
-            if ($team1Count !== 2 || $team2Count !== 2) {
-                sendError('Each team must have exactly 2 players in 2HG');
+            if (count($teamCounts) < 2) {
+                sendError('2HG requires at least 2 teams');
+            }
+            foreach ($teamCounts as $count) {
+                if ($count !== 2) {
+                    sendError('Each team must have exactly 2 players in 2HG');
+                }
+            }
+        }
+
+        // Derive winning_turn: max eliminated_turn across all non-winning results
+        $winningTurn = null;
+        foreach ($data['results'] as $result) {
+            if ((int)($result['finish_position'] ?? 0) !== 1) {
+                $et = $result['eliminated_turn'] ?? null;
+                if ($et !== null && $et !== '' && (int)$et > ($winningTurn ?? 0)) {
+                    $winningTurn = (int)$et;
+                }
             }
         }
 
@@ -125,7 +140,7 @@ switch ($method) {
             ');
             $stmt->execute([
                 $data['played_at'],
-                $data['winning_turn'] ?? null,
+                $winningTurn,
                 $data['notes'] ?? null,
                 $gameType
             ]);
@@ -193,10 +208,6 @@ switch ($method) {
                 $updates[] = 'played_at = ?';
                 $params[] = $data['played_at'];
             }
-            if (array_key_exists('winning_turn', $data)) {
-                $updates[] = 'winning_turn = ?';
-                $params[] = $data['winning_turn'];
-            }
             if (array_key_exists('notes', $data)) {
                 $updates[] = 'notes = ?';
                 $params[] = $data['notes'];
@@ -212,8 +223,21 @@ switch ($method) {
                 $stmt->execute($params);
             }
 
-            // If results are provided, replace all existing results
+            // If results are provided, replace all existing results and re-derive winning_turn
             if (isset($data['results']) && is_array($data['results'])) {
+                // Derive winning_turn: max eliminated_turn across all non-winning results
+                $newWinningTurn = null;
+                foreach ($data['results'] as $result) {
+                    if ((int)($result['finish_position'] ?? 0) !== 1) {
+                        $et = $result['eliminated_turn'] ?? null;
+                        if ($et !== null && $et !== '' && (int)$et > ($newWinningTurn ?? 0)) {
+                            $newWinningTurn = (int)$et;
+                        }
+                    }
+                }
+                $pdo->prepare('UPDATE games SET winning_turn = ? WHERE id = ?')
+                    ->execute([$newWinningTurn, $id]);
+
                 // Delete existing results
                 $deleteStmt = $pdo->prepare('DELETE FROM game_results WHERE game_id = ?');
                 $deleteStmt->execute([$id]);

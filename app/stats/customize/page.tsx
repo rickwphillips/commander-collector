@@ -277,7 +277,7 @@ function ComparisonBuilder({
           value={conditions.game_type ?? 'all'}
           options={[
             { value: 'all', label: 'All' },
-            { value: 'standard', label: 'Standard' },
+            { value: 'standard', label: 'Commander' },
             { value: '2hg', label: '2HG' },
           ]}
           onChange={(v) => setCond('game_type', v as 'all' | 'standard' | '2hg')}

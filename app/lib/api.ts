@@ -105,7 +105,6 @@ export const api = {
     id: number,
     data: Partial<import('./types').CreateGameInput> & {
       played_at?: string;
-      winning_turn?: number | null;
       notes?: string | null;
     }
   ) =>
