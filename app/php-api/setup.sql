@@ -74,3 +74,25 @@ CREATE INDEX idx_games_played_at ON games(played_at);
 -- Run in phpMyAdmin on rickwphi_app_commander (prod) and grandkid_arcade/dev DB:
 -- ALTER TABLE stat_panels ADD COLUMN panel_type ENUM('predefined','comparison') NOT NULL DEFAULT 'predefined';
 -- ALTER TABLE stat_panels ADD COLUMN config JSON NULL;
+
+-- Migration: Add color boolean columns to decks table
+-- Run in phpMyAdmin on rickwphi_app_commander (prod) and grandkid_arcade/dev DB:
+-- ALTER TABLE decks
+--   ADD COLUMN has_w TINYINT(1) NOT NULL DEFAULT 0,
+--   ADD COLUMN has_u TINYINT(1) NOT NULL DEFAULT 0,
+--   ADD COLUMN has_b TINYINT(1) NOT NULL DEFAULT 0,
+--   ADD COLUMN has_r TINYINT(1) NOT NULL DEFAULT 0,
+--   ADD COLUMN has_g TINYINT(1) NOT NULL DEFAULT 0;
+--
+-- UPDATE decks SET
+--   has_w = IF(colors LIKE '%W%', 1, 0),
+--   has_u = IF(colors LIKE '%U%', 1, 0),
+--   has_b = IF(colors LIKE '%B%', 1, 0),
+--   has_r = IF(colors LIKE '%R%', 1, 0),
+--   has_g = IF(colors LIKE '%G%', 1, 0);
+--
+-- Normalize existing colors strings to canonical WUBRG order
+-- UPDATE decks SET colors = CONCAT(
+--   IF(has_w, 'W', ''), IF(has_u, 'U', ''), IF(has_b, 'B', ''),
+--   IF(has_r, 'R', ''), IF(has_g, 'G', '')
+-- ) WHERE colors != 'C' AND colors != '';

@@ -34,8 +34,8 @@ describe('getSectionDef', () => {
 });
 
 describe('VALID_SECTION_IDS', () => {
-  it('contains all 11 section IDs', () => {
-    expect(VALID_SECTION_IDS.size).toBe(11);
+  it('contains all 13 section IDs', () => {
+    expect(VALID_SECTION_IDS.size).toBe(13);
   });
 
   it('contains "overall"', () => {
@@ -52,8 +52,8 @@ describe('VALID_SECTION_IDS', () => {
 });
 
 describe('DEFAULT_SECTION_ORDER', () => {
-  it('has 11 entries', () => {
-    expect(DEFAULT_SECTION_ORDER).toHaveLength(11);
+  it('has 13 entries', () => {
+    expect(DEFAULT_SECTION_ORDER).toHaveLength(13);
   });
 
   it('starts with "overall"', () => {
@@ -66,8 +66,8 @@ describe('DEFAULT_SECTION_ORDER', () => {
 });
 
 describe('STATS_SECTIONS', () => {
-  it('has 11 entries', () => {
-    expect(STATS_SECTIONS).toHaveLength(11);
+  it('has 13 entries', () => {
+    expect(STATS_SECTIONS).toHaveLength(13);
   });
 
   it('all entries have required fields', () => {

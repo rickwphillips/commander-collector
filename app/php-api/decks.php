@@ -3,6 +3,25 @@ require_once 'config.php';
 require_once __DIR__ . '/auth/middleware.php';
 requireAuth();
 
+function colorsToFields(string $colors): array {
+    $s = strtoupper(trim($colors));
+    $has_w = (int)(strpos($s, 'W') !== false);
+    $has_u = (int)(strpos($s, 'U') !== false);
+    $has_b = (int)(strpos($s, 'B') !== false);
+    $has_r = (int)(strpos($s, 'R') !== false);
+    $has_g = (int)(strpos($s, 'G') !== false);
+    $canonical = ($has_w ? 'W' : '') . ($has_u ? 'U' : '') . ($has_b ? 'B' : '')
+               . ($has_r ? 'R' : '') . ($has_g ? 'G' : '');
+    return [
+        'colors' => $canonical ?: 'C',
+        'has_w'  => $has_w,
+        'has_u'  => $has_u,
+        'has_b'  => $has_b,
+        'has_r'  => $has_r,
+        'has_g'  => $has_g,
+    ];
+}
+
 $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
 $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
@@ -90,17 +109,22 @@ switch ($method) {
             sendError('Commander is required');
         }
 
-        $colors = isset($data['colors']) ? strtoupper(trim($data['colors'])) : '';
+        $colorFields = colorsToFields(isset($data['colors']) ? $data['colors'] : '');
 
         $stmt = $pdo->prepare('
-            INSERT INTO decks (player_id, name, commander, colors)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO decks (player_id, name, commander, colors, has_w, has_u, has_b, has_r, has_g)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ');
         $stmt->execute([
             (int)$data['player_id'],
             trim($data['name']),
             trim($data['commander']),
-            $colors
+            $colorFields['colors'],
+            $colorFields['has_w'],
+            $colorFields['has_u'],
+            $colorFields['has_b'],
+            $colorFields['has_r'],
+            $colorFields['has_g'],
         ]);
 
         sendJSON([
@@ -108,7 +132,12 @@ switch ($method) {
             'player_id' => (int)$data['player_id'],
             'name' => trim($data['name']),
             'commander' => trim($data['commander']),
-            'colors' => $colors,
+            'colors' => $colorFields['colors'],
+            'has_w' => $colorFields['has_w'],
+            'has_u' => $colorFields['has_u'],
+            'has_b' => $colorFields['has_b'],
+            'has_r' => $colorFields['has_r'],
+            'has_g' => $colorFields['has_g'],
             'created_at' => date('Y-m-d H:i:s')
         ], 201);
         break;
@@ -131,8 +160,19 @@ switch ($method) {
             $params[] = trim($data['commander']);
         }
         if (isset($data['colors'])) {
+            $colorFields = colorsToFields($data['colors']);
             $updates[] = 'colors = ?';
-            $params[] = strtoupper(trim($data['colors']));
+            $params[] = $colorFields['colors'];
+            $updates[] = 'has_w = ?';
+            $params[] = $colorFields['has_w'];
+            $updates[] = 'has_u = ?';
+            $params[] = $colorFields['has_u'];
+            $updates[] = 'has_b = ?';
+            $params[] = $colorFields['has_b'];
+            $updates[] = 'has_r = ?';
+            $params[] = $colorFields['has_r'];
+            $updates[] = 'has_g = ?';
+            $params[] = $colorFields['has_g'];
         }
         if (isset($data['player_id'])) {
             $updates[] = 'player_id = ?';

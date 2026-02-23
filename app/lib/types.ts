@@ -15,6 +15,11 @@ export interface Deck {
   name: string;
   commander: string;
   colors: string; // Stored as "WUBRG" format, "C" for colorless
+  has_w: number; // 0 or 1
+  has_u: number;
+  has_b: number;
+  has_r: number;
+  has_g: number;
   created_at: string;
 }
 
@@ -220,12 +225,32 @@ export interface TwoHgStats {
   recentGames: TwoHgRecentGame[];
 }
 
+export interface ColorPresenceStats {
+  color_key: string; // 'W' | 'U' | 'B' | 'R' | 'G'
+  deck_count: number;
+  total_games: number;
+  wins: number;
+  win_rate: number;
+  avg_finish_position: number;
+}
+
+export interface ColorCountStats {
+  color_count: number; // 0–5
+  deck_count: number;
+  total_games: number;
+  wins: number;
+  win_rate: number;
+  avg_finish_position: number;
+}
+
 export interface AdvancedStatsResponse {
   colorMeta: ColorMetaStats[];
   gameSizeStats: GameSizeStats[];
   playerStreaks: PlayerStreak[];
   deckStreaks: DeckStreak[];
   twoHgStats: TwoHgStats;
+  colorPresence: ColorPresenceStats[];
+  colorCount: ColorCountStats[];
 }
 
 // MTG color identity

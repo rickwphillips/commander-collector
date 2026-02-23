@@ -801,6 +801,142 @@ function StatsPageInner() {
       );
     },
 
+    colorPresence: () => {
+      if (!advancedStats || advancedStats.colorPresence.length === 0) return null;
+      const colorLabel: Record<string, string> = {
+        W: 'White',
+        U: 'Blue',
+        B: 'Black',
+        R: 'Red',
+        G: 'Green',
+      };
+      return (
+        <Card sx={{ mb: 4 }}>
+          <CardContent>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
+              <PaletteIcon color="primary" />
+              <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                Color Presence
+              </Typography>
+            </Stack>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>{sortHeader('colorPresence', 'color_key', 'Color')}</TableCell>
+                    <TableCell align="center">
+                      {sortHeader('colorPresence', 'deck_count', 'Decks')}
+                    </TableCell>
+                    <TableCell align="center">
+                      {sortHeader('colorPresence', 'total_games', 'Games')}
+                    </TableCell>
+                    <TableCell align="center">
+                      {sortHeader('colorPresence', 'wins', 'Wins')}
+                    </TableCell>
+                    <TableCell align="right">
+                      {sortHeader('colorPresence', 'win_rate', 'Win Rate')}
+                    </TableCell>
+                    <TableCell align="right">
+                      {sortHeader('colorPresence', 'avg_finish_position', 'Avg Position')}
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {sortData('colorPresence', advancedStats.colorPresence).map((row) => (
+                    <TableRow key={row.color_key}>
+                      <TableCell>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <ColorIdentityChips colors={row.color_key} size="small" />
+                          <Typography variant="body2">{colorLabel[row.color_key]}</Typography>
+                        </Stack>
+                      </TableCell>
+                      <TableCell align="center">{row.deck_count}</TableCell>
+                      <TableCell align="center">{row.total_games}</TableCell>
+                      <TableCell align="center">{row.wins}</TableCell>
+                      <TableCell align="right">{Number(row.win_rate).toFixed(1)}%</TableCell>
+                      <TableCell align="right">
+                        {Number(row.avg_finish_position).toFixed(2)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
+      );
+    },
+
+    colorCount: () => {
+      if (!advancedStats || advancedStats.colorCount.length === 0) return null;
+      const countLabel: Record<number, string> = {
+        0: 'Colorless',
+        1: 'Mono-color',
+        2: 'Two-color',
+        3: 'Three-color',
+        4: 'Four-color',
+        5: 'Five-color',
+      };
+      return (
+        <Card sx={{ mb: 4 }}>
+          <CardContent>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
+              <PaletteIcon color="primary" />
+              <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                Color Complexity
+              </Typography>
+            </Stack>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>{sortHeader('colorCount', 'color_count', 'Colors')}</TableCell>
+                    <TableCell>{sortHeader('colorCount', 'color_count', 'Type')}</TableCell>
+                    <TableCell align="center">
+                      {sortHeader('colorCount', 'deck_count', 'Decks')}
+                    </TableCell>
+                    <TableCell align="center">
+                      {sortHeader('colorCount', 'total_games', 'Games')}
+                    </TableCell>
+                    <TableCell align="center">
+                      {sortHeader('colorCount', 'wins', 'Wins')}
+                    </TableCell>
+                    <TableCell align="right">
+                      {sortHeader('colorCount', 'win_rate', 'Win Rate')}
+                    </TableCell>
+                    <TableCell align="right">
+                      {sortHeader('colorCount', 'avg_finish_position', 'Avg Position')}
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {sortData('colorCount', advancedStats.colorCount).map((row) => (
+                    <TableRow key={row.color_count}>
+                      <TableCell align="center">
+                        <Chip label={row.color_count} size="small" variant="outlined" />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {countLabel[row.color_count] ?? `${row.color_count}-color`}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">{row.deck_count}</TableCell>
+                      <TableCell align="center">{row.total_games}</TableCell>
+                      <TableCell align="center">{row.wins}</TableCell>
+                      <TableCell align="right">{Number(row.win_rate).toFixed(1)}%</TableCell>
+                      <TableCell align="right">
+                        {Number(row.avg_finish_position).toFixed(2)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
+      );
+    },
+
     podSize: () => {
       if (!advancedStats || advancedStats.gameSizeStats.length === 0) return null;
       return (

@@ -18,6 +18,8 @@ export type StatsSectionId =
   | 'multiplayer'
   | 'twoHg'
   | 'colorMeta'
+  | 'colorPresence'
+  | 'colorCount'
   | 'podSize'
   | 'playerStreaks'
   | 'deckStreaks';
@@ -71,6 +73,18 @@ export const STATS_SECTIONS: StatsSectionDef[] = [
     id: 'colorMeta',
     label: 'Color Meta Analysis',
     description: 'Win rates by color identity',
+    icon: PaletteIcon,
+  },
+  {
+    id: 'colorPresence',
+    label: 'Color Presence',
+    description: 'Win rates for all decks containing each color',
+    icon: PaletteIcon,
+  },
+  {
+    id: 'colorCount',
+    label: 'Color Complexity',
+    description: 'Performance by number of colors (mono vs two-color vs multi)',
     icon: PaletteIcon,
   },
   {

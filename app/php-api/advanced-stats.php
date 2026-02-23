@@ -220,12 +220,76 @@ $twoHgStats = [
     'recentGames' => $twoHgRecent,
 ];
 
+// E) Color Presence Breakdown — stats for all decks containing each individual color
+$colorPresence = $pdo->query('
+    SELECT "W" as color_key,
+        COUNT(DISTINCT d.id) as deck_count,
+        COUNT(gr.id) as total_games,
+        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
+        ROUND(COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 / NULLIF(COUNT(gr.id), 0), 1) as win_rate,
+        ROUND(AVG(gr.finish_position), 2) as avg_finish_position
+    FROM decks d JOIN game_results gr ON gr.deck_id = d.id WHERE d.has_w = 1
+    UNION ALL
+    SELECT "U" as color_key,
+        COUNT(DISTINCT d.id) as deck_count,
+        COUNT(gr.id) as total_games,
+        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
+        ROUND(COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 / NULLIF(COUNT(gr.id), 0), 1) as win_rate,
+        ROUND(AVG(gr.finish_position), 2) as avg_finish_position
+    FROM decks d JOIN game_results gr ON gr.deck_id = d.id WHERE d.has_u = 1
+    UNION ALL
+    SELECT "B" as color_key,
+        COUNT(DISTINCT d.id) as deck_count,
+        COUNT(gr.id) as total_games,
+        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
+        ROUND(COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 / NULLIF(COUNT(gr.id), 0), 1) as win_rate,
+        ROUND(AVG(gr.finish_position), 2) as avg_finish_position
+    FROM decks d JOIN game_results gr ON gr.deck_id = d.id WHERE d.has_b = 1
+    UNION ALL
+    SELECT "R" as color_key,
+        COUNT(DISTINCT d.id) as deck_count,
+        COUNT(gr.id) as total_games,
+        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
+        ROUND(COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 / NULLIF(COUNT(gr.id), 0), 1) as win_rate,
+        ROUND(AVG(gr.finish_position), 2) as avg_finish_position
+    FROM decks d JOIN game_results gr ON gr.deck_id = d.id WHERE d.has_r = 1
+    UNION ALL
+    SELECT "G" as color_key,
+        COUNT(DISTINCT d.id) as deck_count,
+        COUNT(gr.id) as total_games,
+        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
+        ROUND(COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 / NULLIF(COUNT(gr.id), 0), 1) as win_rate,
+        ROUND(AVG(gr.finish_position), 2) as avg_finish_position
+    FROM decks d JOIN game_results gr ON gr.deck_id = d.id WHERE d.has_g = 1
+')->fetchAll();
+
+// F) Color Count Breakdown — stats grouped by number of colors in a deck
+$colorCount = $pdo->query('
+    SELECT
+        (d.has_w + d.has_u + d.has_b + d.has_r + d.has_g) as color_count,
+        COUNT(DISTINCT d.id) as deck_count,
+        COUNT(gr.id) as total_games,
+        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
+        ROUND(
+            COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 /
+            NULLIF(COUNT(gr.id), 0),
+            1
+        ) as win_rate,
+        ROUND(AVG(gr.finish_position), 2) as avg_finish_position
+    FROM decks d
+    JOIN game_results gr ON gr.deck_id = d.id
+    GROUP BY color_count
+    ORDER BY color_count
+')->fetchAll();
+
 sendJSON([
     'colorMeta' => $colorMeta,
     'gameSizeStats' => $gameSizeStats,
     'playerStreaks' => $playerStreaks,
     'deckStreaks' => $deckStreaks,
     'twoHgStats' => $twoHgStats,
+    'colorPresence' => $colorPresence,
+    'colorCount' => $colorCount,
 ]);
 
 function computeStreaks(array $rows, string $mode): array {
