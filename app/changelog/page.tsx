@@ -38,6 +38,17 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.8.1',
+    date: '2026-02-23',
+    title: 'Versioned DB Migrations',
+    changes: [
+      {
+        type: 'improved',
+        text: 'Deploy script now applies versioned DB migrations automatically — schema changes in migrations/v*.sql run before PHP deploy, tracked in schema_migrations table',
+      },
+    ],
+  },
+  {
     version: '1.8.0',
     date: '2026-02-23',
     title: 'Color Stats, 2HG Overhaul & UX Polish',
