@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -20,15 +20,12 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
-  ListItemSecondaryAction,
   Divider,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogContentText,
   DialogActions,
-  Tabs,
-  Tab,
   Autocomplete,
   Checkbox,
   FormGroup,
@@ -40,8 +37,6 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
-import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
-import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ShareIcon from '@mui/icons-material/Share';
 import SaveIcon from '@mui/icons-material/Save';
@@ -49,28 +44,11 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import Link from 'next/link';
 import { PageContainer } from '../../components/PageContainer';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { api } from '../../lib/api';
-import { STATS_SECTIONS, getSectionDef } from '../../lib/statsSections';
+import { getSectionDef } from '../../lib/statsSections';
 import type { StatsSectionId } from '../../lib/statsSections';
 import type {
   StatPanel,
@@ -145,56 +123,6 @@ const ENTITY_GROUP_BYS = new Set<ComparisonGroupBy>([
 
 const OPPONENT_GROUP_BYS = new Set<ComparisonGroupBy>(['opponent_player', 'opponent_commander']);
 
-// ---- Sortable section for predefined builder ----
-function SortableSection({
-  id,
-  onRemove,
-}: {
-  id: StatsSectionId;
-  onRemove: (id: StatsSectionId) => void;
-}) {
-  const def = getSectionDef(id);
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id,
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  if (!def) return null;
-  const Icon = def.icon;
-
-  return (
-    <ListItem
-      ref={setNodeRef}
-      style={style}
-      sx={{
-        border: '1px solid',
-        borderColor: 'divider',
-        borderRadius: 1,
-        mb: 1,
-        bgcolor: 'background.paper',
-      }}
-    >
-      <ListItemIcon sx={{ minWidth: 36, cursor: 'grab' }} {...attributes} {...listeners}>
-        <DragIndicatorIcon color="action" />
-      </ListItemIcon>
-      <ListItemIcon sx={{ minWidth: 36 }}>
-        <Icon color="primary" fontSize="small" />
-      </ListItemIcon>
-      <ListItemText primary={def.label} secondary={def.description} />
-      <ListItemSecondaryAction>
-        <IconButton edge="end" size="small" onClick={() => onRemove(id)}>
-          <RemoveCircleOutlineIcon fontSize="small" />
-        </IconButton>
-      </ListItemSecondaryAction>
-    </ListItem>
-  );
-}
-
 // ---- Chip selector helper ----
 function ChipGroup<T extends string | number>({
   label,
@@ -224,6 +152,56 @@ function ChipGroup<T extends string | number>({
             sx={{ mb: 0.5 }}
           />
         ))}
+      </Stack>
+    </Box>
+  );
+}
+
+// ---- Entity color filter (Section C helper) ----
+function EntityColorFilter({
+  entityFilter,
+  setFilter,
+}: {
+  entityFilter: ComparisonEntityFilter;
+  setFilter: <K extends keyof ComparisonEntityFilter>(key: K, val: ComparisonEntityFilter[K]) => void;
+}) {
+  return (
+    <Box>
+      <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+        Filter by deck color
+      </Typography>
+      <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
+        {(['W', 'U', 'B', 'R', 'G'] as const).map((color) => {
+          const active = entityFilter.colors?.includes(color) ?? false;
+          return (
+            <Chip
+              key={color}
+              label={color}
+              size="small"
+              onClick={() => {
+                const current = entityFilter.colors ?? [];
+                const next = active ? current.filter((c) => c !== color) : [...current, color];
+                setFilter('colors', next.length ? next : undefined);
+                if (!next.length) setFilter('color_mode', undefined);
+              }}
+              color={active ? 'primary' : 'default'}
+              variant={active ? 'filled' : 'outlined'}
+            />
+          );
+        })}
+        {(entityFilter.colors?.length ?? 0) > 0 && (
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={entityFilter.color_mode ?? 'and'}
+            onChange={(_, v) => { if (v) setFilter('color_mode', v as ColorFilterMode); }}
+            sx={{ '& .MuiToggleButton-root': { py: 0, px: 0.75, fontSize: '0.65rem' } }}
+          >
+            <ToggleButton value="and">AND</ToggleButton>
+            <ToggleButton value="or">OR</ToggleButton>
+            <ToggleButton value="only">Only</ToggleButton>
+          </ToggleButtonGroup>
+        )}
       </Stack>
     </Box>
   );
@@ -470,11 +448,11 @@ function ComparisonBuilder({
             multiple
             freeSolo
             size="small"
-            options={[] as string[]}
+            options={[...new Set(decks.map((d) => d.commander))].sort()}
             value={conditions.required_commanders ?? []}
             onChange={(_, v) => setCond('required_commanders', v as string[])}
             renderInput={(params) => (
-              <TextField {...params} placeholder="Type commander name + Enter" />
+              <TextField {...params} placeholder="Type or select commander" />
             )}
           />
         </Box>
@@ -688,23 +666,21 @@ function ComparisonBuilder({
         </Typography>
 
         {groupBy === 'player' && (
-          <Autocomplete
-            multiple
-            size="small"
-            options={players}
-            getOptionLabel={(p) => p.name}
-            value={players.filter((p) => entityFilter.player_ids?.includes(p.id) ?? false)}
-            onChange={(_, v) =>
-              setFilter(
-                'player_ids',
-                v.map((p) => p.id)
-              )
-            }
-            renderInput={(params) => (
-              <TextField {...params} label="Specific players" placeholder="All players" />
-            )}
-            isOptionEqualToValue={(o, v) => o.id === v.id}
-          />
+          <Stack spacing={1.5}>
+            <Autocomplete
+              multiple
+              size="small"
+              options={players}
+              getOptionLabel={(p) => p.name}
+              value={players.filter((p) => entityFilter.player_ids?.includes(p.id) ?? false)}
+              onChange={(_, v) => setFilter('player_ids', v.map((p) => p.id))}
+              renderInput={(params) => (
+                <TextField {...params} label="Specific players" placeholder="All players" />
+              )}
+              isOptionEqualToValue={(o, v) => o.id === v.id}
+            />
+            <EntityColorFilter entityFilter={entityFilter} setFilter={setFilter} />
+          </Stack>
         )}
 
         {groupBy === 'deck' && (
@@ -715,12 +691,7 @@ function ComparisonBuilder({
               options={players}
               getOptionLabel={(p) => p.name}
               value={players.filter((p) => entityFilter.player_ids?.includes(p.id) ?? false)}
-              onChange={(_, v) =>
-                setFilter(
-                  'player_ids',
-                  v.map((p) => p.id)
-                )
-              }
+              onChange={(_, v) => setFilter('player_ids', v.map((p) => p.id))}
               renderInput={(params) => (
                 <TextField {...params} label="Filter decks by player" placeholder="All players" />
               )}
@@ -735,17 +706,13 @@ function ComparisonBuilder({
               )}
               getOptionLabel={(d) => `${d.name} (${d.player_name})`}
               value={decks.filter((d) => entityFilter.deck_ids?.includes(d.id) ?? false)}
-              onChange={(_, v) =>
-                setFilter(
-                  'deck_ids',
-                  v.map((d) => d.id)
-                )
-              }
+              onChange={(_, v) => setFilter('deck_ids', v.map((d) => d.id))}
               renderInput={(params) => (
                 <TextField {...params} label="Specific decks" placeholder="All decks" />
               )}
               isOptionEqualToValue={(o, v) => o.id === v.id}
             />
+            <EntityColorFilter entityFilter={entityFilter} setFilter={setFilter} />
           </Stack>
         )}
 
@@ -805,8 +772,8 @@ function ComparisonBuilder({
         )}
 
         {!isEntityGroup && (
-          <Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          <Stack spacing={1.5}>
+            <Typography variant="body2" color="text.secondary">
               Filter whose stats appear in each bucket:
             </Typography>
             <Autocomplete
@@ -815,38 +782,32 @@ function ComparisonBuilder({
               options={players}
               getOptionLabel={(p) => p.name}
               value={players.filter((p) => entityFilter.player_ids?.includes(p.id) ?? false)}
-              onChange={(_, v) =>
-                setFilter(
-                  'player_ids',
-                  v.map((p) => p.id)
-                )
-              }
+              onChange={(_, v) => setFilter('player_ids', v.map((p) => p.id))}
               renderInput={(params) => (
                 <TextField {...params} label="Specific players" placeholder="All players" />
               )}
               isOptionEqualToValue={(o, v) => o.id === v.id}
             />
-          </Box>
+            <EntityColorFilter entityFilter={entityFilter} setFilter={setFilter} />
+          </Stack>
         )}
 
         {groupBy === 'deck_age' && (
-          <Autocomplete
-            multiple
-            size="small"
-            options={players}
-            getOptionLabel={(p) => p.name}
-            value={players.filter((p) => entityFilter.player_ids?.includes(p.id) ?? false)}
-            onChange={(_, v) =>
-              setFilter(
-                'player_ids',
-                v.map((p) => p.id)
-              )
-            }
-            renderInput={(params) => (
-              <TextField {...params} label="Specific players" placeholder="All players" />
-            )}
-            isOptionEqualToValue={(o, v) => o.id === v.id}
-          />
+          <Stack spacing={1.5}>
+            <Autocomplete
+              multiple
+              size="small"
+              options={players}
+              getOptionLabel={(p) => p.name}
+              value={players.filter((p) => entityFilter.player_ids?.includes(p.id) ?? false)}
+              onChange={(_, v) => setFilter('player_ids', v.map((p) => p.id))}
+              renderInput={(params) => (
+                <TextField {...params} label="Specific players" placeholder="All players" />
+              )}
+              isOptionEqualToValue={(o, v) => o.id === v.id}
+            />
+            <EntityColorFilter entityFilter={entityFilter} setFilter={setFilter} />
+          </Stack>
         )}
 
         {groupBy === 'opponent_player' && (
@@ -942,10 +903,8 @@ export default function CustomizePage() {
   // Builder state
   const [editingId, setEditingId] = useState<number | null>(null);
   const [panelName, setPanelName] = useState('');
-  const [selectedSections, setSelectedSections] = useState<StatsSectionId[]>([]);
   const [saving, setSaving] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
-  const [builderTab, setBuilderTab] = useState(0); // 0 = predefined, 1 = comparison
 
   // Comparison state
   const [compGroupBy, setCompGroupBy] = useState<ComparisonGroupBy>('player');
@@ -969,11 +928,6 @@ export default function CustomizePage() {
 
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<StatPanel | null>(null);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
 
   useEffect(() => {
     fetchPanels();
@@ -999,27 +953,6 @@ export default function CustomizePage() {
     }
   };
 
-  const availableSections = STATS_SECTIONS.filter((s) => !selectedSections.includes(s.id));
-
-  const handleAddSection = (id: StatsSectionId) => {
-    setSelectedSections((prev) => [...prev, id]);
-  };
-
-  const handleRemoveSection = useCallback((id: StatsSectionId) => {
-    setSelectedSections((prev) => prev.filter((s) => s !== id));
-  }, []);
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      setSelectedSections((prev) => {
-        const oldIndex = prev.indexOf(active.id as StatsSectionId);
-        const newIndex = prev.indexOf(over.id as StatsSectionId);
-        return arrayMove(prev, oldIndex, newIndex);
-      });
-    }
-  };
-
   const resetComparisonState = () => {
     setCompGroupBy('player');
     setCompConditions({});
@@ -1031,9 +964,7 @@ export default function CustomizePage() {
   const startNew = () => {
     setEditingId(null);
     setPanelName('');
-    setSelectedSections([]);
     resetComparisonState();
-    setBuilderTab(0);
     setShowBuilder(true);
   };
 
@@ -1041,16 +972,12 @@ export default function CustomizePage() {
     setEditingId(panel.id);
     setPanelName(panel.name);
     if (panel.panel_type === 'comparison' && panel.config) {
-      setBuilderTab(1);
       setCompGroupBy(panel.config.groupBy);
       setCompConditions(panel.config.conditions ?? {});
       setCompEntityFilter(panel.config.entityFilter ?? {});
       setCompMetrics(panel.config.metrics ?? ['win_rate']);
       setCompTopN(panel.config.top_n);
-      setSelectedSections([]);
     } else {
-      setBuilderTab(0);
-      setSelectedSections(panel.sections as StatsSectionId[]);
       resetComparisonState();
     }
     setShowBuilder(true);
@@ -1060,9 +987,7 @@ export default function CustomizePage() {
     setShowBuilder(false);
     setEditingId(null);
     setPanelName('');
-    setSelectedSections([]);
     resetComparisonState();
-    setBuilderTab(0);
   };
 
   const handleSave = async () => {
@@ -1070,57 +995,26 @@ export default function CustomizePage() {
       setSnackbar('Panel name is required');
       return;
     }
-
-    const isComparison = builderTab === 1;
-
-    if (isComparison) {
-      if (compMetrics.length === 0) {
-        setSnackbar('Select at least one metric');
-        return;
-      }
-    } else {
-      if (selectedSections.length === 0) {
-        setSnackbar('At least one section is required');
-        return;
-      }
+    if (compMetrics.length === 0) {
+      setSnackbar('Select at least one metric');
+      return;
     }
+
+    const config: ComparisonConfig = {
+      groupBy: compGroupBy,
+      conditions: compConditions,
+      entityFilter: Object.keys(compEntityFilter).length > 0 ? compEntityFilter : undefined,
+      metrics: compMetrics,
+      top_n: compTopN,
+    };
 
     setSaving(true);
     try {
       if (editingId) {
-        if (isComparison) {
-          const config: ComparisonConfig = {
-            groupBy: compGroupBy,
-            conditions: compConditions,
-            entityFilter: Object.keys(compEntityFilter).length > 0 ? compEntityFilter : undefined,
-            metrics: compMetrics,
-            top_n: compTopN,
-          };
-          await api.updateStatPanel(editingId, { name: panelName.trim(), config });
-        } else {
-          await api.updateStatPanel(editingId, {
-            name: panelName.trim(),
-            sections: selectedSections,
-          });
-        }
+        await api.updateStatPanel(editingId, { name: panelName.trim(), config });
         setSnackbar('Panel updated');
       } else {
-        if (isComparison) {
-          const config: ComparisonConfig = {
-            groupBy: compGroupBy,
-            conditions: compConditions,
-            entityFilter: Object.keys(compEntityFilter).length > 0 ? compEntityFilter : undefined,
-            metrics: compMetrics,
-            top_n: compTopN,
-          };
-          await api.createStatPanel({ name: panelName.trim(), panel_type: 'comparison', config });
-        } else {
-          await api.createStatPanel({
-            name: panelName.trim(),
-            panel_type: 'predefined',
-            sections: selectedSections,
-          });
-        }
+        await api.createStatPanel({ name: panelName.trim(), panel_type: 'comparison', config });
         setSnackbar('Panel created');
       }
       cancelBuilder();
@@ -1193,11 +1087,7 @@ export default function CustomizePage() {
   const groupByLabel = (gb: ComparisonGroupBy) =>
     [...GROUP_BY_ENTITY, ...GROUP_BY_PROPERTY].find((o) => o.id === gb)?.label ?? gb;
 
-  const isSaveDisabled =
-    saving ||
-    !panelName.trim() ||
-    (builderTab === 0 && selectedSections.length === 0) ||
-    (builderTab === 1 && compMetrics.length === 0);
+  const isSaveDisabled = saving || !panelName.trim() || compMetrics.length === 0;
 
   if (loading) {
     return (
@@ -1421,116 +1311,20 @@ export default function CustomizePage() {
               inputProps={{ maxLength: 100 }}
             />
 
-            {/* Panel type tabs */}
-            <Tabs
-              value={builderTab}
-              onChange={(_, v) => setBuilderTab(v)}
-              sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
-            >
-              <Tab label="Pre-built Sections" />
-              <Tab
-                label="Custom Comparison"
-                icon={<CompareArrowsIcon fontSize="small" />}
-                iconPosition="start"
-              />
-            </Tabs>
-
-            {/* Predefined builder */}
-            {builderTab === 0 && (
-              <Box sx={{ display: 'flex', gap: 3, flexDirection: { xs: 'column', md: 'row' } }}>
-                {/* Available Sections */}
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                    Available Sections
-                  </Typography>
-                  {availableSections.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary">
-                      All sections added
-                    </Typography>
-                  ) : (
-                    <List dense>
-                      {availableSections.map((section) => {
-                        const Icon = section.icon;
-                        return (
-                          <ListItem
-                            key={section.id}
-                            component="div"
-                            onClick={() => handleAddSection(section.id)}
-                            sx={{
-                              border: '1px solid',
-                              borderColor: 'divider',
-                              borderRadius: 1,
-                              mb: 0.5,
-                              cursor: 'pointer',
-                              '&:hover': { bgcolor: 'action.hover' },
-                            }}
-                          >
-                            <ListItemIcon sx={{ minWidth: 36 }}>
-                              <Icon color="action" fontSize="small" />
-                            </ListItemIcon>
-                            <ListItemText primary={section.label} />
-                            <AddIcon fontSize="small" color="action" />
-                          </ListItem>
-                        );
-                      })}
-                    </List>
-                  )}
-                </Box>
-
-                <Divider
-                  orientation="vertical"
-                  flexItem
-                  sx={{ display: { xs: 'none', md: 'block' } }}
-                />
-
-                {/* Selected Sections (sortable) */}
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                    Selected Sections ({selectedSections.length})
-                  </Typography>
-                  {selectedSections.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary">
-                      Click sections from the left to add them
-                    </Typography>
-                  ) : (
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={handleDragEnd}
-                    >
-                      <SortableContext
-                        items={selectedSections}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        <List dense>
-                          {selectedSections.map((id) => (
-                            <SortableSection key={id} id={id} onRemove={handleRemoveSection} />
-                          ))}
-                        </List>
-                      </SortableContext>
-                    </DndContext>
-                  )}
-                </Box>
-              </Box>
-            )}
-
-            {/* Comparison builder */}
-            {builderTab === 1 && (
-              <ComparisonBuilder
-                groupBy={compGroupBy}
-                setGroupBy={setCompGroupBy}
-                conditions={compConditions}
-                setConditions={setCompConditions}
-                entityFilter={compEntityFilter}
-                setEntityFilter={setCompEntityFilter}
-                metrics={compMetrics}
-                setMetrics={setCompMetrics}
-                topN={compTopN}
-                setTopN={setCompTopN}
-                players={players}
-                decks={decks}
-              />
-            )}
+            <ComparisonBuilder
+              groupBy={compGroupBy}
+              setGroupBy={setCompGroupBy}
+              conditions={compConditions}
+              setConditions={setCompConditions}
+              entityFilter={compEntityFilter}
+              setEntityFilter={setCompEntityFilter}
+              metrics={compMetrics}
+              setMetrics={setCompMetrics}
+              topN={compTopN}
+              setTopN={setCompTopN}
+              players={players}
+              decks={decks}
+            />
 
             <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ mt: 3 }}>
               <Button variant="outlined" startIcon={<CancelIcon />} onClick={cancelBuilder}>
