@@ -19,6 +19,8 @@ import {
   FormControl,
   InputLabel,
   Tooltip,
+  ToggleButtonGroup,
+  ToggleButton,
 } from '@mui/material';
 import Link from 'next/link';
 import AddIcon from '@mui/icons-material/Add';
@@ -31,7 +33,7 @@ import { ColorIdentityChips } from '../components/ColorIdentityChips';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
 import { api } from '../lib/api';
-import type { DeckWithPlayer, MtgColor } from '../lib/types';
+import type { DeckWithPlayer, MtgColor, ColorFilterMode } from '../lib/types';
 
 interface DeckWithStats extends DeckWithPlayer {
   total_games: number;
@@ -65,6 +67,7 @@ export default function DecksPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [playerFilter, setPlayerFilter] = useState('');
   const [colorFilter, setColorFilter] = useState<Set<MtgColor>>(new Set());
+  const [colorMode, setColorMode] = useState<ColorFilterMode>('and');
   const [sortOption, setSortOption] = useState<SortOption>('name-asc');
 
   useEffect(() => {
@@ -117,13 +120,21 @@ export default function DecksPage() {
       result = result.filter((d) => d.player_name === playerFilter);
     }
 
-    // Color filter — deck must contain ALL selected colors
+    // Color filter
     if (colorFilter.size > 0) {
+      const selected = [...colorFilter];
       result = result.filter((d) => {
-        for (const c of colorFilter) {
-          if (!d.colors.includes(c)) return false;
+        if (colorMode === 'or') {
+          return selected.some((c) => d.colors.includes(c));
+        } else if (colorMode === 'only') {
+          const hasAll = selected.every((c) => d.colors.includes(c));
+          const hasNone = (['W', 'U', 'B', 'R', 'G'] as MtgColor[])
+            .filter((c) => !selected.includes(c))
+            .every((c) => !d.colors.includes(c));
+          return hasAll && hasNone;
+        } else {
+          return selected.every((c) => d.colors.includes(c));
         }
-        return true;
       });
     }
 
@@ -151,7 +162,7 @@ export default function DecksPage() {
     }
 
     return sorted;
-  }, [decks, searchQuery, playerFilter, colorFilter, sortOption]);
+  }, [decks, searchQuery, playerFilter, colorFilter, colorMode, sortOption]);
 
   const hasActiveFilters = searchQuery || playerFilter || colorFilter.size > 0;
 
@@ -159,6 +170,7 @@ export default function DecksPage() {
     setSearchQuery('');
     setPlayerFilter('');
     setColorFilter(new Set());
+    setColorMode('and');
     setSortOption('name-asc');
   };
 
@@ -245,37 +257,52 @@ export default function DecksPage() {
                   </FormControl>
                 </Grid>
                 <Grid size={{ xs: 12, sm: 2 }}>
-                  <Stack direction="row" spacing={0.5} justifyContent="center">
-                    {MTG_COLORS.map(({ code, name, color, bg }) => (
-                      <Tooltip key={code} title={name}>
-                        <Box
-                          onClick={() => toggleColor(code)}
-                          sx={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: '50%',
-                            background: `linear-gradient(135deg, ${bg} 0%, ${color} 100%)`,
-                            border: `2px solid ${color}`,
-                            opacity: colorFilter.has(code) ? 1 : 0.3,
-                            cursor: 'pointer',
-                            transition: 'opacity 0.2s, transform 0.2s',
-                            transform: colorFilter.has(code) ? 'scale(1.15)' : 'scale(1)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: 14,
-                            fontWeight: 700,
-                            color: code === 'W' ? '#333' : '#FFF',
-                            '&:hover': {
-                              opacity: colorFilter.has(code) ? 1 : 0.6,
-                              transform: 'scale(1.15)',
-                            },
-                          }}
-                        >
-                          {code}
-                        </Box>
-                      </Tooltip>
-                    ))}
+                  <Stack spacing={0.75} alignItems="center">
+                    <Stack direction="row" spacing={0.5} justifyContent="center">
+                      {MTG_COLORS.map(({ code, name, color, bg }) => (
+                        <Tooltip key={code} title={name}>
+                          <Box
+                            onClick={() => toggleColor(code)}
+                            sx={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: '50%',
+                              background: `linear-gradient(135deg, ${bg} 0%, ${color} 100%)`,
+                              border: `2px solid ${color}`,
+                              opacity: colorFilter.has(code) ? 1 : 0.3,
+                              cursor: 'pointer',
+                              transition: 'opacity 0.2s, transform 0.2s',
+                              transform: colorFilter.has(code) ? 'scale(1.15)' : 'scale(1)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 14,
+                              fontWeight: 700,
+                              color: code === 'W' ? '#333' : '#FFF',
+                              '&:hover': {
+                                opacity: colorFilter.has(code) ? 1 : 0.6,
+                                transform: 'scale(1.15)',
+                              },
+                            }}
+                          >
+                            {code}
+                          </Box>
+                        </Tooltip>
+                      ))}
+                    </Stack>
+                    {colorFilter.size > 0 && (
+                      <ToggleButtonGroup
+                        exclusive
+                        size="small"
+                        value={colorMode}
+                        onChange={(_, v) => { if (v) setColorMode(v as ColorFilterMode); }}
+                        sx={{ '& .MuiToggleButton-root': { py: 0, px: 0.75, fontSize: '0.65rem' } }}
+                      >
+                        <ToggleButton value="and">AND</ToggleButton>
+                        <ToggleButton value="or">OR</ToggleButton>
+                        <ToggleButton value="only">Only</ToggleButton>
+                      </ToggleButtonGroup>
+                    )}
                   </Stack>
                 </Grid>
               </Grid>

@@ -1,0 +1,85 @@
+@startuml Commander Collector — Search Architecture
+
+skinparam backgroundColor #FAFAFA
+skinparam componentStyle rectangle
+skinparam defaultFontName Helvetica
+skinparam arrowColor #555
+skinparam componentBorderColor #888
+
+title Commander Collector — Search & Filter Architecture
+
+package "Frontend (React / Next.js)" {
+
+  component "Decks Page\n(decks/page.tsx)" as DecksPage {
+    portin "text search\n(name, commander)" as DeckText
+    portin "player dropdown" as DeckPlayer
+    portin "color chips\n[AND-only today]" as DeckColor
+    portin "sort" as DeckSort
+  }
+
+  component "Stats Page\n(stats/page.tsx)" as StatsPage {
+    portin "group_by selector" as GroupBy
+    portin "metrics checkboxes" as Metrics
+    portin "conditions panel" as Conditions
+    portin "entity filter panel" as EntityFilter
+  }
+
+  component "Games Page\n(games/page.tsx)" as GamesPage
+  component "Players Page\n(players/page.tsx)" as PlayersPage
+
+  component "API Client\n(lib/api.ts)\nbuildComparisonParams()" as ApiClient
+}
+
+package "PHP API Endpoints" {
+  component "comparison.php\n[14 group_bys, 9 metrics\n10+ conditions, 4 entity filters]" as ComparisonPHP
+  component "stats.php\n[player_id?, deck_id?]" as StatsPHP
+  component "head-to-head.php\n[player1?, player2?]" as H2HPHP
+  component "advanced-stats.php\n[no params]" as AdvancedPHP
+  component "decks.php\n[id?, player_id?]" as DecksPHP
+  component "players.php\n[id?]" as PlayersPHP
+  component "games.php\n[id?]" as GamesPHP
+}
+
+database "MySQL\n(rickwphi_app_commander)" as DB {
+  component "game_results" as grTable
+  component "games" as gTable
+  component "decks\n(has_w/u/b/r/g cols)" as dTable
+  component "players" as pTable
+}
+
+' Frontend → API Client
+DecksPage --> DecksPHP : getDecks()\n[load all, filter client-side]
+StatsPage --> ApiClient : getComparison(config)
+StatsPage --> StatsPHP : getStats()\ngetAdvancedStats()
+StatsPage --> H2HPHP : getHeadToHead()
+GamesPage --> GamesPHP : getGames()
+PlayersPage --> PlayersPHP : getPlayers()
+
+' API Client → PHP
+ApiClient --> ComparisonPHP : GET comparison.php?group_by=...\n&metrics=...&conditions=...
+
+' PHP → DB
+ComparisonPHP --> DB : Dynamic SELECT\nJOIN pod subquery\nWHERE + HAVING
+StatsPHP --> DB : GROUP BY p.id\nor d.id
+H2HPHP --> DB : Self-JOIN on\ngame_results x2
+AdvancedPHP --> DB : 7 queries\n+ computeStreaks()
+DecksPHP --> DB : LEFT JOIN stats
+PlayersPHP --> DB : JOIN stats
+GamesPHP --> DB : GROUP_CONCAT\nfor 2HG winners
+
+note bottom of DecksPage
+  Color filter is client-side:
+  deck.colors.includes(c)
+  ONLY supports AND today.
+  Missing: OR, Only modes.
+end note
+
+note right of ComparisonPHP
+  must_include_colors → d.has_X = 1 (AND only today)
+  filter_colors → exact colors string match
+    (ONLY works when group_by=color)
+    DOES NOT match "contains color X" semantics.
+  Missing: OR, Only modes; has_X filter for all group_bys.
+end note
+
+@enduml

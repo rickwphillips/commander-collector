@@ -259,6 +259,8 @@ export type MtgColor = 'W' | 'U' | 'B' | 'R' | 'G';
 // Comparison Builder types
 export type PanelType = 'predefined' | 'comparison';
 
+export type ColorFilterMode = 'and' | 'or' | 'only';
+
 export type ComparisonGroupBy =
   | 'player'
   | 'deck'
@@ -271,7 +273,9 @@ export type ComparisonGroupBy =
   | 'month'
   | 'year'
   | 'season'
-  | 'day_of_week';
+  | 'day_of_week'
+  | 'opponent_player'
+  | 'opponent_commander';
 
 export type ComparisonMetric =
   | 'win_rate'
@@ -282,7 +286,9 @@ export type ComparisonMetric =
   | 'avg_survival_turns'
   | 'avg_turns_to_win'
   | 'top2_rate'
-  | 'elimination_rate';
+  | 'elimination_rate'
+  | 'std_dev_finish_position'
+  | 'first_elimination_rate';
 
 export interface ComparisonConditions {
   game_type?: 'all' | 'standard' | '2hg';
@@ -295,7 +301,14 @@ export interface ComparisonConditions {
   date_from?: string;
   date_to?: string;
   min_games?: number;
-  must_include_colors?: string[]; // deck must contain ALL listed colors (W/U/B/R/G)
+  must_include_colors?: string[];
+  color_mode?: ColorFilterMode;
+  my_games_only?: boolean;
+  opponent_player_ids?: number[];
+  opponent_commanders?: string[];
+  opponent_colors?: string[];
+  opponent_color_mode?: ColorFilterMode;
+  exclude_player_ids?: number[];
 }
 
 export interface ComparisonEntityFilter {
@@ -303,6 +316,7 @@ export interface ComparisonEntityFilter {
   deck_ids?: number[];
   commanders?: string[];
   colors?: string[];
+  color_mode?: ColorFilterMode; // mode for filter_colors — default 'and'
 }
 
 export interface ComparisonConfig {
@@ -310,6 +324,7 @@ export interface ComparisonConfig {
   conditions: ComparisonConditions;
   entityFilter?: ComparisonEntityFilter;
   metrics: ComparisonMetric[];
+  top_n?: number;
 }
 
 export interface ComparisonEntityResult {
@@ -326,6 +341,8 @@ export interface ComparisonEntityResult {
   avg_turns_to_win: number | null;
   top2_rate: number | null;
   elimination_rate: number | null;
+  std_dev_finish_position: number | null;
+  first_elimination_rate: number | null;
 }
 
 export interface ComparisonResult {

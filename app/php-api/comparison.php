@@ -34,6 +34,8 @@ $mustIncludeColors = isset($_GET['must_include_colors']) && is_array($_GET['must
         array_map('strtoupper', array_map('strval', $_GET['must_include_colors'])),
         fn($c) => in_array($c, ['W', 'U', 'B', 'R', 'G'], true)
     )) : [];
+$colorMode        = in_array($_GET['color_mode'] ?? '', ['or', 'only'], true)
+    ? $_GET['color_mode'] : 'and';
 
 // Entity filter
 $filterPlayerIds  = isset($_GET['filter_player_ids']) && is_array($_GET['filter_player_ids'])
@@ -43,16 +45,52 @@ $filterDeckIds    = isset($_GET['filter_deck_ids']) && is_array($_GET['filter_de
 $filterCommanders = isset($_GET['filter_commanders']) && is_array($_GET['filter_commanders'])
     ? array_map('strval', $_GET['filter_commanders']) : [];
 $filterColors     = isset($_GET['filter_colors']) && is_array($_GET['filter_colors'])
-    ? array_map('strval', $_GET['filter_colors']) : [];
+    ? array_values(array_filter(
+        array_map('strtoupper', array_map('strval', $_GET['filter_colors'])),
+        fn($c) => in_array($c, ['W', 'U', 'B', 'R', 'G'], true)
+    )) : [];
+$filterColorMode  = in_array($_GET['filter_color_mode'] ?? '', ['or', 'only'], true)
+    ? $_GET['filter_color_mode'] : 'and';
+
+// Phase 2 — new condition params
+$myGamesOnly      = filter_var($_GET['my_games_only'] ?? false, FILTER_VALIDATE_BOOLEAN)
+    && !empty($user['player_id']);
+$oppPlayerIds     = isset($_GET['opponent_player_ids']) && is_array($_GET['opponent_player_ids'])
+    ? array_map('intval', $_GET['opponent_player_ids']) : [];
+$oppCommanders    = isset($_GET['opponent_commanders']) && is_array($_GET['opponent_commanders'])
+    ? array_map('strval', $_GET['opponent_commanders']) : [];
+$oppColors        = isset($_GET['opponent_colors']) && is_array($_GET['opponent_colors'])
+    ? array_values(array_filter(
+        array_map('strtoupper', array_map('strval', $_GET['opponent_colors'])),
+        fn($c) => in_array($c, ['W', 'U', 'B', 'R', 'G'], true)
+    )) : [];
+$oppColorMode     = in_array($_GET['opponent_color_mode'] ?? '', ['or', 'only'], true)
+    ? $_GET['opponent_color_mode'] : 'and';
+$excludePlayerIds = isset($_GET['exclude_player_ids']) && is_array($_GET['exclude_player_ids'])
+    ? array_map('intval', $_GET['exclude_player_ids']) : [];
+$topN             = isset($_GET['top_n']) ? max(1, (int)$_GET['top_n']) : null;
 
 // Validate groupBy
 $validGroupBys = [
     'player', 'deck', 'commander', 'color', 'deck_age',
     'pod_size', 'game_length', 'game_type',
     'month', 'year', 'season', 'day_of_week',
+    'opponent_player', 'opponent_commander',
 ];
 if (!in_array($groupBy, $validGroupBys, true)) {
     sendError("Invalid group_by: $groupBy");
+}
+
+// Perspective player for opponent group-bys
+$perspectivePlayerId = null;
+if (in_array($groupBy, ['opponent_player', 'opponent_commander'], true)) {
+    if ($myGamesOnly && !empty($user['player_id'])) {
+        $perspectivePlayerId = (int)$user['player_id'];
+    } elseif (!empty($reqPlayerIds)) {
+        $perspectivePlayerId = $reqPlayerIds[0];
+    } else {
+        sendError('opponent_player and opponent_commander group-bys require a perspective player (set required_player_ids or my_games_only)');
+    }
 }
 
 // --- Build shared WHERE clause ---
@@ -109,10 +147,88 @@ foreach ($reqCommanders as $cmd) {
     $params[] = $cmd;
 }
 
-// Deck must contain all listed colors (uses boolean columns)
+// Color column map shared by must_include_colors and filter_colors
 $colorColumnMap = ['W' => 'has_w', 'U' => 'has_u', 'B' => 'has_b', 'R' => 'has_r', 'G' => 'has_g'];
-foreach ($mustIncludeColors as $color) {
-    $where[] = 'd.' . $colorColumnMap[$color] . ' = 1';
+
+// Deck must include colors (condition — applies to the deck played by each game_result row)
+if (!empty($mustIncludeColors)) {
+    if ($colorMode === 'or') {
+        $clauses = array_map(fn($c) => 'd.' . $colorColumnMap[$c] . ' = 1', $mustIncludeColors);
+        $where[] = '(' . implode(' OR ', $clauses) . ')';
+    } elseif ($colorMode === 'only') {
+        foreach ($mustIncludeColors as $c) {
+            $where[] = 'd.' . $colorColumnMap[$c] . ' = 1';
+        }
+        foreach (array_diff(array_keys($colorColumnMap), $mustIncludeColors) as $c) {
+            $where[] = 'd.' . $colorColumnMap[$c] . ' = 0';
+        }
+    } else { // 'and' (default)
+        foreach ($mustIncludeColors as $c) {
+            $where[] = 'd.' . $colorColumnMap[$c] . ' = 1';
+        }
+    }
+}
+
+// Entity color filter (applies to all group_bys — narrows which entity rows appear in results)
+if (!empty($filterColors)) {
+    if ($filterColorMode === 'or') {
+        $clauses = array_map(fn($c) => 'd.' . $colorColumnMap[$c] . ' = 1', $filterColors);
+        $where[] = '(' . implode(' OR ', $clauses) . ')';
+    } elseif ($filterColorMode === 'only') {
+        foreach ($filterColors as $c) {
+            $where[] = 'd.' . $colorColumnMap[$c] . ' = 1';
+        }
+        foreach (array_diff(array_keys($colorColumnMap), $filterColors) as $c) {
+            $where[] = 'd.' . $colorColumnMap[$c] . ' = 0';
+        }
+    } else { // 'and' (default)
+        foreach ($filterColors as $c) {
+            $where[] = 'd.' . $colorColumnMap[$c] . ' = 1';
+        }
+    }
+}
+
+// My games only — restrict to games where the authenticated user's player was present
+if ($myGamesOnly) {
+    $where[] = 'g.id IN (SELECT game_id FROM game_results WHERE player_id = ?)';
+    $params[] = (int)$user['player_id'];
+}
+
+// Opponent players — ALL listed players must be in the same game
+foreach ($oppPlayerIds as $pid) {
+    $where[] = 'g.id IN (SELECT game_id FROM game_results WHERE player_id = ?)';
+    $params[] = $pid;
+}
+
+// Opponent commanders — ALL listed commanders must appear in the same game
+foreach ($oppCommanders as $cmd) {
+    $where[] = 'g.id IN (SELECT gr2.game_id FROM game_results gr2 JOIN decks d2 ON gr2.deck_id = d2.id WHERE d2.commander = ?)';
+    $params[] = $cmd;
+}
+
+// Opponent colors — at least one opponent's deck (not this row's player) matches the color filter
+if (!empty($oppColors)) {
+    $oppBase = 'SELECT gr2.game_id FROM game_results gr2 JOIN decks d2 ON gr2.deck_id = d2.id WHERE gr2.player_id != gr.player_id';
+    if ($oppColorMode === 'or') {
+        $clauses = array_map(fn($c) => 'd2.' . $colorColumnMap[$c] . ' = 1', $oppColors);
+        $where[] = 'g.id IN (' . $oppBase . ' AND (' . implode(' OR ', $clauses) . '))';
+    } elseif ($oppColorMode === 'only') {
+        $incClauses = array_map(fn($c) => 'd2.' . $colorColumnMap[$c] . ' = 1', $oppColors);
+        $excClauses = array_map(
+            fn($c) => 'd2.' . $colorColumnMap[$c] . ' = 0',
+            array_diff(array_keys($colorColumnMap), $oppColors)
+        );
+        $where[] = 'g.id IN (' . $oppBase . ' AND ' . implode(' AND ', array_merge($incClauses, $excClauses)) . ')';
+    } else { // 'and'
+        $clauses = array_map(fn($c) => 'd2.' . $colorColumnMap[$c] . ' = 1', $oppColors);
+        $where[] = 'g.id IN (' . $oppBase . ' AND ' . implode(' AND ', $clauses) . ')';
+    }
+}
+
+// Exclude players — none of these players may be in the game
+foreach ($excludePlayerIds as $pid) {
+    $where[] = 'g.id NOT IN (SELECT game_id FROM game_results WHERE player_id = ?)';
+    $params[] = $pid;
 }
 
 // --- Metric expressions ---
@@ -124,8 +240,10 @@ function metricExpression(string $metric): string {
         case 'avg_finish_position': return 'ROUND(AVG(gr.finish_position), 2)';
         case 'avg_survival_turns':  return 'ROUND(AVG(CASE WHEN gr.finish_position > 1 THEN gr.eliminated_turn END), 1)';
         case 'avg_turns_to_win':    return 'ROUND(AVG(CASE WHEN gr.finish_position = 1 THEN g.winning_turn END), 1)';
-        case 'top2_rate':           return 'ROUND(SUM(gr.finish_position <= 2) / COUNT(gr.id) * 100, 1)';
-        case 'elimination_rate':    return 'ROUND(SUM(gr.finish_position > 1) / COUNT(gr.id) * 100, 1)';
+        case 'top2_rate':                  return 'ROUND(SUM(gr.finish_position <= 2) / COUNT(gr.id) * 100, 1)';
+        case 'elimination_rate':           return 'ROUND(SUM(gr.finish_position > 1) / COUNT(gr.id) * 100, 1)';
+        case 'std_dev_finish_position':    return 'ROUND(STDDEV_POP(gr.finish_position), 2)';
+        case 'first_elimination_rate':     return 'ROUND(SUM(gr.finish_position = pod.pod_size) / COUNT(gr.id) * 100, 1)';
         default: return 'NULL';
     }
 }
@@ -139,8 +257,9 @@ function buildQuery(
     array $filterPlayerIds,
     array $filterDeckIds,
     array $filterCommanders,
-    array $filterColors,
-    bool $needsRecent
+    bool $needsRecent,
+    ?int $topN = null,
+    ?int $perspectivePlayerId = null
 ): string {
     $podSubquery = '(SELECT game_id, COUNT(*) AS pod_size FROM game_results GROUP BY game_id) pod';
 
@@ -194,22 +313,7 @@ function buildQuery(
             $joins   = "JOIN decks d ON gr.deck_id = d.id JOIN players p ON gr.player_id = p.id JOIN $podSubquery ON pod.game_id = g.id";
             $groupSql = $normColors;
             $orderBy = 'win_rate DESC';
-            if ($filterColors) {
-                foreach ($filterColors as $fc) {
-                    // Normalize filter value to canonical WUBRG order
-                    if ($fc === '' || $fc === 'C') {
-                        $normalized = 'C';
-                    } else {
-                        $normalized = '';
-                        foreach (['W', 'U', 'B', 'R', 'G'] as $c) {
-                            if (strpos($fc, $c) !== false) $normalized .= $c;
-                        }
-                        if ($normalized === '') $normalized = 'C';
-                    }
-                    $where[] = "($normColors) = ?";
-                    $params[] = $normalized;
-                }
-            }
+            // filter_colors now handled in shared WHERE via has_X columns
             break;
 
         case 'deck_age':
@@ -342,12 +446,53 @@ function buildQuery(
             }
             break;
 
+        case 'opponent_player':
+            $select  = 'opp_player.id AS id, opp_player.name AS label, NULL AS sublabel';
+            $joins   = "JOIN players p ON gr.player_id = p.id"
+                . " JOIN decks d ON gr.deck_id = d.id"
+                . " JOIN game_results gr_opp ON gr_opp.game_id = gr.game_id AND gr_opp.player_id != gr.player_id"
+                . " JOIN players opp_player ON gr_opp.player_id = opp_player.id"
+                . " JOIN $podSubquery ON pod.game_id = g.id";
+            $groupSql = 'opp_player.id';
+            $orderBy = 'win_rate DESC';
+            if ($perspectivePlayerId) {
+                $where[] = 'gr.player_id = ?';
+                $params[] = $perspectivePlayerId;
+            }
+            if ($filterPlayerIds) {
+                $in = implode(',', array_fill(0, count($filterPlayerIds), '?'));
+                $where[] = "opp_player.id IN ($in)";
+                $params  = array_merge($params, $filterPlayerIds);
+            }
+            break;
+
+        case 'opponent_commander':
+            $select  = 'd_opp.commander AS id, d_opp.commander AS label, NULL AS sublabel';
+            $joins   = "JOIN players p ON gr.player_id = p.id"
+                . " JOIN decks d ON gr.deck_id = d.id"
+                . " JOIN game_results gr_opp ON gr_opp.game_id = gr.game_id AND gr_opp.player_id != gr.player_id"
+                . " JOIN decks d_opp ON gr_opp.deck_id = d_opp.id"
+                . " JOIN $podSubquery ON pod.game_id = g.id";
+            $groupSql = 'd_opp.commander';
+            $orderBy = 'win_rate DESC';
+            if ($perspectivePlayerId) {
+                $where[] = 'gr.player_id = ?';
+                $params[] = $perspectivePlayerId;
+            }
+            if ($filterCommanders) {
+                $in = implode(',', array_fill(0, count($filterCommanders), '?'));
+                $where[] = "d_opp.commander IN ($in)";
+                $params  = array_merge($params, $filterCommanders);
+            }
+            break;
+
         default:
             sendError("Unsupported group_by: $groupBy");
     }
 
     $whereClause = implode(' AND ', $where);
     $havingClause = "COUNT(gr.id) >= $minGames";
+    $limitClause = $topN !== null ? "LIMIT $topN" : '';
 
     $sql = "
         SELECT
@@ -359,7 +504,9 @@ function buildQuery(
             ROUND(AVG(CASE WHEN gr.finish_position > 1 THEN gr.eliminated_turn END), 1) AS avg_survival_turns,
             ROUND(AVG(CASE WHEN gr.finish_position = 1 THEN g.winning_turn END), 1) AS avg_turns_to_win,
             ROUND(SUM(gr.finish_position <= 2) / COUNT(gr.id) * 100, 1) AS top2_rate,
-            ROUND(SUM(gr.finish_position > 1) / COUNT(gr.id) * 100, 1) AS elimination_rate
+            ROUND(SUM(gr.finish_position > 1) / COUNT(gr.id) * 100, 1) AS elimination_rate,
+            ROUND(STDDEV_POP(gr.finish_position), 2) AS std_dev_finish_position,
+            ROUND(SUM(gr.finish_position = pod.pod_size) / COUNT(gr.id) * 100, 1) AS first_elimination_rate
         FROM game_results gr
         JOIN games g ON gr.game_id = g.id
         $joins
@@ -367,6 +514,7 @@ function buildQuery(
         GROUP BY $groupSql
         HAVING $havingClause
         ORDER BY $orderBy
+        $limitClause
     ";
 
     return $sql;
@@ -376,8 +524,8 @@ $needsRecent = in_array('recent_win_rate', $metrics, true);
 
 $sql = buildQuery(
     $groupBy, $where, $params, $minGames,
-    $filterPlayerIds, $filterDeckIds, $filterCommanders, $filterColors,
-    $needsRecent
+    $filterPlayerIds, $filterDeckIds, $filterCommanders,
+    $needsRecent, $topN, $perspectivePlayerId
 );
 
 try {
@@ -397,8 +545,7 @@ function computeRecentWinRate(
     array $params,
     array $filterPlayerIds,
     array $filterDeckIds,
-    array $filterCommanders,
-    array $filterColors
+    array $filterCommanders
 ): array {
     $recent = [];
     foreach ($rows as $row) {
@@ -463,7 +610,7 @@ $recentRates = [];
 if ($needsRecent) {
     $recentRates = computeRecentWinRate(
         $pdo, $groupBy, $rows, $where, $params,
-        $filterPlayerIds, $filterDeckIds, $filterCommanders, $filterColors
+        $filterPlayerIds, $filterDeckIds, $filterCommanders
     );
 }
 
@@ -482,8 +629,10 @@ $entities = array_map(function($row) use ($needsRecent, $recentRates) {
         'recent_win_rate'     => $needsRecent ? ($recentRates[$id] ?? null) : null,
         'avg_survival_turns'  => $row['avg_survival_turns'] !== null ? (float)$row['avg_survival_turns'] : null,
         'avg_turns_to_win'    => $row['avg_turns_to_win'] !== null ? (float)$row['avg_turns_to_win'] : null,
-        'top2_rate'           => $row['top2_rate'] !== null ? (float)$row['top2_rate'] : null,
-        'elimination_rate'    => $row['elimination_rate'] !== null ? (float)$row['elimination_rate'] : null,
+        'top2_rate'                => $row['top2_rate'] !== null ? (float)$row['top2_rate'] : null,
+        'elimination_rate'         => $row['elimination_rate'] !== null ? (float)$row['elimination_rate'] : null,
+        'std_dev_finish_position'  => $row['std_dev_finish_position'] !== null ? (float)$row['std_dev_finish_position'] : null,
+        'first_elimination_rate'   => $row['first_elimination_rate'] !== null ? (float)$row['first_elimination_rate'] : null,
     ];
 }, $rows);
 
@@ -500,11 +649,19 @@ $conditions = array_filter([
     'date_to'              => $dateTo,
     'min_games'            => $minGames > 1 ? $minGames : null,
     'must_include_colors'  => $mustIncludeColors ?: null,
+    'color_mode'           => ($mustIncludeColors && $colorMode !== 'and') ? $colorMode : null,
+    'my_games_only'        => $myGamesOnly ?: null,
+    'opponent_player_ids'  => $oppPlayerIds ?: null,
+    'opponent_commanders'  => $oppCommanders ?: null,
+    'opponent_colors'      => $oppColors ?: null,
+    'opponent_color_mode'  => ($oppColors && $oppColorMode !== 'and') ? $oppColorMode : null,
+    'exclude_player_ids'   => $excludePlayerIds ?: null,
 ], fn($v) => $v !== null);
 
 sendJSON([
     'groupBy'    => $groupBy,
     'metrics'    => array_values($metrics),
     'conditions' => $conditions,
+    'top_n'      => $topN,
     'entities'   => $entities,
 ]);

@@ -184,6 +184,9 @@ function buildComparisonParams(config: import('./types').ComparisonConfig): stri
     c.must_include_colors.forEach((color) =>
       parts.push(`must_include_colors[]=${encodeURIComponent(color)}`)
     );
+    if (c.color_mode && c.color_mode !== 'and') {
+      parts.push(`color_mode=${c.color_mode}`);
+    }
   }
 
   const ef = config.entityFilter;
@@ -192,8 +195,34 @@ function buildComparisonParams(config: import('./types').ComparisonConfig): stri
   if (ef?.deck_ids?.length) ef.deck_ids.forEach((id) => parts.push(`filter_deck_ids[]=${id}`));
   if (ef?.commanders?.length)
     ef.commanders.forEach((cmd) => parts.push(`filter_commanders[]=${encodeURIComponent(cmd)}`));
-  if (ef?.colors?.length)
+  if (ef?.colors?.length) {
     ef.colors.forEach((c) => parts.push(`filter_colors[]=${encodeURIComponent(c)}`));
+    if (ef.color_mode && ef.color_mode !== 'and') {
+      parts.push(`filter_color_mode=${ef.color_mode}`);
+    }
+  }
+
+  if (c.my_games_only) parts.push('my_games_only=1');
+  if (c.opponent_player_ids?.length) {
+    c.opponent_player_ids.forEach((id) => parts.push(`opponent_player_ids[]=${id}`));
+  }
+  if (c.opponent_commanders?.length) {
+    c.opponent_commanders.forEach((cmd) =>
+      parts.push(`opponent_commanders[]=${encodeURIComponent(cmd)}`)
+    );
+  }
+  if (c.opponent_colors?.length) {
+    c.opponent_colors.forEach((color) =>
+      parts.push(`opponent_colors[]=${encodeURIComponent(color)}`)
+    );
+    if (c.opponent_color_mode && c.opponent_color_mode !== 'and') {
+      parts.push(`opponent_color_mode=${c.opponent_color_mode}`);
+    }
+  }
+  if (c.exclude_player_ids?.length) {
+    c.exclude_player_ids.forEach((id) => parts.push(`exclude_player_ids[]=${id}`));
+  }
+  if (config.top_n != null) parts.push(`top_n=${config.top_n}`);
 
   return parts.join('&');
 }

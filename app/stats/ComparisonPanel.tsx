@@ -36,6 +36,8 @@ const METRIC_LABELS: Record<ComparisonMetric, string> = {
   avg_turns_to_win: 'Avg Turns to Win',
   top2_rate: 'Top-2 Rate',
   elimination_rate: 'Elimination Rate',
+  std_dev_finish_position: 'Consistency',
+  first_elimination_rate: '1st Elim. Rate',
 };
 
 // Metrics where lower = better (for winner highlighting)
