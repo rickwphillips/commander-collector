@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Typography,
@@ -145,9 +145,9 @@ export interface ComparisonBuilderProps {
   groupBy: ComparisonGroupBy;
   setGroupBy: (v: ComparisonGroupBy) => void;
   conditions: ComparisonConditions;
-  setConditions: (v: ComparisonConditions) => void;
+  setConditions: React.Dispatch<React.SetStateAction<ComparisonConditions>>;
   entityFilter: ComparisonEntityFilter;
-  setEntityFilter: (v: ComparisonEntityFilter) => void;
+  setEntityFilter: React.Dispatch<React.SetStateAction<ComparisonEntityFilter>>;
   metrics: ComparisonMetric[];
   setMetrics: (v: ComparisonMetric[]) => void;
   topN: number | undefined;
@@ -183,14 +183,14 @@ export function ComparisonBuilder({
         : null;
 
   function setCond<K extends keyof ComparisonConditions>(key: K, val: ComparisonConditions[K]) {
-    setConditions({ ...conditions, [key]: val });
+    setConditions((prev) => ({ ...prev, [key]: val }));
   }
 
   function setFilter<K extends keyof ComparisonEntityFilter>(
     key: K,
     val: ComparisonEntityFilter[K]
   ) {
-    setEntityFilter({ ...entityFilter, [key]: val });
+    setEntityFilter((prev) => ({ ...prev, [key]: val }));
   }
 
   function toggleMetric(m: ComparisonMetric) {
