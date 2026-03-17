@@ -38,6 +38,33 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.9.1',
+    date: '2026-03-17',
+    title: 'Mana Symbol Visuals',
+    changes: [
+      {
+        type: 'added',
+        text: 'Mana symbol SVG icons — all color identity displays now show official mana pip icons (W/U/B/R/G/C)',
+      },
+      {
+        type: 'added',
+        text: 'Geometric pip arrangements — 3 colors display as a triangle, 4 as a square, 5 as a pentagon',
+      },
+      {
+        type: 'added',
+        text: 'Colorless (C) option in color pickers throughout the app, mutually exclusive with WUBRG',
+      },
+      {
+        type: 'improved',
+        text: 'Color identity sentence in comparison builder now reads as a subject ("Show me all white and blue commanders…") rather than a condition clause',
+      },
+      {
+        type: 'improved',
+        text: 'Deck list filter and edit dialog use interactive mana symbol toggles instead of checkboxes',
+      },
+    ],
+  },
+  {
     version: '1.9.0',
     date: '2026-03-17',
     title: 'Custom Comparison Builder Overhaul',
