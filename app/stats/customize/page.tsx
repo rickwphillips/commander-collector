@@ -9,47 +9,15 @@ import {
   Box,
   Button,
   TextField,
-  IconButton,
-  Chip,
   Alert,
   Snackbar,
-  Switch,
-  FormControlLabel,
-  Tooltip,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Divider,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  Autocomplete,
-  Checkbox,
-  FormGroup,
-  Collapse,
-  CircularProgress,
-  ToggleButtonGroup,
-  ToggleButton,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import ShareIcon from '@mui/icons-material/Share';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
-import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import Link from 'next/link';
 import { PageContainer } from '../../components/PageContainer';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { api } from '../../lib/api';
-import { getSectionDef } from '../../lib/statsSections';
-import type { StatsSectionId } from '../../lib/statsSections';
 import type {
   StatPanel,
   Player,
@@ -60,841 +28,11 @@ import type {
   ComparisonEntityFilter,
   ComparisonConfig,
   ComparisonResult,
-  ColorFilterMode,
 } from '../../lib/types';
-import { ComparisonPanel } from '../ComparisonPanel';
+import { ComparisonBuilder } from './ComparisonBuilder';
+import { PanelCard } from './PanelCard';
+import { DeletePanelDialog } from './DeletePanelDialog';
 
-// ---- Metric definitions ----
-const METRIC_OPTIONS: { id: ComparisonMetric; label: string; description: string }[] = [
-  { id: 'win_rate', label: 'Win Rate', description: '% of games won' },
-  { id: 'wins', label: 'Wins', description: 'Total wins' },
-  { id: 'total_games', label: 'Total Games', description: 'Games played' },
-  { id: 'avg_finish_position', label: 'Avg Finish Position', description: 'Lower is better' },
-  { id: 'recent_win_rate', label: 'Recent Win Rate', description: 'Last 5 matching games' },
-  {
-    id: 'avg_survival_turns',
-    label: 'Avg Survival Turns',
-    description: 'How long when not winning',
-  },
-  { id: 'avg_turns_to_win', label: 'Avg Turns to Win', description: 'Fast vs slow wins' },
-  { id: 'top2_rate', label: 'Top-2 Rate', description: 'Finish 1st or 2nd' },
-  { id: 'elimination_rate', label: 'Elimination Rate', description: 'How often knocked out' },
-  {
-    id: 'std_dev_finish_position',
-    label: 'Consistency Score',
-    description: 'Std dev of finish position — low = consistent',
-  },
-  {
-    id: 'first_elimination_rate',
-    label: 'First Eliminated Rate',
-    description: '% of games knocked out first',
-  },
-];
-
-const GROUP_BY_ENTITY: { id: ComparisonGroupBy; label: string }[] = [
-  { id: 'player', label: 'Player' },
-  { id: 'deck', label: 'Deck' },
-  { id: 'commander', label: 'Commander' },
-  { id: 'color', label: 'Color' },
-  { id: 'deck_age', label: 'Deck Age' },
-  { id: 'opponent_player', label: 'Opponent Player' },
-  { id: 'opponent_commander', label: 'Opponent Commander' },
-];
-
-const GROUP_BY_PROPERTY: { id: ComparisonGroupBy; label: string }[] = [
-  { id: 'pod_size', label: 'Pod Size' },
-  { id: 'game_length', label: 'Game Length' },
-  { id: 'game_type', label: 'Game Type' },
-  { id: 'month', label: 'Month' },
-  { id: 'year', label: 'Year' },
-  { id: 'season', label: 'Season' },
-  { id: 'day_of_week', label: 'Day of Week' },
-];
-
-const ENTITY_GROUP_BYS = new Set<ComparisonGroupBy>([
-  'player',
-  'deck',
-  'commander',
-  'color',
-  'deck_age',
-  'opponent_player',
-  'opponent_commander',
-]);
-
-const OPPONENT_GROUP_BYS = new Set<ComparisonGroupBy>(['opponent_player', 'opponent_commander']);
-
-// ---- Chip selector helper ----
-function ChipGroup<T extends string | number>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <Box sx={{ mb: 2 }}>
-      <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-        {label}
-      </Typography>
-      <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-        {options.map((opt) => (
-          <Chip
-            key={String(opt.value)}
-            label={opt.label}
-            size="small"
-            onClick={() => onChange(opt.value)}
-            color={value === opt.value ? 'primary' : 'default'}
-            variant={value === opt.value ? 'filled' : 'outlined'}
-            sx={{ mb: 0.5 }}
-          />
-        ))}
-      </Stack>
-    </Box>
-  );
-}
-
-// ---- Entity color filter (Section C helper) ----
-function EntityColorFilter({
-  entityFilter,
-  setFilter,
-}: {
-  entityFilter: ComparisonEntityFilter;
-  setFilter: <K extends keyof ComparisonEntityFilter>(key: K, val: ComparisonEntityFilter[K]) => void;
-}) {
-  return (
-    <Box>
-      <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-        Filter by deck color
-      </Typography>
-      <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
-        {(['W', 'U', 'B', 'R', 'G'] as const).map((color) => {
-          const active = entityFilter.colors?.includes(color) ?? false;
-          return (
-            <Chip
-              key={color}
-              label={color}
-              size="small"
-              onClick={() => {
-                const current = entityFilter.colors ?? [];
-                const next = active ? current.filter((c) => c !== color) : [...current, color];
-                setFilter('colors', next.length ? next : undefined);
-                if (!next.length) setFilter('color_mode', undefined);
-              }}
-              color={active ? 'primary' : 'default'}
-              variant={active ? 'filled' : 'outlined'}
-            />
-          );
-        })}
-        {(entityFilter.colors?.length ?? 0) > 0 && (
-          <ToggleButtonGroup
-            exclusive
-            size="small"
-            value={entityFilter.color_mode ?? 'and'}
-            onChange={(_, v) => { if (v) setFilter('color_mode', v as ColorFilterMode); }}
-            sx={{ '& .MuiToggleButton-root': { py: 0, px: 0.75, fontSize: '0.65rem' } }}
-          >
-            <ToggleButton value="and">AND</ToggleButton>
-            <ToggleButton value="or">OR</ToggleButton>
-            <ToggleButton value="only">Only</ToggleButton>
-          </ToggleButtonGroup>
-        )}
-      </Stack>
-    </Box>
-  );
-}
-
-// ---- Comparison Builder sub-form ----
-interface ComparisonBuilderProps {
-  groupBy: ComparisonGroupBy;
-  setGroupBy: (v: ComparisonGroupBy) => void;
-  conditions: ComparisonConditions;
-  setConditions: (v: ComparisonConditions) => void;
-  entityFilter: ComparisonEntityFilter;
-  setEntityFilter: (v: ComparisonEntityFilter) => void;
-  metrics: ComparisonMetric[];
-  setMetrics: (v: ComparisonMetric[]) => void;
-  topN: number | undefined;
-  setTopN: (v: number | undefined) => void;
-  players: Player[];
-  decks: DeckWithPlayer[];
-}
-
-function ComparisonBuilder({
-  groupBy,
-  setGroupBy,
-  conditions,
-  setConditions,
-  entityFilter,
-  setEntityFilter,
-  metrics,
-  setMetrics,
-  topN,
-  setTopN,
-  players,
-  decks,
-}: ComparisonBuilderProps) {
-  const isEntityGroup = ENTITY_GROUP_BYS.has(groupBy);
-
-  // Local state for the game length number input
-  const [glValue, setGlValue] = useState(
-    conditions.min_winning_turn ?? conditions.max_winning_turn ?? 5
-  );
-  const glDirection =
-    conditions.min_winning_turn != null
-      ? 'gte'
-      : conditions.max_winning_turn != null
-        ? 'lte'
-        : null;
-
-  function setCond<K extends keyof ComparisonConditions>(key: K, val: ComparisonConditions[K]) {
-    setConditions({ ...conditions, [key]: val });
-  }
-
-  function setFilter<K extends keyof ComparisonEntityFilter>(
-    key: K,
-    val: ComparisonEntityFilter[K]
-  ) {
-    setEntityFilter({ ...entityFilter, [key]: val });
-  }
-
-  function toggleMetric(m: ComparisonMetric) {
-    setMetrics(metrics.includes(m) ? metrics.filter((x) => x !== m) : [...metrics, m]);
-  }
-
-  return (
-    <Stack spacing={0}>
-      {/* A — Conditions */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
-          A — Conditions
-        </Typography>
-
-        <ChipGroup
-          label="Game Type"
-          value={conditions.game_type ?? 'all'}
-          options={[
-            { value: 'all', label: 'All' },
-            { value: 'standard', label: 'Commander' },
-            { value: '2hg', label: '2HG' },
-          ]}
-          onChange={(v) => setCond('game_type', v as 'all' | 'standard' | '2hg')}
-        />
-
-        <ChipGroup
-          label="Pod Size"
-          value={conditions.pod_size ?? 0}
-          options={[
-            { value: 0, label: 'Any' },
-            { value: 3, label: '3-player' },
-            { value: 4, label: '4-player' },
-            { value: 5, label: '5+' },
-          ]}
-          onChange={(v) => setCond('pod_size', v === 0 ? undefined : (v as number))}
-        />
-
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-            Game Length
-          </Typography>
-          <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap>
-            <TextField
-              type="number"
-              size="small"
-              value={glValue}
-              disabled={glDirection === null}
-              onChange={(e) => {
-                const n = Math.max(1, parseInt(e.target.value) || 1);
-                setGlValue(n);
-                if (glDirection === 'gte') setCond('min_winning_turn', n);
-                else if (glDirection === 'lte') setCond('max_winning_turn', n);
-              }}
-              inputProps={{ min: 1, max: 99 }}
-              sx={{ width: 70 }}
-            />
-            <Typography variant="body2" color={glDirection === null ? 'text.disabled' : 'text.primary'}>
-              turns
-            </Typography>
-            <FormControlLabel
-              sx={{ mr: 0 }}
-              control={
-                <Checkbox
-                  size="small"
-                  checked={glDirection === 'gte'}
-                  onChange={() => {
-                    if (glDirection === 'gte') {
-                      setCond('min_winning_turn', undefined);
-                    } else {
-                      setConditions({ ...conditions, min_winning_turn: glValue, max_winning_turn: undefined });
-                    }
-                  }}
-                />
-              }
-              label="or more"
-            />
-            <FormControlLabel
-              sx={{ mr: 0 }}
-              control={
-                <Checkbox
-                  size="small"
-                  checked={glDirection === 'lte'}
-                  onChange={() => {
-                    if (glDirection === 'lte') {
-                      setCond('max_winning_turn', undefined);
-                    } else {
-                      setConditions({ ...conditions, min_winning_turn: undefined, max_winning_turn: glValue });
-                    }
-                  }}
-                />
-              }
-              label="or less"
-            />
-            <FormControlLabel
-              sx={{ mr: 0 }}
-              control={
-                <Checkbox
-                  size="small"
-                  checked={glDirection === null}
-                  onChange={() => {
-                    if (glDirection !== null) {
-                      setConditions({ ...conditions, min_winning_turn: undefined, max_winning_turn: undefined });
-                    }
-                  }}
-                />
-              }
-              label="Any"
-            />
-          </Stack>
-        </Box>
-
-        <ChipGroup
-          label="Count As Win"
-          value={conditions.min_finish_position ?? 1}
-          options={[
-            { value: 1, label: '1st place only' },
-            { value: 2, label: 'Top-2 finishes' },
-          ]}
-          onChange={(v) => setCond('min_finish_position', v === 1 ? undefined : (v as number))}
-        />
-
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-            Deck must include colors
-          </Typography>
-          <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
-            {(['W', 'U', 'B', 'R', 'G'] as const).map((color) => {
-              const active = conditions.must_include_colors?.includes(color) ?? false;
-              return (
-                <Chip
-                  key={color}
-                  label={color}
-                  size="small"
-                  onClick={() => {
-                    const current = conditions.must_include_colors ?? [];
-                    const next = active ? current.filter((c) => c !== color) : [...current, color];
-                    setCond('must_include_colors', next.length ? next : undefined);
-                    if (!next.length) setCond('color_mode', undefined);
-                  }}
-                  color={active ? 'primary' : 'default'}
-                  variant={active ? 'filled' : 'outlined'}
-                />
-              );
-            })}
-            {(conditions.must_include_colors?.length ?? 0) > 0 && (
-              <ToggleButtonGroup
-                exclusive
-                size="small"
-                value={conditions.color_mode ?? 'and'}
-                onChange={(_, v) => { if (v) setCond('color_mode', v as ColorFilterMode); }}
-                sx={{ '& .MuiToggleButton-root': { py: 0, px: 0.75, fontSize: '0.65rem' } }}
-              >
-                <ToggleButton value="and">AND</ToggleButton>
-                <ToggleButton value="or">OR</ToggleButton>
-                <ToggleButton value="only">Only</ToggleButton>
-              </ToggleButtonGroup>
-            )}
-          </Stack>
-        </Box>
-
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-            Player must be in pod (required_players)
-          </Typography>
-          <Autocomplete
-            multiple
-            size="small"
-            options={players}
-            getOptionLabel={(p) => p.name}
-            value={players.filter((p) => conditions.required_player_ids?.includes(p.id) ?? false)}
-            onChange={(_, v) =>
-              setCond(
-                'required_player_ids',
-                v.map((p) => p.id)
-              )
-            }
-            renderInput={(params) => <TextField {...params} placeholder="Any player" />}
-            isOptionEqualToValue={(o, v) => o.id === v.id}
-          />
-        </Box>
-
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-            Commander must be in pod
-          </Typography>
-          <Autocomplete
-            multiple
-            freeSolo
-            size="small"
-            options={[...new Set(decks.map((d) => d.commander))].sort()}
-            value={conditions.required_commanders ?? []}
-            onChange={(_, v) => setCond('required_commanders', v as string[])}
-            renderInput={(params) => (
-              <TextField {...params} placeholder="Type or select commander" />
-            )}
-          />
-        </Box>
-
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
-          <TextField
-            label="Date From"
-            type="date"
-            size="small"
-            value={conditions.date_from ?? ''}
-            onChange={(e) => setCond('date_from', e.target.value || undefined)}
-            InputLabelProps={{ shrink: true }}
-            sx={{ flex: 1 }}
-          />
-          <TextField
-            label="Date To"
-            type="date"
-            size="small"
-            value={conditions.date_to ?? ''}
-            onChange={(e) => setCond('date_to', e.target.value || undefined)}
-            InputLabelProps={{ shrink: true }}
-            sx={{ flex: 1 }}
-          />
-        </Stack>
-
-        <TextField
-          label="Min games threshold"
-          type="number"
-          size="small"
-          value={conditions.min_games ?? ''}
-          onChange={(e) =>
-            setCond('min_games', e.target.value ? parseInt(e.target.value) : undefined)
-          }
-          helperText="Exclude entities with fewer games"
-          inputProps={{ min: 1, max: 50 }}
-          sx={{ maxWidth: 220 }}
-        />
-
-        <Box sx={{ mb: 2, mt: 2 }}>
-          <FormControlLabel
-            control={
-              <Checkbox
-                size="small"
-                checked={conditions.my_games_only ?? false}
-                onChange={(e) => setCond('my_games_only', e.target.checked || undefined)}
-              />
-            }
-            label={
-              <Box>
-                <Typography variant="body2">My games only</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Only count games where you were at the table (requires claimed player)
-                </Typography>
-              </Box>
-            }
-          />
-        </Box>
-
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-            Opponent players were in pod
-          </Typography>
-          <Autocomplete
-            multiple
-            size="small"
-            options={players}
-            getOptionLabel={(p) => p.name}
-            value={players.filter((p) => conditions.opponent_player_ids?.includes(p.id) ?? false)}
-            onChange={(_, v) =>
-              setCond('opponent_player_ids', v.length ? v.map((p) => p.id) : undefined)
-            }
-            renderInput={(params) => <TextField {...params} placeholder="Any opponent" />}
-            isOptionEqualToValue={(o, v) => o.id === v.id}
-          />
-        </Box>
-
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-            Opponent commander was in pod
-          </Typography>
-          <Autocomplete
-            multiple
-            freeSolo
-            size="small"
-            options={[...new Set(decks.map((d) => d.commander))].sort()}
-            value={conditions.opponent_commanders ?? []}
-            onChange={(_, v) => setCond('opponent_commanders', v.length ? (v as string[]) : undefined)}
-            renderInput={(params) => (
-              <TextField {...params} placeholder="Type or select commander" />
-            )}
-          />
-        </Box>
-
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-            At least one opponent played this color
-          </Typography>
-          <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
-            {(['W', 'U', 'B', 'R', 'G'] as const).map((color) => {
-              const active = conditions.opponent_colors?.includes(color) ?? false;
-              return (
-                <Chip
-                  key={color}
-                  label={color}
-                  size="small"
-                  onClick={() => {
-                    const current = conditions.opponent_colors ?? [];
-                    const next = active ? current.filter((c) => c !== color) : [...current, color];
-                    setCond('opponent_colors', next.length ? next : undefined);
-                    if (!next.length) setCond('opponent_color_mode', undefined);
-                  }}
-                  color={active ? 'primary' : 'default'}
-                  variant={active ? 'filled' : 'outlined'}
-                />
-              );
-            })}
-            {(conditions.opponent_colors?.length ?? 0) > 0 && (
-              <ToggleButtonGroup
-                exclusive
-                size="small"
-                value={conditions.opponent_color_mode ?? 'and'}
-                onChange={(_, v) => { if (v) setCond('opponent_color_mode', v as ColorFilterMode); }}
-                sx={{ '& .MuiToggleButton-root': { py: 0, px: 0.75, fontSize: '0.65rem' } }}
-              >
-                <ToggleButton value="and">AND</ToggleButton>
-                <ToggleButton value="or">OR</ToggleButton>
-                <ToggleButton value="only">Only</ToggleButton>
-              </ToggleButtonGroup>
-            )}
-          </Stack>
-        </Box>
-
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-            Exclude players from pod
-          </Typography>
-          <Autocomplete
-            multiple
-            size="small"
-            options={players}
-            getOptionLabel={(p) => p.name}
-            value={players.filter((p) => conditions.exclude_player_ids?.includes(p.id) ?? false)}
-            onChange={(_, v) =>
-              setCond('exclude_player_ids', v.length ? v.map((p) => p.id) : undefined)
-            }
-            renderInput={(params) => <TextField {...params} placeholder="No exclusions" />}
-            isOptionEqualToValue={(o, v) => o.id === v.id}
-          />
-        </Box>
-
-      </Box>
-
-      <Divider sx={{ mb: 3 }} />
-
-      {/* B — Group by */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
-          B — Group by
-        </Typography>
-
-        <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-          Entity
-        </Typography>
-        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
-          {GROUP_BY_ENTITY.map((opt) => (
-            <Chip
-              key={opt.id}
-              label={opt.label}
-              size="small"
-              onClick={() => setGroupBy(opt.id)}
-              color={groupBy === opt.id ? 'primary' : 'default'}
-              variant={groupBy === opt.id ? 'filled' : 'outlined'}
-              sx={{ mb: 0.5 }}
-            />
-          ))}
-        </Stack>
-
-        <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-          Game Property
-        </Typography>
-        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-          {GROUP_BY_PROPERTY.map((opt) => (
-            <Chip
-              key={opt.id}
-              label={opt.label}
-              size="small"
-              onClick={() => setGroupBy(opt.id)}
-              color={groupBy === opt.id ? 'primary' : 'default'}
-              variant={groupBy === opt.id ? 'filled' : 'outlined'}
-              sx={{ mb: 0.5 }}
-            />
-          ))}
-        </Stack>
-
-        {OPPONENT_GROUP_BYS.has(groupBy) && !conditions.required_player_ids?.length && !conditions.my_games_only && (
-          <Alert severity="warning" sx={{ mt: 1.5 }}>
-            Opponent group-bys require a perspective player — set &ldquo;All of these players were present&rdquo; (one player) or enable &ldquo;My games only&rdquo; in section A.
-          </Alert>
-        )}
-      </Box>
-
-      <Divider sx={{ mb: 3 }} />
-
-      {/* C — Narrow to */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
-          C — Narrow to{' '}
-          <Typography component="span" variant="caption" color="text.secondary">
-            (optional — leave empty for all)
-          </Typography>
-        </Typography>
-
-        {groupBy === 'player' && (
-          <Stack spacing={1.5}>
-            <Autocomplete
-              multiple
-              size="small"
-              options={players}
-              getOptionLabel={(p) => p.name}
-              value={players.filter((p) => entityFilter.player_ids?.includes(p.id) ?? false)}
-              onChange={(_, v) => setFilter('player_ids', v.map((p) => p.id))}
-              renderInput={(params) => (
-                <TextField {...params} label="Specific players" placeholder="All players" />
-              )}
-              isOptionEqualToValue={(o, v) => o.id === v.id}
-            />
-            <EntityColorFilter entityFilter={entityFilter} setFilter={setFilter} />
-          </Stack>
-        )}
-
-        {groupBy === 'deck' && (
-          <Stack spacing={1.5}>
-            <Autocomplete
-              multiple
-              size="small"
-              options={players}
-              getOptionLabel={(p) => p.name}
-              value={players.filter((p) => entityFilter.player_ids?.includes(p.id) ?? false)}
-              onChange={(_, v) => setFilter('player_ids', v.map((p) => p.id))}
-              renderInput={(params) => (
-                <TextField {...params} label="Filter decks by player" placeholder="All players" />
-              )}
-              isOptionEqualToValue={(o, v) => o.id === v.id}
-            />
-            <Autocomplete
-              multiple
-              size="small"
-              options={decks.filter(
-                (d) =>
-                  !entityFilter.player_ids?.length || entityFilter.player_ids.includes(d.player_id)
-              )}
-              getOptionLabel={(d) => `${d.name} (${d.player_name})`}
-              value={decks.filter((d) => entityFilter.deck_ids?.includes(d.id) ?? false)}
-              onChange={(_, v) => setFilter('deck_ids', v.map((d) => d.id))}
-              renderInput={(params) => (
-                <TextField {...params} label="Specific decks" placeholder="All decks" />
-              )}
-              isOptionEqualToValue={(o, v) => o.id === v.id}
-            />
-            <EntityColorFilter entityFilter={entityFilter} setFilter={setFilter} />
-          </Stack>
-        )}
-
-        {groupBy === 'commander' && (
-          <Autocomplete
-            multiple
-            freeSolo
-            size="small"
-            options={[] as string[]}
-            value={entityFilter.commanders ?? []}
-            onChange={(_, v) => setFilter('commanders', v as string[])}
-            renderInput={(params) => (
-              <TextField {...params} label="Specific commanders" placeholder="All commanders" />
-            )}
-          />
-        )}
-
-        {groupBy === 'color' && (
-          <Box>
-            <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-              Narrow to color identities
-            </Typography>
-            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
-              {(['W', 'U', 'B', 'R', 'G'] as const).map((color) => {
-                const active = entityFilter.colors?.includes(color) ?? false;
-                return (
-                  <Chip
-                    key={color}
-                    label={color}
-                    size="small"
-                    onClick={() => {
-                      const current = entityFilter.colors ?? [];
-                      const next = active ? current.filter((c) => c !== color) : [...current, color];
-                      setFilter('colors', next.length ? next : undefined);
-                      if (!next.length) setFilter('color_mode', undefined);
-                    }}
-                    color={active ? 'primary' : 'default'}
-                    variant={active ? 'filled' : 'outlined'}
-                  />
-                );
-              })}
-              {(entityFilter.colors?.length ?? 0) > 0 && (
-                <ToggleButtonGroup
-                  exclusive
-                  size="small"
-                  value={entityFilter.color_mode ?? 'and'}
-                  onChange={(_, v) => { if (v) setFilter('color_mode', v as ColorFilterMode); }}
-                  sx={{ '& .MuiToggleButton-root': { py: 0, px: 0.75, fontSize: '0.65rem' } }}
-                >
-                  <ToggleButton value="and">AND</ToggleButton>
-                  <ToggleButton value="or">OR</ToggleButton>
-                  <ToggleButton value="only">Only</ToggleButton>
-                </ToggleButtonGroup>
-              )}
-            </Stack>
-          </Box>
-        )}
-
-        {!isEntityGroup && (
-          <Stack spacing={1.5}>
-            <Typography variant="body2" color="text.secondary">
-              Filter whose stats appear in each bucket:
-            </Typography>
-            <Autocomplete
-              multiple
-              size="small"
-              options={players}
-              getOptionLabel={(p) => p.name}
-              value={players.filter((p) => entityFilter.player_ids?.includes(p.id) ?? false)}
-              onChange={(_, v) => setFilter('player_ids', v.map((p) => p.id))}
-              renderInput={(params) => (
-                <TextField {...params} label="Specific players" placeholder="All players" />
-              )}
-              isOptionEqualToValue={(o, v) => o.id === v.id}
-            />
-            <EntityColorFilter entityFilter={entityFilter} setFilter={setFilter} />
-          </Stack>
-        )}
-
-        {groupBy === 'deck_age' && (
-          <Stack spacing={1.5}>
-            <Autocomplete
-              multiple
-              size="small"
-              options={players}
-              getOptionLabel={(p) => p.name}
-              value={players.filter((p) => entityFilter.player_ids?.includes(p.id) ?? false)}
-              onChange={(_, v) => setFilter('player_ids', v.map((p) => p.id))}
-              renderInput={(params) => (
-                <TextField {...params} label="Specific players" placeholder="All players" />
-              )}
-              isOptionEqualToValue={(o, v) => o.id === v.id}
-            />
-            <EntityColorFilter entityFilter={entityFilter} setFilter={setFilter} />
-          </Stack>
-        )}
-
-        {groupBy === 'opponent_player' && (
-          <Autocomplete
-            multiple
-            size="small"
-            options={players}
-            getOptionLabel={(p) => p.name}
-            value={players.filter((p) => entityFilter.player_ids?.includes(p.id) ?? false)}
-            onChange={(_, v) =>
-              setFilter('player_ids', v.length ? v.map((p) => p.id) : undefined)
-            }
-            renderInput={(params) => (
-              <TextField {...params} label="Specific opponents" placeholder="All opponents" />
-            )}
-            isOptionEqualToValue={(o, v) => o.id === v.id}
-          />
-        )}
-
-        {groupBy === 'opponent_commander' && (
-          <Autocomplete
-            multiple
-            freeSolo
-            size="small"
-            options={[...new Set(decks.map((d) => d.commander))].sort()}
-            value={entityFilter.commanders ?? []}
-            onChange={(_, v) => setFilter('commanders', v.length ? (v as string[]) : undefined)}
-            renderInput={(params) => (
-              <TextField {...params} label="Specific commanders" placeholder="All commanders" />
-            )}
-          />
-        )}
-      </Box>
-
-      <Divider sx={{ mb: 3 }} />
-
-      {/* D — Metrics */}
-      <Box>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-          D — Metrics{' '}
-          <Typography component="span" variant="caption" color="text.secondary">
-            (select at least one)
-          </Typography>
-        </Typography>
-        <FormGroup>
-          <Stack direction="row" flexWrap="wrap" useFlexGap gap={0}>
-            {METRIC_OPTIONS.map((m) => (
-              <FormControlLabel
-                key={m.id}
-                sx={{ width: { xs: '100%', sm: '50%' }, mr: 0 }}
-                control={
-                  <Checkbox
-                    size="small"
-                    checked={metrics.includes(m.id)}
-                    onChange={() => toggleMetric(m.id)}
-                  />
-                }
-                label={
-                  <Box>
-                    <Typography variant="body2">{m.label}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {m.description}
-                    </Typography>
-                  </Box>
-                }
-              />
-            ))}
-          </Stack>
-        </FormGroup>
-        <Box sx={{ mt: 2 }}>
-          <TextField
-            label="Top N results"
-            type="number"
-            size="small"
-            value={topN ?? ''}
-            onChange={(e) => setTopN(e.target.value ? Math.max(1, parseInt(e.target.value)) : undefined)}
-            helperText="Leave blank for all results"
-            inputProps={{ min: 1 }}
-            sx={{ maxWidth: 180 }}
-          />
-        </Box>
-      </Box>
-    </Stack>
-  );
-}
-
-// ---- Main page ----
 export default function CustomizePage() {
   const [loading, setLoading] = useState(true);
   const [panels, setPanels] = useState<StatPanel[]>([]);
@@ -910,11 +48,7 @@ export default function CustomizePage() {
   const [compGroupBy, setCompGroupBy] = useState<ComparisonGroupBy>('player');
   const [compConditions, setCompConditions] = useState<ComparisonConditions>({});
   const [compEntityFilter, setCompEntityFilter] = useState<ComparisonEntityFilter>({});
-  const [compMetrics, setCompMetrics] = useState<ComparisonMetric[]>([
-    'win_rate',
-    'total_games',
-    'wins',
-  ]);
+  const [compMetrics, setCompMetrics] = useState<ComparisonMetric[]>(['win_rate', 'total_games', 'wins']);
   const [compTopN, setCompTopN] = useState<number | undefined>(undefined);
 
   // Entity data for pickers
@@ -931,15 +65,9 @@ export default function CustomizePage() {
 
   useEffect(() => {
     fetchPanels();
-    // Load players and decks for pickers
     Promise.all([api.getPlayers(), api.getDecks()])
-      .then(([p, d]) => {
-        setPlayers(p);
-        setDecks(d);
-      })
-      .catch(() => {
-        /* non-fatal */
-      });
+      .then(([p, d]) => { setPlayers(p); setDecks(d); })
+      .catch(() => { /* non-fatal */ });
   }, []);
 
   const fetchPanels = async () => {
@@ -991,14 +119,8 @@ export default function CustomizePage() {
   };
 
   const handleSave = async () => {
-    if (!panelName.trim()) {
-      setSnackbar('Panel name is required');
-      return;
-    }
-    if (compMetrics.length === 0) {
-      setSnackbar('Select at least one metric');
-      return;
-    }
+    if (!panelName.trim()) { setSnackbar('Panel name is required'); return; }
+    if (compMetrics.length === 0) { setSnackbar('Select at least one metric'); return; }
 
     const config: ComparisonConfig = {
       groupBy: compGroupBy,
@@ -1027,25 +149,14 @@ export default function CustomizePage() {
   };
 
   const handleTogglePreview = (panel: StatPanel) => {
-    if (previewId === panel.id) {
-      setPreviewId(null);
-      return;
-    }
+    if (previewId === panel.id) { setPreviewId(null); return; }
     setPreviewId(panel.id);
-    // Comparison panels: fetch data if not already cached
     if (panel.panel_type === 'comparison' && panel.config && !previewData[panel.id]) {
       setPreviewLoading((prev) => new Set(prev).add(panel.id));
-      api
-        .getComparison(panel.config)
+      api.getComparison(panel.config)
         .then((result) => setPreviewData((prev) => ({ ...prev, [panel.id]: result })))
         .catch(() => setPreviewData((prev) => ({ ...prev, [panel.id]: 'error' })))
-        .finally(() =>
-          setPreviewLoading((prev) => {
-            const s = new Set(prev);
-            s.delete(panel.id);
-            return s;
-          })
-        );
+        .finally(() => setPreviewLoading((prev) => { const s = new Set(prev); s.delete(panel.id); return s; }));
     }
   };
 
@@ -1074,48 +185,29 @@ export default function CustomizePage() {
   const copyShareLink = (panel: StatPanel) => {
     if (!panel.share_code) return;
     const url = `https://rickwphillips.com/app/projects/commander/stats?panel=${panel.share_code}`;
-    navigator.clipboard
-      .writeText(url)
-      .then(() => {
-        setSnackbar('Share link copied to clipboard');
-      })
-      .catch(() => {
-        setSnackbar('Failed to copy link');
-      });
+    navigator.clipboard.writeText(url)
+      .then(() => setSnackbar('Share link copied to clipboard'))
+      .catch(() => setSnackbar('Failed to copy link'));
   };
-
-  const groupByLabel = (gb: ComparisonGroupBy) =>
-    [...GROUP_BY_ENTITY, ...GROUP_BY_PROPERTY].find((o) => o.id === gb)?.label ?? gb;
 
   const isSaveDisabled = saving || !panelName.trim() || compMetrics.length === 0;
 
   if (loading) {
     return (
-      <PageContainer
-        title="Customize Stats"
-        subtitle="Create and manage custom stat panels"
-        backHref="/stats"
-        backLabel="Stats"
-      >
+      <PageContainer title="Customize Stats" subtitle="Create and manage custom stat panels" backHref="/stats" backLabel="Stats">
         <LoadingSpinner message="Loading panels..." />
       </PageContainer>
     );
   }
 
   return (
-    <PageContainer
-      title="Customize Stats"
-      subtitle="Create and manage custom stat panels"
-      backHref="/stats"
-      backLabel="Stats"
-    >
+    <PageContainer title="Customize Stats" subtitle="Create and manage custom stat panels" backHref="/stats" backLabel="Stats">
+
       {/* Your Panels */}
       <Card sx={{ mb: 4 }}>
         <CardContent>
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-            <Typography variant="h5" sx={{ fontWeight: 600 }}>
-              Your Panels
-            </Typography>
+            <Typography variant="h5" sx={{ fontWeight: 600 }}>Your Panels</Typography>
             <Button
               variant="contained"
               startIcon={<AddIcon />}
@@ -1128,9 +220,7 @@ export default function CustomizePage() {
           </Stack>
 
           {panels.length >= 10 && (
-            <Alert severity="info" sx={{ mb: 2 }}>
-              Maximum of 10 panels reached.
-            </Alert>
+            <Alert severity="info" sx={{ mb: 2 }}>Maximum of 10 panels reached.</Alert>
           )}
 
           {panels.length === 0 && !showBuilder && (
@@ -1139,157 +229,21 @@ export default function CustomizePage() {
             </Typography>
           )}
 
-          {panels.map((panel) => {
-            const isPreviewing = previewId === panel.id;
-            const isLoadingPreview = previewLoading.has(panel.id);
-            const previewResult = previewData[panel.id];
-
-            return (
-              <Card key={panel.id} variant="outlined" sx={{ mb: 2 }}>
-                <CardContent sx={{ py: 2, '&:last-child': { pb: isPreviewing ? 1 : 2 } }}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Box>
-                      <Stack direction="row" alignItems="center" spacing={1}>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                          {panel.name}
-                        </Typography>
-                        {panel.panel_type === 'comparison' && (
-                          <Chip
-                            icon={<CompareArrowsIcon sx={{ fontSize: 14 }} />}
-                            label="Comparison"
-                            size="small"
-                            color="secondary"
-                            variant="outlined"
-                          />
-                        )}
-                      </Stack>
-                      <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5 }}>
-                        {panel.panel_type === 'comparison' && panel.config ? (
-                          <Chip
-                            label={`Group by: ${groupByLabel(panel.config.groupBy)}`}
-                            size="small"
-                            variant="outlined"
-                            color="primary"
-                          />
-                        ) : (
-                          panel.sections.map((s) => {
-                            const def = getSectionDef(s as StatsSectionId);
-                            return def ? (
-                              <Chip key={s} label={def.label} size="small" variant="outlined" />
-                            ) : null;
-                          })
-                        )}
-                      </Stack>
-                    </Box>
-                    <Stack direction="row" spacing={0.5} alignItems="center">
-                      <Tooltip title={isPreviewing ? 'Hide preview' : 'Preview'}>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleTogglePreview(panel)}
-                          color={isPreviewing ? 'primary' : 'default'}
-                        >
-                          {isPreviewing ? (
-                            <VisibilityOffIcon fontSize="small" />
-                          ) : (
-                            <VisibilityIcon fontSize="small" />
-                          )}
-                        </IconButton>
-                      </Tooltip>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={panel.is_shared}
-                            onChange={() => handleShareToggle(panel)}
-                            size="small"
-                          />
-                        }
-                        label={
-                          <ShareIcon
-                            fontSize="small"
-                            color={panel.is_shared ? 'primary' : 'action'}
-                          />
-                        }
-                        sx={{ mr: 0 }}
-                      />
-                      {panel.is_shared && panel.share_code && (
-                        <Tooltip title="Copy share link">
-                          <IconButton size="small" onClick={() => copyShareLink(panel)}>
-                            <ContentCopyIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                      <Tooltip title="Edit">
-                        <IconButton
-                          size="small"
-                          onClick={() => startEdit(panel)}
-                          disabled={showBuilder}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton
-                          size="small"
-                          onClick={() => setDeleteTarget(panel)}
-                          color="error"
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Stack>
-                  </Stack>
-
-                  <Collapse in={isPreviewing}>
-                    <Divider sx={{ mt: 1.5, mb: 2 }} />
-                    {panel.panel_type === 'comparison' ? (
-                      isLoadingPreview ? (
-                        <Stack alignItems="center" sx={{ py: 2 }}>
-                          <CircularProgress size={24} />
-                        </Stack>
-                      ) : previewResult === 'error' ? (
-                        <Alert severity="error" sx={{ mb: 1 }}>
-                          Failed to load preview.
-                        </Alert>
-                      ) : previewResult ? (
-                        <ComparisonPanel result={previewResult} />
-                      ) : null
-                    ) : (
-                      <List dense disablePadding>
-                        {panel.sections.map((s) => {
-                          const def = getSectionDef(s as StatsSectionId);
-                          if (!def) return null;
-                          const Icon = def.icon;
-                          return (
-                            <ListItem key={s} disableGutters sx={{ py: 0.25 }}>
-                              <ListItemIcon sx={{ minWidth: 32 }}>
-                                <Icon color="primary" fontSize="small" />
-                              </ListItemIcon>
-                              <ListItemText
-                                primary={def.label}
-                                secondary={def.description}
-                                primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }}
-                                secondaryTypographyProps={{ variant: 'caption' }}
-                              />
-                            </ListItem>
-                          );
-                        })}
-                      </List>
-                    )}
-                    <Stack direction="row" justifyContent="flex-end" sx={{ mt: 1.5 }}>
-                      <Button
-                        component={Link}
-                        href={`/stats?panel_id=${panel.id}`}
-                        size="small"
-                        variant="outlined"
-                      >
-                        Open in Stats →
-                      </Button>
-                    </Stack>
-                  </Collapse>
-                </CardContent>
-              </Card>
-            );
-          })}
+          {panels.map((panel) => (
+            <PanelCard
+              key={panel.id}
+              panel={panel}
+              isPreviewing={previewId === panel.id}
+              isLoadingPreview={previewLoading.has(panel.id)}
+              previewResult={previewData[panel.id]}
+              showBuilder={showBuilder}
+              onTogglePreview={() => handleTogglePreview(panel)}
+              onEdit={() => startEdit(panel)}
+              onDelete={() => setDeleteTarget(panel)}
+              onShareToggle={() => handleShareToggle(panel)}
+              onCopyShareLink={() => copyShareLink(panel)}
+            />
+          ))}
         </CardContent>
       </Card>
 
@@ -1343,22 +297,11 @@ export default function CustomizePage() {
         </Card>
       )}
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
-        <DialogTitle>Delete Panel</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete &quot;{deleteTarget?.name}&quot;?
-            {deleteTarget?.is_shared && ' This panel is currently shared with other users.'}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
-          <Button onClick={handleDelete} color="error" variant="contained">
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <DeletePanelDialog
+        target={deleteTarget}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
 
       <Snackbar
         open={!!snackbar}
