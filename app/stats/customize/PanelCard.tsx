@@ -23,6 +23,7 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ShareIcon from '@mui/icons-material/Share';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
@@ -41,6 +42,7 @@ interface PanelCardProps {
   isLoadingPreview: boolean;
   previewResult: ComparisonResult | 'error' | undefined;
   showBuilder: boolean;
+  isEditing: boolean;
   onTogglePreview: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -54,6 +56,7 @@ export function PanelCard({
   isLoadingPreview,
   previewResult,
   showBuilder,
+  isEditing,
   onTogglePreview,
   onEdit,
   onDelete,
@@ -128,9 +131,9 @@ export function PanelCard({
                 </IconButton>
               </Tooltip>
             )}
-            <Tooltip title="Edit">
-              <IconButton size="small" onClick={onEdit} disabled={showBuilder}>
-                <EditIcon fontSize="small" />
+            <Tooltip title={isEditing ? 'Cancel edit' : 'Edit'}>
+              <IconButton size="small" onClick={onEdit} disabled={showBuilder && !isEditing} color={isEditing ? 'warning' : 'default'}>
+                {isEditing ? <CloseIcon fontSize="small" /> : <EditIcon fontSize="small" />}
               </IconButton>
             </Tooltip>
             <Tooltip title="Delete">

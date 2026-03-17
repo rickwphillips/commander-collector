@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -63,6 +63,17 @@ export default function CustomizePage() {
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<StatPanel | null>(null);
 
+  // Builder scroll ref — delay past MUI Collapse animation (300ms) when a preview was open
+  const builderRef = useRef<HTMLDivElement | null>(null);
+  const scrollDelayRef = useRef(50);
+  useEffect(() => {
+    if (showBuilder) {
+      const delay = scrollDelayRef.current;
+      scrollDelayRef.current = 50;
+      setTimeout(() => builderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), delay);
+    }
+  }, [showBuilder]);
+
   useEffect(() => {
     fetchPanels();
     Promise.all([api.getPlayers(), api.getDecks()])
@@ -90,13 +101,16 @@ export default function CustomizePage() {
   };
 
   const startNew = () => {
+    if (previewId !== null) scrollDelayRef.current = 350;
     setEditingId(null);
     setPanelName('');
     resetComparisonState();
+    setPreviewId(null);
     setShowBuilder(true);
   };
 
   const startEdit = (panel: StatPanel) => {
+    if (previewId !== null) scrollDelayRef.current = 350;
     setEditingId(panel.id);
     setPanelName(panel.name);
     if (panel.panel_type === 'comparison' && panel.config) {
@@ -108,6 +122,7 @@ export default function CustomizePage() {
     } else {
       resetComparisonState();
     }
+    setPreviewId(null);
     setShowBuilder(true);
   };
 
@@ -132,15 +147,21 @@ export default function CustomizePage() {
 
     setSaving(true);
     try {
-      if (editingId) {
-        await api.updateStatPanel(editingId, { name: panelName.trim(), config });
-        setSnackbar('Panel updated');
-      } else {
-        await api.createStatPanel({ name: panelName.trim(), panel_type: 'comparison', config });
-        setSnackbar('Panel created');
-      }
+      const saved = editingId
+        ? await api.updateStatPanel(editingId, { name: panelName.trim(), config })
+        : await api.createStatPanel({ name: panelName.trim(), panel_type: 'comparison', config });
+      setSnackbar(editingId ? 'Panel updated' : 'Panel created');
       cancelBuilder();
       fetchPanels();
+
+      // Open (or refresh) the saved panel's preview
+      setPreviewId(saved.id);
+      setPreviewData((prev) => { const next = { ...prev }; delete next[saved.id]; return next; });
+      setPreviewLoading((prev) => new Set(prev).add(saved.id));
+      api.getComparison(config)
+        .then((result) => setPreviewData((prev) => ({ ...prev, [saved.id]: result })))
+        .catch(() => setPreviewData((prev) => ({ ...prev, [saved.id]: 'error' })))
+        .finally(() => setPreviewLoading((prev) => { const s = new Set(prev); s.delete(saved.id); return s; }));
     } catch (err) {
       setSnackbar(err instanceof Error ? err.message : 'Failed to save panel');
     } finally {
@@ -237,8 +258,9 @@ export default function CustomizePage() {
               isLoadingPreview={previewLoading.has(panel.id)}
               previewResult={previewData[panel.id]}
               showBuilder={showBuilder}
+              isEditing={editingId === panel.id}
               onTogglePreview={() => handleTogglePreview(panel)}
-              onEdit={() => startEdit(panel)}
+              onEdit={() => editingId === panel.id ? cancelBuilder() : startEdit(panel)}
               onDelete={() => setDeleteTarget(panel)}
               onShareToggle={() => handleShareToggle(panel)}
               onCopyShareLink={() => copyShareLink(panel)}
@@ -249,7 +271,7 @@ export default function CustomizePage() {
 
       {/* Panel Builder */}
       {showBuilder && (
-        <Card sx={{ mb: 4 }}>
+        <Card ref={builderRef} sx={{ mb: 4 }}>
           <CardContent>
             <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
               {editingId ? 'Edit Panel' : 'New Panel'}
