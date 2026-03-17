@@ -38,6 +38,61 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.9.0',
+    date: '2026-03-17',
+    title: 'Custom Comparison Builder Overhaul',
+    changes: [
+      {
+        type: 'improved',
+        text: 'Color filter in comparison builder now uses has_W/U/B/R/G columns instead of exact string match — AND/OR/Only modes work correctly for all group-bys',
+      },
+      {
+        type: 'added',
+        text: 'Opponent filters in comparison conditions — filter games by opponent players, opponent commanders, and opponent deck colors (with AND/OR/Only mode)',
+      },
+      {
+        type: 'added',
+        text: 'Opponent group-bys — group results by Opponent Player or Opponent Commander to see your performance against specific opponents',
+      },
+      {
+        type: 'added',
+        text: 'New metrics: Consistency Score (std dev of finish position) and First Eliminated Rate',
+      },
+      {
+        type: 'added',
+        text: 'My Games Only condition — restrict results to games you personally played in (requires claimed player)',
+      },
+      {
+        type: 'added',
+        text: 'Exclude Players condition — remove specific players from pod when counting stats',
+      },
+      {
+        type: 'added',
+        text: 'Top N results limit — show only the top N entities in comparison results',
+      },
+      {
+        type: 'added',
+        text: 'Color filter (with AND/OR/Only mode) in Section C Narrow To — filter by deck color for player, deck, deck_age, and game-property group-bys',
+      },
+      {
+        type: 'changed',
+        text: 'Panel builder is now comparison-only — Pre-built Sections tab removed; all new panels use the custom comparison builder',
+      },
+      {
+        type: 'improved',
+        text: 'Commander autocomplete in conditions now pulls from your loaded decks data instead of requiring free-text entry',
+      },
+      {
+        type: 'fixed',
+        text: 'Color filter on decks page now uses has_X columns with AND/OR/Only mode instead of exact string match',
+      },
+      {
+        type: 'fixed',
+        text: 'stat_panels.user_id column widened to VARCHAR(36) to match UUID-based auth system',
+      },
+    ],
+  },
+  {
     version: '1.8.1',
     date: '2026-02-23',
     title: 'Versioned DB Migrations',
