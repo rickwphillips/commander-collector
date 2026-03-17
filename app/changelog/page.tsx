@@ -102,6 +102,10 @@ const releases: Release[] = [
         text: 'Color filter (with AND/OR/Only mode) in Section C Narrow To — filter by deck color for player, deck, deck_age, and game-property group-bys',
       },
       {
+        type: 'added',
+        text: 'Query Sentence — live natural-language description of the current comparison query, updating in real time as conditions are configured in the panel builder',
+      },
+      {
         type: 'changed',
         text: 'Panel builder is now comparison-only — Pre-built Sections tab removed; all new panels use the custom comparison builder',
       },
