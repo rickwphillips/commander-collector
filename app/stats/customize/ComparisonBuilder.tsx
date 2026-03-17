@@ -13,8 +13,6 @@ import {
   Checkbox,
   FormControlLabel,
   FormGroup,
-  ToggleButtonGroup,
-  ToggleButton,
 } from '@mui/material';
 import type {
   Player,
@@ -23,7 +21,6 @@ import type {
   ComparisonMetric,
   ComparisonConditions,
   ComparisonEntityFilter,
-  ColorFilterMode,
 } from '../../lib/types';
 import { QuerySentence } from './QuerySentence';
 import { ConditionColorPicker } from './ConditionColorPicker';

@@ -252,7 +252,10 @@ export function ComparisonPanel({ result }: ComparisonPanelProps) {
                   <TableRow key={String(e.id)}>
                     <TableCell>
                       <Stack direction="row" alignItems="center" spacing={1}>
-                        {e.colors && <ColorIdentityChips colors={e.colors} size="small" />}
+                        {/* Fixed-width column so names align regardless of pip count or absence */}
+                        <Box sx={{ width: 46, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                          {e.colors && <ColorIdentityChips colors={e.colors} size="small" />}
+                        </Box>
                         <Box>
                           {groupBy !== 'color' && (
                             <Typography variant="body2" sx={{ fontWeight: 500 }}>

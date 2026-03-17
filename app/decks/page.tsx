@@ -18,7 +18,6 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  Tooltip,
   ToggleButtonGroup,
   ToggleButton,
 } from '@mui/material';
@@ -30,6 +29,7 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import InputAdornment from '@mui/material/InputAdornment';
 import { PageContainer } from '../components/PageContainer';
 import { ColorIdentityChips } from '../components/ColorIdentityChips';
+import { ManaSymbol } from '../components/ManaSymbol';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
 import { api } from '../lib/api';
@@ -41,13 +41,6 @@ interface DeckWithStats extends DeckWithPlayer {
   win_rate: number | null;
 }
 
-const MTG_COLORS: { code: MtgColor; name: string; color: string; bg: string }[] = [
-  { code: 'W', name: 'White', color: '#F8F6D8', bg: '#F8E7B9' },
-  { code: 'U', name: 'Blue', color: '#0E68AB', bg: '#C9DEF9' },
-  { code: 'B', name: 'Black', color: '#332B2E', bg: '#BFACAB' },
-  { code: 'R', name: 'Red', color: '#D3202A', bg: '#F9C8C6' },
-  { code: 'G', name: 'Green', color: '#00733E', bg: '#A3C095' },
-];
 
 type SortOption =
   | 'name-asc'
@@ -259,35 +252,15 @@ export default function DecksPage() {
                 <Grid size={{ xs: 12, sm: 2 }}>
                   <Stack spacing={0.75} alignItems="center">
                     <Stack direction="row" spacing={0.5} justifyContent="center">
-                      {MTG_COLORS.map(({ code, name, color, bg }) => (
-                        <Tooltip key={code} title={name}>
-                          <Box
-                            onClick={() => toggleColor(code)}
-                            sx={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: '50%',
-                              background: `linear-gradient(135deg, ${bg} 0%, ${color} 100%)`,
-                              border: `2px solid ${color}`,
-                              opacity: colorFilter.has(code) ? 1 : 0.3,
-                              cursor: 'pointer',
-                              transition: 'opacity 0.2s, transform 0.2s',
-                              transform: colorFilter.has(code) ? 'scale(1.15)' : 'scale(1)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: 14,
-                              fontWeight: 700,
-                              color: code === 'W' ? '#333' : '#FFF',
-                              '&:hover': {
-                                opacity: colorFilter.has(code) ? 1 : 0.6,
-                                transform: 'scale(1.15)',
-                              },
-                            }}
-                          >
-                            {code}
-                          </Box>
-                        </Tooltip>
+                      {(['W', 'U', 'B', 'R', 'G'] as const).map((code) => (
+                        <ManaSymbol
+                          key={code}
+                          color={code}
+                          size={28}
+                          active={colorFilter.has(code)}
+                          dimmed
+                          onClick={() => toggleColor(code)}
+                        />
                       ))}
                     </Stack>
                     {colorFilter.size > 0 && (
@@ -362,7 +335,7 @@ export default function DecksPage() {
                             Piloted by {deck.player_name}
                           </Typography>
                         </Box>
-                        <ColorIdentityChips colors={deck.colors} size="medium" />
+                        <ColorIdentityChips colors={deck.colors} size="medium" fixed />
                       </Stack>
 
                       <Stack direction="row" spacing={1} sx={{ mt: 2 }}>

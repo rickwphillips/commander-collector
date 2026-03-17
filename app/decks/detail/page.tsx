@@ -19,9 +19,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  FormGroup,
-  FormControlLabel,
-  Checkbox,
 } from '@mui/material';
 import Link from 'next/link';
 import EditIcon from '@mui/icons-material/Edit';
@@ -30,18 +27,12 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import { PageContainer } from '../../components/PageContainer';
 import { StatsCard } from '../../components/StatsCard';
 import { ColorIdentityChips } from '../../components/ColorIdentityChips';
+import { ManaSymbol } from '../../components/ManaSymbol';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
 import { api } from '../../lib/api';
 import type { DeckDetail as DeckDetailType, GameWithResults } from '../../lib/types';
 
-const COLOR_OPTIONS = [
-  { value: 'W', label: 'White', color: '#F9FAF4' },
-  { value: 'U', label: 'Blue', color: '#0E68AB' },
-  { value: 'B', label: 'Black', color: '#150B00' },
-  { value: 'R', label: 'Red', color: '#D3202A' },
-  { value: 'G', label: 'Green', color: '#00733E' },
-];
 
 export default function DeckDetailPage() {
   const searchParams = useSearchParams();
@@ -333,24 +324,18 @@ export default function DeckDetailPage() {
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
                 Color Identity
               </Typography>
-              <FormGroup row>
-                {COLOR_OPTIONS.map((color) => (
-                  <FormControlLabel
-                    key={color.value}
-                    control={
-                      <Checkbox
-                        checked={editColors.includes(color.value)}
-                        onChange={() => handleColorToggle(color.value)}
-                        sx={{
-                          color: color.color,
-                          '&.Mui-checked': { color: color.color },
-                        }}
-                      />
-                    }
-                    label={color.label}
+              <Stack direction="row" spacing={1}>
+                {(['W', 'U', 'B', 'R', 'G'] as const).map((c) => (
+                  <ManaSymbol
+                    key={c}
+                    color={c}
+                    size={32}
+                    active={editColors.includes(c)}
+                    dimmed
+                    onClick={() => handleColorToggle(c)}
                   />
                 ))}
-              </FormGroup>
+              </Stack>
             </Box>
           </Stack>
         </DialogContent>

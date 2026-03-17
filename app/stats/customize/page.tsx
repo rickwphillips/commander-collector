@@ -6,7 +6,6 @@ import {
   CardContent,
   Typography,
   Stack,
-  Box,
   Button,
   TextField,
   Alert,
@@ -271,7 +270,7 @@ export default function CustomizePage() {
 
       {/* Panel Builder */}
       {showBuilder && (
-        <Card ref={builderRef} sx={{ mb: 4 }}>
+        <Card ref={builderRef} sx={{ mb: 4, overflow: 'visible' }}>
           <CardContent>
             <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
               {editingId ? 'Edit Panel' : 'New Panel'}

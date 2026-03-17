@@ -6,6 +6,10 @@ const nextConfig: NextConfig = {
   // Only use static export for production builds
   ...(isDev ? {} : { output: 'export' }),
   basePath: isDev ? '' : '/app/projects/commander',
+  images: {
+    unoptimized: true,
+    dangerouslyAllowSVG: true,
+  },
   trailingSlash: true,
 
   // Proxy PHP API requests in development

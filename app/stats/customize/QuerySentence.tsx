@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import type {
   ComparisonGroupBy,
@@ -50,6 +51,20 @@ const METRIC_LABEL: Record<ComparisonMetric, string> = {
   first_elimination_rate: '1st Elim. Rate',
 };
 
+const COLOR_NAME: Record<string, string> = {
+  W: 'white', U: 'blue', B: 'black', R: 'red', G: 'green', C: 'colorless',
+};
+
+/** Full color names for use in the subject: "white and blue", "only red", etc. */
+function subjectColors(colors: string[], mode: string | undefined): string {
+  const names = colors.map((c) => COLOR_NAME[c] ?? c);
+  const m = mode ?? 'and';
+  if (m === 'only') return `only ${joinNames(names)}`;
+  if (m === 'or') return names.join(' or ');
+  return joinNames(names);
+}
+
+/** Letter abbreviations for opponent/filter clauses: "W+U decks", etc. */
 function colorClause(colors: string[], mode: string | undefined): string {
   const m = mode ?? 'and';
   if (m === 'only') return `only ${colors.join('')} decks`;
@@ -76,6 +91,11 @@ export function buildQuerySentence({
 }): string {
   const subject = SUBJECT[groupBy];
   const prefix = topN ? `top ${topN}` : 'all';
+
+  // Colors describe the subject itself (commanders/decks share the same color identity)
+  const colorPrefix = conditions.must_include_colors?.length
+    ? `${subjectColors(conditions.must_include_colors, conditions.color_mode)} `
+    : '';
 
   // ── Narrow-to clauses (from entityFilter) ──────────────────────
   const narrowClauses: string[] = [];
@@ -120,11 +140,7 @@ export function buildQuerySentence({
   if (conditions.min_finish_position != null && conditions.min_finish_position > 1) {
     condClauses.push(`counting top-${conditions.min_finish_position} as wins`);
   }
-  if (conditions.must_include_colors?.length) {
-    condClauses.push(
-      `where decks include ${colorClause(conditions.must_include_colors, conditions.color_mode)}`
-    );
-  }
+
   if (conditions.required_player_ids?.length) {
     const names = conditions.required_player_ids.map(
       (id) => players.find((p) => p.id === id)?.name ?? `#${id}`
@@ -169,7 +185,7 @@ export function buildQuerySentence({
   }
 
   // ── Assemble ───────────────────────────────────────────────────
-  let sentence = `Show me ${prefix} ${subject}`;
+  let sentence = `Show me ${prefix} ${colorPrefix}${subject}`;
   if (narrowClauses.length) sentence += ` ${narrowClauses.join(', ')}`;
   if (condClauses.length) sentence += `, ${condClauses.join(', ')}`;
   if (metrics.length) {
@@ -194,28 +210,51 @@ interface QuerySentenceProps {
 
 export function QuerySentence(props: QuerySentenceProps) {
   const sentence = buildQuerySentence(props);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [stuck, setStuck] = useState(false);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setStuck(!entry.isIntersecting),
+      { threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <Box
-      sx={{
-        borderLeft: 3,
-        borderColor: 'primary.main',
-        pl: 1.5,
-        py: 0.75,
-        mb: 3,
-        bgcolor: (theme) =>
-          theme.palette.mode === 'dark'
-            ? 'rgba(255,255,255,0.04)'
-            : 'rgba(0,0,0,0.03)',
-        borderRadius: '0 4px 4px 0',
-      }}
-    >
-      <Typography
-        variant="body2"
-        sx={{ fontStyle: 'italic', color: 'text.secondary', lineHeight: 1.6 }}
+    <>
+      <div ref={sentinelRef} style={{ height: 1, marginBottom: -1 }} />
+      <Box
+        sx={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+          borderLeft: 3,
+          borderColor: 'primary.main',
+          pl: 1.5,
+          py: 0.75,
+          mb: 3,
+          bgcolor: (theme) =>
+            stuck
+              ? theme.palette.background.paper
+              : theme.palette.mode === 'dark'
+                ? 'rgba(255,255,255,0.04)'
+                : 'rgba(0,0,0,0.03)',
+          borderRadius: '0 4px 4px 0',
+          boxShadow: stuck ? 2 : 0,
+          transition: 'box-shadow 0.2s ease, background-color 0.2s ease',
+        }}
       >
-        {sentence}
-      </Typography>
-    </Box>
+        <Typography
+          variant="body2"
+          sx={{ fontStyle: 'italic', color: 'text.secondary', lineHeight: 1.6 }}
+        >
+          {sentence}
+        </Typography>
+      </Box>
+    </>
   );
 }

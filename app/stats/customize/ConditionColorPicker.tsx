@@ -1,6 +1,7 @@
 'use client';
 
-import { Stack, Chip, ToggleButtonGroup, ToggleButton } from '@mui/material';
+import { Stack, ToggleButtonGroup, ToggleButton } from '@mui/material';
+import { ManaSymbol } from '../../components/ManaSymbol';
 import type { ColorFilterMode } from '../../lib/types';
 
 interface ConditionColorPickerProps {
@@ -16,27 +17,39 @@ export function ConditionColorPicker({
   onColorsChange,
   onColorModeChange,
 }: ConditionColorPickerProps) {
+  const isColorless = colors?.includes('C') ?? false;
+
+  const handleColor = (color: string) => {
+    const active = colors?.includes(color) ?? false;
+    if (color === 'C') {
+      if (active) {
+        onColorsChange(undefined);
+        onColorModeChange(undefined);
+      } else {
+        onColorsChange(['C']);
+        onColorModeChange(undefined);
+      }
+    } else {
+      const current = (colors ?? []).filter((c) => c !== 'C');
+      const next = active ? current.filter((c) => c !== color) : [...current, color];
+      onColorsChange(next.length ? next : undefined);
+      if (!next.length) onColorModeChange(undefined);
+    }
+  };
+
   return (
-    <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
-      {(['W', 'U', 'B', 'R', 'G'] as const).map((color) => {
-        const active = colors?.includes(color) ?? false;
-        return (
-          <Chip
-            key={color}
-            label={color}
-            size="small"
-            onClick={() => {
-              const current = colors ?? [];
-              const next = active ? current.filter((c) => c !== color) : [...current, color];
-              onColorsChange(next.length ? next : undefined);
-              if (!next.length) onColorModeChange(undefined);
-            }}
-            color={active ? 'primary' : 'default'}
-            variant={active ? 'filled' : 'outlined'}
-          />
-        );
-      })}
-      {(colors?.length ?? 0) > 0 && (
+    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+      {(['W', 'U', 'B', 'R', 'G', 'C'] as const).map((color) => (
+        <ManaSymbol
+          key={color}
+          color={color}
+          size={32}
+          active={colors?.includes(color) ?? false}
+          dimmed
+          onClick={() => handleColor(color)}
+        />
+      ))}
+      {(colors?.length ?? 0) > 0 && !isColorless && (
         <ToggleButtonGroup
           exclusive
           size="small"
