@@ -34,6 +34,8 @@ import { api } from '../../lib/api';
 import type { DeckDetail as DeckDetailType, GameWithResults } from '../../lib/types';
 
 
+const COLOR_OPTIONS = ['W', 'U', 'B', 'R', 'G'];
+
 export default function DeckDetailPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -102,9 +104,7 @@ export default function DeckDetailPage() {
 
     setSaving(true);
     try {
-      const colorsString = COLOR_OPTIONS.filter((c) => editColors.includes(c.value))
-        .map((c) => c.value)
-        .join('');
+      const colorsString = COLOR_OPTIONS.filter((c) => editColors.includes(c)).join('');
 
       await api.updateDeck(deckId, {
         name: editName.trim(),
