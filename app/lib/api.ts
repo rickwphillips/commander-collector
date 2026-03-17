@@ -1,6 +1,11 @@
 // API base URL - works for both dev (proxied via Next.js rewrites) and production
 export const API_BASE = '/php-api/';
 
+// Asset base path — Next.js basePath is NOT auto-prepended to src="" attributes
+// Must be prepended manually for any public/ assets referenced in code
+const isDev = process.env.NODE_ENV === 'development';
+export const ASSET_BASE = isDev ? '' : '/app/projects/commander';
+
 // Auth token key (shared with portfolio login page)
 const AUTH_TOKEN_KEY = 'auth_token';
 

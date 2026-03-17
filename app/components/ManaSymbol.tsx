@@ -2,6 +2,7 @@
 
 import { Box, Tooltip } from '@mui/material';
 import Image from 'next/image';
+import { ASSET_BASE } from '../lib/api';
 
 const COLOR_NAME: Record<string, string> = {
   W: 'White', U: 'Blue', B: 'Black', R: 'Red', G: 'Green', C: 'Colorless',
@@ -63,7 +64,7 @@ export function ManaSymbol({
       }}
     >
       <Image
-        src={`/mana/${color}.svg`}
+        src={`${ASSET_BASE}/mana/${color}.svg`}
         alt={label}
         width={size}
         height={size}
@@ -208,7 +209,6 @@ export function ColorSymbols({
         position: 'relative',
         height: arr.height,
         minWidth: '40px',
-        marginInline: 'auto'
       }}
     >
       {normalized.map((c, i) => (
