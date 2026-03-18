@@ -32,6 +32,7 @@ import type {
   GameType,
   GameWithResults,
 } from '@/lib/types';
+import type { GameManagerPrefill } from '@/game-manager/types';
 
 interface DeckOption extends DeckWithPlayer {
   total_games?: number;
@@ -89,6 +90,28 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
       const [deckData, playerData] = await Promise.all([api.getDecks(), api.getPlayers()]);
       setDecks(deckData as DeckOption[]);
       setPlayers(playerData);
+
+      // Check for game manager pre-fill
+      const prefillRaw = typeof window !== 'undefined' ? localStorage.getItem('commander_game_prefill') : null;
+      if (prefillRaw && mode === 'create') {
+        try {
+          const prefill = JSON.parse(prefillRaw) as GameManagerPrefill;
+          localStorage.removeItem('commander_game_prefill');
+          // Apply prefill: set playedAt, and build results array from prefill data
+          setPlayedAt(prefill.playedAt);
+          const prefillResults: PlayerResult[] = prefill.results.map(r => ({
+            player_id: r.playerId,
+            deck_id: r.deckId,
+            finish_position: r.finishPosition,
+            eliminated_turn: r.eliminatedTurn,
+            team_number: null,
+          }));
+          setResults(prefillResults);
+          return; // Skip edit mode population
+        } catch {
+          // ignore malformed prefill
+        }
+      }
 
       // If editing, load existing game data
       if (mode === 'edit' && gameId) {
