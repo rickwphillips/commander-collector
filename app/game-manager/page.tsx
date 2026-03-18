@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { GameSetup } from './components/GameSetup';
 import { GameBoard } from './components/GameBoard';
@@ -8,6 +8,28 @@ import { GameEndSummary } from './components/GameEndSummary';
 import type { GameManagerState, PlayerSetup, PlayerState, CommanderDamageMap } from './types';
 
 const POSITIONS: Array<PlayerState['position']> = ['bottom', 'top', 'left', 'right'];
+const GAME_STATE_KEY = 'commander_game_state';
+
+const DEFAULT_STATE: GameManagerState = {
+  players: [],
+  commanderDamage: {},
+  currentPlayerIdx: 0,
+  turnNumber: 1,
+  startingLife: 40,
+  phase: 'setup',
+};
+
+function loadSavedState(): GameManagerState | null {
+  try {
+    const raw = localStorage.getItem(GAME_STATE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as GameManagerState;
+    if (parsed.phase === 'playing' || parsed.phase === 'ended') return parsed;
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 function buildInitialState(playerSetups: PlayerSetup[], startingLife: number): GameManagerState {
   const players: PlayerState[] = playerSetups.map((setup, i) => ({
@@ -45,14 +67,16 @@ function buildInitialState(playerSetups: PlayerSetup[], startingLife: number): G
 
 export default function GameManagerPage() {
   const router = useRouter();
-  const [state, setState] = useState<GameManagerState>({
-    players: [],
-    commanderDamage: {},
-    currentPlayerIdx: 0,
-    turnNumber: 1,
-    startingLife: 40,
-    phase: 'setup',
+  const [state, setState] = useState<GameManagerState>(() => {
+    if (typeof window === 'undefined') return DEFAULT_STATE;
+    return loadSavedState() ?? DEFAULT_STATE;
   });
+
+  useEffect(() => {
+    if (state.phase !== 'setup') {
+      localStorage.setItem(GAME_STATE_KEY, JSON.stringify(state));
+    }
+  }, [state]);
 
   const handleStart = (playerSetups: PlayerSetup[], startingLife: number) => {
     setState(buildInitialState(playerSetups, startingLife));
@@ -67,18 +91,13 @@ export default function GameManagerPage() {
   };
 
   const handleLogGame = () => {
+    localStorage.removeItem(GAME_STATE_KEY);
     router.push('/games/new');
   };
 
   const handleNewGame = () => {
-    setState({
-      players: [],
-      commanderDamage: {},
-      currentPlayerIdx: 0,
-      turnNumber: 1,
-      startingLife: 40,
-      phase: 'setup',
-    });
+    localStorage.removeItem(GAME_STATE_KEY);
+    setState(DEFAULT_STATE);
   };
 
   if (state.phase === 'setup') {
