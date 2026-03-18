@@ -41,16 +41,16 @@ interface DeckOption extends DeckWithPlayer {
 interface PlayerResult {
   player_id: number | '';
   deck_id: number | '';
-  finish_position: number;
+  finish_position: number | '';
   eliminated_turn: number | '';
   team_number: number | null;
 }
 
 const defaultResults: PlayerResult[] = [
-  { player_id: '', deck_id: '', finish_position: 1, eliminated_turn: '', team_number: null },
-  { player_id: '', deck_id: '', finish_position: 2, eliminated_turn: '', team_number: null },
-  { player_id: '', deck_id: '', finish_position: 3, eliminated_turn: '', team_number: null },
-  { player_id: '', deck_id: '', finish_position: 4, eliminated_turn: '', team_number: null },
+  { player_id: '', deck_id: '', finish_position: '', eliminated_turn: '', team_number: null },
+  { player_id: '', deck_id: '', finish_position: '', eliminated_turn: '', team_number: null },
+  { player_id: '', deck_id: '', finish_position: '', eliminated_turn: '', team_number: null },
+  { player_id: '', deck_id: '', finish_position: '', eliminated_turn: '', team_number: null },
 ];
 
 const default2hgResults: PlayerResult[] = [
@@ -147,7 +147,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
         {
           player_id: '',
           deck_id: '',
-          finish_position: results.length + 1,
+          finish_position: '',
           eliminated_turn: '',
           team_number: null,
         },
@@ -157,8 +157,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
 
   const removePlayer = (index: number) => {
     if (results.length > 2) {
-      const newResults = results.filter((_, i) => i !== index);
-      setResults(newResults.map((r, i) => ({ ...r, finish_position: i + 1 })));
+      setResults(results.filter((_, i) => i !== index));
     }
   };
 
@@ -253,6 +252,13 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
       return;
     }
 
+    if (gameType === 'standard') {
+      if (validResults.some((r) => r.finish_position === '')) {
+        setError('Please assign a finish position to each player');
+        return;
+      }
+    }
+
     if (gameType === '2hg') {
       const teamNums = [
         ...new Set(validResults.map((r) => r.team_number).filter(Boolean)),
@@ -287,10 +293,10 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
           });
       }
 
-      const gameResults: GameResultInput[] = validResults.map((r, index) => ({
+      const gameResults: GameResultInput[] = validResults.map((r) => ({
         deck_id: r.deck_id as number,
         player_id: r.player_id as number,
-        finish_position: gameType === '2hg' ? (teamPositions[r.team_number ?? 0] ?? 2) : index + 1,
+        finish_position: gameType === '2hg' ? (teamPositions[r.team_number ?? 0] ?? 2) : (r.finish_position as number),
         eliminated_turn:
           gameType === '2hg'
             ? r.team_number !== winningTeam
@@ -429,18 +435,13 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
 
   const renderStandardResults = () => (
     <>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          Players & Results
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Order from winner (1st) to last eliminated
-        </Typography>
-      </Stack>
+      <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+        Players & Results
+      </Typography>
 
       <Stack spacing={2}>
         {results.map((result, index) => {
-          const isWinner = index === 0;
+          const isWinner = result.finish_position === 1;
           return (
             <Grow key={index} in timeout={600 + index * 100}>
               <Card
@@ -462,7 +463,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
                             color: isWinner ? 'primary.main' : 'text.primary',
                           }}
                         >
-                          {isWinner ? 'Winner' : `${index + 1}${getOrdinalSuffix(index + 1)} Place`}
+                          Player {index + 1}
                         </Typography>
                       </Stack>
                       {results.length > 2 && (
@@ -474,7 +475,27 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
 
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                       <Box sx={{ flex: 1 }}>{renderPlayerAndDeckSelector(result, index)}</Box>
-                      {!isWinner && (
+                      <TextField
+                        select
+                        label="Finish"
+                        value={result.finish_position}
+                        onChange={(e) =>
+                          updateResult(
+                            index,
+                            'finish_position',
+                            e.target.value === '' ? '' : Number(e.target.value)
+                          )
+                        }
+                        sx={{ minWidth: 120 }}
+                      >
+                        <MenuItem value="">–</MenuItem>
+                        {Array.from({ length: results.length }, (_, i) => i + 1).map((pos) => (
+                          <MenuItem key={pos} value={pos}>
+                            {pos === 1 ? '1st (Winner)' : `${pos}${getOrdinalSuffix(pos)}`}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                      {result.finish_position !== '' && result.finish_position !== 1 && (
                         <TextField
                           label="Eliminated Turn"
                           type="number"
