@@ -38,6 +38,29 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.9.2',
+    date: '2026-03-18',
+    title: 'Color Picker & UI Polish',
+    changes: [
+      {
+        type: 'improved',
+        text: 'New deck form now uses mana symbol pips for color identity selection instead of letter toggle buttons',
+      },
+      {
+        type: 'fixed',
+        text: 'Mana symbols no longer clipped by card borders on the decks list',
+      },
+      {
+        type: 'improved',
+        text: 'Single-color pip now has consistent right margin matching multi-color arrangements',
+      },
+      {
+        type: 'improved',
+        text: 'Colorless (C) support added to deck edit dialog and decks page color filter',
+      },
+    ],
+  },
+  {
     version: '1.9.1',
     date: '2026-03-17',
     title: 'Mana Symbol Visuals',
