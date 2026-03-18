@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -17,10 +17,12 @@ import {
   DialogActions,
   Alert,
   Grow,
+  InputAdornment,
 } from '@mui/material';
 import Link from 'next/link';
 import AddIcon from '@mui/icons-material/Add';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import SearchIcon from '@mui/icons-material/Search';
 import { PageContainer } from '@/components/PageContainer';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { EmptyState } from '@/components/EmptyState';
@@ -37,6 +39,7 @@ export default function PlayersPage() {
   const [players, setPlayers] = useState<PlayerWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -72,6 +75,12 @@ export default function PlayersPage() {
     }
   };
 
+  const filteredPlayers = useMemo(() => {
+    if (!searchQuery.trim()) return players;
+    const q = searchQuery.toLowerCase();
+    return players.filter((p) => p.name.toLowerCase().includes(q));
+  }, [players, searchQuery]);
+
   if (loading) {
     return (
       <PageContainer title="Players" subtitle="Manage your playgroup">
@@ -96,6 +105,26 @@ export default function PlayersPage() {
         </Alert>
       )}
 
+      {players.length > 0 && (
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Search players..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          sx={{ mb: 3 }}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
+      )}
+
       {players.length === 0 ? (
         <EmptyState
           title="No players yet"
@@ -103,9 +132,13 @@ export default function PlayersPage() {
           actionLabel="Add Player"
           actionHref="#"
         />
+      ) : filteredPlayers.length === 0 ? (
+        <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+          No players match &ldquo;{searchQuery}&rdquo;
+        </Typography>
       ) : (
         <Grid container spacing={3}>
-          {players.map((player, index) => (
+          {filteredPlayers.map((player, index) => (
             <Grid key={player.id} size={{ xs: 12, sm: 6, md: 4 }}>
               <Grow in timeout={600 + index * 100}>
                 <Card>

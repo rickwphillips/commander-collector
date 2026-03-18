@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -13,10 +13,13 @@ import {
   Grow,
   Alert,
   Tooltip,
+  TextField,
+  InputAdornment,
 } from '@mui/material';
 import Link from 'next/link';
 import AddIcon from '@mui/icons-material/Add';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import SearchIcon from '@mui/icons-material/Search';
 import { PageContainer } from '@/components/PageContainer';
 import { ColorIdentityChips } from '@/components/ColorIdentityChips';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -28,6 +31,7 @@ export default function GamesPage() {
   const [games, setGames] = useState<GameWithResults[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchGames();
@@ -43,6 +47,19 @@ export default function GamesPage() {
       setLoading(false);
     }
   };
+
+  const filteredGames = useMemo(() => {
+    if (!searchQuery.trim()) return games;
+    const q = searchQuery.toLowerCase();
+    return games.filter((game) =>
+      game.results?.some(
+        (r) =>
+          r.player_name.toLowerCase().includes(q) ||
+          r.deck_name?.toLowerCase().includes(q) ||
+          r.commander?.toLowerCase().includes(q)
+      )
+    );
+  }, [games, searchQuery]);
 
   if (loading) {
     return (
@@ -68,6 +85,26 @@ export default function GamesPage() {
         </Alert>
       )}
 
+      {games.length > 0 && (
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Search by player, deck, or commander..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          sx={{ mb: 3 }}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
+      )}
+
       {games.length === 0 ? (
         <EmptyState
           title="No games recorded"
@@ -75,9 +112,13 @@ export default function GamesPage() {
           actionLabel="Log Your First Game"
           actionHref="/games/new"
         />
+      ) : filteredGames.length === 0 ? (
+        <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+          No games match &ldquo;{searchQuery}&rdquo;
+        </Typography>
       ) : (
         <Stack spacing={2}>
-          {games.map((game, index) => {
+          {filteredGames.map((game, index) => {
             const winners = game.results?.filter((r) => r.finish_position === 1) || [];
             const winner = winners[0];
             const is2HG = game.game_type === '2hg';
