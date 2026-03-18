@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Checkbox, FormControlLabel, Stack, Typography } from '@mui/material';
 import type {
   ComparisonGroupBy,
   ComparisonMetric,
@@ -55,8 +55,42 @@ const COLOR_NAME: Record<string, string> = {
   W: 'white', U: 'blue', B: 'black', R: 'red', G: 'green', C: 'colorless',
 };
 
+// ---- Guild / Shard / Wedge nickname maps ----
+
+const COLOR_ORDER = 'WUBRG';
+function sortColors(colors: string[]): string {
+  return [...colors].sort((a, b) => COLOR_ORDER.indexOf(a) - COLOR_ORDER.indexOf(b)).join('');
+}
+
+const GUILD_NAMES: Record<string, string> = {
+  WU: 'Azorius', WB: 'Orzhov', WR: 'Boros', WG: 'Selesnya',
+  UB: 'Dimir', UR: 'Izzet', UG: 'Simic', BR: 'Rakdos', BG: 'Golgari', RG: 'Gruul',
+};
+
+const SHARD_NAMES: Record<string, string> = {
+  WUG: 'Bant', WUB: 'Esper', UBR: 'Grixis', BRG: 'Jund', WRG: 'Naya',
+};
+
+const WEDGE_NAMES: Record<string, string> = {
+  WBG: 'Abzan', WUR: 'Jeskai', UBG: 'Sultai', WBR: 'Mardu', URG: 'Temur',
+};
+
+interface NickFlags { useGuilds: boolean; useShards: boolean; useWedges: boolean }
+
+function colorNickname(colors: string[], flags: NickFlags): string | undefined {
+  const key = sortColors(colors);
+  if (colors.length === 2 && flags.useGuilds) return GUILD_NAMES[key];
+  if (colors.length === 3) {
+    if (flags.useShards && SHARD_NAMES[key]) return SHARD_NAMES[key];
+    if (flags.useWedges && WEDGE_NAMES[key]) return WEDGE_NAMES[key];
+  }
+  return undefined;
+}
+
 /** Full color names for use in the subject: "white and blue", "only red", etc. */
-function subjectColors(colors: string[], mode: string | undefined): string {
+function subjectColors(colors: string[], mode: string | undefined, flags: NickFlags): string {
+  const nickname = colorNickname(colors, flags);
+  if (nickname) return nickname;
   const names = colors.map((c) => COLOR_NAME[c] ?? c);
   const m = mode ?? 'and';
   if (m === 'only') return `only ${joinNames(names)}`;
@@ -80,6 +114,7 @@ export function buildQuerySentence({
   topN,
   players,
   decks,
+  nickFlags = { useGuilds: false, useShards: false, useWedges: false },
 }: {
   groupBy: ComparisonGroupBy;
   conditions: ComparisonConditions;
@@ -88,13 +123,14 @@ export function buildQuerySentence({
   topN: number | undefined;
   players: Player[];
   decks: DeckWithPlayer[];
+  nickFlags?: NickFlags;
 }): string {
   const subject = SUBJECT[groupBy];
   const prefix = topN ? `top ${topN}` : 'all';
 
   // Colors describe the subject itself (commanders/decks share the same color identity)
   const colorPrefix = conditions.must_include_colors?.length
-    ? `${subjectColors(conditions.must_include_colors, conditions.color_mode)} `
+    ? `${subjectColors(conditions.must_include_colors, conditions.color_mode, nickFlags)} `
     : '';
 
   // ── Narrow-to clauses (from entityFilter) ──────────────────────
@@ -209,7 +245,12 @@ interface QuerySentenceProps {
 }
 
 export function QuerySentence(props: QuerySentenceProps) {
-  const sentence = buildQuerySentence(props);
+  const [useGuilds, setUseGuilds] = useState(false);
+  const [useShards, setUseShards] = useState(false);
+  const [useWedges, setUseWedges] = useState(false);
+  const nickFlags: NickFlags = { useGuilds, useShards, useWedges };
+
+  const sentence = buildQuerySentence({ ...props, nickFlags });
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [stuck, setStuck] = useState(false);
 
@@ -224,6 +265,12 @@ export function QuerySentence(props: QuerySentenceProps) {
     return () => observer.disconnect();
   }, []);
 
+  const nickOptions = [
+    { label: 'Guilds', val: useGuilds, set: setUseGuilds },
+    { label: 'Shards', val: useShards, set: setUseShards },
+    { label: 'Wedges', val: useWedges, set: setUseWedges },
+  ];
+
   return (
     <>
       <div ref={sentinelRef} style={{ height: 1, marginBottom: -1 }} />
@@ -236,7 +283,7 @@ export function QuerySentence(props: QuerySentenceProps) {
           borderColor: 'primary.main',
           pl: 1.5,
           py: 0.75,
-          mb: 3,
+          mb: 1,
           bgcolor: (theme) =>
             stuck
               ? theme.palette.background.paper
@@ -255,6 +302,41 @@ export function QuerySentence(props: QuerySentenceProps) {
           {sentence}
         </Typography>
       </Box>
+      <Stack direction="row" alignItems="center" spacing={0} sx={{ mb: 2, pl: 0.5 }}>
+        <Typography variant="caption" color="text.disabled" sx={{ mr: 1 }}>
+          Color names:
+        </Typography>
+        {nickOptions.map(({ label, val, set }) => (
+          <FormControlLabel
+            key={label}
+            sx={{ mr: 1 }}
+            control={
+              <Checkbox
+                size="small"
+                checked={val}
+                onChange={(e) => set(e.target.checked)}
+                sx={{ py: 0.25 }}
+              />
+            }
+            label={<Typography variant="caption">{label}</Typography>}
+          />
+        ))}
+        <Typography
+          variant="caption"
+          onClick={() => { setUseGuilds(true); setUseShards(true); setUseWedges(true); }}
+          sx={{ cursor: 'pointer', color: 'primary.main', mr: 0.75 }}
+        >
+          All
+        </Typography>
+        <Typography variant="caption" color="text.disabled" sx={{ mr: 0.75 }}>/</Typography>
+        <Typography
+          variant="caption"
+          onClick={() => { setUseGuilds(false); setUseShards(false); setUseWedges(false); }}
+          sx={{ cursor: 'pointer', color: 'primary.main' }}
+        >
+          None
+        </Typography>
+      </Stack>
     </>
   );
 }
