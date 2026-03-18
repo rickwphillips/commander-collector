@@ -37,7 +37,6 @@ export default function GameDetailPage() {
   const router = useRouter();
   const gameId = Number(searchParams.get('id'));
 
-  const [mounted, setMounted] = useState(false);
   const [game, setGame] = useState<GameWithResults | null>(null);
   const [loading, setLoading] = useState(!!gameId);
   const [error, setError] = useState<string | null>(null);
@@ -47,14 +46,12 @@ export default function GameDetailPage() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 0);
     if (gameId) {
       api.getGame(gameId)
         .then(setGame)
         .catch(() => setError('Failed to load game'))
         .finally(() => setLoading(false));
     }
-    return () => clearTimeout(timer);
   }, [gameId]);
 
   const handleDelete = async () => {
@@ -169,7 +166,7 @@ export default function GameDetailPage() {
             const isWinner = result.finish_position === 1;
 
             return (
-              <Grow key={result.id} in={mounted} timeout={600 + index * 100}>
+              <Grow key={result.id} in timeout={600 + index * 100}>
                 <Card
                   sx={{
                     borderLeft: isWinner ? '4px solid #DAA520' : undefined,
