@@ -365,18 +365,12 @@ const releases: Release[] = [
 ];
 
 export default function ChangelogPage() {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 0);
-    return () => clearTimeout(timer);
-  }, []);
 
   return (
     <PageContainer title="Changelog" subtitle="What's new in Commander Collector">
       <Stack spacing={3}>
         {releases.map((release, index) => (
-          <Grow key={release.version} in={mounted} timeout={600 + index * 200}>
+          <Grow key={release.version} in timeout={600 + index * 200}>
             <Card>
               <CardContent>
                 <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>

@@ -34,7 +34,6 @@ interface PlayerWithStats extends Player {
 }
 
 export default function PlayersPage() {
-  const [mounted, setMounted] = useState(false);
   const [players, setPlayers] = useState<PlayerWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,9 +42,7 @@ export default function PlayersPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 0);
     fetchPlayers();
-    return () => clearTimeout(timer);
   }, []);
 
   const fetchPlayers = async () => {
@@ -110,7 +107,7 @@ export default function PlayersPage() {
         <Grid container spacing={3}>
           {players.map((player, index) => (
             <Grid key={player.id} size={{ xs: 12, sm: 6, md: 4 }}>
-              <Grow in={mounted} timeout={600 + index * 100}>
+              <Grow in timeout={600 + index * 100}>
                 <Card>
                   <CardActionArea component={Link} href={`/players/detail?id=${player.id}`}>
                     <CardContent>

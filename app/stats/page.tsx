@@ -70,7 +70,6 @@ function StatsPageInner() {
   const panelCode = searchParams.get('panel');
   const panelIdParam = searchParams.get('panel_id');
 
-  const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [headToHead, setHeadToHead] = useState<HeadToHeadResponse>({
     twoPlayer: [],
@@ -107,9 +106,7 @@ function StatsPageInner() {
   } = useHiddenStats();
 
   useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 0);
     fetchData();
-    return () => clearTimeout(timer);
   }, []);
 
   // Helper: activate a panel (handles comparison data fetch)
@@ -1298,7 +1295,7 @@ function StatsPageInner() {
           const node = sectionRenderers[id]?.();
           if (!node) return null;
           return (
-            <Grow in={mounted} timeout={800 + i * 200} key={id}>
+            <Grow in timeout={800 + i * 200} key={id}>
               <Box sx={{ position: 'relative' }}>
                 {isDefaultView && (
                   <Tooltip title="Hide this section">

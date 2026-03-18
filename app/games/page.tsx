@@ -25,15 +25,12 @@ import { api } from '@/lib/api';
 import type { GameWithResults } from '@/lib/types';
 
 export default function GamesPage() {
-  const [mounted, setMounted] = useState(false);
   const [games, setGames] = useState<GameWithResults[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 0);
     fetchGames();
-    return () => clearTimeout(timer);
   }, []);
 
   const fetchGames = async () => {
@@ -86,7 +83,7 @@ export default function GamesPage() {
             const is2HG = game.game_type === '2hg';
 
             return (
-              <Grow key={game.id} in={mounted} timeout={600 + index * 50}>
+              <Grow key={game.id} in timeout={600 + index * 50}>
                 <Tooltip
                   title={game.notes || ''}
                   placement="top"
