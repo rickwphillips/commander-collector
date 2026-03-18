@@ -41,7 +41,6 @@ export default function DeckDetailPage() {
   const router = useRouter();
   const deckId = Number(searchParams.get('id'));
 
-  const [mounted, setMounted] = useState(false);
   const [deck, setDeck] = useState<DeckDetailType | null>(null);
   const [games, setGames] = useState<GameWithResults[]>([]);
   const [loading, setLoading] = useState(!!deckId);
@@ -77,11 +76,9 @@ export default function DeckDetailPage() {
   }, [deckId]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 0);
     if (deckId) {
       fetchData();
     }
-    return () => clearTimeout(timer);
   }, [deckId, fetchData]);
 
   const handleEdit = () => {
@@ -254,7 +251,7 @@ export default function DeckDetailPage() {
             const isWin = deckResult?.finish_position === 1;
 
             return (
-              <Grow key={game.id} in={mounted} timeout={600 + index * 100}>
+              <Grow key={game.id} in timeout={600 + index * 100}>
                 <Card>
                   <CardActionArea component={Link} href={`/games/detail?id=${game.id}`}>
                     <CardContent>

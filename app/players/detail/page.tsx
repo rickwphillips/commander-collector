@@ -54,7 +54,6 @@ export default function PlayerDetailPage() {
   const { user: currentUser } = useAuth();
   const playerId = Number(searchParams.get('id'));
 
-  const [mounted, setMounted] = useState(false);
   const [player, setPlayer] = useState<Player | null>(null);
   const [stats, setStats] = useState<PlayerStats | null>(null);
   const [decks, setDecks] = useState<DeckWithStats[]>([]);
@@ -73,7 +72,6 @@ export default function PlayerDetailPage() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 0);
     if (playerId) {
       fetchData();
     }
@@ -84,7 +82,6 @@ export default function PlayerDetailPage() {
         .then(setUsers)
         .catch(() => {});
     }
-    return () => clearTimeout(timer);
   }, [playerId, currentUser?.role]);
 
   const fetchData = async () => {
@@ -246,7 +243,7 @@ export default function PlayerDetailPage() {
         <Grid container spacing={3}>
           {decks.map((deck, index) => (
             <Grid key={deck.id} size={{ xs: 12, sm: 6, md: 4 }}>
-              <Grow in={mounted} timeout={600 + index * 100}>
+              <Grow in timeout={600 + index * 100}>
                 <Card>
                   <CardActionArea component={Link} href={`/decks/detail?id=${deck.id}`}>
                     <CardContent>
