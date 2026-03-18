@@ -67,7 +67,6 @@ interface GameFormProps {
 }
 
 export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
-  const [mounted, setMounted] = useState(false);
   const [players, setPlayers] = useState<Player[]>([]);
   const [decks, setDecks] = useState<DeckOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,9 +81,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
   const [teamElimTurns, setTeamElimTurns] = useState<Record<number, number | ''>>({ 2: '' });
 
   useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 0);
     fetchData();
-    return () => clearTimeout(timer);
   }, [gameId]);
 
   const fetchData = async () => {
@@ -445,7 +442,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
         {results.map((result, index) => {
           const isWinner = index === 0;
           return (
-            <Grow key={index} in={mounted} timeout={600 + index * 100}>
+            <Grow key={index} in timeout={600 + index * 100}>
               <Card
                 variant="outlined"
                 sx={{
@@ -559,7 +556,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
               .filter((r) => r.team_number === teamNum);
 
             return (
-              <Grow key={teamNum} in={mounted} timeout={500 + idx * 150}>
+              <Grow key={teamNum} in timeout={500 + idx * 150}>
                 <Card
                   variant="outlined"
                   sx={{ borderColor: isWinning ? '#DAA520' : 'divider', borderWidth: isWinning ? 2 : 1 }}

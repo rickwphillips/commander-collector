@@ -52,7 +52,6 @@ type SortOption =
   | 'games-asc';
 
 export default function DecksPage() {
-  const [mounted, setMounted] = useState(false);
   const [decks, setDecks] = useState<DeckWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,9 +64,7 @@ export default function DecksPage() {
   const [sortOption, setSortOption] = useState<SortOption>('name-asc');
 
   useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 0);
     fetchDecks();
-    return () => clearTimeout(timer);
   }, []);
 
   const fetchDecks = async () => {
@@ -206,7 +203,7 @@ export default function DecksPage() {
 
       {/* Filter Bar */}
       {decks.length > 0 && (
-        <Grow in={mounted} timeout={400}>
+        <Grow in timeout={400}>
           <Card sx={{ mb: 3 }}>
             <CardContent>
               <Grid container spacing={2} alignItems="center">
@@ -332,7 +329,7 @@ export default function DecksPage() {
         <Grid container spacing={3}>
           {filteredDecks.map((deck, index) => (
             <Grid key={deck.id} size={{ xs: 12, sm: 6, md: 4 }}>
-              <Grow in={mounted} timeout={600 + index * 100}>
+              <Grow in timeout={600 + index * 100}>
                 <Card>
                   <CardActionArea component={Link} href={`/decks/detail?id=${deck.id}`}>
                     <CardContent>
