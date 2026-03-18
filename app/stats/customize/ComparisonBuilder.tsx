@@ -114,28 +114,6 @@ function ChipGroup<T extends string | number>({
   );
 }
 
-function EntityColorFilter({
-  entityFilter,
-  setFilter,
-}: {
-  entityFilter: ComparisonEntityFilter;
-  setFilter: <K extends keyof ComparisonEntityFilter>(key: K, val: ComparisonEntityFilter[K]) => void;
-}) {
-  return (
-    <Box>
-      <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-        Filter by deck color
-      </Typography>
-      <ConditionColorPicker
-        colors={entityFilter.colors}
-        colorMode={entityFilter.color_mode}
-        onColorsChange={(c) => setFilter('colors', c)}
-        onColorModeChange={(m) => setFilter('color_mode', m)}
-      />
-    </Box>
-  );
-}
-
 // ---- Comparison Builder ----
 
 export interface ComparisonBuilderProps {
@@ -322,6 +300,43 @@ export function ComparisonBuilder({
         />
 
         <Box sx={{ mb: 2 }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                size="small"
+                checked={conditions.my_games_only ?? false}
+                onChange={(e) => setCond('my_games_only', e.target.checked || undefined)}
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body2">My games only</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Only count games where you were at the table (requires claimed player)
+                </Typography>
+              </Box>
+            }
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                size="small"
+                checked={conditions.my_decks_only ?? false}
+                onChange={(e) => setCond('my_decks_only', e.target.checked || undefined)}
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body2">My decks only</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Only count results for decks you own, regardless of who piloted them (requires claimed player)
+                </Typography>
+              </Box>
+            }
+          />
+        </Box>
+
+        <Box sx={{ mb: 2 }}>
           <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
             Deck must include colors
           </Typography>
@@ -395,26 +410,6 @@ export function ComparisonBuilder({
           inputProps={{ min: 1, max: 50 }}
           sx={{ maxWidth: 220 }}
         />
-
-        <Box sx={{ mb: 2, mt: 2 }}>
-          <FormControlLabel
-            control={
-              <Checkbox
-                size="small"
-                checked={conditions.my_games_only ?? false}
-                onChange={(e) => setCond('my_games_only', e.target.checked || undefined)}
-              />
-            }
-            label={
-              <Box>
-                <Typography variant="body2">My games only</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Only count games where you were at the table (requires claimed player)
-                </Typography>
-              </Box>
-            }
-          />
-        </Box>
 
         <Box sx={{ mb: 2 }}>
           <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
@@ -550,7 +545,6 @@ export function ComparisonBuilder({
               )}
               isOptionEqualToValue={(o, v) => o.id === v.id}
             />
-            <EntityColorFilter entityFilter={entityFilter} setFilter={setFilter} />
           </Stack>
         )}
 
@@ -582,7 +576,6 @@ export function ComparisonBuilder({
               )}
               isOptionEqualToValue={(o, v) => o.id === v.id}
             />
-            <EntityColorFilter entityFilter={entityFilter} setFilter={setFilter} />
           </Stack>
         )}
 
@@ -631,7 +624,6 @@ export function ComparisonBuilder({
               )}
               isOptionEqualToValue={(o, v) => o.id === v.id}
             />
-            <EntityColorFilter entityFilter={entityFilter} setFilter={setFilter} />
           </Stack>
         )}
 
@@ -649,7 +641,6 @@ export function ComparisonBuilder({
               )}
               isOptionEqualToValue={(o, v) => o.id === v.id}
             />
-            <EntityColorFilter entityFilter={entityFilter} setFilter={setFilter} />
           </Stack>
         )}
 

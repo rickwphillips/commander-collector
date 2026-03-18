@@ -10,6 +10,7 @@ import type {
   Player,
   DeckWithPlayer,
 } from '@/lib/types';
+import { sortColors, GUILD_NAMES, SHARD_NAMES, WEDGE_NAMES } from '@/lib/utils';
 
 // ---- Helpers ----
 
@@ -55,25 +56,7 @@ const COLOR_NAME: Record<string, string> = {
   W: 'white', U: 'blue', B: 'black', R: 'red', G: 'green', C: 'colorless',
 };
 
-// ---- Guild / Shard / Wedge nickname maps ----
-
-const COLOR_ORDER = 'WUBRG';
-function sortColors(colors: string[]): string {
-  return [...colors].sort((a, b) => COLOR_ORDER.indexOf(a) - COLOR_ORDER.indexOf(b)).join('');
-}
-
-const GUILD_NAMES: Record<string, string> = {
-  WU: 'Azorius', WB: 'Orzhov', WR: 'Boros', WG: 'Selesnya',
-  UB: 'Dimir', UR: 'Izzet', UG: 'Simic', BR: 'Rakdos', BG: 'Golgari', RG: 'Gruul',
-};
-
-const SHARD_NAMES: Record<string, string> = {
-  WUG: 'Bant', WUB: 'Esper', UBR: 'Grixis', BRG: 'Jund', WRG: 'Naya',
-};
-
-const WEDGE_NAMES: Record<string, string> = {
-  WBG: 'Abzan', WUR: 'Jeskai', UBG: 'Sultai', WBR: 'Mardu', URG: 'Temur',
-};
+// ---- Guild / Shard / Wedge nickname flags ----
 
 interface NickFlags { useGuilds: boolean; useShards: boolean; useWedges: boolean }
 
@@ -98,9 +81,13 @@ function subjectColors(colors: string[], mode: string | undefined, flags: NickFl
   return joinNames(names);
 }
 
-/** Letter abbreviations for opponent/filter clauses: "W+U decks", etc. */
-function colorClause(colors: string[], mode: string | undefined): string {
+/** Color clause for filter/opponent contexts: uses nickname when AND mode matches a known combo. */
+function colorClause(colors: string[], mode: string | undefined, flags: NickFlags): string {
   const m = mode ?? 'and';
+  if (m === 'and') {
+    const nickname = colorNickname(colors, flags);
+    if (nickname) return `${nickname} decks`;
+  }
   if (m === 'only') return `only ${colors.join('')} decks`;
   if (m === 'or') return `${colors.join(' or ')} decks`;
   return `${colors.join('+')} decks`;
@@ -126,7 +113,9 @@ export function buildQuerySentence({
   nickFlags?: NickFlags;
 }): string {
   const subject = SUBJECT[groupBy];
-  const prefix = topN ? `top ${topN}` : 'all';
+  const prefix = conditions.my_decks_only
+    ? topN ? `my top ${topN} ` : 'my '
+    : topN ? `top ${topN} ` : 'all ';
 
   // Colors describe the subject itself (commanders/decks share the same color identity)
   const colorPrefix = conditions.must_include_colors?.length
@@ -151,17 +140,16 @@ export function buildQuerySentence({
   if (entityFilter.commanders?.length) {
     narrowClauses.push(`playing ${joinNames(entityFilter.commanders)}`);
   }
-  if (entityFilter.colors?.length) {
-    narrowClauses.push(`playing ${colorClause(entityFilter.colors, entityFilter.color_mode)}`);
-  }
 
   // ── Condition clauses ──────────────────────────────────────────
   const condClauses: string[] = [];
 
   if (conditions.my_games_only) {
-    condClauses.push('in my games');
-  }
-  if (conditions.game_type && conditions.game_type !== 'all') {
+    const typeLabel =
+      conditions.game_type === '2hg' ? '2HG' :
+      conditions.game_type === 'standard' ? 'Commander' : '';
+    condClauses.push(typeLabel ? `in my ${typeLabel} games` : 'in my games');
+  } else if (conditions.game_type && conditions.game_type !== 'all') {
     condClauses.push(`in ${conditions.game_type === '2hg' ? '2HG' : 'Commander'} games`);
   }
   if (conditions.pod_size != null) {
@@ -200,7 +188,7 @@ export function buildQuerySentence({
   }
   if (conditions.opponent_colors?.length) {
     condClauses.push(
-      `against ${colorClause(conditions.opponent_colors, conditions.opponent_color_mode)}`
+      `against ${colorClause(conditions.opponent_colors, conditions.opponent_color_mode, nickFlags)}`
     );
   }
   if (conditions.exclude_player_ids?.length) {
@@ -221,11 +209,11 @@ export function buildQuerySentence({
   }
 
   // ── Assemble ───────────────────────────────────────────────────
-  let sentence = `Show me ${prefix} ${colorPrefix}${subject}`;
+  let sentence = `Show me ${prefix}${colorPrefix}${subject}`;
   if (narrowClauses.length) sentence += ` ${narrowClauses.join(', ')}`;
   if (condClauses.length) sentence += `, ${condClauses.join(', ')}`;
   if (metrics.length) {
-    sentence += `, ranked by ${metrics.map((m) => METRIC_LABEL[m]).join(' · ')}`;
+    sentence += `, ranked by ${joinNames(metrics.map((m) => METRIC_LABEL[m]))}`;
   }
   sentence += '.';
 
@@ -245,9 +233,9 @@ interface QuerySentenceProps {
 }
 
 export function QuerySentence(props: QuerySentenceProps) {
-  const [useGuilds, setUseGuilds] = useState(false);
-  const [useShards, setUseShards] = useState(false);
-  const [useWedges, setUseWedges] = useState(false);
+  const [useGuilds, setUseGuilds] = useState(true);
+  const [useShards, setUseShards] = useState(true);
+  const [useWedges, setUseWedges] = useState(true);
   const nickFlags: NickFlags = { useGuilds, useShards, useWedges };
 
   const sentence = buildQuerySentence({ ...props, nickFlags });

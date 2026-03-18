@@ -38,6 +38,65 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.10.0',
+    date: '2026-03-18',
+    title: 'Query Sentence & Comparison Builder Overhaul',
+    changes: [
+      {
+        type: 'added',
+        text: 'Guild, shard, and wedge name toggles in Query Sentence — independently substitute Ravnica guild names (2-color), Alara shard names, and Khans wedge names; All/None shortcuts; all enabled by default',
+      },
+      {
+        type: 'added',
+        text: 'My Decks Only checkbox in comparison builder — restricts results to decks owned by the claimed player, regardless of who piloted them',
+      },
+      {
+        type: 'added',
+        text: 'Commander metadata column in comparison results — deck group-by now returns commander name; toggle visibility via Show checkboxes on the panel',
+      },
+      {
+        type: 'added',
+        text: 'Show/hide metadata checkboxes on results panel — independently toggle Colors, Player, and Commander columns',
+      },
+      {
+        type: 'added',
+        text: 'Search added to games page (by player, deck, or commander) and players page (by name)',
+      },
+      {
+        type: 'improved',
+        text: 'Color combination names (guild/shard/wedge) appear in all three color pickers when AND mode is active and colors match a known combination',
+      },
+      {
+        type: 'improved',
+        text: 'Query sentence uses guild/shard/wedge names consistently across subject, entity filter, and opponent color clauses',
+      },
+      {
+        type: 'improved',
+        text: 'My Games Only + game type combined into a single sentence clause ("in my Commander games" / "in my 2HG games")',
+      },
+      {
+        type: 'improved',
+        text: 'My Games Only and My Decks Only moved above Deck must include colors in Section A',
+      },
+      {
+        type: 'improved',
+        text: 'Ranked metrics now use natural-language list ("Win Rate, Wins, and Total Games") instead of bullet separators',
+      },
+      {
+        type: 'changed',
+        text: '"Filter by deck color" removed from Section C — consolidated into "Deck must include colors" in Section A to eliminate redundant constraint',
+      },
+      {
+        type: 'fixed',
+        text: 'Color picker normalizes selection order to WUBRG before storing — guild/shard/wedge name matches correctly regardless of click order',
+      },
+      {
+        type: 'fixed',
+        text: 'Guild/shard/wedge name suppressed in OR mode and shown only in AND mode',
+      },
+    ],
+  },
+  {
     version: '1.9.2',
     date: '2026-03-18',
     title: 'Color Picker & UI Polish',

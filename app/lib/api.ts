@@ -208,6 +208,7 @@ function buildComparisonParams(config: import('./types').ComparisonConfig): stri
   }
 
   if (c.my_games_only) parts.push('my_games_only=1');
+  if (c.my_decks_only) parts.push('my_decks_only=1');
   if (c.opponent_player_ids?.length) {
     c.opponent_player_ids.forEach((id) => parts.push(`opponent_player_ids[]=${id}`));
   }

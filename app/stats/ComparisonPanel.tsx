@@ -7,6 +7,8 @@ import {
   Stack,
   Box,
   Chip,
+  Checkbox,
+  FormControlLabel,
   Table,
   TableBody,
   TableCell,
@@ -15,6 +17,7 @@ import {
   TableRow,
   Skeleton,
 } from '@mui/material';
+import { useState } from 'react';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import { ColorIdentityChips } from '@/components/ColorIdentityChips';
@@ -112,6 +115,15 @@ interface ComparisonPanelProps {
 export function ComparisonPanel({ result }: ComparisonPanelProps) {
   const { entities, metrics, conditions, groupBy } = result;
 
+  const [showColors, setShowColors] = useState(true);
+  const [showPlayer, setShowPlayer] = useState(true);
+  const [showCommander, setShowCommander] = useState(true);
+
+  // Whether these fields are actually present in the result set
+  const hasColors = entities.some((e) => e.colors);
+  const hasPlayer = entities.some((e) => e.sublabel);
+  const hasCommander = entities.some((e) => e.commander);
+
   if (entities.length === 0) {
     return (
       <Card sx={{ mb: 4 }}>
@@ -159,6 +171,35 @@ export function ComparisonPanel({ result }: ComparisonPanelProps) {
 
         <ConditionsSummary conditions={conditions} groupBy={groupBy} />
 
+        {(hasColors || hasPlayer || hasCommander) && (
+          <Stack direction="row" alignItems="center" spacing={0} sx={{ mb: 1.5 }}>
+            <Typography variant="caption" color="text.disabled" sx={{ mr: 1 }}>
+              Show:
+            </Typography>
+            {hasColors && (
+              <FormControlLabel
+                sx={{ mr: 1 }}
+                control={<Checkbox size="small" checked={showColors} onChange={(e) => setShowColors(e.target.checked)} sx={{ py: 0.25 }} />}
+                label={<Typography variant="caption">Colors</Typography>}
+              />
+            )}
+            {hasPlayer && (
+              <FormControlLabel
+                sx={{ mr: 1 }}
+                control={<Checkbox size="small" checked={showPlayer} onChange={(e) => setShowPlayer(e.target.checked)} sx={{ py: 0.25 }} />}
+                label={<Typography variant="caption">Player</Typography>}
+              />
+            )}
+            {hasCommander && (
+              <FormControlLabel
+                sx={{ mr: 1 }}
+                control={<Checkbox size="small" checked={showCommander} onChange={(e) => setShowCommander(e.target.checked)} sx={{ py: 0.25 }} />}
+                label={<Typography variant="caption">Commander</Typography>}
+              />
+            )}
+          </Stack>
+        )}
+
         {entities.length <= 8 ? (
           // Horizontal layout: entities as columns, metrics as rows
           <TableContainer>
@@ -170,12 +211,14 @@ export function ComparisonPanel({ result }: ComparisonPanelProps) {
                     <TableCell key={String(e.id)} align="center" sx={{ fontWeight: 600 }}>
                       <Box>
                         {groupBy === 'color' && e.colors ? (
-                          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0.25 }}>
-                            <ColorIdentityChips colors={e.colors} size="small" />
-                          </Box>
+                          showColors && (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0.25 }}>
+                              <ColorIdentityChips colors={e.colors} size="small" />
+                            </Box>
+                          )
                         ) : (
                           <>
-                            {e.colors && (
+                            {showColors && e.colors && (
                               <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0.25 }}>
                                 <ColorIdentityChips colors={e.colors} size="small" />
                               </Box>
@@ -185,7 +228,12 @@ export function ComparisonPanel({ result }: ComparisonPanelProps) {
                             </Typography>
                           </>
                         )}
-                        {e.sublabel && (
+                        {showCommander && e.commander && (
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {e.commander}
+                          </Typography>
+                        )}
+                        {showPlayer && e.sublabel && (
                           <Typography variant="caption" color="text.secondary">
                             {e.sublabel}
                           </Typography>
@@ -252,17 +300,23 @@ export function ComparisonPanel({ result }: ComparisonPanelProps) {
                   <TableRow key={String(e.id)}>
                     <TableCell>
                       <Stack direction="row" alignItems="center" spacing={1}>
-                        {/* Fixed-width column so names align regardless of pip count or absence */}
-                        <Box sx={{ width: 46, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                          {e.colors && <ColorIdentityChips colors={e.colors} size="small" />}
-                        </Box>
+                        {showColors && (
+                          <Box sx={{ width: 46, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                            {e.colors && <ColorIdentityChips colors={e.colors} size="small" />}
+                          </Box>
+                        )}
                         <Box>
                           {groupBy !== 'color' && (
                             <Typography variant="body2" sx={{ fontWeight: 500 }}>
                               {e.label}
                             </Typography>
                           )}
-                          {e.sublabel && (
+                          {showCommander && e.commander && (
+                            <Typography variant="caption" color="text.secondary" display="block">
+                              {e.commander}
+                            </Typography>
+                          )}
+                          {showPlayer && e.sublabel && (
                             <Typography variant="caption" color="text.secondary">
                               {e.sublabel}
                             </Typography>

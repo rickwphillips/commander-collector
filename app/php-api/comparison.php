@@ -55,6 +55,8 @@ $filterColorMode  = in_array($_GET['filter_color_mode'] ?? '', ['or', 'only'], t
 // Phase 2 — new condition params
 $myGamesOnly      = filter_var($_GET['my_games_only'] ?? false, FILTER_VALIDATE_BOOLEAN)
     && !empty($user['player_id']);
+$myDecksOnly      = filter_var($_GET['my_decks_only'] ?? false, FILTER_VALIDATE_BOOLEAN)
+    && !empty($user['player_id']);
 $oppPlayerIds     = isset($_GET['opponent_player_ids']) && is_array($_GET['opponent_player_ids'])
     ? array_map('intval', $_GET['opponent_player_ids']) : [];
 $oppCommanders    = isset($_GET['opponent_commanders']) && is_array($_GET['opponent_commanders'])
@@ -194,6 +196,12 @@ if ($myGamesOnly) {
     $params[] = (int)$user['player_id'];
 }
 
+// My decks only — restrict to game results using a deck owned by the authenticated user's player
+if ($myDecksOnly) {
+    $where[] = 'd.player_id = ?';
+    $params[] = (int)$user['player_id'];
+}
+
 // Opponent players — ALL listed players must be in the same game
 foreach ($oppPlayerIds as $pid) {
     $where[] = 'g.id IN (SELECT game_id FROM game_results WHERE player_id = ?)';
@@ -278,7 +286,7 @@ function buildQuery(
             break;
 
         case 'deck':
-            $select  = "gr.deck_id AS id, d.name AS label, p.name AS sublabel, IF(d.colors IS NULL OR d.colors = '', 'C', d.colors) AS colors";
+            $select  = "gr.deck_id AS id, d.name AS label, p.name AS sublabel, d.commander AS commander, IF(d.colors IS NULL OR d.colors = '', 'C', d.colors) AS colors";
             $joins   = "JOIN decks d ON gr.deck_id = d.id JOIN players p ON d.player_id = p.id JOIN $podSubquery ON pod.game_id = g.id";
             $groupSql = 'gr.deck_id';
             $orderBy = 'win_rate DESC';
@@ -621,6 +629,7 @@ $entities = array_map(function($row) use ($needsRecent, $recentRates) {
         'id'                  => $id,
         'label'               => (string)$row['label'],
         'sublabel'            => $row['sublabel'] ?? null,
+        'commander'           => $row['commander'] ?? null,
         'colors'              => $row['colors'] ?? null,
         'total_games'         => (int)$row['total_games'],
         'wins'                => (int)$row['wins'],
@@ -651,6 +660,7 @@ $conditions = array_filter([
     'must_include_colors'  => $mustIncludeColors ?: null,
     'color_mode'           => ($mustIncludeColors && $colorMode !== 'and') ? $colorMode : null,
     'my_games_only'        => $myGamesOnly ?: null,
+    'my_decks_only'        => $myDecksOnly ?: null,
     'opponent_player_ids'  => $oppPlayerIds ?: null,
     'opponent_commanders'  => $oppCommanders ?: null,
     'opponent_colors'      => $oppColors ?: null,

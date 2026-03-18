@@ -305,6 +305,7 @@ export interface ComparisonConditions {
   must_include_colors?: string[];
   color_mode?: ColorFilterMode;
   my_games_only?: boolean;
+  my_decks_only?: boolean;
   opponent_player_ids?: number[];
   opponent_commanders?: string[];
   opponent_colors?: string[];
@@ -332,6 +333,7 @@ export interface ComparisonEntityResult {
   id: number | string;
   label: string;
   sublabel?: string;
+  commander?: string | null;
   colors?: string | null;
   total_games: number;
   wins: number;
