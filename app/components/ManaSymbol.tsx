@@ -145,8 +145,8 @@ function getArrangement(count: number, size: number): Arrangement {
     return { positions, width: 2.3 * size, height: 2.3 * size };
   }
 
-  // 1 color — single pip
-  return { positions: [{ left: size / 2, top: 0 }], width: size, height: size };
+  // 1 color — single pip, offset right with margin
+  return { positions: [{ left: size * 0.6, top: 0 }], width: size * 2.1, height: size };
 }
 
 /**
@@ -207,8 +207,8 @@ export function ColorSymbols({
     <Box
       sx={{
         position: 'relative',
+        width: arr.width,
         height: arr.height,
-        minWidth: '40px',
       }}
     >
       {normalized.map((c, i) => (

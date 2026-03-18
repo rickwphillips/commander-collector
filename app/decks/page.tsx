@@ -345,7 +345,9 @@ export default function DecksPage() {
                             Piloted by {deck.player_name}
                           </Typography>
                         </Box>
-                        <ColorIdentityChips colors={deck.colors} size="medium" fixed />
+                        <Box sx={{ flexShrink: 0, ml:-30 }}>
+                          <ColorIdentityChips colors={deck.colors} size="medium" fixed />
+                        </Box>
                       </Stack>
 
                       <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
