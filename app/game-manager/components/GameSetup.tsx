@@ -101,8 +101,11 @@ export function GameSetup({ onStart }: GameSetupProps) {
   const handleDeckChange = (idx: number, deckId: number | '') => {
     const deck = decks.find((d) => d.id === deckId);
     const commanderName = deck?.commander ?? '';
+    const ownerPlayerId = deck?.player_id ?? '';
+    const currentPlayerId = slots[idx].playerId;
     updateSlot(idx, {
       deckId,
+      playerId: currentPlayerId === '' ? ownerPlayerId : currentPlayerId,
       commander: {
         ...slots[idx].commander,
         name: commanderName,
