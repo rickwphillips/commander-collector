@@ -2,8 +2,8 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Alert } from '@mui/material';
-import { PageContainer } from '../../components/PageContainer';
-import { GameForm } from '../../components/GameForm';
+import { PageContainer } from '@/components/PageContainer';
+import { GameForm } from '@/components/GameForm';
 
 export default function EditGamePage() {
   const router = useRouter();

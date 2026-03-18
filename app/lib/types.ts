@@ -255,6 +255,7 @@ export interface AdvancedStatsResponse {
 
 // MTG color identity
 export type MtgColor = 'W' | 'U' | 'B' | 'R' | 'G';
+export type MtgColorOrColorless = MtgColor | 'C';
 
 // Comparison Builder types
 export type PanelType = 'predefined' | 'comparison';

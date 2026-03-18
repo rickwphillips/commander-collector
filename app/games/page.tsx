@@ -17,12 +17,12 @@ import {
 import Link from 'next/link';
 import AddIcon from '@mui/icons-material/Add';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import { PageContainer } from '../components/PageContainer';
-import { ColorIdentityChips } from '../components/ColorIdentityChips';
-import { LoadingSpinner } from '../components/LoadingSpinner';
-import { EmptyState } from '../components/EmptyState';
-import { api } from '../lib/api';
-import type { GameWithResults } from '../lib/types';
+import { PageContainer } from '@/components/PageContainer';
+import { ColorIdentityChips } from '@/components/ColorIdentityChips';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { EmptyState } from '@/components/EmptyState';
+import { api } from '@/lib/api';
+import type { GameWithResults } from '@/lib/types';
 
 export default function GamesPage() {
   const [mounted, setMounted] = useState(false);

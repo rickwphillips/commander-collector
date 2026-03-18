@@ -26,14 +26,14 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import StyleIcon from '@mui/icons-material/Style';
-import { PageContainer } from '../../components/PageContainer';
-import { StatsCard } from '../../components/StatsCard';
-import { ColorIdentityChips } from '../../components/ColorIdentityChips';
-import { LoadingSpinner } from '../../components/LoadingSpinner';
-import { EmptyState } from '../../components/EmptyState';
-import { useAuth } from '../../components/AuthGuard';
-import { api } from '../../lib/api';
-import type { Player, Deck, PlayerStats } from '../../lib/types';
+import { PageContainer } from '@/components/PageContainer';
+import { StatsCard } from '@/components/StatsCard';
+import { ColorIdentityChips } from '@/components/ColorIdentityChips';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { EmptyState } from '@/components/EmptyState';
+import { useAuth } from '@/components/AuthGuard';
+import { api } from '@/lib/api';
+import type { Player, Deck, PlayerStats } from '@/lib/types';
 
 interface DeckWithStats extends Deck {
   total_games: number;
@@ -58,7 +58,7 @@ export default function PlayerDetailPage() {
   const [player, setPlayer] = useState<Player | null>(null);
   const [stats, setStats] = useState<PlayerStats | null>(null);
   const [decks, setDecks] = useState<DeckWithStats[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!playerId);
   const [error, setError] = useState<string | null>(null);
 
   // Edit state
@@ -76,8 +76,6 @@ export default function PlayerDetailPage() {
     const timer = setTimeout(() => setMounted(true), 0);
     if (playerId) {
       fetchData();
-    } else {
-      setLoading(false);
     }
     // Fetch users list for admin user dropdown
     if (currentUser?.role === 'admin') {

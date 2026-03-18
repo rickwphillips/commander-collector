@@ -8,7 +8,7 @@ import {
   DialogActions,
   Button,
 } from '@mui/material';
-import type { StatPanel } from '../../lib/types';
+import type { StatPanel } from '@/lib/types';
 
 interface DeletePanelDialogProps {
   target: StatPanel | null;

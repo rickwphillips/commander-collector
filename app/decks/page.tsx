@@ -27,13 +27,14 @@ import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import InputAdornment from '@mui/material/InputAdornment';
-import { PageContainer } from '../components/PageContainer';
-import { ColorIdentityChips } from '../components/ColorIdentityChips';
-import { ManaSymbol } from '../components/ManaSymbol';
-import { LoadingSpinner } from '../components/LoadingSpinner';
-import { EmptyState } from '../components/EmptyState';
-import { api } from '../lib/api';
-import type { DeckWithPlayer, MtgColor, ColorFilterMode } from '../lib/types';
+import { PageContainer } from '@/components/PageContainer';
+import { ColorIdentityChips } from '@/components/ColorIdentityChips';
+import { ManaSymbol } from '@/components/ManaSymbol';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { EmptyState } from '@/components/EmptyState';
+import { api } from '@/lib/api';
+import { MTG_COLORS, MTG_COLORS_WITH_C } from '@/lib/utils';
+import type { DeckWithPlayer, MtgColorOrColorless, ColorFilterMode } from '@/lib/types';
 
 interface DeckWithStats extends DeckWithPlayer {
   total_games: number;
@@ -59,7 +60,7 @@ export default function DecksPage() {
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [playerFilter, setPlayerFilter] = useState('');
-  const [colorFilter, setColorFilter] = useState<Set<MtgColor>>(new Set());
+  const [colorFilter, setColorFilter] = useState<Set<MtgColorOrColorless>>(new Set());
   const [colorMode, setColorMode] = useState<ColorFilterMode>('and');
   const [sortOption, setSortOption] = useState<SortOption>('name-asc');
 
@@ -85,13 +86,23 @@ export default function DecksPage() {
     return names.sort();
   }, [decks]);
 
-  const toggleColor = (color: MtgColor) => {
+  const toggleColor = (color: MtgColorOrColorless) => {
     setColorFilter((prev) => {
       const next = new Set(prev);
-      if (next.has(color)) {
-        next.delete(color);
+      if (color === 'C') {
+        if (next.has('C')) {
+          next.delete('C');
+        } else {
+          next.clear();
+          next.add('C');
+        }
       } else {
-        next.add(color);
+        next.delete('C');
+        if (next.has(color)) {
+          next.delete(color);
+        } else {
+          next.add(color);
+        }
       }
       return next;
     });
@@ -116,19 +127,21 @@ export default function DecksPage() {
     // Color filter
     if (colorFilter.size > 0) {
       const selected = [...colorFilter];
-      result = result.filter((d) => {
-        if (colorMode === 'or') {
-          return selected.some((c) => d.colors.includes(c));
-        } else if (colorMode === 'only') {
+      if (colorFilter.has('C')) {
+        result = result.filter((d) => d.colors === 'C' || d.colors === '');
+      } else if (colorMode === 'or') {
+        result = result.filter((d) => selected.some((c) => d.colors.includes(c)));
+      } else if (colorMode === 'only') {
+        result = result.filter((d) => {
           const hasAll = selected.every((c) => d.colors.includes(c));
-          const hasNone = (['W', 'U', 'B', 'R', 'G'] as MtgColor[])
+          const hasNone = MTG_COLORS
             .filter((c) => !selected.includes(c))
             .every((c) => !d.colors.includes(c));
           return hasAll && hasNone;
-        } else {
-          return selected.every((c) => d.colors.includes(c));
-        }
-      });
+        });
+      } else {
+        result = result.filter((d) => selected.every((c) => d.colors.includes(c)));
+      }
     }
 
     // Sort
@@ -252,7 +265,7 @@ export default function DecksPage() {
                 <Grid size={{ xs: 12, sm: 2 }}>
                   <Stack spacing={0.75} alignItems="center">
                     <Stack direction="row" spacing={0.5} justifyContent="center">
-                      {(['W', 'U', 'B', 'R', 'G'] as const).map((code) => (
+                      {MTG_COLORS_WITH_C.map((code) => (
                         <ManaSymbol
                           key={code}
                           color={code}
@@ -263,7 +276,7 @@ export default function DecksPage() {
                         />
                       ))}
                     </Stack>
-                    {colorFilter.size > 0 && (
+                    {colorFilter.size > 0 && !colorFilter.has('C') && (
                       <ToggleButtonGroup
                         exclusive
                         size="small"

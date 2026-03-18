@@ -9,7 +9,7 @@ import type {
   ComparisonEntityFilter,
   Player,
   DeckWithPlayer,
-} from '../../lib/types';
+} from '@/lib/types';
 
 // ---- Helpers ----
 

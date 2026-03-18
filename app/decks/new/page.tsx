@@ -11,27 +11,17 @@ import {
   MenuItem,
   Alert,
   Typography,
-  ToggleButton,
-  ToggleButtonGroup,
   Box,
-  Tooltip,
 } from '@mui/material';
-import { PageContainer } from '../../components/PageContainer';
-import { LoadingSpinner } from '../../components/LoadingSpinner';
-import { api } from '../../lib/api';
-import type { Player } from '../../lib/types';
-
-const mtgColors = [
-  { code: 'W', name: 'White', color: '#F8E7B9', textColor: '#333' },
-  { code: 'U', name: 'Blue', color: '#0E68AB', textColor: '#FFF' },
-  { code: 'B', name: 'Black', color: '#332B2E', textColor: '#FFF' },
-  { code: 'R', name: 'Red', color: '#D3202A', textColor: '#FFF' },
-  { code: 'G', name: 'Green', color: '#00733E', textColor: '#FFF' },
-];
+import { PageContainer } from '@/components/PageContainer';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { ManaSymbol } from '@/components/ManaSymbol';
+import { api } from '@/lib/api';
+import { MTG_COLORS_WITH_C } from '@/lib/utils';
+import type { Player } from '@/lib/types';
 
 export default function NewDeckPage() {
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -43,9 +33,7 @@ export default function NewDeckPage() {
   const [colors, setColors] = useState<string[]>([]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 0);
     fetchPlayers();
-    return () => clearTimeout(timer);
   }, []);
 
   const fetchPlayers = async () => {
@@ -59,11 +47,18 @@ export default function NewDeckPage() {
     }
   };
 
-  const handleColorsChange = (_event: React.MouseEvent<HTMLElement>, newColors: string[]) => {
-    setColors(newColors);
+  const handleColorClick = (color: string) => {
+    const active = colors.includes(color);
+    if (color === 'C') {
+      setColors(active ? [] : ['C']);
+    } else {
+      const current = colors.filter((c) => c !== 'C');
+      const next = active ? current.filter((c) => c !== color) : [...current, color];
+      setColors(next);
+    }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
 
     if (!playerId || !name.trim() || !commander.trim()) {
@@ -147,42 +142,18 @@ export default function NewDeckPage() {
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
                   Color Identity
                 </Typography>
-                <ToggleButtonGroup
-                  value={colors}
-                  onChange={handleColorsChange}
-                  aria-label="color identity"
-                >
-                  {mtgColors.map((color) => (
-                    <ToggleButton
-                      key={color.code}
-                      value={color.code}
-                      aria-label={color.name}
-                      sx={{
-                        width: 48,
-                        height: 48,
-                        backgroundColor: colors.includes(color.code) ? color.color : 'transparent',
-                        color: colors.includes(color.code) ? color.textColor : 'text.primary',
-                        border: `2px solid ${color.color}`,
-                        '&:hover': {
-                          backgroundColor: color.color,
-                          opacity: 0.8,
-                        },
-                        '&.Mui-selected': {
-                          backgroundColor: color.color,
-                          color: color.textColor,
-                          '&:hover': {
-                            backgroundColor: color.color,
-                            opacity: 0.9,
-                          },
-                        },
-                      }}
-                    >
-                      <Tooltip title={color.name}>
-                        <span style={{ fontWeight: 700, fontSize: 18 }}>{color.code}</span>
-                      </Tooltip>
-                    </ToggleButton>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  {MTG_COLORS_WITH_C.map((color) => (
+                    <ManaSymbol
+                      key={color}
+                      color={color}
+                      size={32}
+                      active={colors.includes(color)}
+                      dimmed
+                      onClick={() => handleColorClick(color)}
+                    />
                   ))}
-                </ToggleButtonGroup>
+                </Stack>
                 <Typography
                   variant="caption"
                   color="text.secondary"

@@ -14,9 +14,9 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
-import { PageContainer } from '../../components/PageContainer';
-import { LoadingSpinner } from '../../components/LoadingSpinner';
-import { api } from '../../lib/api';
+import { PageContainer } from '@/components/PageContainer';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { api } from '@/lib/api';
 import type {
   StatPanel,
   Player,
@@ -27,7 +27,7 @@ import type {
   ComparisonEntityFilter,
   ComparisonConfig,
   ComparisonResult,
-} from '../../lib/types';
+} from '@/lib/types';
 import { ComparisonBuilder } from './ComparisonBuilder';
 import { PanelCard } from './PanelCard';
 import { DeletePanelDialog } from './DeletePanelDialog';

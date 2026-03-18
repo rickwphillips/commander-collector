@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Card,
@@ -24,17 +24,17 @@ import Link from 'next/link';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import { PageContainer } from '../../components/PageContainer';
-import { StatsCard } from '../../components/StatsCard';
-import { ColorIdentityChips } from '../../components/ColorIdentityChips';
-import { ManaSymbol } from '../../components/ManaSymbol';
-import { LoadingSpinner } from '../../components/LoadingSpinner';
-import { EmptyState } from '../../components/EmptyState';
-import { api } from '../../lib/api';
-import type { DeckDetail as DeckDetailType, GameWithResults } from '../../lib/types';
+import { PageContainer } from '@/components/PageContainer';
+import { StatsCard } from '@/components/StatsCard';
+import { ColorIdentityChips } from '@/components/ColorIdentityChips';
+import { ManaSymbol } from '@/components/ManaSymbol';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { EmptyState } from '@/components/EmptyState';
+import { api } from '@/lib/api';
+import { getOrdinalSuffix, MTG_COLORS_WITH_C } from '@/lib/utils';
+import type { DeckDetail as DeckDetailType, GameWithResults } from '@/lib/types';
 
 
-const COLOR_OPTIONS = ['W', 'U', 'B', 'R', 'G'];
 
 export default function DeckDetailPage() {
   const searchParams = useSearchParams();
@@ -44,7 +44,7 @@ export default function DeckDetailPage() {
   const [mounted, setMounted] = useState(false);
   const [deck, setDeck] = useState<DeckDetailType | null>(null);
   const [games, setGames] = useState<GameWithResults[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!deckId);
   const [error, setError] = useState<string | null>(null);
 
   // Edit state
@@ -58,17 +58,7 @@ export default function DeckDetailPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 0);
-    if (deckId) {
-      fetchData();
-    } else {
-      setLoading(false);
-    }
-    return () => clearTimeout(timer);
-  }, [deckId]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [deckData, gamesData] = await Promise.all([api.getDeck(deckId), api.getGames()]);
       setDeck(deckData);
@@ -84,7 +74,15 @@ export default function DeckDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [deckId]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setMounted(true), 0);
+    if (deckId) {
+      fetchData();
+    }
+    return () => clearTimeout(timer);
+  }, [deckId, fetchData]);
 
   const handleEdit = () => {
     setEditName(deck?.name || '');
@@ -94,9 +92,14 @@ export default function DeckDetailPage() {
   };
 
   const handleColorToggle = (color: string) => {
-    setEditColors((prev) =>
-      prev.includes(color) ? prev.filter((c) => c !== color) : [...prev, color]
-    );
+    const active = editColors.includes(color);
+    if (color === 'C') {
+      setEditColors(active ? [] : ['C']);
+    } else {
+      const current = editColors.filter((c) => c !== 'C');
+      const next = active ? current.filter((c) => c !== color) : [...current, color];
+      setEditColors(next);
+    }
   };
 
   const handleSave = async () => {
@@ -104,7 +107,7 @@ export default function DeckDetailPage() {
 
     setSaving(true);
     try {
-      const colorsString = COLOR_OPTIONS.filter((c) => editColors.includes(c)).join('');
+      const colorsString = MTG_COLORS_WITH_C.filter((c) => editColors.includes(c)).join('');
 
       await api.updateDeck(deckId, {
         name: editName.trim(),
@@ -325,7 +328,7 @@ export default function DeckDetailPage() {
                 Color Identity
               </Typography>
               <Stack direction="row" spacing={1}>
-                {(['W', 'U', 'B', 'R', 'G'] as const).map((c) => (
+                {MTG_COLORS_WITH_C.map((c) => (
                   <ManaSymbol
                     key={c}
                     color={c}
@@ -371,8 +374,3 @@ export default function DeckDetailPage() {
   );
 }
 
-function getOrdinalSuffix(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd'];
-  const v = n % 100;
-  return s[(v - 20) % 10] || s[v] || s[0];
-}

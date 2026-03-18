@@ -2,7 +2,7 @@
 
 import { Box, Tooltip } from '@mui/material';
 import Image from 'next/image';
-import { ASSET_BASE } from '../lib/api';
+import { ASSET_BASE } from '@/lib/api';
 
 const COLOR_NAME: Record<string, string> = {
   W: 'White', U: 'Blue', B: 'Black', R: 'Red', G: 'Green', C: 'Colorless',

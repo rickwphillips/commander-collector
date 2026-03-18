@@ -42,16 +42,16 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import CloseIcon from '@mui/icons-material/Close';
 import DashboardCustomizeIcon from '@mui/icons-material/DashboardCustomize';
 import Link from 'next/link';
-import { PageContainer } from '../components/PageContainer';
-import { StatsCard } from '../components/StatsCard';
-import { ColorIdentityChips } from '../components/ColorIdentityChips';
-import { LoadingSpinner } from '../components/LoadingSpinner';
-import { EmptyState } from '../components/EmptyState';
-import { ViewSelector } from '../components/ViewSelector';
-import { api } from '../lib/api';
-import { useHiddenStats } from '../lib/useHiddenStats';
-import { STATS_SECTIONS, DEFAULT_SECTION_ORDER } from '../lib/statsSections';
-import type { StatsSectionId } from '../lib/statsSections';
+import { PageContainer } from '@/components/PageContainer';
+import { StatsCard } from '@/components/StatsCard';
+import { ColorIdentityChips } from '@/components/ColorIdentityChips';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { EmptyState } from '@/components/EmptyState';
+import { ViewSelector } from '@/components/ViewSelector';
+import { api } from '@/lib/api';
+import { useHiddenStats } from '@/lib/useHiddenStats';
+import { STATS_SECTIONS, DEFAULT_SECTION_ORDER } from '@/lib/statsSections';
+import type { StatsSectionId } from '@/lib/statsSections';
 import type {
   StatsResponse,
   HeadToHeadResponse,
@@ -59,7 +59,7 @@ import type {
   StatPanel,
   StatPanelsResponse,
   ComparisonResult,
-} from '../lib/types';
+} from '@/lib/types';
 import { ComparisonPanel, ComparisonPanelSkeleton } from './ComparisonPanel';
 
 type SortDirection = 'asc' | 'desc';

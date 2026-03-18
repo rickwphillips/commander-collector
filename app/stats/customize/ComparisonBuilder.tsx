@@ -21,7 +21,7 @@ import type {
   ComparisonMetric,
   ComparisonConditions,
   ComparisonEntityFilter,
-} from '../../lib/types';
+} from '@/lib/types';
 import { QuerySentence } from './QuerySentence';
 import { ConditionColorPicker } from './ConditionColorPicker';
 

@@ -6,7 +6,7 @@ import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import BuildIcon from '@mui/icons-material/Build';
 import BugReportIcon from '@mui/icons-material/BugReport';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import { PageContainer } from '../components/PageContainer';
+import { PageContainer } from '@/components/PageContainer';
 
 type ChangeType = 'added' | 'changed' | 'fixed' | 'improved';
 

@@ -24,14 +24,14 @@ import GroupsIcon from '@mui/icons-material/Groups';
 import ListSubheader from '@mui/material/ListSubheader';
 import { ColorIdentityChips } from './ColorIdentityChips';
 import { LoadingSpinner } from './LoadingSpinner';
-import { api } from '../lib/api';
+import { api } from '@/lib/api';
 import type {
   Player,
   DeckWithPlayer,
   GameResultInput,
   GameType,
   GameWithResults,
-} from '../lib/types';
+} from '@/lib/types';
 
 interface DeckOption extends DeckWithPlayer {
   total_games?: number;

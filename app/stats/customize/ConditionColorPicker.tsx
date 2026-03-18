@@ -1,8 +1,9 @@
 'use client';
 
 import { Stack, ToggleButtonGroup, ToggleButton } from '@mui/material';
-import { ManaSymbol } from '../../components/ManaSymbol';
-import type { ColorFilterMode } from '../../lib/types';
+import { ManaSymbol } from '@/components/ManaSymbol';
+import { MTG_COLORS_WITH_C } from '@/lib/utils';
+import type { ColorFilterMode } from '@/lib/types';
 
 interface ConditionColorPickerProps {
   colors: string[] | undefined;
@@ -39,7 +40,7 @@ export function ConditionColorPicker({
 
   return (
     <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-      {(['W', 'U', 'B', 'R', 'G', 'C'] as const).map((color) => (
+      {MTG_COLORS_WITH_C.map((color) => (
         <ManaSymbol
           key={color}
           color={color}

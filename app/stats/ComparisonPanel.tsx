@@ -17,13 +17,13 @@ import {
 } from '@mui/material';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import { ColorIdentityChips } from '../components/ColorIdentityChips';
+import { ColorIdentityChips } from '@/components/ColorIdentityChips';
 import type {
   ComparisonResult,
   ComparisonMetric,
   ComparisonConditions,
   ComparisonGroupBy,
-} from '../lib/types';
+} from '@/lib/types';
 
 // ---- Metric labels ----
 const METRIC_LABELS: Record<ComparisonMetric, string> = {

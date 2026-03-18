@@ -1,8 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { PageContainer } from '../../components/PageContainer';
-import { GameForm } from '../../components/GameForm';
+import { PageContainer } from '@/components/PageContainer';
+import { GameForm } from '@/components/GameForm';
 
 export default function NewGamePage() {
   const router = useRouter();

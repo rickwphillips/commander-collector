@@ -24,12 +24,13 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import GroupsIcon from '@mui/icons-material/Groups';
-import { PageContainer } from '../../components/PageContainer';
-import { ColorIdentityChips } from '../../components/ColorIdentityChips';
-import { LoadingSpinner } from '../../components/LoadingSpinner';
-import { EmptyState } from '../../components/EmptyState';
-import { api } from '../../lib/api';
-import type { GameWithResults } from '../../lib/types';
+import { PageContainer } from '@/components/PageContainer';
+import { ColorIdentityChips } from '@/components/ColorIdentityChips';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { EmptyState } from '@/components/EmptyState';
+import { api } from '@/lib/api';
+import { getOrdinalSuffix } from '@/lib/utils';
+import type { GameWithResults } from '@/lib/types';
 
 export default function GameDetailPage() {
   const searchParams = useSearchParams();
@@ -38,7 +39,7 @@ export default function GameDetailPage() {
 
   const [mounted, setMounted] = useState(false);
   const [game, setGame] = useState<GameWithResults | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!gameId);
   const [error, setError] = useState<string | null>(null);
 
   // Delete state
@@ -48,23 +49,13 @@ export default function GameDetailPage() {
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 0);
     if (gameId) {
-      fetchGame();
-    } else {
-      setLoading(false);
+      api.getGame(gameId)
+        .then(setGame)
+        .catch(() => setError('Failed to load game'))
+        .finally(() => setLoading(false));
     }
     return () => clearTimeout(timer);
   }, [gameId]);
-
-  const fetchGame = async () => {
-    try {
-      const data = await api.getGame(gameId);
-      setGame(data);
-    } catch {
-      setError('Failed to load game');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -290,8 +281,3 @@ export default function GameDetailPage() {
   );
 }
 
-function getOrdinalSuffix(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd'];
-  const v = n % 100;
-  return s[(v - 20) % 10] || s[v] || s[0];
-}

@@ -30,10 +30,10 @@ import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import Link from 'next/link';
-import { getSectionDef } from '../../lib/statsSections';
-import type { StatsSectionId } from '../../lib/statsSections';
-import type { StatPanel, ComparisonResult } from '../../lib/types';
-import { ComparisonPanel } from '../ComparisonPanel';
+import { getSectionDef } from '@/lib/statsSections';
+import type { StatsSectionId } from '@/lib/statsSections';
+import type { StatPanel, ComparisonResult } from '@/lib/types';
+import { ComparisonPanel } from '@/stats/ComparisonPanel';
 import { groupByLabel } from './ComparisonBuilder';
 
 interface PanelCardProps {

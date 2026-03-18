@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import type { StatPanel } from '../lib/types';
+import type { StatPanel } from '@/lib/types';
 
 interface ViewSelectorProps {
   activeView: 'default' | number;
