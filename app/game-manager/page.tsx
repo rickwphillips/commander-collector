@@ -9,7 +9,11 @@ import type { GameManagerState, PlayerSetup, PlayerState, CommanderDamageMap } f
 import type { GameResultInput } from '@/lib/types';
 import { api } from '@/lib/api';
 
-const POSITIONS: Array<PlayerState['position']> = ['bottom', 'right', 'top', 'left'];
+const POSITIONS_BY_COUNT: Record<number, Array<PlayerState['position']>> = {
+  2: ['bottom', 'top'],
+  3: ['bottom', 'right', 'top'],
+  4: ['bottom', 'right', 'top', 'left'],
+};
 const GAME_STATE_KEY = 'commander_game_state';
 
 const DEFAULT_STATE: GameManagerState = {
@@ -39,7 +43,7 @@ function loadSavedState(): GameManagerState | null {
 function buildInitialState(playerSetups: PlayerSetup[], startingLife: number): GameManagerState {
   const players: PlayerState[] = playerSetups.map((setup, i) => ({
     ...setup,
-    position: POSITIONS[i],
+    position: (POSITIONS_BY_COUNT[playerSetups.length] ?? POSITIONS_BY_COUNT[4])[i],
     life: startingLife,
     poison: 0,
     commanderTax: 0,
