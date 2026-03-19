@@ -100,6 +100,28 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
               ? { name: p.partner.name, artCropUrl: p.partner.artCropUrl, options: [], loading: false }
               : emptyCommander(),
           })));
+        } else if (process.env.NODE_ENV === 'development') {
+          const seen = new Set<number>();
+          const devSlots: PlayerSlot[] = [];
+          for (const deck of deckData) {
+            if (seen.has(deck.player_id)) continue;
+            seen.add(deck.player_id);
+            devSlots.push({
+              playerId: deck.player_id,
+              deckId: deck.id,
+              commander: { name: deck.commander ?? '', artCropUrl: undefined, options: [], loading: false },
+              hasPartner: false,
+              partner: emptyCommander(),
+            });
+            if (devSlots.length === 4) break;
+          }
+          if (devSlots.length > 0) {
+            setPlayerCount(devSlots.length);
+            setSlots(devSlots);
+            devSlots.forEach((slot, i) => {
+              if (slot.commander.name) fetchCommanderArt(i, 'commander', slot.commander.name);
+            });
+          }
         }
       } catch {
         setError('Failed to load players and decks');
@@ -383,7 +405,7 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
   return (
     <Box
       sx={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

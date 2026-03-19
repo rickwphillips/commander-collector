@@ -367,7 +367,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
                       position: 'absolute',
                       top: '50%',
                       left: '50%',
-                      width: '100vh',
+                      width: '100dvh',
                       height: '220px',
                       transform: `translate(-50%, -50%) ${rotation}`,
                     }

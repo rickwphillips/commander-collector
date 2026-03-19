@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Box, Stack, Typography, IconButton, Button, TextField } from '@mui/material';
+import { Box, Stack, Typography, IconButton, Button, TextField, Tooltip } from '@mui/material';
 import CrownIcon from '@mui/icons-material/EmojiEvents';
 import InitiativeIcon from '@mui/icons-material/Shield';
 import CityIcon from '@mui/icons-material/AccountBalance';
@@ -76,6 +76,11 @@ export function PlayerPanel({
 
   const poisonProgress = Math.min(player.poison / 10, 1);
 
+  const energyGlowIntensity = player.energy > 0 ? Math.min(player.energy / 8, 1) : 0;
+  const energyGlow = energyGlowIntensity > 0
+    ? `0 0 ${4 + energyGlowIntensity * 18}px rgba(80,200,255,${(0.5 + energyGlowIntensity * 0.45).toFixed(2)}), 0 0 ${10 + energyGlowIntensity * 36}px rgba(80,200,255,${(0.2 + energyGlowIntensity * 0.3).toFixed(2)})`
+    : undefined;
+
   const isLifeLow = player.life <= 0;
   const isPoisoned = player.poison >= 10;
   const isCmdDmgHigh = Object.values(commanderDamage[playerIdx] ?? {}).some(
@@ -118,6 +123,7 @@ export function PlayerPanel({
           },
         }),
         transition: 'box-shadow 0.1s ease, border 0.1s ease, filter 1s ease',
+        '& .MuiTypography-root': { textShadow: energyGlow, transition: 'text-shadow 0.4s ease' },
         filter: poisonProgress > 0 ? `saturate(${1 + poisonProgress * 0.5})` : 'none',
         borderRadius: 2,
         overflow: 'hidden',
@@ -408,33 +414,55 @@ export function PlayerPanel({
       )}
 
       {/* ── Header ── */}
-      <Box sx={{ px: 1, py: 0.5, bgcolor: 'rgba(0,0,0,0.08)', flexShrink: 0, filter: 'none' }}>
-        <Stack direction="row" alignItems="center" spacing={0.75}>
+      <Box sx={{ px: 1, py: 0.5, bgcolor: 'rgba(0,0,0,0.08)', flexShrink: 0, filter: 'none', position: 'relative', display: 'flex', alignItems: 'center' }}>
+        {/* Left: commander art + tax */}
+        <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0, zIndex: 1 }}>
           {player.commander.artCropUrl && (
             <Box component="img" src={player.commander.artCropUrl} alt={player.commander.name}
               sx={{ height: 32, width: 'auto', borderRadius: 0.5, flexShrink: 0 }} />
           )}
-          <Box sx={{ flex: 1, overflow: 'hidden', textAlign: 'center' }}>
-            <Typography noWrap sx={{ fontWeight: 700, fontSize: 12, lineHeight: 1.2 }}>
-              {player.playerName}
-            </Typography>
-            <Typography noWrap sx={{ fontSize: 9, lineHeight: 1.2, color: 'text.secondary' }}>
-              {player.deckName} · {player.commander.name}{player.partner ? ` / ${player.partner.name}` : ''}
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={0} alignItems="center">
-            <IconButton size="small" onClick={() => onToggleMonarch(playerIdx)} sx={{ p: 0.25, color: player.isMonarch ? '#DAA520' : 'text.disabled' }} title="Monarch">
-              <CrownIcon sx={{ fontSize: 14 }} />
+          {player.commanderTax > 0 && (
+            <Tooltip title={`Commander Tax: cast ${player.commanderTax}× (+${player.commanderTax * 2} generic mana)`} placement="bottom" arrow>
+              <Stack direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
+                <Typography sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary', lineHeight: 1, userSelect: 'none' }}>+</Typography>
+                <Box sx={{
+                  width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                  background: 'radial-gradient(circle at 38% 35%, #d0d0d0, #7a7a7a)',
+                  border: '1.5px solid #3a3a3a',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Typography sx={{ fontSize: 11, fontWeight: 800, color: '#111', lineHeight: 1, userSelect: 'none' }}>
+                    {player.commanderTax * 2}
+                  </Typography>
+                </Box>
+              </Stack>
+            </Tooltip>
+          )}
+        </Stack>
+
+        {/* Center: absolutely positioned so it's always centered relative to the full header */}
+        <Box sx={{ position: 'absolute', left: 0, right: 0, textAlign: 'center', pointerEvents: 'none', px: 6 }}>
+          <Typography noWrap sx={{ fontWeight: 700, fontSize: 12, lineHeight: 1.2 }}>
+            {player.playerName}
+          </Typography>
+          <Typography noWrap sx={{ fontSize: 9, lineHeight: 1.2, color: 'text.secondary' }}>
+            {player.deckName} · {player.commander.name}{player.partner ? ` / ${player.partner.name}` : ''}
+          </Typography>
+        </Box>
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ ml: 'auto', zIndex: 1 }}>
+            <IconButton size="small" onClick={() => onToggleMonarch(playerIdx)} sx={{ p: 0.5, color: player.isMonarch ? '#DAA520' : 'text.disabled' }} title="Monarch">
+              <CrownIcon sx={{ fontSize: 18 }} />
             </IconButton>
-            <IconButton size="small" onClick={() => onToggleInitiative(playerIdx)} sx={{ p: 0.25, color: player.hasInitiative ? '#4FC3F7' : 'text.disabled' }} title="Initiative">
-              <InitiativeIcon sx={{ fontSize: 14 }} />
+            <IconButton size="small" onClick={() => onToggleInitiative(playerIdx)} sx={{ p: 0.5, color: player.hasInitiative ? '#4FC3F7' : 'text.disabled' }} title="Initiative">
+              <InitiativeIcon sx={{ fontSize: 18 }} />
             </IconButton>
-            <IconButton size="small" onClick={() => onToggleCitysBlessing(playerIdx)} sx={{ p: 0.25, color: player.hasCitysBlessing ? '#81C784' : 'text.disabled' }} title="City's Blessing">
-              <CityIcon sx={{ fontSize: 14 }} />
+            <IconButton size="small" onClick={() => onToggleCitysBlessing(playerIdx)} sx={{ p: 0.5, color: player.hasCitysBlessing ? '#81C784' : 'text.disabled' }} title="City's Blessing">
+              <CityIcon sx={{ fontSize: 18 }} />
             </IconButton>
             {player.isEliminated ? (
-              <IconButton size="small" onClick={() => onUndoEliminate(playerIdx)} sx={{ p: 0.25, color: 'error.main' }} title="Undo Eliminate">
-                <ElimIcon sx={{ fontSize: 14 }} />
+              <IconButton size="small" onClick={() => onUndoEliminate(playerIdx)} sx={{ p: 0.5, color: 'error.main' }} title="Undo Eliminate">
+                <ElimIcon sx={{ fontSize: 18 }} />
               </IconButton>
             ) : showEliminateConfirm ? (
               <Stack direction="row" spacing={0.5} alignItems="center" sx={{ ml: 0.5 }}>
@@ -449,12 +477,11 @@ export function PlayerPanel({
                   sx={{ fontSize: 9, py: 0, px: 0.5 }}>✕</Button>
               </Stack>
             ) : (
-              <IconButton size="small" onClick={() => setShowEliminateConfirm(true)} sx={{ p: 0.25, color: 'text.disabled' }} title="Eliminate">
-                <ElimIcon sx={{ fontSize: 14 }} />
+              <IconButton size="small" onClick={() => setShowEliminateConfirm(true)} sx={{ p: 0.5, color: 'text.disabled' }} title="Eliminate">
+                <ElimIcon sx={{ fontSize: 18 }} />
               </IconButton>
             )}
           </Stack>
-        </Stack>
       </Box>
 
       {/* ── Main: Commander Damage (left) + Life (right) ── */}
@@ -551,7 +578,7 @@ export function PlayerPanel({
             ['Poison', player.poison, () => onPoisonChange(playerIdx, -1), () => onPoisonChange(playerIdx, 1), player.poison >= 10 ? 'error.main' : player.poison > 0 ? 'warning.main' : 'text.disabled'],
             ['Energy', player.energy, () => onEnergyChange(playerIdx, -1), () => onEnergyChange(playerIdx, 1), player.energy > 0 ? 'primary.main' : 'text.disabled'],
             ['Experience', player.experience, () => onExperienceChange(playerIdx, -1), () => onExperienceChange(playerIdx, 1), player.experience > 0 ? 'primary.main' : 'text.disabled'],
-            ['Cmd Tax', player.commanderTax, () => onCommanderTaxChange(playerIdx, -1), () => onCommanderTaxChange(playerIdx, 1), player.commanderTax > 0 ? 'warning.main' : 'text.disabled'],
+            ['Commander Tax', player.commanderTax, () => onCommanderTaxChange(playerIdx, -1), () => onCommanderTaxChange(playerIdx, 1), player.commanderTax > 0 ? 'warning.main' : 'text.disabled'],
           ] as [string, number, () => void, () => void, string][]).flatMap(([label, value, onDec, onInc, color]) => [
             <Typography key={`${label}-lbl`} sx={{ fontSize: 12, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none' }}>{label}</Typography>,
             <IconButton key={`${label}-dec`} onClick={onDec} sx={{ p: 0, minWidth: 32, minHeight: 32 }}><Typography sx={{ fontSize: 18, fontWeight: 700 }}>−</Typography></IconButton>,
