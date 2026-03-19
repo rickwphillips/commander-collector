@@ -1,39 +1,175 @@
 'use client';
 
-import { Box } from '@mui/material';
+import { useRef, useState, useEffect, useCallback } from 'react';
+import { Box, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, Stack } from '@mui/material';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
+import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import { PlayerPanel } from './PlayerPanel';
 import { CenterZone } from './CenterZone';
 import type { GameManagerState, CommanderDamageMap, PlayerState } from '../types';
+
+type RollPhase = 'idle' | 'rolling' | 'done';
+
+interface RollState {
+  phase: RollPhase;
+  highlightIdx: number | null;
+  finalIdx: number | null;
+}
 
 interface GameBoardProps {
   state: GameManagerState;
   onUpdate: (newState: GameManagerState) => void;
   onEndGame: () => void;
+  onRestartGame: (players: PlayerState[]) => void;
+  onLogGame: () => void;
+  onSaveGame: (state: GameManagerState) => Promise<void>;
+  isResumed?: boolean;
 }
 
-export function GameBoard({ state, onUpdate, onEndGame }: GameBoardProps) {
-  const { players, commanderDamage, currentPlayerIdx, turnNumber } = state;
+export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame, onSaveGame, isResumed = false }: GameBoardProps) {
+  const { players, commanderDamage, currentPlayerIdx, turnNumber, turnTimerSeconds, turnStartTime } = state;
+
+  const [rollState, setRollState] = useState<RollState>({ phase: 'idle', highlightIdx: null, finalIdx: null });
+  const [firstPlayerSet, setFirstPlayerSet] = useState(isResumed);
+  const [winner, setWinner] = useState<PlayerState | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [poisonKillPrompt, setPoisonKillPrompt] = useState<{ targetIdx: number; newPlayers: PlayerState[] } | null>(null);
+  const [lifeKillPrompt, setLifeKillPrompt] = useState<{ targetIdx: number; pendingWinner: PlayerState | null } | null>(null);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const rollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tickTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Tick the turn timer every second
+  useEffect(() => {
+    if (!firstPlayerSet) return;
+    if (tickTimer.current) clearInterval(tickTimer.current);
+    tickTimer.current = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - turnStartTime) / 1000));
+    }, 1000);
+    return () => { if (tickTimer.current) clearInterval(tickTimer.current); };
+  }, [firstPlayerSet, turnStartTime]);
+
+  // Reset elapsed display when turn changes
+  useEffect(() => {
+    setElapsedSeconds(0);
+  }, [currentPlayerIdx]);
+
+  const startRoll = () => {
+    if (rollTimer.current) clearTimeout(rollTimer.current);
+    const active = players.map((p, i) => i).filter((i) => !players[i].isEliminated);
+    const finalIdx = active[Math.floor(Math.random() * active.length)];
+
+    // Build a sequence that cycles through active players and lands on finalIdx
+    const STEPS = 14;
+    const sequence: number[] = [];
+    let cur = 0;
+    for (let i = 0; i < STEPS - 1; i++) {
+      sequence.push(active[cur % active.length]);
+      cur++;
+    }
+    sequence.push(finalIdx);
+
+    setRollState({ phase: 'rolling', highlightIdx: sequence[0], finalIdx });
+
+    let step = 0;
+    const animate = () => {
+      step++;
+      if (step >= sequence.length) {
+        setRollState({ phase: 'done', highlightIdx: finalIdx, finalIdx });
+        return;
+      }
+      setRollState((prev) => ({ ...prev, highlightIdx: sequence[step] }));
+      const progress = step / sequence.length;
+      rollTimer.current = setTimeout(animate, 40 + progress * progress * 250);
+    };
+    rollTimer.current = setTimeout(animate, 40);
+  };
+
+  const handleAcceptFirstPlayer = () => {
+    if (rollState.finalIdx === null) return;
+    onUpdate({ ...state, currentPlayerIdx: rollState.finalIdx, turnStartTime: Date.now() });
+    setRollState({ phase: 'idle', highlightIdx: null, finalIdx: null });
+    setFirstPlayerSet(true);
+  };
+
+  const handleRollAgain = () => {
+    startRoll();
+  };
 
   const updateState = (patch: Partial<GameManagerState>) => {
     onUpdate({ ...state, ...patch });
   };
 
   const handleLifeChange = (idx: number, delta: number) => {
-    const newPlayers = players.map((p, i) =>
-      i === idx ? { ...p, life: p.life + delta } : p
-    );
-    updateState({ players: newPlayers });
+    const target = players[idx];
+    const newLife = target.life + delta;
+    const isNewLifeKill = target.life > 0 && newLife <= 0;
+    const isUndoLifeKill = target.life <= 0 && newLife > 0;
+    const lifeNoteTag = `[lifekill:${idx}]`;
+
+    let newNotes = state.notes;
+    if (isUndoLifeKill) {
+      newNotes = state.notes.split('\n').filter((l) => !l.includes(lifeNoteTag)).join('\n');
+    }
+
+    const wasEliminatedByLife = target.isEliminated && target.life <= 0 && target.poison < 10;
+    const newPlayers = players.map((p, i) => {
+      if (i !== idx) return p;
+      return {
+        ...p,
+        life: newLife,
+        ...(isNewLifeKill && !p.isEliminated ? { isEliminated: true, eliminatedTurn: state.turnNumber } : {}),
+        ...(isUndoLifeKill && wasEliminatedByLife ? { isEliminated: false, eliminatedTurn: null } : {}),
+      };
+    });
+    updateState({ players: newPlayers, notes: newNotes });
+
+    if (isNewLifeKill) {
+      const remaining = newPlayers.filter((p) => !p.isEliminated);
+      const pendingWinner = remaining.length === 1 ? remaining[0] : null;
+      setLifeKillPrompt({ targetIdx: idx, pendingWinner });
+    }
   };
 
   const handlePoisonChange = (idx: number, delta: number) => {
+    const target = players[idx];
     const newPlayers = players.map((p, i) => {
       if (i !== idx) return p;
       const poison = Math.max(0, p.poison + delta);
-      const isEliminated = poison >= 10 ? true : p.isEliminated;
-      const eliminatedTurn = poison >= 10 && !p.isEliminated ? state.turnNumber : p.eliminatedTurn;
+      const wasEliminatedByPoison = p.isEliminated && p.poison >= 10;
+      const isEliminated = poison >= 10 ? true : wasEliminatedByPoison ? false : p.isEliminated;
+      const eliminatedTurn = poison >= 10 && !p.isEliminated ? state.turnNumber : isEliminated ? p.eliminatedTurn : null;
       return { ...p, poison, isEliminated, eliminatedTurn };
     });
-    updateState({ players: newPlayers });
+
+    const isNewPoisonKill = !target.isEliminated && Math.max(0, target.poison + delta) >= 10;
+    const isUndoPoisonKill = target.isEliminated && target.poison >= 10 && Math.max(0, target.poison + delta) < 10;
+    const poisonNoteTag = `[poisonkill:${idx}]`;
+
+    let newNotes = state.notes;
+    if (isUndoPoisonKill) {
+      newNotes = state.notes.split('\n').filter((l) => !l.includes(poisonNoteTag)).join('\n');
+    }
+
+    updateState({ players: newPlayers, notes: newNotes });
+
+    if (isNewPoisonKill) {
+      setPoisonKillPrompt({ targetIdx: idx, newPlayers });
+    }
   };
 
   const handleCommanderTaxChange = (idx: number, delta: number) => {
@@ -59,6 +195,27 @@ export function GameBoard({ state, onUpdate, onEndGame }: GameBoardProps) {
     updateState({ players: newPlayers });
   };
 
+  const handleEnergyChange = (idx: number, delta: number) => {
+    const newPlayers = players.map((p, i) =>
+      i === idx ? { ...p, energy: Math.max(0, p.energy + delta) } : p
+    );
+    updateState({ players: newPlayers });
+  };
+
+  const handleExperienceChange = (idx: number, delta: number) => {
+    const newPlayers = players.map((p, i) =>
+      i === idx ? { ...p, experience: Math.max(0, p.experience + delta) } : p
+    );
+    updateState({ players: newPlayers });
+  };
+
+  const handleToggleCitysBlessing = (idx: number) => {
+    const newPlayers = players.map((p, i) =>
+      i === idx ? { ...p, hasCitysBlessing: !p.hasCitysBlessing } : p
+    );
+    updateState({ players: newPlayers });
+  };
+
   const handleCommanderDamageChange = (
     targetIdx: number,
     sourceIdx: number,
@@ -77,7 +234,39 @@ export function GameBoard({ state, onUpdate, onEndGame }: GameBoardProps) {
         [sourceIdx]: newDmg,
       },
     };
-    updateState({ commanderDamage: newCommanderDamage });
+    const prevTotal = current[0] + current[1];
+    const cmdDmgTotal = newDmg[0] + newDmg[1];
+    const isNewElimination = !players[targetIdx].isEliminated && cmdDmgTotal >= 21;
+    const isUndoElimination = players[targetIdx].isEliminated && prevTotal >= 21 && cmdDmgTotal < 21;
+    const target = players[targetIdx];
+    const source = players[sourceIdx];
+    const cmdLabel = source.partner
+      ? `${source.commander.name} / ${source.partner.name}`
+      : source.commander.name;
+    const noteTag = `[cmdkill:${targetIdx}:${sourceIdx}]`;
+    const noteLine = `${noteTag} ${target.playerName} eliminated by ${cmdLabel} commander damage (turn ${state.turnNumber})`;
+
+    let newNotes = state.notes;
+    if (isNewElimination) {
+      newNotes = [state.notes, noteLine].filter(Boolean).join('\n');
+    } else if (isUndoElimination) {
+      newNotes = state.notes.split('\n').filter((l) => !l.includes(noteTag)).join('\n');
+    }
+
+    const newPlayers = players.map((p, i) => {
+      if (i !== targetIdx) return p;
+      return {
+        ...p,
+        life: p.life - delta,
+        ...(isNewElimination ? { isEliminated: true, eliminatedTurn: state.turnNumber } : {}),
+        ...(isUndoElimination ? { isEliminated: false, eliminatedTurn: null } : {}),
+      };
+    });
+    updateState({ commanderDamage: newCommanderDamage, players: newPlayers, notes: newNotes });
+    if (isNewElimination) {
+      const remaining = newPlayers.filter((p) => !p.isEliminated);
+      if (remaining.length === 1) setWinner(remaining[0]);
+    }
   };
 
   const handleEliminate = (idx: number) => {
@@ -87,6 +276,8 @@ export function GameBoard({ state, onUpdate, onEndGame }: GameBoardProps) {
         : p
     );
     updateState({ players: newPlayers });
+    const remaining = newPlayers.filter((p) => !p.isEliminated);
+    if (remaining.length === 1) setWinner(remaining[0]);
   };
 
   const handleUndoEliminate = (idx: number) => {
@@ -96,36 +287,40 @@ export function GameBoard({ state, onUpdate, onEndGame }: GameBoardProps) {
     updateState({ players: newPlayers });
   };
 
-  const handleNextTurn = () => {
-    const count = players.length;
-    let next = (currentPlayerIdx + 1) % count;
-    let wrapped = false;
-    // skip eliminated players
-    while (players[next].isEliminated && next !== currentPlayerIdx) {
-      if (next === 0) wrapped = true;
-      next = (next + 1) % count;
-    }
-    const cycledBack = next <= currentPlayerIdx || wrapped;
-    const newTurnNumber = cycledBack ? turnNumber + 1 : turnNumber;
-    updateState({ currentPlayerIdx: next, turnNumber: newTurnNumber });
-  };
+  const CLOCKWISE: PlayerState['position'][] = ['bottom', 'left', 'top', 'right'];
 
-  // Assign grid areas based on position
-  const getGridArea = (position: PlayerState['position']) => {
-    switch (position) {
-      case 'bottom': return 'bottom';
-      case 'top': return 'top';
-      case 'left': return 'left';
-      case 'right': return 'right';
+  const handleNextTurn = () => {
+    const currentPos = players[currentPlayerIdx].position;
+    const curCW = CLOCKWISE.indexOf(currentPos);
+    let nextPlayerIdx = -1;
+    let nextCW = -1;
+    for (let step = 1; step <= 4; step++) {
+      const nextPos = CLOCKWISE[(curCW + step) % 4];
+      const idx = players.findIndex(p => p.position === nextPos && !p.isEliminated);
+      if (idx !== -1) { nextPlayerIdx = idx; nextCW = (curCW + step) % 4; break; }
     }
+    if (nextPlayerIdx === -1) return;
+    const wrapped = nextCW <= curCW;
+    const newTurnNumber = wrapped ? turnNumber + 1 : turnNumber;
+    updateState({ currentPlayerIdx: nextPlayerIdx, turnNumber: newTurnNumber, turnStartTime: Date.now() });
   };
 
   const getRotation = (position: PlayerState['position']) => {
     switch (position) {
       case 'bottom': return 'rotate(0deg)';
       case 'top': return 'rotate(180deg)';
-      case 'left': return 'rotate(-90deg)';
-      case 'right': return 'rotate(90deg)';
+      case 'left': return 'rotate(90deg)';
+      case 'right': return 'rotate(-90deg)';
+    }
+  };
+
+  // Grid placement: col/row (1-indexed)
+  const getGridPlacement = (position: PlayerState['position']) => {
+    switch (position) {
+      case 'top':    return { gridColumn: 2, gridRow: 1 };
+      case 'bottom': return { gridColumn: 2, gridRow: 3 };
+      case 'left':   return { gridColumn: 1, gridRow: '1 / 4' }; // full height
+      case 'right':  return { gridColumn: 3, gridRow: '1 / 4' }; // full height
     }
   };
 
@@ -139,53 +334,67 @@ export function GameBoard({ state, onUpdate, onEndGame }: GameBoardProps) {
         position: 'fixed',
         inset: 0,
         display: 'grid',
-        gridTemplateAreas: '". top ." "left center right" ". bottom ."',
         gridTemplateColumns,
         gridTemplateRows: '220px 1fr 220px',
         bgcolor: (theme) =>
           theme.palette.mode === 'dark' ? '#1A1410' : '#FFF8F0',
         gap: 0.5,
-        p: 0.5,
+        px: 0.5,
+        py: 0,
       }}
     >
       {players.map((player, idx) => {
-        const area = getGridArea(player.position);
+        const placement = getGridPlacement(player.position);
         const rotation = getRotation(player.position);
         const isVertical = player.position === 'left' || player.position === 'right';
 
-        if (player.position === 'top' && playerCount < 4) return null;
-        if (player.position === 'left' && playerCount < 3) return null;
+        if (player.position === 'top' && playerCount < 3) return null;
+        if (player.position === 'left' && playerCount < 4) return null;
 
         return (
           <Box
             key={idx}
             sx={{
-              gridArea: area,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              ...placement,
+              position: 'relative',
               overflow: 'hidden',
             }}
           >
             <Box
-              sx={{
-                transform: rotation,
-                transformOrigin: 'center center',
-                width: isVertical ? 'calc(100vh - 440px - 8px)' : '100%',
-                height: isVertical ? '220px' : '100%',
-                position: 'relative',
-              }}
+              sx={
+                isVertical
+                  ? {
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      width: '100vh',
+                      height: '220px',
+                      transform: `translate(-50%, -50%) ${rotation}`,
+                    }
+                  : {
+                      position: 'absolute',
+                      inset: 0,
+                      transform: rotation,
+                    }
+              }
             >
               <PlayerPanel
                 player={player}
                 playerIdx={idx}
                 allPlayers={players}
                 commanderDamage={commanderDamage}
+                isHighlighted={rollState.highlightIdx === idx}
+                isCurrentPlayer={firstPlayerSet && currentPlayerIdx === idx}
+                elapsedSeconds={firstPlayerSet && currentPlayerIdx === idx ? elapsedSeconds : 0}
+                turnTimerSeconds={turnTimerSeconds}
                 onLifeChange={handleLifeChange}
                 onPoisonChange={handlePoisonChange}
                 onCommanderTaxChange={handleCommanderTaxChange}
+                onEnergyChange={handleEnergyChange}
+                onExperienceChange={handleExperienceChange}
                 onToggleMonarch={handleToggleMonarch}
                 onToggleInitiative={handleToggleInitiative}
+                onToggleCitysBlessing={handleToggleCitysBlessing}
                 onCommanderDamageChange={handleCommanderDamageChange}
                 onEliminate={handleEliminate}
                 onUndoEliminate={handleUndoEliminate}
@@ -195,15 +404,120 @@ export function GameBoard({ state, onUpdate, onEndGame }: GameBoardProps) {
         );
       })}
 
-      <Box sx={{ gridArea: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+<Box sx={{ gridColumn: 2, gridRow: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <CenterZone
           turnNumber={turnNumber}
           currentPlayerIdx={currentPlayerIdx}
           players={players}
+          rollPhase={rollState.phase}
+          rolledPlayerName={rollState.finalIdx !== null ? players[rollState.finalIdx]?.playerName : undefined}
+          firstPlayerSet={firstPlayerSet}
           onNextTurn={handleNextTurn}
           onEndGame={onEndGame}
+          onRollForFirst={startRoll}
+          onAcceptFirstPlayer={handleAcceptFirstPlayer}
+          onRollAgain={handleRollAgain}
+          onRestartGame={() => onRestartGame(players)}
+          turnTimerSeconds={turnTimerSeconds}
+          onTimerChange={(s) => updateState({ turnTimerSeconds: s })}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={toggleFullscreen}
+          notes={state.notes}
+          onNotesChange={(n) => updateState({ notes: n })}
         />
       </Box>
+
+      {/* Life kill attribution prompt */}
+      {lifeKillPrompt && (() => {
+        const target = players[lifeKillPrompt.targetIdx];
+        const opponents = players.filter((_, i) => i !== lifeKillPrompt.targetIdx && !players[i].isEliminated);
+        const lifeNoteTag = `[lifekill:${lifeKillPrompt.targetIdx}]`;
+        const handleSelect = (sourceIdx: number | null) => {
+          const source = sourceIdx !== null ? players[sourceIdx] : null;
+          const noteLine = source
+            ? `${lifeNoteTag} ${target.playerName} brought to 0 life by ${source.playerName} (turn ${state.turnNumber})`
+            : `${lifeNoteTag} ${target.playerName} brought to 0 life (turn ${state.turnNumber})`;
+          updateState({ notes: [state.notes, noteLine].filter(Boolean).join('\n') });
+          const pending = lifeKillPrompt.pendingWinner;
+          setLifeKillPrompt(null);
+          if (pending) setWinner(pending);
+        };
+        return (
+          <Dialog open maxWidth="xs" fullWidth>
+            <DialogTitle sx={{ fontWeight: 700 }}>Who brought {target.playerName} to 0?</DialogTitle>
+            <DialogContent>
+              <Stack spacing={1}>
+                {opponents.map((opp) => {
+                  const oppIdx = players.indexOf(opp);
+                  return (
+                    <Button key={oppIdx} variant="outlined" fullWidth onClick={() => handleSelect(oppIdx)}>
+                      {opp.playerName}
+                    </Button>
+                  );
+                })}
+              </Stack>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => handleSelect(null)}>Skip</Button>
+            </DialogActions>
+          </Dialog>
+        );
+      })()}
+
+      {/* Poison kill attribution prompt */}
+      {poisonKillPrompt && (() => {
+        const target = players[poisonKillPrompt.targetIdx];
+        const opponents = players.filter((_, i) => i !== poisonKillPrompt.targetIdx && !players[i].isEliminated);
+        const poisonNoteTag = `[poisonkill:${poisonKillPrompt.targetIdx}]`;
+        const handleSelect = (sourceIdx: number | null) => {
+          const source = sourceIdx !== null ? players[sourceIdx] : null;
+          const noteLine = source
+            ? `${poisonNoteTag} ${target.playerName} eliminated by ${source.playerName}'s poison (turn ${state.turnNumber})`
+            : `${poisonNoteTag} ${target.playerName} eliminated by poison (turn ${state.turnNumber})`;
+          updateState({ notes: [state.notes, noteLine].filter(Boolean).join('\n') });
+          const remaining = poisonKillPrompt.newPlayers.filter((p) => !p.isEliminated);
+          const pending = remaining.length === 1 ? remaining[0] : null;
+          setPoisonKillPrompt(null);
+          if (pending) setWinner(pending);
+        };
+        return (
+          <Dialog open maxWidth="xs" fullWidth>
+            <DialogTitle sx={{ fontWeight: 700 }}>Who poisoned {target.playerName}?</DialogTitle>
+            <DialogContent>
+              <Stack spacing={1}>
+                {opponents.map((opp, i) => {
+                  const oppIdx = players.indexOf(opp);
+                  return (
+                    <Button key={i} variant="outlined" fullWidth onClick={() => handleSelect(oppIdx)}>
+                      {opp.playerName}
+                    </Button>
+                  );
+                })}
+              </Stack>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => handleSelect(null)}>Skip</Button>
+            </DialogActions>
+          </Dialog>
+        );
+      })()}
+
+      {/* Win dialog */}
+      <Dialog open={!!winner} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ textAlign: 'center', fontWeight: 900, fontSize: 24 }}>
+          🏆 {winner?.playerName} Wins!
+        </DialogTitle>
+        <DialogContent sx={{ textAlign: 'center' }}>
+          <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>
+            {winner?.commander.name}
+          </Typography>
+          <Typography sx={{ mt: 1 }}>Would you like to save this game?</Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', gap: 1, pb: 2 }}>
+          <Button variant="outlined" onClick={() => { setWinner(null); onEndGame(); }}>Skip</Button>
+          <Button variant="contained" onClick={() => { setWinner(null); onSaveGame(state); }}>Save Game</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

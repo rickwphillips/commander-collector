@@ -19,6 +19,9 @@ export interface PlayerState extends PlayerSetup {
   commanderTax: number;
   isMonarch: boolean;
   hasInitiative: boolean;
+  hasCitysBlessing: boolean;
+  energy: number;
+  experience: number;
   isEliminated: boolean;
   eliminatedTurn: number | null;
 }
@@ -35,6 +38,9 @@ export interface GameManagerState {
   turnNumber: number;
   startingLife: number;
   phase: GamePhase;
+  turnTimerSeconds: number;
+  turnStartTime: number; // Date.now() when current turn began
+  notes: string;
 }
 
 export interface GameManagerPrefill {

@@ -12,15 +12,37 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  TextField,
+  IconButton,
 } from '@mui/material';
+import CasinoIcon from '@mui/icons-material/Casino';
+import CloseIcon from '@mui/icons-material/Close';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
+import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
+import NotesIcon from '@mui/icons-material/Notes';
 import type { PlayerState } from '../types';
+
+type RollPhase = 'idle' | 'rolling' | 'done';
 
 interface CenterZoneProps {
   turnNumber: number;
   currentPlayerIdx: number;
   players: PlayerState[];
+  rollPhase: RollPhase;
+  rolledPlayerName?: string;
+  firstPlayerSet: boolean;
   onNextTurn: () => void;
   onEndGame: () => void;
+  onRollForFirst: () => void;
+  onAcceptFirstPlayer: () => void;
+  onRollAgain: () => void;
+  onRestartGame: () => void;
+  turnTimerSeconds: number;
+  onTimerChange: (seconds: number) => void;
+  isFullscreen: boolean;
+  onToggleFullscreen: () => void;
+  notes: string;
+  onNotesChange: (notes: string) => void;
 }
 
 function rollDie(sides: number): number {
@@ -31,13 +53,46 @@ export function CenterZone({
   turnNumber,
   currentPlayerIdx,
   players,
+  rollPhase,
+  rolledPlayerName,
+  firstPlayerSet,
   onNextTurn,
   onEndGame,
+  onRollForFirst,
+  onAcceptFirstPlayer,
+  onRollAgain,
+  onRestartGame,
+  turnTimerSeconds,
+  onTimerChange,
+  isFullscreen,
+  onToggleFullscreen,
+  notes,
+  onNotesChange,
 }: CenterZoneProps) {
-  const [d6Result, setD6Result] = useState<number | null>(null);
-  const [d20Result, setD20Result] = useState<number | null>(null);
-  const [coinResult, setCoinResult] = useState<string | null>(null);
+  type RollEntry = { label: string; rolls: (number | string)[]; total: number | null; color: string };
+  const [history, setHistory] = useState<RollEntry[]>([]);
+  const [resultKey, setResultKey] = useState(0);
+  const [diceCount, setDiceCount] = useState(1);
   const [confirmEnd, setConfirmEnd] = useState(false);
+  const [confirmRestart, setConfirmRestart] = useState(false);
+  const [diceOpen, setDiceOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesDraft, setNotesDraft] = useState('');
+
+  const addRoll = (label: string, sides: number | null) => {
+    if (sides === null) {
+      const rolls = Array.from({ length: diceCount }, () => Math.random() < 0.5 ? 'Heads' : 'Tails');
+      setHistory((prev) => [...prev, { label: diceCount === 1 ? 'Coin Flip' : `${diceCount}× Coin`, rolls, total: null, color: 'primary.main' }]);
+    } else {
+      const rolls = Array.from({ length: diceCount }, () => rollDie(sides));
+      const total = rolls.reduce((a, b) => (a as number) + (b as number), 0) as number;
+      const color = sides === 20 && diceCount === 1 ? (rolls[0] === 20 ? '#DAA520' : rolls[0] === 1 ? 'error.main' : 'primary.main') : 'primary.main';
+      setHistory((prev) => [...prev, { label: diceCount === 1 ? `d${sides}` : `${diceCount}d${sides}`, rolls, total: diceCount > 1 ? total : null, color }]);
+    }
+    setResultKey((k) => k + 1);
+  };
+
+  const lastEntry = history.length > 0 ? history[history.length - 1] : null;
 
   const currentPlayer = players[currentPlayerIdx];
 
@@ -53,132 +108,210 @@ export function CenterZone({
             theme.palette.mode === 'dark' ? '#1A1410' : '#FFF8F0',
           border: (theme) => `1px solid ${theme.palette.divider}`,
           borderRadius: 2,
-          overflow: 'auto',
+          overflow: 'hidden',
+          position: 'relative',
         }}
       >
-        <CardContent sx={{ flex: 1, p: 1.5, '&:last-child': { pb: 1.5 } }}>
-          <Stack spacing={1.5}>
-            {/* Turn tracker */}
-            <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main', lineHeight: 1 }}>
-                Turn {turnNumber}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                Active:
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  fontWeight: 700,
-                  color: 'primary.main',
-                  fontSize: 13,
-                }}
-              >
-                {currentPlayer?.playerName ?? '—'}
-              </Typography>
+        {/* Main content */}
+        <CardContent sx={{ flex: 1, p: 1.5, '&:last-child': { pb: 1.5 }, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+
+          {/* Turn tracker */}
+          {firstPlayerSet && (
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '100%', px: 1 }}>
+              {/* Left side — rotated for left-panel player */}
+              <Box sx={{ transform: 'rotate(90deg)', textAlign: 'center', whiteSpace: 'normal', overflowWrap: 'break-word', maxWidth: 120 }}>
+                <Typography sx={{ fontWeight: 900, fontSize: 36, color: 'primary.main', lineHeight: 1 }}>
+                  Turn {turnNumber}
+                </Typography>
+                <Typography sx={{ fontSize: 16, fontWeight: 600, color: 'text.primary', lineHeight: 1.2 }}>
+                  {currentPlayer?.commander.name ?? '—'}
+                </Typography>
+                <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.3 }}>
+                  {currentPlayer?.playerName ?? '—'}
+                </Typography>
+              </Box>
+
               <Button
                 variant="contained"
-                size="small"
                 onClick={onNextTurn}
-                fullWidth
-                sx={{ mt: 0.5, fontSize: 11 }}
+                sx={{ width: 150, height: 150, fontSize: 24, fontWeight: 700, borderRadius: 2, lineHeight: 1.2, flexShrink: 0 }}
               >
-                Next Turn
+                Next<br />Turn
               </Button>
-            </Box>
 
-            {/* Dice roller */}
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block', mb: 0.5 }}>
-                Dice
-              </Typography>
-              <Stack direction="row" spacing={0.5} justifyContent="center">
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => setD6Result(rollDie(6))}
-                  sx={{ fontSize: 11, px: 1 }}
-                >
-                  d6
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => setD20Result(rollDie(20))}
-                  sx={{ fontSize: 11, px: 1 }}
-                >
-                  d20
-                </Button>
-              </Stack>
-              {(d6Result !== null || d20Result !== null) && (
-                <Stack direction="row" spacing={1} justifyContent="center" sx={{ mt: 0.5 }}>
-                  {d6Result !== null && (
-                    <Box sx={{ textAlign: 'center' }}>
-                      <Typography variant="caption" color="text.secondary">d6</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 900, color: 'primary.main', lineHeight: 1 }}>
-                        {d6Result}
-                      </Typography>
-                    </Box>
-                  )}
-                  {d20Result !== null && (
-                    <Box sx={{ textAlign: 'center' }}>
-                      <Typography variant="caption" color="text.secondary">d20</Typography>
-                      <Typography
-                        variant="h6"
-                        sx={{
-                          fontWeight: 900,
-                          lineHeight: 1,
-                          color:
-                            d20Result === 20
-                              ? '#DAA520'
-                              : d20Result === 1
-                              ? 'error.main'
-                              : 'primary.main',
-                        }}
-                      >
-                        {d20Result}
-                      </Typography>
-                    </Box>
-                  )}
-                </Stack>
-              )}
-            </Box>
-
-            {/* Coin flip */}
-            <Box sx={{ textAlign: 'center' }}>
-              <Button
-                variant="outlined"
-                size="small"
-                fullWidth
-                onClick={() => setCoinResult(Math.random() < 0.5 ? 'Heads' : 'Tails')}
-                sx={{ fontSize: 11 }}
-              >
-                Flip Coin
-              </Button>
-              {coinResult && (
-                <Typography
-                  variant="body2"
-                  sx={{ fontWeight: 700, mt: 0.5, color: 'primary.main' }}
-                >
-                  {coinResult}
+              {/* Right side — rotated for right-panel player */}
+              <Box sx={{ transform: 'rotate(-90deg)', textAlign: 'center', whiteSpace: 'normal', overflowWrap: 'break-word', maxWidth: 120 }}>
+                <Typography sx={{ fontWeight: 900, fontSize: 36, color: 'primary.main', lineHeight: 1 }}>
+                  Turn {turnNumber}
                 </Typography>
+                <Typography sx={{ fontSize: 16, fontWeight: 600, color: 'text.primary', lineHeight: 1.2 }}>
+                  {currentPlayer?.commander.name ?? '—'}
+                </Typography>
+                <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.3 }}>
+                  {currentPlayer?.playerName ?? '—'}
+                </Typography>
+              </Box>
+            </Stack>
+          )}
+
+          {/* Roll for first player */}
+          {!firstPlayerSet && <Box sx={{ textAlign: 'center', width: '100%' }}>
+            {rollPhase === 'idle' && (
+              <Button variant="outlined" fullWidth onClick={onRollForFirst} sx={{ fontSize: 13, py: 1.5 }}>
+                Roll for First Player
+              </Button>
+            )}
+            {rollPhase === 'rolling' && (
+              <Button variant="outlined" fullWidth disabled sx={{ fontSize: 13, py: 1.5 }}>
+                Rolling…
+              </Button>
+            )}
+            {rollPhase === 'done' && (
+              <Box>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#DAA520', display: 'block', mb: 0.5 }}>
+                  {rolledPlayerName} goes first!
+                </Typography>
+                <Stack direction="row" spacing={0.5}>
+                  <Button variant="contained" onClick={onAcceptFirstPlayer} sx={{ flex: 1, fontSize: 11 }}>Accept</Button>
+                  <Button variant="outlined" onClick={onRollAgain} sx={{ flex: 1, fontSize: 11 }}>Roll Again</Button>
+                </Stack>
+              </Box>
+            )}
+          </Box>}
+
+          {/* Fullscreen toggle */}
+          <IconButton
+            onClick={onToggleFullscreen}
+            sx={{ position: 'absolute', bottom: 6, left: 6, color: 'text.secondary' }}
+            title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+          >
+            {isFullscreen ? <FullscreenExitIcon sx={{ fontSize: 20 }} /> : <FullscreenIcon sx={{ fontSize: 20 }} />}
+          </IconButton>
+
+          {/* Notes button */}
+          <IconButton
+            onClick={() => { setNotesDraft(notes); setNotesOpen(true); }}
+            sx={{ position: 'absolute', bottom: 6, left: 34, color: notes.trim() ? 'primary.main' : 'text.secondary' }}
+            title="Game Notes"
+          >
+            <NotesIcon sx={{ fontSize: 20 }} />
+          </IconButton>
+
+          {/* Dice & More toggle */}
+          <IconButton
+            onClick={() => setDiceOpen(true)}
+            sx={{ position: 'absolute', bottom: 6, right: 6, color: 'text.secondary' }}
+            title="Dice & More"
+          >
+            <CasinoIcon sx={{ fontSize: 20 }} />
+          </IconButton>
+        </CardContent>
+
+        {/* Dice & More overlay */}
+        {diceOpen && (
+          <Box sx={{
+            position: 'absolute',
+            inset: 0,
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? '#1A1410EE' : '#FFF8F0EE',
+            zIndex: 10,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            p: 1.5,
+          }}>
+            {/* Header */}
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '100%' }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Dice / Flips
+              </Typography>
+              <IconButton size="small" onClick={() => setDiceOpen(false)} sx={{ p: 0.25 }}>
+                <CloseIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Stack>
+
+            {/* Latest result — big display */}
+            <Box sx={{ minHeight: 80, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {lastEntry ? (
+                <Box key={resultKey} sx={{
+                  position: 'relative', width: '100%', textAlign: 'center',
+                  animation: 'diceResultPop 0.35s cubic-bezier(0.34,1.56,0.64,1)',
+                  '@keyframes diceResultPop': {
+                    '0%':   { opacity: 0, transform: 'scale(0.4) translateY(12px)' },
+                    '100%': { opacity: 1, transform: 'scale(1)   translateY(0)'    },
+                  },
+                }}>
+                  {lastEntry.rolls.length === 1 ? (
+                    <Typography sx={{ fontWeight: 900, fontSize: 48, lineHeight: 1, color: lastEntry.color }}>
+                      {lastEntry.rolls[0]}
+                    </Typography>
+                  ) : (
+                    <>
+                      <Stack direction="row" flexWrap="wrap" justifyContent="center" gap={1}>
+                        {lastEntry.rolls.map((r, i) => (
+                          <Box key={i} sx={{ textAlign: 'center' }}>
+                            <Typography sx={{ fontSize: 9, color: 'text.disabled' }}>{i + 1}</Typography>
+                            <Typography sx={{ fontWeight: 900, fontSize: 32, lineHeight: 1, color: lastEntry.color }}>{r}</Typography>
+                          </Box>
+                        ))}
+                      </Stack>
+                      {lastEntry.total !== null && (
+                        <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.5 }}>
+                          total: {lastEntry.total}
+                        </Typography>
+                      )}
+                    </>
+                  )}
+                  <Typography sx={{ fontSize: 10, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1, mt: 1.5 }}>
+                    {lastEntry.label}
+                  </Typography>
+                </Box>
+              ) : (
+                <Typography sx={{ fontSize: 11, color: 'text.disabled' }}>—</Typography>
               )}
             </Box>
 
-            {/* End game */}
-            <Button
-              variant="outlined"
-              color="error"
-              size="small"
-              fullWidth
-              onClick={() => setConfirmEnd(true)}
-              sx={{ fontSize: 11 }}
-            >
-              End Game
-            </Button>
-          </Stack>
-        </CardContent>
+
+            {/* Buttons */}
+            <Box sx={{ width: '100%' }}>
+              <Stack direction="row" spacing={0.5} justifyContent="center" sx={{ mb: 0.75 }}>
+                <Button variant="outlined" size="small" onClick={() => addRoll('d6', 6)} sx={{ fontSize: 11, px: 1.5 }}>d6</Button>
+                <Button variant="outlined" size="small" onClick={() => addRoll('d20', 20)} sx={{ fontSize: 11, px: 1.5 }}>d20</Button>
+                <Button variant="outlined" size="small" onClick={() => addRoll('coin', null)} sx={{ fontSize: 11, px: 1.5 }}>Flip Coin</Button>
+              </Stack>
+              <Stack direction="row" alignItems="center" justifyContent="space-between">
+                {/* Dice count — bottom left */}
+                <Stack direction="row" alignItems="center" spacing={0.5}>
+                  <Button size="small" variant="outlined" onClick={() => setDiceCount((c) => Math.max(1, c - 1))} sx={{ minWidth: 24, px: 0, fontSize: 14 }}>−</Button>
+                  <Typography sx={{ fontWeight: 700, fontSize: 13, minWidth: 20, textAlign: 'center' }}>{diceCount}</Typography>
+                  <Button size="small" variant="outlined" onClick={() => setDiceCount((c) => Math.min(20, c + 1))} sx={{ minWidth: 24, px: 0, fontSize: 14 }}>+</Button>
+                  <Typography sx={{ fontSize: 10, color: 'text.secondary' }}>dice</Typography>
+                </Stack>
+                {/* Game actions — bottom right */}
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                  {history.length > 0 && <Button variant="text" size="small" onClick={() => setHistory([])} sx={{ fontSize: 10, px: 0.5, color: 'text.disabled' }}>Clear</Button>}
+                  <Button variant="outlined" color="error" size="small" onClick={() => setConfirmEnd(true)} sx={{ fontSize: 11, px: 1 }}>End Game</Button>
+                  <Button variant="outlined" size="small" onClick={() => setConfirmRestart(true)} sx={{ fontSize: 11, px: 1 }}>Restart</Button>
+                </Stack>
+              </Stack>
+            </Box>
+          </Box>
+        )}
       </Card>
+
+      <Dialog open={confirmRestart} onClose={() => setConfirmRestart(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Restart Game?</DialogTitle>
+        <DialogContent>
+          <Typography>This will clear the current game and return to setup.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmRestart(false)}>Cancel</Button>
+          <Button onClick={() => { setConfirmRestart(false); onRestartGame(); }} variant="contained">
+            Restart
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={confirmEnd} onClose={() => setConfirmEnd(false)} maxWidth="xs" fullWidth>
         <DialogTitle>End Game?</DialogTitle>
@@ -197,6 +330,26 @@ export function CenterZone({
           >
             End Game
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={notesOpen} onClose={() => setNotesOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Game Notes</DialogTitle>
+        <DialogContent>
+          <TextField
+            multiline
+            fullWidth
+            minRows={5}
+            maxRows={12}
+            value={notesDraft}
+            onChange={(e) => setNotesDraft(e.target.value)}
+            placeholder="Add notes about this game..."
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setNotesOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={() => { onNotesChange(notesDraft); setNotesOpen(false); }}>Save</Button>
         </DialogActions>
       </Dialog>
     </>

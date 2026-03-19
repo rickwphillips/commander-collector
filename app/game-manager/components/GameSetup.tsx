@@ -25,7 +25,8 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import type { PlayerSetup, CommanderInfo } from '../types';
 
 interface GameSetupProps {
-  onStart: (players: PlayerSetup[], startingLife: number) => void;
+  onStart: (players: PlayerSetup[], startingLife: number, turnTimerSeconds: number) => void;
+  prefillPlayers?: PlayerSetup[];
 }
 
 interface CommanderFieldState {
@@ -60,7 +61,7 @@ const emptySlot = (): PlayerSlot => ({
 
 const LIFE_PRESETS = [20, 30, 40];
 
-export function GameSetup({ onStart }: GameSetupProps) {
+export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [decks, setDecks] = useState<DeckWithPlayer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +70,7 @@ export function GameSetup({ onStart }: GameSetupProps) {
   const [startingLife, setStartingLife] = useState<number>(40);
   const [customLife, setCustomLife] = useState<string>('');
   const [isCustomLife, setIsCustomLife] = useState(false);
+  const [turnTimerSeconds, setTurnTimerSeconds] = useState<number>(300);
 
   const [playerCount, setPlayerCount] = useState<number>(4);
   const [slots, setSlots] = useState<PlayerSlot[]>([emptySlot(), emptySlot(), emptySlot(), emptySlot()]);
@@ -82,6 +84,19 @@ export function GameSetup({ onStart }: GameSetupProps) {
         const [deckData, playerData] = await Promise.all([api.getDecks(), api.getPlayers()]);
         setDecks(deckData);
         setPlayers(playerData);
+
+        if (prefillPlayers && prefillPlayers.length > 0) {
+          setPlayerCount(prefillPlayers.length);
+          setSlots(prefillPlayers.map((p) => ({
+            playerId: p.playerId,
+            deckId: p.deckId,
+            commander: { name: p.commander.name, artCropUrl: p.commander.artCropUrl, options: [], loading: false },
+            hasPartner: !!p.partner,
+            partner: p.partner
+              ? { name: p.partner.name, artCropUrl: p.partner.artCropUrl, options: [], loading: false }
+              : emptyCommander(),
+          })));
+        }
       } catch {
         setError('Failed to load players and decks');
       } finally {
@@ -95,7 +110,7 @@ export function GameSetup({ onStart }: GameSetupProps) {
   }, []);
 
   const handlePlayerChange = (idx: number, playerId: number | '') => {
-    updateSlot(idx, { playerId, deckId: '' });
+    updateSlot(idx, { playerId });
   };
 
   const handleDeckChange = (idx: number, deckId: number | '') => {
@@ -103,9 +118,12 @@ export function GameSetup({ onStart }: GameSetupProps) {
     const commanderName = deck?.commander ?? '';
     const ownerPlayerId = deck?.player_id ?? '';
     const currentPlayerId = slots[idx].playerId;
+    const ownerAlreadyPlaying = slots.some((s, i) => i !== idx && s.playerId === ownerPlayerId);
+    const resolvedPlayerId =
+      currentPlayerId === '' && !ownerAlreadyPlaying ? ownerPlayerId : currentPlayerId;
     updateSlot(idx, {
       deckId,
-      playerId: currentPlayerId === '' ? ownerPlayerId : currentPlayerId,
+      playerId: resolvedPlayerId,
       commander: {
         ...slots[idx].commander,
         name: commanderName,
@@ -200,6 +218,12 @@ export function GameSetup({ onStart }: GameSetupProps) {
         return;
       }
     }
+    const playerIds = activeSlots.map((s) => s.playerId).filter((id) => id !== '');
+    if (new Set(playerIds).size !== playerIds.length) {
+      setError('Each player must be unique.');
+      return;
+    }
+
     setError(null);
 
     const positions: Array<'bottom' | 'top' | 'left' | 'right'> =
@@ -227,7 +251,7 @@ export function GameSetup({ onStart }: GameSetupProps) {
       return setup;
     });
 
-    onStart(playerSetups, startingLife);
+    onStart(playerSetups, startingLife, turnTimerSeconds);
   };
 
   if (loading) return <LoadingSpinner message="Loading..." />;
@@ -283,30 +307,6 @@ export function GameSetup({ onStart }: GameSetupProps) {
           <Stack spacing={2}>
             <TextField
               select
-              label="Player"
-              value={slot.playerId}
-              onChange={(e) =>
-                handlePlayerChange(idx, e.target.value === '' ? '' : Number(e.target.value))
-              }
-              size="small"
-              fullWidth
-            >
-              <MenuItem value="">Select a player</MenuItem>
-              {players.map((p) => (
-                <MenuItem
-                  key={p.id}
-                  value={p.id}
-                  disabled={slots
-                    .slice(0, playerCount)
-                    .some((s, i) => i !== idx && s.playerId === p.id)}
-                >
-                  {p.name}
-                </MenuItem>
-              ))}
-            </TextField>
-
-            <TextField
-              select
               label="Deck"
               value={slot.deckId}
               onChange={(e) =>
@@ -328,6 +328,30 @@ export function GameSetup({ onStart }: GameSetupProps) {
               {otherDecks.map((d) => (
                 <MenuItem key={d.id} value={d.id}>
                   {d.name} ({d.player_name}) — {d.commander}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              select
+              label="Player"
+              value={slot.playerId}
+              onChange={(e) =>
+                handlePlayerChange(idx, e.target.value === '' ? '' : Number(e.target.value))
+              }
+              size="small"
+              fullWidth
+            >
+              <MenuItem value="">Select a player</MenuItem>
+              {players.map((p) => (
+                <MenuItem
+                  key={p.id}
+                  value={p.id}
+                  disabled={slots
+                    .slice(0, playerCount)
+                    .some((s, i) => i !== idx && s.playerId === p.id)}
+                >
+                  {p.name}
                 </MenuItem>
               ))}
             </TextField>
@@ -408,6 +432,15 @@ export function GameSetup({ onStart }: GameSetupProps) {
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
               Starting life: <strong>{startingLife}</strong>
             </Typography>
+            <TextField
+              label="Turn Timer (seconds)"
+              type="number"
+              size="small"
+              value={turnTimerSeconds}
+              onChange={(e) => setTurnTimerSeconds(Math.max(1, Number(e.target.value)))}
+              inputProps={{ min: 1 }}
+              sx={{ mt: 2, width: 180 }}
+            />
           </CardContent>
         </Card>
 

@@ -20,6 +20,7 @@ import Link from 'next/link';
 import AddIcon from '@mui/icons-material/Add';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import SearchIcon from '@mui/icons-material/Search';
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import { PageContainer } from '@/components/PageContainer';
 import { ColorIdentityChips } from '@/components/ColorIdentityChips';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -74,9 +75,14 @@ export default function GamesPage() {
       title="Games"
       subtitle="View your game history"
       actions={
-        <Button variant="contained" startIcon={<AddIcon />} component={Link} href="/games/new">
-          Log Game
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <Button variant="outlined" startIcon={<SportsEsportsIcon />} component={Link} href="/game-manager">
+            Play Game
+          </Button>
+          <Button variant="contained" startIcon={<AddIcon />} component={Link} href="/games/new">
+            Log Game
+          </Button>
+        </Stack>
       }
     >
       {error && (

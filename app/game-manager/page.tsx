@@ -6,8 +6,10 @@ import { GameSetup } from './components/GameSetup';
 import { GameBoard } from './components/GameBoard';
 import { GameEndSummary } from './components/GameEndSummary';
 import type { GameManagerState, PlayerSetup, PlayerState, CommanderDamageMap } from './types';
+import type { GameResultInput } from '@/lib/types';
+import { api } from '@/lib/api';
 
-const POSITIONS: Array<PlayerState['position']> = ['bottom', 'top', 'left', 'right'];
+const POSITIONS: Array<PlayerState['position']> = ['bottom', 'right', 'top', 'left'];
 const GAME_STATE_KEY = 'commander_game_state';
 
 const DEFAULT_STATE: GameManagerState = {
@@ -17,6 +19,9 @@ const DEFAULT_STATE: GameManagerState = {
   turnNumber: 1,
   startingLife: 40,
   phase: 'setup',
+  turnTimerSeconds: 300,
+  turnStartTime: 0,
+  notes: '',
 };
 
 function loadSavedState(): GameManagerState | null {
@@ -40,6 +45,9 @@ function buildInitialState(playerSetups: PlayerSetup[], startingLife: number): G
     commanderTax: 0,
     isMonarch: false,
     hasInitiative: false,
+    hasCitysBlessing: false,
+    energy: 0,
+    experience: 0,
     isEliminated: false,
     eliminatedTurn: null,
   }));
@@ -62,15 +70,23 @@ function buildInitialState(playerSetups: PlayerSetup[], startingLife: number): G
     turnNumber: 1,
     startingLife,
     phase: 'playing',
+    turnTimerSeconds: 300,
+    turnStartTime: Date.now(),
+    notes: '',
   };
 }
 
 export default function GameManagerPage() {
   const router = useRouter();
+  const [isResumed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return loadSavedState() !== null;
+  });
   const [state, setState] = useState<GameManagerState>(() => {
     if (typeof window === 'undefined') return DEFAULT_STATE;
     return loadSavedState() ?? DEFAULT_STATE;
   });
+  const [setupPrefill, setSetupPrefill] = useState<PlayerSetup[] | null>(null);
 
   useEffect(() => {
     if (state.phase !== 'setup') {
@@ -78,8 +94,8 @@ export default function GameManagerPage() {
     }
   }, [state]);
 
-  const handleStart = (playerSetups: PlayerSetup[], startingLife: number) => {
-    setState(buildInitialState(playerSetups, startingLife));
+  const handleStart = (playerSetups: PlayerSetup[], startingLife: number, turnTimerSeconds: number) => {
+    setState({ ...buildInitialState(playerSetups, startingLife), turnTimerSeconds });
   };
 
   const handleUpdate = (newState: GameManagerState) => {
@@ -95,13 +111,43 @@ export default function GameManagerPage() {
     router.push('/games/new');
   };
 
+  const handleSaveGame = async (currentState: GameManagerState) => {
+    const today = new Date().toISOString().split('T')[0];
+    const winner = currentState.players.find((p) => !p.isEliminated);
+    const losers = currentState.players
+      .filter((p) => p.isEliminated)
+      .sort((a, b) => (b.eliminatedTurn ?? 0) - (a.eliminatedTurn ?? 0));
+    const results: GameResultInput[] = [
+      ...(winner ? [{ deck_id: winner.deckId, player_id: winner.playerId, finish_position: 1, eliminated_turn: null, team_number: null }] : []),
+      ...losers.map((p, i) => ({ deck_id: p.deckId, player_id: p.playerId, finish_position: i + 2, eliminated_turn: p.eliminatedTurn, team_number: null })),
+    ];
+    const cleanNotes = currentState.notes.replace(/\[(?:cmdkill|poisonkill):[^\]]+\]\s*/g, '').trim() || null;
+    const { id } = await api.createGame({ played_at: today, notes: cleanNotes, game_type: 'standard', results });
+    localStorage.removeItem(GAME_STATE_KEY);
+    router.push(`/games/detail?id=${id}`);
+  };
+
   const handleNewGame = () => {
     localStorage.removeItem(GAME_STATE_KEY);
+    setSetupPrefill(null);
+    setState(DEFAULT_STATE);
+  };
+
+  const handleRestartGame = (currentPlayers: PlayerState[]) => {
+    localStorage.removeItem(GAME_STATE_KEY);
+    setSetupPrefill(currentPlayers.map((p) => ({
+      playerId: p.playerId,
+      deckId: p.deckId,
+      playerName: p.playerName,
+      deckName: p.deckName,
+      commander: p.commander,
+      partner: p.partner,
+    })));
     setState(DEFAULT_STATE);
   };
 
   if (state.phase === 'setup') {
-    return <GameSetup onStart={handleStart} />;
+    return <GameSetup onStart={handleStart} prefillPlayers={setupPrefill ?? undefined} />;
   }
 
   if (state.phase === 'playing') {
@@ -110,6 +156,10 @@ export default function GameManagerPage() {
         state={state}
         onUpdate={handleUpdate}
         onEndGame={handleEndGame}
+        onRestartGame={handleRestartGame}
+        onLogGame={handleLogGame}
+        onSaveGame={handleSaveGame}
+        isResumed={isResumed}
       />
     );
   }
