@@ -38,6 +38,22 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.13.0',
+    date: '2026-03-19',
+    title: 'Game Manager — Visual Effects & Polish',
+    changes: [
+      { type: 'added', text: "City's Blessing animated panel — castle silhouette slides in from the left, god rays fan out from the top-left corner, multicolored fireworks launch in sequence, and clouds drift slowly across the top" },
+      { type: 'added', text: "City's Blessing exit sequence — reverses entrance: clouds stop, fireworks fade, rays fade out, then castle slides back off-screen" },
+      { type: 'added', text: 'Initiative torch overlay — dungeon stone background fades in when initiative is held; an animated torch silhouette wanders across the panel with a drifting flame animation and flickering glow' },
+      { type: 'added', text: 'Initiative icon (castle) shown in the commander damage list alongside crown and City\'s Blessing icons when the source player holds the initiative' },
+      { type: 'added', text: 'Monarch icon replaced with a crown SVG; all status header icons now have tooltips' },
+      { type: 'added', text: 'Ixalan set symbol added as an in-code SVG for the City\'s Blessing status icon' },
+      { type: 'added', text: 'Toggleable text size mode in the game manager panel — cycles through compact, normal, and large layouts' },
+      { type: 'improved', text: "City's Blessing icon uses a royal purple gradient (pink → violet → deep indigo) in all locations when active" },
+      { type: 'fixed', text: 'Commander damage minus button no longer adds life back when damage is already at 0 — uses actual delta to prevent phantom life gain' },
+    ],
+  },
+  {
     version: '1.12.1',
     date: '2026-03-19',
     title: 'Game Setup — Position Arrows',
