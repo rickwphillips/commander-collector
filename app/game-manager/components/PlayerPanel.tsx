@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { keyframes } from '@emotion/react';
 import { Box, Stack, Typography, IconButton, Button, TextField, Tooltip } from '@mui/material';
 import CrownIcon from '@mui/icons-material/EmojiEvents';
@@ -56,6 +56,19 @@ export function PlayerPanel({
 }: PlayerPanelProps) {
   const [eliminateTurnInput, setEliminateTurnInput] = useState('');
   const [showEliminateConfirm, setShowEliminateConfirm] = useState(false);
+  const [xpFlashing, setXpFlashing] = useState(false);
+  const [xpRippleKey, setXpRippleKey] = useState(0);
+  const prevExperience = useRef(player.experience);
+
+  useEffect(() => {
+    if (player.experience > prevExperience.current) {
+      setXpFlashing(true);
+      setXpRippleKey(k => k + 1);
+      setTimeout(() => setXpFlashing(false), 700);
+    }
+    prevExperience.current = player.experience;
+  }, [player.experience]);
+
   const [lpKey, setLpKey] = useState<string | null>(null);
   const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lpFired = useRef(false);
@@ -106,6 +119,24 @@ export function PlayerPanel({
     ? `0 0 ${8 + player.energy * 6}px rgba(80,200,255,${Math.min(1, 0.7 + energyGlowIntensity * 0.3).toFixed(2)}), 0 0 ${20 + player.energy * 12}px rgba(80,200,255,${Math.min(0.6, 0.3 + energyGlowIntensity * 0.3).toFixed(2)})`
     : undefined;
   const energyPulseDuration = player.energy > 5 ? Math.max(0.8, 2.5 - (player.energy - 5) * 0.09) : 2.5;
+  const xpGlowIntensity = player.experience > 0 ? Math.min(player.experience / 10, 1) : 0;
+  const xpGlow = xpGlowIntensity > 0
+    ? `0 0 ${4 + xpGlowIntensity * 12}px rgba(218,165,32,${(0.5 + xpGlowIntensity * 0.5).toFixed(2)}), 0 0 ${10 + xpGlowIntensity * 24}px rgba(218,165,32,${(0.2 + xpGlowIntensity * 0.3).toFixed(2)})`
+    : undefined;
+  const xpShimmerAnim = useMemo(() => player.experience > 0 ? keyframes`
+    0%,100% { text-shadow: ${xpGlow}; filter: brightness(1); }
+    45%, 55% { text-shadow: 0 0 ${6 + xpGlowIntensity * 16}px rgba(255,223,0,0.95), 0 0 ${18 + xpGlowIntensity * 28}px rgba(218,165,32,0.7); filter: brightness(1.5); }
+  ` : null, [player.experience]);
+  const xpFlashAnim = useMemo(() => keyframes`
+    0%   { box-shadow: 0 2px 8px rgba(218,165,32,0.5); transform: rotate(45deg) scale(1); }
+    25%  { box-shadow: 0 2px 28px rgba(255,215,0,1), 0 0 48px rgba(255,215,0,0.5); transform: rotate(45deg) scale(1.3); }
+    100% { box-shadow: 0 2px 8px rgba(218,165,32,0.5); transform: rotate(45deg) scale(1); }
+  `, []);
+  const xpRippleAnim = useMemo(() => keyframes`
+    0%   { transform: translate(-50%,-50%) rotate(45deg) scale(0.4); opacity: 0.9; }
+    100% { transform: translate(-50%,-50%) rotate(45deg) scale(4);   opacity: 0; }
+  `, []);
+
   const energyPulseAnim = useMemo(() => player.energy > 5 ? keyframes`
     0%   { text-shadow: ${energyGlow}; }
     35%  { text-shadow: ${energyGlowPeak}; }
@@ -471,6 +502,33 @@ export function PlayerPanel({
               </Stack>
             </Tooltip>
           )}
+          {player.experience > 0 && (
+            <Box sx={{ position: 'relative', flexShrink: 0, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {/* Diamond shape */}
+              <Box sx={{
+                position: 'absolute',
+                width: 26, height: 26,
+                transform: 'rotate(45deg)',
+                background: 'linear-gradient(135deg, #FFD700, #8B6914)',
+                border: '1.5px solid rgba(255,215,0,0.85)',
+                boxShadow: '0 2px 8px rgba(218,165,32,0.55)',
+                ...(xpFlashing && { animation: `${xpFlashAnim} 0.7s ease-out` }),
+              }} />
+              {/* Ripple — also diamond */}
+              <Box key={xpRippleKey} sx={{
+                position: 'absolute', top: '50%', left: '50%',
+                width: 26, height: 26,
+                border: '2px solid rgba(255,215,0,0.8)',
+                pointerEvents: 'none',
+                animation: `${xpRippleAnim} 0.7s ease-out forwards`,
+              }} />
+              {/* Text — unrotated, on top */}
+              <Box sx={{ position: 'relative', zIndex: 1, textAlign: 'center', lineHeight: 1 }}>
+                <Typography sx={{ fontSize: 7, fontWeight: 900, color: '#111', lineHeight: 1, letterSpacing: 0.3, userSelect: 'none', display: 'block' }}>XP</Typography>
+                <Typography sx={{ fontSize: 9, fontWeight: 900, color: '#111', lineHeight: 1, userSelect: 'none', display: 'block' }}>{player.experience}</Typography>
+              </Box>
+            </Box>
+          )}
         </Stack>
 
         {/* Center: absolutely positioned so it's always centered relative to the full header */}
@@ -624,7 +682,7 @@ export function PlayerPanel({
             <Tooltip key={`${label}-dec`} open={lpKey === `${label}-dec`} title="-5" placement="top" disableFocusListener disableHoverListener disableTouchListener>
               <IconButton onClick={guardClick(onDec)} onPointerDown={() => startLongPress(`${label}-dec`, onDec5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: 32, minHeight: 32 }}><Typography sx={{ fontSize: 18, fontWeight: 700 }}>−</Typography></IconButton>
             </Tooltip>,
-            <Typography key={`${label}-val`} sx={{ fontSize: 16, fontWeight: 700, textAlign: 'center', color, filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none', ...(label === 'Poison' && value === 9 && { animation: 'poisonPulse 2.5s ease-in-out infinite', '@keyframes poisonPulse': { '0%, 100%': { opacity: 1, transform: 'scale(1)', textShadow: '0 0 8px rgba(0,200,60,0.9), 0 0 20px rgba(0,200,60,0.5)' }, '50%': { opacity: 0.3, transform: 'scale(0.85)', textShadow: '0 0 2px rgba(0,200,60,0.2)' } } }) }}>{value}</Typography>,
+            <Typography key={`${label}-val`} sx={{ fontSize: 16, fontWeight: 700, textAlign: 'center', color, filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none', ...(label === 'Poison' && value === 9 && { animation: 'poisonPulse 2.5s ease-in-out infinite', '@keyframes poisonPulse': { '0%, 100%': { opacity: 1, transform: 'scale(1)', textShadow: '0 0 8px rgba(0,200,60,0.9), 0 0 20px rgba(0,200,60,0.5)' }, '50%': { opacity: 0.3, transform: 'scale(0.85)', textShadow: '0 0 2px rgba(0,200,60,0.2)' } } }), ...(label === 'Experience' && xpGlow && { textShadow: xpGlow, ...(xpShimmerAnim && { animation: `${xpShimmerAnim} 3s ease-in-out infinite` }) }) }}>{value}</Typography>,
             <Tooltip key={`${label}-inc`} open={lpKey === `${label}-inc`} title="+5" placement="top" disableFocusListener disableHoverListener disableTouchListener>
               <IconButton onClick={guardClick(onInc)} onPointerDown={() => startLongPress(`${label}-inc`, onInc5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: 32, minHeight: 32 }}><Typography sx={{ fontSize: 18, fontWeight: 700 }}>+</Typography></IconButton>
             </Tooltip>,
