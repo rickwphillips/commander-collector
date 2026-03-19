@@ -45,6 +45,7 @@ const releases: Release[] = [
       { type: 'fixed', text: '2-player games now correctly show bottom and top panels (was assigning right position to 2nd player, which had 0px column width)' },
       { type: 'fixed', text: '3-player games use bottom, right, and top positions; left panel correctly hidden' },
       { type: 'fixed', text: 'Guard logic updated — right hidden for 2-player, left hidden for 2 and 3-player' },
+      { type: 'added', text: 'Back button on game setup page to return to games list' },
     ],
   },
   {
