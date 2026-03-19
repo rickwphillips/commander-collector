@@ -38,6 +38,16 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.11.1',
+    date: '2026-03-18',
+    title: 'Game Manager Layout Fixes',
+    changes: [
+      { type: 'fixed', text: '2-player games now correctly show bottom and top panels (was assigning right position to 2nd player, which had 0px column width)' },
+      { type: 'fixed', text: '3-player games use bottom, right, and top positions; left panel correctly hidden' },
+      { type: 'fixed', text: 'Guard logic updated — right hidden for 2-player, left hidden for 2 and 3-player' },
+    ],
+  },
+  {
     version: '1.11.0',
     date: '2026-03-18',
     title: 'Game Manager — Kill Attribution, Auto-Elimination & Notes',
