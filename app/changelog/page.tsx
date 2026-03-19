@@ -38,6 +38,15 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.13.1',
+    date: '2026-03-19',
+    title: 'Game Manager — Bug Fixes',
+    changes: [
+      { type: 'fixed', text: 'Roll for first player UI now correctly shown after game restart — isResumed flag was persisting across restarts, causing the roll screen to be skipped' },
+      { type: 'fixed', text: 'Dungeon stone background image now loads correctly in production — asset path was missing the basePath prefix' },
+    ],
+  },
+  {
     version: '1.13.0',
     date: '2026-03-19',
     title: 'Game Manager — Visual Effects & Polish',

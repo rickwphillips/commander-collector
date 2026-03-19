@@ -82,7 +82,7 @@ function buildInitialState(playerSetups: PlayerSetup[], startingLife: number): G
 
 export default function GameManagerPage() {
   const router = useRouter();
-  const [isResumed] = useState(() => {
+  const [isResumed, setIsResumed] = useState(() => {
     if (typeof window === 'undefined') return false;
     return loadSavedState() !== null;
   });
@@ -141,6 +141,7 @@ export default function GameManagerPage() {
 
   const handleRestartGame = (currentPlayers: PlayerState[]) => {
     localStorage.removeItem(GAME_STATE_KEY);
+    setIsResumed(false);
     setSetupPrefill(currentPlayers.map((p) => ({
       playerId: p.playerId,
       deckId: p.deckId,

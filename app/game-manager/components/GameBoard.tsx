@@ -126,6 +126,14 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
     startRoll();
   };
 
+  const handleRestartGame = () => {
+    setFirstPlayerSet(false);
+    setFirstPlayerIdx(0);
+    setRollState({ phase: 'idle', highlightIdx: null, finalIdx: null });
+    setWinner(null);
+    onRestartGame(players);
+  };
+
   const updateState = (patch: Partial<GameManagerState>) => {
     onUpdate({ ...state, ...patch });
   };
@@ -450,7 +458,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
           onAcceptFirstPlayer={handleAcceptFirstPlayer}
           onChooseFirstPlayer={handleChooseFirstPlayer}
           onRollAgain={handleRollAgain}
-          onRestartGame={() => onRestartGame(players)}
+          onRestartGame={handleRestartGame}
           turnTimerSeconds={turnTimerSeconds}
           onTimerChange={(s) => updateState({ turnTimerSeconds: s })}
           isFullscreen={isFullscreen}
