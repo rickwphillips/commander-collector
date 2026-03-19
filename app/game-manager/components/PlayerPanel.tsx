@@ -630,10 +630,6 @@ export function PlayerPanel({
                     {source.commander.name}
                   </Typography>
                   <Stack direction="row" spacing={0.5} sx={{ mt: ts > 0 ? 0 : 0.15, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: source.life <= 0 ? 'error.main' : 'primary.main', lineHeight: 1 }}>♥{source.life}</Typography>
-                    {source.poison > 0 && <Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: source.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1 }}>☠{source.poison}</Typography>}
-                    {source.energy > 0 && <Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: '#4FC8FF', lineHeight: 1 }}>⚡{source.energy}</Typography>}
-                    {source.experience > 0 && <Stack direction="row" alignItems="center" spacing={0.25}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: ts === 2 ? 14 : ts === 1 ? 12 : 10, height: ts === 2 ? 14 : ts === 1 ? 12 : 10, objectFit: 'contain', mixBlendMode: 'multiply', transition: 'width 0.2s ease, height 0.2s ease' }} /><Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: '#DAA520', lineHeight: 1 }}>{source.experience}</Typography></Stack>}
                     {source.isMonarch && <CrownIcon sx={{
                       fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10,
                       color: '#DAA520',
@@ -643,6 +639,10 @@ export function PlayerPanel({
                         '50%': { filter: 'drop-shadow(0 0 7px #FFD700) brightness(1.5)' },
                       },
                     }} />}
+                    <Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: source.life <= 0 ? 'error.main' : 'primary.main', lineHeight: 1 }}>♥{source.life}</Typography>
+                    {source.poison > 0 && <Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: source.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1 }}>☠{source.poison}</Typography>}
+                    {source.energy > 0 && <Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: '#4FC8FF', lineHeight: 1 }}>⚡{source.energy}</Typography>}
+                    {source.experience > 0 && <Stack direction="row" alignItems="center" spacing={0.25}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: ts === 2 ? 14 : ts === 1 ? 12 : 10, height: ts === 2 ? 14 : ts === 1 ? 12 : 10, objectFit: 'contain', mixBlendMode: 'multiply', transition: 'width 0.2s ease, height 0.2s ease' }} /><Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: '#DAA520', lineHeight: 1 }}>{source.experience}</Typography></Stack>}
                   </Stack>
                 </Box>,
                 <Tooltip key={`${sourceIdx}-dec`} open={lpKey === `${sourceIdx}-dec`} title="-5" placement="top" disableFocusListener disableHoverListener disableTouchListener>
@@ -686,9 +686,27 @@ export function PlayerPanel({
 
         {/* Life total + controls */}
         <Box sx={{ width: '33%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5 }}>
-          <Typography sx={{ fontWeight: 900, fontSize: ts === 2 ? 128 : ts === 1 ? 96 : 80, lineHeight: 1, color: isLifeLow ? 'error.main' : 'primary.main', transition: 'font-size 0.2s ease', ...(energyPulseAnim && { animation: `${energyPulseAnim} ${energyPulseDuration.toFixed(2)}s ease-in-out infinite` }) }}>
-            {player.life}
-          </Typography>
+          <Box sx={{ position: 'relative', lineHeight: 1 }}>
+            {player.isMonarch && (
+              <CrownIcon sx={{
+                fontSize: ts === 2 ? 72 : ts === 1 ? 60 : 48,
+                color: '#DAA520',
+                transform: 'rotate(-25deg)',
+                transition: 'font-size 0.25s ease',
+                position: 'absolute',
+                top: ts === 2 ? -36 : ts === 1 ? -30 : -24,
+                left: ts === 2 ? -44 : ts === 1 ? -36 : -28,
+                animation: 'crownShimmerBig 2s ease-in-out infinite',
+                '@keyframes crownShimmerBig': {
+                  '0%, 100%': { filter: 'drop-shadow(0 0 3px #DAA520) brightness(1)' },
+                  '50%': { filter: 'drop-shadow(0 0 10px #FFD700) brightness(1.6)' },
+                },
+              }} />
+            )}
+            <Typography sx={{ fontWeight: 900, fontSize: ts === 2 ? 128 : ts === 1 ? 96 : 80, lineHeight: 1, color: isLifeLow ? 'error.main' : 'primary.main', transition: 'font-size 0.2s ease', ...(energyPulseAnim && { animation: `${energyPulseAnim} ${energyPulseDuration.toFixed(2)}s ease-in-out infinite` }) }}>
+              {player.life}
+            </Typography>
+          </Box>
           <Stack direction="row" alignItems="center" spacing={ts === 2 ? 3 : ts === 1 ? 1.5 : 0} sx={{ mt: ts === 2 ? -1.5 : ts === 1 ? -0.5 : 0.5, transition: 'gap 0.2s ease, margin-top 0.2s ease' }}>
             <Tooltip open={lpKey === 'life-dec'} title="-5" placement="top" disableFocusListener disableHoverListener disableTouchListener>
               <IconButton

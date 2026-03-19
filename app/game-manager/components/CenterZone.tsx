@@ -124,6 +124,8 @@ export function CenterZone({
           borderRadius: 2,
           overflow: 'hidden',
           position: 'relative',
+          transition: 'none',
+          '&:hover': { transform: 'none', boxShadow: 'none' },
         }}
       >
         {/* Main content */}
