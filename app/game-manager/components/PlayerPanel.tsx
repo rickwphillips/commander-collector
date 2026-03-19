@@ -2,8 +2,12 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { keyframes } from '@emotion/react';
-import { Box, Stack, Typography, IconButton, Button, TextField, Tooltip } from '@mui/material';
-import CrownIcon from '@mui/icons-material/EmojiEvents';
+import { Box, Stack, Typography, IconButton, Button, TextField, Tooltip, SvgIcon } from '@mui/material';
+const CrownIcon = (props: React.ComponentProps<typeof SvgIcon>) => (
+  <SvgIcon {...props} viewBox="0 0 24 24">
+    <path d="M5 16l-3-10 5.5 4L12 2l4.5 8L22 6l-3 10H5zm0 2h14v2H5v-2z" />
+  </SvgIcon>
+);
 import InitiativeIcon from '@mui/icons-material/Shield';
 import CityIcon from '@mui/icons-material/AccountBalance';
 import ElimIcon from '@mui/icons-material/PersonOff';
@@ -545,19 +549,37 @@ export function PlayerPanel({
           </Typography>
         </Box>
           <Stack direction="row" spacing={0.5} alignItems="center" sx={{ ml: 'auto', zIndex: 1 }}>
-            <IconButton size="small" onClick={() => onToggleMonarch(playerIdx)} sx={{ p: 0.5, color: player.isMonarch ? '#DAA520' : 'text.disabled' }} title="Monarch">
-              <CrownIcon sx={{ fontSize: 18 }} />
-            </IconButton>
-            <IconButton size="small" onClick={() => onToggleInitiative(playerIdx)} sx={{ p: 0.5, color: player.hasInitiative ? '#4FC3F7' : 'text.disabled' }} title="Initiative">
-              <InitiativeIcon sx={{ fontSize: 18 }} />
-            </IconButton>
-            <IconButton size="small" onClick={() => onToggleCitysBlessing(playerIdx)} sx={{ p: 0.5, color: player.hasCitysBlessing ? '#81C784' : 'text.disabled' }} title="City's Blessing">
-              <CityIcon sx={{ fontSize: 18 }} />
-            </IconButton>
-            {player.isEliminated ? (
-              <IconButton size="small" onClick={() => onUndoEliminate(playerIdx)} sx={{ p: 0.5, color: 'error.main' }} title="Undo Eliminate">
-                <ElimIcon sx={{ fontSize: 18 }} />
+            <Tooltip title="Monarch" placement="bottom" arrow>
+              <IconButton size="small" onClick={() => onToggleMonarch(playerIdx)} sx={{ p: 0.5, color: player.isMonarch ? '#DAA520' : 'text.disabled' }}>
+                <CrownIcon sx={{
+                  fontSize: player.isMonarch ? 26 : 18,
+                  transition: 'font-size 0.25s ease',
+                  ...(player.isMonarch && {
+                    animation: 'crownShimmer 2s ease-in-out infinite',
+                    '@keyframes crownShimmer': {
+                      '0%, 100%': { filter: 'drop-shadow(0 0 2px #DAA520) brightness(1)', },
+                      '50%': { filter: 'drop-shadow(0 0 7px #FFD700) brightness(1.5)', },
+                    },
+                  }),
+                }} />
               </IconButton>
+            </Tooltip>
+            <Tooltip title="Initiative" placement="bottom" arrow>
+              <IconButton size="small" onClick={() => onToggleInitiative(playerIdx)} sx={{ p: 0.5, color: player.hasInitiative ? '#4FC3F7' : 'text.disabled' }}>
+                <InitiativeIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="City's Blessing" placement="bottom" arrow>
+              <IconButton size="small" onClick={() => onToggleCitysBlessing(playerIdx)} sx={{ p: 0.5, color: player.hasCitysBlessing ? '#81C784' : 'text.disabled' }}>
+                <CityIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Tooltip>
+            {player.isEliminated ? (
+              <Tooltip title="Undo Eliminate" placement="bottom" arrow>
+                <IconButton size="small" onClick={() => onUndoEliminate(playerIdx)} sx={{ p: 0.5, color: 'error.main' }}>
+                  <ElimIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Tooltip>
             ) : showEliminateConfirm ? (
               <Stack direction="row" spacing={0.5} alignItems="center" sx={{ ml: 0.5 }}>
                 <TextField size="small" label="Eliminated Turn" type="number" value={eliminateTurnInput}
@@ -571,9 +593,11 @@ export function PlayerPanel({
                   sx={{ fontSize: 9, py: 0, px: 0.5 }}>✕</Button>
               </Stack>
             ) : (
-              <IconButton size="small" onClick={() => setShowEliminateConfirm(true)} sx={{ p: 0.5, color: 'text.disabled' }} title="Eliminate">
-                <ElimIcon sx={{ fontSize: 18 }} />
-              </IconButton>
+              <Tooltip title="Eliminate" placement="bottom" arrow>
+                <IconButton size="small" onClick={() => setShowEliminateConfirm(true)} sx={{ p: 0.5, color: 'text.disabled' }}>
+                  <ElimIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Tooltip>
             )}
           </Stack>
       </Box>
@@ -605,11 +629,20 @@ export function PlayerPanel({
                   <Typography sx={{ fontSize: ts === 2 ? 19 : ts === 1 ? 16 : 14, color: sourceEliminated ? 'text.disabled' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none' }}>
                     {source.commander.name}
                   </Typography>
-                  <Stack direction="row" spacing={0.5} sx={{ mt: ts > 0 ? 0 : 0.15, flexWrap: 'wrap' }}>
+                  <Stack direction="row" spacing={0.5} sx={{ mt: ts > 0 ? 0 : 0.15, flexWrap: 'wrap', alignItems: 'center' }}>
                     <Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: source.life <= 0 ? 'error.main' : 'primary.main', lineHeight: 1 }}>♥{source.life}</Typography>
                     {source.poison > 0 && <Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: source.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1 }}>☠{source.poison}</Typography>}
                     {source.energy > 0 && <Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: '#4FC8FF', lineHeight: 1 }}>⚡{source.energy}</Typography>}
                     {source.experience > 0 && <Stack direction="row" alignItems="center" spacing={0.25}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: ts === 2 ? 14 : ts === 1 ? 12 : 10, height: ts === 2 ? 14 : ts === 1 ? 12 : 10, objectFit: 'contain', mixBlendMode: 'multiply', transition: 'width 0.2s ease, height 0.2s ease' }} /><Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: '#DAA520', lineHeight: 1 }}>{source.experience}</Typography></Stack>}
+                    {source.isMonarch && <CrownIcon sx={{
+                      fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10,
+                      color: '#DAA520',
+                      animation: 'crownShimmer 2s ease-in-out infinite',
+                      '@keyframes crownShimmer': {
+                        '0%, 100%': { filter: 'drop-shadow(0 0 2px #DAA520) brightness(1)' },
+                        '50%': { filter: 'drop-shadow(0 0 7px #FFD700) brightness(1.5)' },
+                      },
+                    }} />}
                   </Stack>
                 </Box>,
                 <Tooltip key={`${sourceIdx}-dec`} open={lpKey === `${sourceIdx}-dec`} title="-5" placement="top" disableFocusListener disableHoverListener disableTouchListener>
