@@ -95,6 +95,8 @@ export default function GameManagerPage() {
   useEffect(() => {
     if (state.phase !== 'setup') {
       localStorage.setItem(GAME_STATE_KEY, JSON.stringify(state));
+    } else {
+      localStorage.removeItem(GAME_STATE_KEY);
     }
   }, [state]);
 

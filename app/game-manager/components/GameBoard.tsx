@@ -31,6 +31,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
 
   const [rollState, setRollState] = useState<RollState>({ phase: 'idle', highlightIdx: null, finalIdx: null });
   const [firstPlayerSet, setFirstPlayerSet] = useState(isResumed);
+  const [firstPlayerIdx, setFirstPlayerIdx] = useState(isResumed ? state.currentPlayerIdx : 0);
   const [winner, setWinner] = useState<PlayerState | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [poisonKillPrompt, setPoisonKillPrompt] = useState<{ targetIdx: number; newPlayers: PlayerState[] } | null>(null);
@@ -74,7 +75,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
     const finalIdx = active[Math.floor(Math.random() * active.length)];
 
     // Build a sequence that cycles through active players and lands on finalIdx
-    const STEPS = 14;
+    const STEPS = 18;
     const sequence: number[] = [];
     let cur = 0;
     for (let i = 0; i < STEPS - 1; i++) {
@@ -94,15 +95,29 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
       }
       setRollState((prev) => ({ ...prev, highlightIdx: sequence[step] }));
       const progress = step / sequence.length;
-      rollTimer.current = setTimeout(animate, 40 + progress * progress * 250);
+      rollTimer.current = setTimeout(animate, 30 + (1 - Math.cos(progress * Math.PI)) / 2 * 380);
     };
-    rollTimer.current = setTimeout(animate, 40);
+    rollTimer.current = setTimeout(animate, 30);
   };
 
   const handleAcceptFirstPlayer = () => {
     if (rollState.finalIdx === null) return;
-    onUpdate({ ...state, currentPlayerIdx: rollState.finalIdx, turnStartTime: Date.now() });
+    const player = players[rollState.finalIdx];
+    const note = `First player (rolled): ${player?.playerName ?? '?'}`;
+    const newNotes = state.notes ? `${state.notes}\n${note}` : note;
+    onUpdate({ ...state, currentPlayerIdx: rollState.finalIdx, turnStartTime: Date.now(), notes: newNotes });
     setRollState({ phase: 'idle', highlightIdx: null, finalIdx: null });
+    setFirstPlayerIdx(rollState.finalIdx);
+    setFirstPlayerSet(true);
+  };
+
+  const handleChooseFirstPlayer = (idx: number) => {
+    const player = players[idx];
+    const note = `First player (chosen): ${player?.playerName ?? '?'}`;
+    const newNotes = state.notes ? `${state.notes}\n${note}` : note;
+    onUpdate({ ...state, currentPlayerIdx: idx, turnStartTime: Date.now(), notes: newNotes });
+    setRollState({ phase: 'idle', highlightIdx: null, finalIdx: null });
+    setFirstPlayerIdx(idx);
     setFirstPlayerSet(true);
   };
 
@@ -293,31 +308,28 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
     const currentPos = players[currentPlayerIdx].position;
     const curCW = CLOCKWISE.indexOf(currentPos);
     let nextPlayerIdx = -1;
-    let nextCW = -1;
     for (let step = 1; step <= 4; step++) {
       const nextPos = CLOCKWISE[(curCW + step) % 4];
       const idx = players.findIndex(p => p.position === nextPos && !p.isEliminated);
-      if (idx !== -1) { nextPlayerIdx = idx; nextCW = (curCW + step) % 4; break; }
+      if (idx !== -1) { nextPlayerIdx = idx; break; }
     }
     if (nextPlayerIdx === -1) return;
-    const wrapped = nextCW <= curCW;
-    const newTurnNumber = wrapped ? turnNumber + 1 : turnNumber;
+    const newTurnNumber = nextPlayerIdx === firstPlayerIdx ? turnNumber + 1 : turnNumber;
     updateState({ currentPlayerIdx: nextPlayerIdx, turnNumber: newTurnNumber, turnStartTime: Date.now() });
   };
 
   const handlePrevTurn = () => {
+    if (currentPlayerIdx === firstPlayerIdx && turnNumber === 1) return;
     const currentPos = players[currentPlayerIdx].position;
     const curCW = CLOCKWISE.indexOf(currentPos);
     let prevPlayerIdx = -1;
-    let prevCW = -1;
     for (let step = 1; step <= 4; step++) {
       const prevPos = CLOCKWISE[(curCW - step + 4) % 4];
       const idx = players.findIndex(p => p.position === prevPos && !p.isEliminated);
-      if (idx !== -1) { prevPlayerIdx = idx; prevCW = (curCW - step + 4) % 4; break; }
+      if (idx !== -1) { prevPlayerIdx = idx; break; }
     }
     if (prevPlayerIdx === -1) return;
-    const wrapped = prevCW > curCW;
-    const newTurnNumber = wrapped ? Math.max(1, turnNumber - 1) : turnNumber;
+    const newTurnNumber = currentPlayerIdx === firstPlayerIdx ? Math.max(1, turnNumber - 1) : turnNumber;
     updateState({ currentPlayerIdx: prevPlayerIdx, turnNumber: newTurnNumber, turnStartTime: Date.now() });
   };
 
@@ -426,13 +438,14 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
           currentPlayerIdx={currentPlayerIdx}
           players={players}
           rollPhase={rollState.phase}
-          rolledPlayerName={rollState.finalIdx !== null ? players[rollState.finalIdx]?.playerName : undefined}
+          rolledPlayerName={rollState.highlightIdx !== null ? players[rollState.highlightIdx]?.playerName : undefined}
           firstPlayerSet={firstPlayerSet}
           onNextTurn={handleNextTurn}
           onPrevTurn={handlePrevTurn}
           onEndGame={onEndGame}
           onRollForFirst={startRoll}
           onAcceptFirstPlayer={handleAcceptFirstPlayer}
+          onChooseFirstPlayer={handleChooseFirstPlayer}
           onRollAgain={handleRollAgain}
           onRestartGame={() => onRestartGame(players)}
           turnTimerSeconds={turnTimerSeconds}

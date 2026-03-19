@@ -38,6 +38,26 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.12.0',
+    date: '2026-03-19',
+    title: 'Game Manager — XP Animations, First Player UX & Turn Logic',
+    changes: [
+      { type: 'added', text: 'Experience counter animations — persistent gold glow scaling with XP count, shimmer sweep every 3s, flash+scale on increment, diamond ripple ring on increment' },
+      { type: 'added', text: 'XP diamond badge in player header — gold diamond with Upgrade icon and count; flashes and ripples on each increment' },
+      { type: 'added', text: 'Opponent status pips in commander damage section — shows ♥ life, ☠ poison, ⚡ energy, and XP icon + count for each opponent under their commander name' },
+      { type: 'added', text: 'Choose First Player option — square button alongside Roll; shows player name buttons to set first player manually' },
+      { type: 'added', text: 'First player recorded in game notes — auto-appends "First player (rolled/chosen): Name" when first player is set' },
+      { type: 'added', text: 'Previous turn via long-hold on Next Turn button (500ms) — goes counter-clockwise, decrements turn number on wrap; blocked at first player on turn 1' },
+      { type: 'improved', text: 'Roll animation — smoother sinusoidal deceleration, live player name updates during roll with spring-bounce transition' },
+      { type: 'improved', text: 'Roll panel redesigned — Roll button (110×110 with d20 icon) and Choose button (80×80) square; Accept and Roll Again match same sizes' },
+      { type: 'improved', text: 'Player name in roll result styled large bold italic; "goes first!" thin and theme-colored; gold glow pulse animation on final result' },
+      { type: 'fixed', text: 'Turn number now correctly increments when the first player takes their next turn — was incorrectly incrementing based on absolute clockwise position index rather than who was chosen first' },
+      { type: 'fixed', text: 'Game state correctly cleared from localStorage on restart — useEffect now removes the key when phase transitions to setup, preventing stale state from being written back' },
+      { type: 'improved', text: 'Commander damage section scrollable when many opponents are shown' },
+      { type: 'improved', text: 'Life color in opponent status pips matches life total color (primary/error) instead of green scale' },
+    ],
+  },
+  {
     version: '1.11.1',
     date: '2026-03-18',
     title: 'Game Manager Layout Fixes',

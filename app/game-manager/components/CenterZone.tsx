@@ -37,6 +37,7 @@ interface CenterZoneProps {
   onEndGame: () => void;
   onRollForFirst: () => void;
   onAcceptFirstPlayer: () => void;
+  onChooseFirstPlayer: (idx: number) => void;
   onRollAgain: () => void;
   onRestartGame: () => void;
   turnTimerSeconds: number;
@@ -63,6 +64,7 @@ export function CenterZone({
   onEndGame,
   onRollForFirst,
   onAcceptFirstPlayer,
+  onChooseFirstPlayer,
   onRollAgain,
   onRestartGame,
   turnTimerSeconds,
@@ -82,6 +84,7 @@ export function CenterZone({
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesDraft, setNotesDraft] = useState('');
   const [prevTurnTooltip, setPrevTurnTooltip] = useState(false);
+  const [choosingFirst, setChoosingFirst] = useState(false);
   const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lpFired = useRef(false);
 
@@ -176,24 +179,78 @@ export function CenterZone({
 
           {/* Roll for first player */}
           {!firstPlayerSet && <Box sx={{ textAlign: 'center', width: '100%' }}>
-            {rollPhase === 'idle' && (
-              <Button variant="outlined" fullWidth onClick={onRollForFirst} sx={{ fontSize: 13, py: 1.5 }}>
-                Roll for First Player
-              </Button>
+            {(rollPhase === 'rolling') && rolledPlayerName && (
+              <Typography variant="caption" sx={{ fontWeight: 600, color: '#DAA520', display: 'block', mb: 0.75, fontSize: 13 }}>
+                <Box key={rolledPlayerName} component="span" sx={{ display: 'inline-block', fontSize: 22, fontWeight: 900, fontStyle: 'italic', letterSpacing: 0.5, animation: 'nameFlash 0.18s cubic-bezier(0.34,1.56,0.64,1)', '@keyframes nameFlash': { '0%': { opacity: 0, transform: 'scale(0.7) translateY(-6px)' }, '100%': { opacity: 1, transform: 'scale(1) translateY(0)' } } }}>
+                  {rolledPlayerName}
+                </Box>
+                <Box component="span" sx={{ color: 'text.primary', fontStyle: 'normal', fontWeight: 300, fontSize: 18 }}>{' goes first!'}</Box>
+              </Typography>
             )}
-            {rollPhase === 'rolling' && (
-              <Button variant="outlined" fullWidth disabled sx={{ fontSize: 13, py: 1.5 }}>
-                Rolling…
-              </Button>
+            {(rollPhase === 'idle' || rollPhase === 'rolling') && !choosingFirst && (
+              <Stack direction="row" spacing={1.5} justifyContent="center" alignItems="flex-end">
+                <Button
+                  variant="contained"
+                  onClick={onRollForFirst}
+                  disabled={rollPhase === 'rolling'}
+                  sx={{ width: 110, height: 110, flexDirection: 'column', gap: 0.75, fontSize: 13, fontWeight: 700, borderRadius: 2, flexShrink: 0 }}
+                >
+                  <svg viewBox="0 0 24 24" width="40" height="40" fill="currentColor">
+                    <path d="M12 2L2 19h20L12 2zm0 4l7 13H5l7-13zm-1 5v4h2v-4h-2zm0 5v2h2v-2h-2z" />
+                  </svg>
+                  {rollPhase === 'rolling' ? 'Rolling…' : 'Roll'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => setChoosingFirst(true)}
+                  disabled={rollPhase === 'rolling'}
+                  sx={{ width: 80, height: 80, flexDirection: 'column', fontSize: 11, fontWeight: 600, borderRadius: 2, flexShrink: 0 }}
+                >
+                  Choose
+                </Button>
+              </Stack>
+            )}
+            {(rollPhase === 'idle' || rollPhase === 'rolling') && choosingFirst && (
+              <Box>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', display: 'block', mb: 1 }}>
+                  Who goes first?
+                </Typography>
+                <Stack spacing={0.5}>
+                  {players.map((p, idx) => (
+                    <Button key={idx} variant="outlined" onClick={() => { onChooseFirstPlayer(idx); setChoosingFirst(false); }} sx={{ fontSize: 12, py: 0.75 }}>
+                      {p.playerName}
+                    </Button>
+                  ))}
+                </Stack>
+                <Button size="small" onClick={() => setChoosingFirst(false)} sx={{ mt: 1, fontSize: 10, color: 'text.disabled' }}>
+                  Cancel
+                </Button>
+              </Box>
             )}
             {rollPhase === 'done' && (
               <Box>
-                <Typography variant="caption" sx={{ fontWeight: 700, color: '#DAA520', display: 'block', mb: 0.5 }}>
-                  {rolledPlayerName} goes first!
+                <Typography variant="caption" sx={{ fontWeight: 600, color: '#DAA520', display: 'block', mb: 0.75, fontSize: 13 }}>
+                  <Box component="span" sx={{
+                    display: 'inline-block',
+                    fontSize: 22, fontWeight: 900, fontStyle: 'italic', letterSpacing: 0.5,
+                    animation: 'nameSizzle 0.5s cubic-bezier(0.34,1.56,0.64,1), nameGlow 2s ease-in-out 0.5s infinite alternate',
+                    '@keyframes nameSizzle': {
+                      '0%':   { opacity: 0, transform: 'scale(1.5)', textShadow: '0 0 32px rgba(255,215,0,1)' },
+                      '70%':  { transform: 'scale(0.95)',             textShadow: '0 0 8px rgba(255,215,0,0.6)' },
+                      '100%': { opacity: 1, transform: 'scale(1)',    textShadow: '0 0 14px rgba(255,215,0,0.8)' },
+                    },
+                    '@keyframes nameGlow': {
+                      '0%':   { textShadow: '0 0 6px rgba(255,215,0,0.5)' },
+                      '100%': { textShadow: '0 0 18px rgba(255,215,0,1), 0 0 32px rgba(255,165,0,0.6)' },
+                    },
+                  }}>
+                    {rolledPlayerName}
+                  </Box>
+                  <Box component="span" sx={{ color: 'text.primary', fontStyle: 'normal', fontWeight: 300, fontSize: 18 }}>{' goes first!'}</Box>
                 </Typography>
-                <Stack direction="row" spacing={0.5}>
-                  <Button variant="contained" onClick={onAcceptFirstPlayer} sx={{ flex: 1, fontSize: 11 }}>Accept</Button>
-                  <Button variant="outlined" onClick={onRollAgain} sx={{ flex: 1, fontSize: 11 }}>Roll Again</Button>
+                <Stack direction="row" spacing={1.5} justifyContent="center" alignItems="flex-end">
+                  <Button variant="contained" onClick={onAcceptFirstPlayer} sx={{ width: 110, height: 110, fontSize: 13, fontWeight: 700, borderRadius: 2 }}>Accept</Button>
+                  <Button variant="outlined" onClick={onRollAgain} sx={{ width: 80, height: 80, fontSize: 11, fontWeight: 600, borderRadius: 2 }}>Roll Again</Button>
                 </Stack>
               </Box>
             )}
