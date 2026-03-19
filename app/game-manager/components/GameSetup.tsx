@@ -395,9 +395,9 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
     >
       <Box sx={{ width: '100%', maxWidth: 700 }}>
         <Stack direction="row" alignItems="center" sx={{ mb: 3 }}>
-          <IconButton onClick={() => router.push('/games')} sx={{ mr: 1 }}>
-            <ArrowBackIcon />
-          </IconButton>
+          <Button startIcon={<ArrowBackIcon />} onClick={() => router.push('/games')} sx={{ mr: 1 }}>
+            Back
+          </Button>
           <Typography variant="h4" sx={{ fontWeight: 700, flex: 1, textAlign: 'center', pr: 5 }}>
             Game Setup
           </Typography>
