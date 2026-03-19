@@ -305,6 +305,22 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
     updateState({ currentPlayerIdx: nextPlayerIdx, turnNumber: newTurnNumber, turnStartTime: Date.now() });
   };
 
+  const handlePrevTurn = () => {
+    const currentPos = players[currentPlayerIdx].position;
+    const curCW = CLOCKWISE.indexOf(currentPos);
+    let prevPlayerIdx = -1;
+    let prevCW = -1;
+    for (let step = 1; step <= 4; step++) {
+      const prevPos = CLOCKWISE[(curCW - step + 4) % 4];
+      const idx = players.findIndex(p => p.position === prevPos && !p.isEliminated);
+      if (idx !== -1) { prevPlayerIdx = idx; prevCW = (curCW - step + 4) % 4; break; }
+    }
+    if (prevPlayerIdx === -1) return;
+    const wrapped = prevCW > curCW;
+    const newTurnNumber = wrapped ? Math.max(1, turnNumber - 1) : turnNumber;
+    updateState({ currentPlayerIdx: prevPlayerIdx, turnNumber: newTurnNumber, turnStartTime: Date.now() });
+  };
+
   const getRotation = (position: PlayerState['position']) => {
     switch (position) {
       case 'bottom': return 'rotate(0deg)';
@@ -413,6 +429,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
           rolledPlayerName={rollState.finalIdx !== null ? players[rollState.finalIdx]?.playerName : undefined}
           firstPlayerSet={firstPlayerSet}
           onNextTurn={handleNextTurn}
+          onPrevTurn={handlePrevTurn}
           onEndGame={onEndGame}
           onRollForFirst={startRoll}
           onAcceptFirstPlayer={handleAcceptFirstPlayer}

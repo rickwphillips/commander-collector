@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   Box,
   Stack,
@@ -14,6 +14,7 @@ import {
   DialogActions,
   TextField,
   IconButton,
+  Tooltip,
 } from '@mui/material';
 import CasinoIcon from '@mui/icons-material/Casino';
 import CloseIcon from '@mui/icons-material/Close';
@@ -32,6 +33,7 @@ interface CenterZoneProps {
   rolledPlayerName?: string;
   firstPlayerSet: boolean;
   onNextTurn: () => void;
+  onPrevTurn: () => void;
   onEndGame: () => void;
   onRollForFirst: () => void;
   onAcceptFirstPlayer: () => void;
@@ -57,6 +59,7 @@ export function CenterZone({
   rolledPlayerName,
   firstPlayerSet,
   onNextTurn,
+  onPrevTurn,
   onEndGame,
   onRollForFirst,
   onAcceptFirstPlayer,
@@ -78,6 +81,9 @@ export function CenterZone({
   const [diceOpen, setDiceOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesDraft, setNotesDraft] = useState('');
+  const [prevTurnTooltip, setPrevTurnTooltip] = useState(false);
+  const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lpFired = useRef(false);
 
   const addRoll = (label: string, sides: number | null) => {
     if (sides === null) {
@@ -131,13 +137,27 @@ export function CenterZone({
                 </Typography>
               </Box>
 
-              <Button
-                variant="contained"
-                onClick={onNextTurn}
-                sx={{ width: 150, height: 150, fontSize: 24, fontWeight: 700, borderRadius: 2, lineHeight: 1.2, flexShrink: 0 }}
-              >
-                Next<br />Turn
-              </Button>
+              <Tooltip open={prevTurnTooltip} title="Previous Turn" placement="top" disableFocusListener disableHoverListener disableTouchListener>
+                <Button
+                  variant="contained"
+                  onClick={() => { if (lpFired.current) { lpFired.current = false; return; } onNextTurn(); }}
+                  onPointerDown={() => {
+                    lpFired.current = false;
+                    lpTimer.current = setTimeout(() => {
+                      lpFired.current = true;
+                      onPrevTurn();
+                      setPrevTurnTooltip(true);
+                      setTimeout(() => setPrevTurnTooltip(false), 700);
+                    }, 500);
+                  }}
+                  onPointerUp={() => { if (lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; } }}
+                  onPointerLeave={() => { if (lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; } }}
+                  onPointerCancel={() => { if (lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; } }}
+                  sx={{ width: 150, height: 150, fontSize: 24, fontWeight: 700, borderRadius: 2, lineHeight: 1.2, flexShrink: 0 }}
+                >
+                  Next<br />Turn
+                </Button>
+              </Tooltip>
 
               {/* Right side — rotated for right-panel player */}
               <Box sx={{ transform: 'rotate(-90deg)', textAlign: 'center', whiteSpace: 'normal', overflowWrap: 'break-word', maxWidth: 120 }}>

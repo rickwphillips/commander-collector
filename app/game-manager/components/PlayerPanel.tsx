@@ -7,6 +7,7 @@ import CrownIcon from '@mui/icons-material/EmojiEvents';
 import InitiativeIcon from '@mui/icons-material/Shield';
 import CityIcon from '@mui/icons-material/AccountBalance';
 import ElimIcon from '@mui/icons-material/PersonOff';
+const XP_ICON_SRC = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRPxc2Yz21vbnc5VP3Muxnx5VtQGAynItuNWg&s';
 import type { PlayerState, CommanderDamageMap } from '../types';
 
 interface PlayerPanelProps {
@@ -523,10 +524,10 @@ export function PlayerPanel({
                 animation: `${xpRippleAnim} 0.7s ease-out forwards`,
               }} />
               {/* Text — unrotated, on top */}
-              <Box sx={{ position: 'relative', zIndex: 1, textAlign: 'center', lineHeight: 1 }}>
-                <Typography sx={{ fontSize: 7, fontWeight: 900, color: '#111', lineHeight: 1, letterSpacing: 0.3, userSelect: 'none', display: 'block' }}>XP</Typography>
-                <Typography sx={{ fontSize: 9, fontWeight: 900, color: '#111', lineHeight: 1, userSelect: 'none', display: 'block' }}>{player.experience}</Typography>
-              </Box>
+              <Stack direction="column" alignItems="center" spacing={0} sx={{ position: 'relative' }}>
+                <Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: 10, height: 10, objectFit: 'contain', mixBlendMode: 'multiply' }} />
+                <Typography sx={{ fontSize: 9, fontWeight: 900, color: '#111', lineHeight: 1, userSelect: 'none' }}>{player.experience}</Typography>
+              </Stack>
             </Box>
           )}
         </Stack>
@@ -584,32 +585,39 @@ export function PlayerPanel({
           borderRight: (theme) => `1px solid ${theme.palette.divider}`,
           px: 0.75,
           py: 0.5,
-          overflowY: 'hidden',
+          overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'center',
         }}>
           <Typography sx={{ fontSize: 9, fontWeight: 600, color: 'text.secondary', mb: 0.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>
             Commander Damage{isCmdDmgHigh && <Typography component="span" sx={{ fontSize: 9, color: 'error.main', ml: 0.5 }}>⚠</Typography>}
           </Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 32px 30px 32px', alignItems: 'center', rowGap: 0.25 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 32px 30px 32px', alignItems: 'start', rowGap: 0.25 }}>
             {opponents.flatMap(({ player: source, idx: sourceIdx }) => {
               const dmg = commanderDamage[playerIdx]?.[sourceIdx] ?? [0, 0];
               const sourceEliminated = source.isEliminated;
               const rows = [
-                <Typography key={`${sourceIdx}-name`} sx={{ fontSize: 12, color: sourceEliminated ? 'text.disabled' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none' }}>
-                  {source.commander.name}
-                </Typography>,
+                <Box key={`${sourceIdx}-name`} sx={{ overflow: 'hidden', pt: 0.25 }}>
+                  <Typography sx={{ fontSize: 12, color: sourceEliminated ? 'text.disabled' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none' }}>
+                    {source.commander.name}
+                  </Typography>
+                  <Stack direction="row" spacing={0.5} sx={{ mt: 0.25, flexWrap: 'wrap' }}>
+                    <Typography sx={{ fontSize: 8, fontWeight: 800, color: source.life <= 0 ? 'error.main' : 'primary.main', lineHeight: 1 }}>♥{source.life}</Typography>
+                    {source.poison > 0 && <Typography sx={{ fontSize: 8, fontWeight: 800, color: source.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1 }}>☠{source.poison}</Typography>}
+                    {source.energy > 0 && <Typography sx={{ fontSize: 8, fontWeight: 800, color: '#4FC8FF', lineHeight: 1 }}>⚡{source.energy}</Typography>}
+                    {source.experience > 0 && <Stack direction="row" alignItems="center" spacing={0.25}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: 8, height: 8, objectFit: 'contain', mixBlendMode: 'multiply' }} /><Typography sx={{ fontSize: 8, fontWeight: 800, color: '#DAA520', lineHeight: 1 }}>{source.experience}</Typography></Stack>}
+                  </Stack>
+                </Box>,
                 <Tooltip key={`${sourceIdx}-dec`} open={lpKey === `${sourceIdx}-dec`} title="-5" placement="top" disableFocusListener disableHoverListener disableTouchListener>
-                  <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => onCommanderDamageChange(playerIdx, sourceIdx, false, -1))} onPointerDown={() => startLongPress(`${sourceIdx}-dec`, () => onCommanderDamageChange(playerIdx, sourceIdx, false, -5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: 32, minHeight: 32 }}>
+                  <span style={{ alignSelf: 'start' }}><IconButton disabled={sourceEliminated} onClick={guardClick(() => onCommanderDamageChange(playerIdx, sourceIdx, false, -1))} onPointerDown={() => startLongPress(`${sourceIdx}-dec`, () => onCommanderDamageChange(playerIdx, sourceIdx, false, -5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: 32, minHeight: 32 }}>
                     <Typography sx={{ fontSize: 18, fontWeight: 700, lineHeight: 1 }}>−</Typography>
                   </IconButton></span>
                 </Tooltip>,
-                <Typography key={`${sourceIdx}-val`} sx={{ fontSize: 16, fontWeight: 700, textAlign: 'center', color: dmg[0] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary' }}>
+                <Typography key={`${sourceIdx}-val`} sx={{ fontSize: 16, fontWeight: 700, textAlign: 'center', alignSelf: 'start', pt: 0.25, color: dmg[0] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary' }}>
                   {dmg[0]}
                 </Typography>,
                 <Tooltip key={`${sourceIdx}-inc`} open={lpKey === `${sourceIdx}-inc`} title="+5" placement="top" disableFocusListener disableHoverListener disableTouchListener>
-                  <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => onCommanderDamageChange(playerIdx, sourceIdx, false, 1))} onPointerDown={() => startLongPress(`${sourceIdx}-inc`, () => onCommanderDamageChange(playerIdx, sourceIdx, false, 5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: 32, minHeight: 32 }}>
+                  <span style={{ alignSelf: 'start' }}><IconButton disabled={sourceEliminated} onClick={guardClick(() => onCommanderDamageChange(playerIdx, sourceIdx, false, 1))} onPointerDown={() => startLongPress(`${sourceIdx}-inc`, () => onCommanderDamageChange(playerIdx, sourceIdx, false, 5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: 32, minHeight: 32 }}>
                     <Typography sx={{ fontSize: 18, fontWeight: 700, lineHeight: 1 }}>+</Typography>
                   </IconButton></span>
                 </Tooltip>,
