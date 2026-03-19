@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
@@ -20,6 +20,10 @@ import {
   IconButton,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import SouthIcon from '@mui/icons-material/South';
+import NorthIcon from '@mui/icons-material/North';
+import EastIcon from '@mui/icons-material/East';
+import WestIcon from '@mui/icons-material/West';
 import ListSubheader from '@mui/material/ListSubheader';
 import { api } from '@/lib/api';
 import type { Player, DeckWithPlayer } from '@/lib/types';
@@ -316,6 +320,19 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
     );
   };
 
+  const POSITIONS_BY_COUNT: Record<number, string[]> = {
+    2: ['bottom', 'top'],
+    3: ['bottom', 'left', 'right'],
+    4: ['bottom', 'top', 'left', 'right'],
+  };
+
+  const positionIcons: Record<string, React.ReactElement> = {
+    bottom: <SouthIcon sx={{ fontSize: 40, color: 'primary.main', opacity: 0.85 }} />,
+    top: <NorthIcon sx={{ fontSize: 40, color: 'primary.main', opacity: 0.85 }} />,
+    left: <WestIcon sx={{ fontSize: 40, color: 'primary.main', opacity: 0.85 }} />,
+    right: <EastIcon sx={{ fontSize: 40, color: 'primary.main', opacity: 0.85 }} />,
+  };
+
   const renderSlot = (idx: number) => {
     const slot = slots[idx];
     const selectedPlayerId = slot.playerId;
@@ -323,13 +340,25 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
       selectedPlayerId !== '' ? decks.filter((d) => d.player_id === selectedPlayerId) : [];
     const otherDecks =
       selectedPlayerId !== '' ? decks.filter((d) => d.player_id !== selectedPlayerId) : decks;
+    const position = (POSITIONS_BY_COUNT[playerCount] ?? [])[idx];
+    const posIcon = position ? positionIcons[position] : null;
 
     return (
       <Card variant="outlined" key={idx} sx={{ mb: 2 }}>
         <CardContent>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
-            Player {idx + 1}
-          </Typography>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+            {posIcon}
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.1 }}>
+                Player {idx + 1}
+              </Typography>
+              {position && (
+                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
+                  {position} seat
+                </Typography>
+              )}
+            </Box>
+          </Stack>
           <Stack spacing={2}>
             <TextField
               select

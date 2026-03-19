@@ -38,6 +38,14 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.12.1',
+    date: '2026-03-19',
+    title: 'Game Setup — Position Arrows',
+    changes: [
+      { type: 'added', text: 'Directional arrow icons on each player slot in Game Setup — shows which board position (bottom/top/left/right) each slot maps to, updating dynamically with player count' },
+    ],
+  },
+  {
     version: '1.12.0',
     date: '2026-03-19',
     title: 'Game Manager — XP Animations, First Player UX & Turn Logic',
