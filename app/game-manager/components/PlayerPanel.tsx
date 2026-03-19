@@ -55,6 +55,38 @@ const torchDrift = keyframes`
   96%  { transform: translateX(-600%) rotate(12deg);  }
   100% { transform: translateX(-600%) rotate(12deg);  }
 `;
+const cloudDrift = keyframes`
+  0%   { transform: translateX(500px); opacity: 0;    }
+  8%   { opacity: 0.30; }
+  88%  { opacity: 0.25; }
+  100% { transform: translateX(-280px); opacity: 0;  }
+`;
+const castleSlideIn = keyframes`
+  from { transform: translateX(-280px); opacity: 0; }
+  to   { transform: translateX(0);      opacity: 1; }
+`;
+const castleSlideOut = keyframes`
+  from { transform: translateX(0);      opacity: 1; }
+  to   { transform: translateX(-280px); opacity: 0; }
+`;
+const godRaysFadeIn = keyframes`
+  from { opacity: 0; }
+  to   { opacity: 1; }
+`;
+const godRaysFadeOut = keyframes`
+  from { opacity: 1; }
+  to   { opacity: 0; }
+`;
+const fwFadeOut = keyframes`
+  from { opacity: 1; }
+  to   { opacity: 0; }
+`;
+const godRaysPulse = keyframes`
+  0%   { opacity: 0.8; }
+  40%  { opacity: 1.0; }
+  70%  { opacity: 0.7; }
+  100% { opacity: 0.8; }
+`;
 const torchFlicker = keyframes`
   0%   { opacity: 0.17; }
   3%   { opacity: 0.13; }
@@ -160,6 +192,18 @@ export function PlayerPanel({
   const ts = textSizeMode;
   const [eliminateTurnInput, setEliminateTurnInput] = useState('');
   const [showEliminateConfirm, setShowEliminateConfirm] = useState(false);
+  const [cityBlessingVisible, setCityBlessingVisible] = useState(player.hasCitysBlessing);
+  const [cityBlessingExiting, setCityBlessingExiting] = useState(false);
+  useEffect(() => {
+    if (player.hasCitysBlessing) {
+      setCityBlessingVisible(true);
+      setCityBlessingExiting(false);
+    } else if (cityBlessingVisible) {
+      setCityBlessingExiting(true);
+      const t = setTimeout(() => { setCityBlessingVisible(false); setCityBlessingExiting(false); }, 3800);
+      return () => clearTimeout(t);
+    }
+  }, [player.hasCitysBlessing]);
   const [xpFlashing, setXpFlashing] = useState(false);
   const [xpRippleKey, setXpRippleKey] = useState(0);
   const prevExperience = useRef(player.experience);
@@ -318,15 +362,86 @@ export function PlayerPanel({
         />
       )}
 
+      {/* ── City's Blessing god rays ── */}
+      {cityBlessingVisible && (
+        <Box component="svg" preserveAspectRatio="none" viewBox="0 0 100 100"
+          sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none', overflow: 'hidden', opacity: 0,
+            animation: cityBlessingExiting
+              ? `${godRaysFadeOut} 1.5s ease-in forwards`
+              : `${godRaysFadeIn} 2s 2s ease-out forwards, ${godRaysPulse} 6s 4s ease-in-out infinite`,
+          }}>
+          <defs>
+            <linearGradient id="rayFade" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%"   stopColor="#FFE050" stopOpacity="0.6"/>
+              <stop offset="60%"  stopColor="#FFE050" stopOpacity="0.15"/>
+              <stop offset="100%" stopColor="#FFE050" stopOpacity="0"/>
+            </linearGradient>
+          </defs>
+          {/* Each triangle: apex at (0,0), spreads to far edge */}
+          <polygon points="0,0  4,0   14,100" fill="url(#rayFade)" opacity="0.7"/>
+          <polygon points="0,0  20,0  30,100" fill="url(#rayFade)" opacity="0.5"/>
+          <polygon points="0,0  38,0  46,100" fill="url(#rayFade)" opacity="0.6"/>
+          <polygon points="0,0  58,0  65,100" fill="url(#rayFade)" opacity="0.4"/>
+          <polygon points="0,0  78,0  83,100" fill="url(#rayFade)" opacity="0.55"/>
+          <polygon points="0,0  100,8 100,16"  fill="url(#rayFade)" opacity="0.45"/>
+          <polygon points="0,0  100,38 100,46" fill="url(#rayFade)" opacity="0.35"/>
+          <polygon points="0,0  100,65 100,73" fill="url(#rayFade)" opacity="0.45"/>
+        </Box>
+      )}
+
+      {/* ── City's Blessing castle silhouette ── */}
+      {cityBlessingVisible && (
+        <Box component="svg" viewBox="0 0 300 240" sx={{
+          position: 'absolute', bottom: -60, left: -120,
+          width: 320, height: 256, fill: 'rgba(0,0,0,0.55)', stroke: 'rgba(0,0,0,0.80)', strokeWidth: 1.2,
+          zIndex: 0, pointerEvents: 'none',
+          animation: cityBlessingExiting
+            ? `${castleSlideOut} 1.8s 2s ease-in forwards`
+            : `${castleSlideIn} 1.8s ease-out forwards`,
+        }}>
+          {/* Main silhouette */}
+          <path d="
+            M0,240
+            L0,62 L40,0 L80,62
+            L80,92 L86,92 L86,80 L94,80 L94,92 L102,92 L102,80 L110,80 L110,92 L118,92 L118,80 L126,80 L126,92
+            L126,68 L150,42 L174,68
+            L174,92 L182,92 L182,80 L190,80 L190,92 L198,92 L198,80 L206,80 L206,92 L214,92 L214,80 L222,80 L222,92
+            L220,62 L260,0 L300,62
+            L300,240 Z
+          " />
+          {/* Left tower arrow slits */}
+          <rect x="28" y="100" width="5" height="20" rx="2" fill="rgba(0,0,0,0.7)" stroke="none"/>
+          <rect x="48" y="100" width="5" height="20" rx="2" fill="rgba(0,0,0,0.7)" stroke="none"/>
+          {/* Left tower stringcourse */}
+          <line x1="2" y1="130" x2="78" y2="130" strokeWidth="1.5" stroke="rgba(0,0,0,0.5)"/>
+          {/* Right tower arrow slits */}
+          <rect x="248" y="100" width="5" height="20" rx="2" fill="rgba(0,0,0,0.7)" stroke="none"/>
+          <rect x="268" y="100" width="5" height="20" rx="2" fill="rgba(0,0,0,0.7)" stroke="none"/>
+          {/* Right tower stringcourse */}
+          <line x1="222" y1="130" x2="298" y2="130" strokeWidth="1.5" stroke="rgba(0,0,0,0.5)"/>
+          {/* Central turret arrow slit */}
+          <rect x="147" y="115" width="6" height="24" rx="2" fill="rgba(0,0,0,0.7)" stroke="none"/>
+          {/* Wall stringcourse */}
+          <line x1="80" y1="160" x2="220" y2="160" strokeWidth="1.5" stroke="rgba(0,0,0,0.4)"/>
+          {/* Stone block hints - horizontal lines on towers */}
+          <line x1="2" y1="170" x2="78" y2="170" strokeWidth="1" stroke="rgba(0,0,0,0.3)"/>
+          <line x1="2" y1="200" x2="78" y2="200" strokeWidth="1" stroke="rgba(0,0,0,0.3)"/>
+          <line x1="222" y1="170" x2="298" y2="170" strokeWidth="1" stroke="rgba(0,0,0,0.3)"/>
+          <line x1="222" y1="200" x2="298" y2="200" strokeWidth="1" stroke="rgba(0,0,0,0.3)"/>
+        </Box>
+      )}
+
       {/* ── City's Blessing fireworks ── */}
-      {player.hasCitysBlessing && (
-        <Box sx={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none', overflow: 'hidden' }}>
+      {cityBlessingVisible && (
+        <Box sx={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none', overflow: 'hidden',
+          ...(cityBlessingExiting && { animation: `${fwFadeOut} 0.5s ease-out forwards` }),
+        }}>
           {([
-            { left: '28%', top: '38%', delay: '0s',    dur: '6s',   color: '#81C784', angle:  -12, scale: 0.7 },
-            { left: '68%', top: '25%', delay: '2.2s',  dur: '7s',   color: '#4FC3F7', angle:   18, scale: 1.4 },
-            { left: '50%', top: '58%', delay: '4.5s',  dur: '6.5s', color: '#FFD700', angle:   -5, scale: 1.0 },
-            { left: '18%', top: '62%', delay: '1.1s',  dur: '8s',   color: '#FF8A65', angle:   25, scale: 1.7 },
-            { left: '80%', top: '48%', delay: '3.3s',  dur: '7.5s', color: '#CE93D8', angle:  -20, scale: 0.5 },
+            { left: '28%', top: '38%', delay: '4.5s',  dur: '6s',   color: '#81C784', angle:  -12, scale: 0.7 },
+            { left: '68%', top: '25%', delay: '6.7s',  dur: '7s',   color: '#4FC3F7', angle:   18, scale: 1.4 },
+            { left: '50%', top: '58%', delay: '9.0s',  dur: '6.5s', color: '#FFD700', angle:   -5, scale: 1.0 },
+            { left: '18%', top: '62%', delay: '5.6s',  dur: '8s',   color: '#FF8A65', angle:   25, scale: 1.7 },
+            { left: '80%', top: '48%', delay: '7.8s',  dur: '7.5s', color: '#CE93D8', angle:  -20, scale: 0.5 },
           ] as { left: string; top: string; delay: string; dur: string; color: string; angle: number; scale: number }[]).map((fw, fi) => (
             <Box key={fi} sx={{ position: 'absolute', left: fw.left, top: fw.top }}>
               <Box sx={{ position: 'absolute', left: '50%', transform: `rotate(${fw.angle}deg)`, transformOrigin: 'bottom center' }}>
@@ -342,6 +457,26 @@ export function PlayerPanel({
           ))}
         </Box>
       )}
+
+      {/* ── City's Blessing clouds ── */}
+      {cityBlessingVisible && !cityBlessingExiting && ([
+        { top: '4%',  scale: 1.0,  delay: '4.5s',  dur: '28s' },
+        { top: '12%', scale: 0.65, delay: '13.5s', dur: '34s' },
+        { top: '2%',  scale: 1.3,  delay: '23.5s', dur: '22s' },
+      ]).map((c, i) => (
+        <Box key={i} component="svg" viewBox="0 0 100 40" sx={{
+          position: 'absolute', top: c.top, left: 0, zIndex: 2,
+          width: `${100 * c.scale}px`, height: `${40 * c.scale}px`,
+          fill: 'rgba(255,245,220,0.18)', pointerEvents: 'none', overflow: 'visible',
+          opacity: 0,
+          animation: `${cloudDrift} ${c.dur} ${c.delay} linear infinite`,
+        }}>
+          <ellipse cx="28" cy="28" rx="22" ry="14"/>
+          <ellipse cx="50" cy="18" rx="20" ry="18"/>
+          <ellipse cx="74" cy="26" rx="18" ry="15"/>
+          <rect x="6" y="28" width="86" height="12"/>
+        </Box>
+      ))}
 
       {/* ── Initiative torch flicker overlay ── */}
       {player.hasInitiative && (
@@ -650,7 +785,7 @@ export function PlayerPanel({
       )}
 
       {/* ── Header ── */}
-      <Box sx={{ px: 1, py: 0.5, bgcolor: 'rgba(0,0,0,0.08)', flexShrink: 0, filter: 'none', position: 'relative', display: 'flex', alignItems: 'center' }}>
+      <Box sx={{ px: 1, py: 0.5, bgcolor: 'rgba(0,0,0,0.08)', flexShrink: 0, filter: 'none', position: 'relative', zIndex: 3, display: 'flex', alignItems: 'center' }}>
         {/* Left: commander art + tax */}
         <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0, zIndex: 1 }}>
           {player.commander.artCropUrl && (
@@ -768,7 +903,7 @@ export function PlayerPanel({
       </Box>
 
       {/* ── Main: Commander Damage (left) + Life (right) ── */}
-      <Box sx={{ display: 'flex', flex: 1, minHeight: 0, borderTop: (theme) => `1px solid ${theme.palette.divider}`, filter: 'none' }}>
+      <Box sx={{ display: 'flex', flex: 1, minHeight: 0, borderTop: (theme) => `1px solid ${theme.palette.divider}`, filter: 'none', position: 'relative', zIndex: 3 }}>
 
         {/* Commander Damage box */}
         <Box sx={{
@@ -805,6 +940,7 @@ export function PlayerPanel({
                       },
                     }} />}
                     {source.hasCitysBlessing && <CityIcon active sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10 }} />}
+                    {source.hasInitiative && <InitiativeIcon sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, color: '#4FC3F7' }} />}
                     <Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: source.life <= 0 ? 'error.main' : 'primary.main', lineHeight: 1 }}>♥{source.life}</Typography>
                     {source.poison > 0 && <Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: source.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1 }}>☠{source.poison}</Typography>}
                     {source.energy > 0 && <Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: '#4FC8FF', lineHeight: 1 }}>⚡{source.energy}</Typography>}
