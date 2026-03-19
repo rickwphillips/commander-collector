@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { keyframes } from '@emotion/react';
 import { Box, Stack, Typography, IconButton, Button, TextField, Tooltip } from '@mui/material';
 import CrownIcon from '@mui/icons-material/EmojiEvents';
 import InitiativeIcon from '@mui/icons-material/Shield';
@@ -80,6 +81,16 @@ export function PlayerPanel({
   const energyGlow = energyGlowIntensity > 0
     ? `0 0 ${4 + energyGlowIntensity * 18}px rgba(80,200,255,${(0.5 + energyGlowIntensity * 0.45).toFixed(2)}), 0 0 ${10 + energyGlowIntensity * 36}px rgba(80,200,255,${(0.2 + energyGlowIntensity * 0.3).toFixed(2)})`
     : undefined;
+  const energyGlowPeak = energyGlowIntensity > 0
+    ? `0 0 ${8 + player.energy * 6}px rgba(80,200,255,${Math.min(1, 0.7 + energyGlowIntensity * 0.3).toFixed(2)}), 0 0 ${20 + player.energy * 12}px rgba(80,200,255,${Math.min(0.6, 0.3 + energyGlowIntensity * 0.3).toFixed(2)})`
+    : undefined;
+  const energyPulseDuration = player.energy > 5 ? Math.max(0.8, 2.5 - (player.energy - 5) * 0.09) : 2.5;
+  const energyPulseAnim = useMemo(() => player.energy > 5 ? keyframes`
+    0%   { text-shadow: ${energyGlow}; }
+    35%  { text-shadow: ${energyGlowPeak}; }
+    65%  { text-shadow: ${energyGlowPeak}; }
+    100% { text-shadow: ${energyGlow}; }
+  ` : null, [player.energy]);
 
   const isLifeLow = player.life <= 0;
   const isPoisoned = player.poison >= 10;
@@ -543,7 +554,7 @@ export function PlayerPanel({
 
         {/* Life total + controls */}
         <Box sx={{ width: '33%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5 }}>
-          <Typography sx={{ fontWeight: 900, fontSize: 64, lineHeight: 1, color: isLifeLow ? 'error.main' : 'primary.main' }}>
+          <Typography sx={{ fontWeight: 900, fontSize: 64, lineHeight: 1, color: isLifeLow ? 'error.main' : 'primary.main', ...(energyPulseAnim && { animation: `${energyPulseAnim} ${energyPulseDuration.toFixed(2)}s ease-in-out infinite` }) }}>
             {player.life}
           </Typography>
           <Stack direction="row" alignItems="center" spacing={0} sx={{ mt: 0.5 }}>
