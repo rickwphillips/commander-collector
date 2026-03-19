@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Box,
   Stack,
@@ -16,7 +17,9 @@ import {
   FormControlLabel,
   MenuItem,
   Alert,
+  IconButton,
 } from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ListSubheader from '@mui/material/ListSubheader';
 import { api } from '@/lib/api';
 import type { Player, DeckWithPlayer } from '@/lib/types';
@@ -62,6 +65,7 @@ const emptySlot = (): PlayerSlot => ({
 const LIFE_PRESETS = [20, 30, 40];
 
 export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
+  const router = useRouter();
   const [players, setPlayers] = useState<Player[]>([]);
   const [decks, setDecks] = useState<DeckWithPlayer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -390,9 +394,14 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
       }}
     >
       <Box sx={{ width: '100%', maxWidth: 700 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, mb: 3, textAlign: 'center' }}>
-          Game Setup
-        </Typography>
+        <Stack direction="row" alignItems="center" sx={{ mb: 3 }}>
+          <IconButton onClick={() => router.push('/games')} sx={{ mr: 1 }}>
+            <ArrowBackIcon />
+          </IconButton>
+          <Typography variant="h4" sx={{ fontWeight: 700, flex: 1, textAlign: 'center', pr: 5 }}>
+            Game Setup
+          </Typography>
+        </Stack>
 
         {error && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
