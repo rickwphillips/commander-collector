@@ -51,6 +51,10 @@ const releases: Release[] = [
       { type: 'added', text: 'Toggleable text size mode in the game manager panel — cycles through compact, normal, and large layouts' },
       { type: 'improved', text: "City's Blessing icon uses a royal purple gradient (pink → violet → deep indigo) in all locations when active" },
       { type: 'fixed', text: 'Commander damage minus button no longer adds life back when damage is already at 0 — uses actual delta to prevent phantom life gain' },
+      { type: 'fixed', text: "City's Blessing clouds no longer appear immediately on activation — they are delayed to start alongside the fireworks" },
+      { type: 'fixed', text: 'XP icon in commander damage status row no longer shows a white background in dark mode — fixed by providing an explicit background surface for the blend mode to composite against' },
+      { type: 'added', text: 'Tooltips on all status indicators in the commander damage list — shows current value for Life, Poison, Energy, and Experience; label only for Monarch, City\'s Blessing, and Initiative' },
+      { type: 'improved', text: 'Tooltip text rotates to match each panel\'s orientation — readable for players at top, left, and right positions' },
     ],
   },
   {
