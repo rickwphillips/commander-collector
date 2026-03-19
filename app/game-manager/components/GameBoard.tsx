@@ -348,7 +348,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
         const rotation = getRotation(player.position);
         const isVertical = player.position === 'left' || player.position === 'right';
 
-        if (player.position === 'top' && playerCount < 3) return null;
+        if (player.position === 'top' && playerCount === 3) return null;
         if (player.position === 'left' && playerCount < 4) return null;
 
         return (
