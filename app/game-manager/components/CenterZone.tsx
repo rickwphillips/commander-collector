@@ -21,6 +21,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import NotesIcon from '@mui/icons-material/Notes';
+import TextFieldsIcon from '@mui/icons-material/TextFields';
 import type { PlayerState } from '../types';
 
 type RollPhase = 'idle' | 'rolling' | 'done';
@@ -46,6 +47,8 @@ interface CenterZoneProps {
   onToggleFullscreen: () => void;
   notes: string;
   onNotesChange: (notes: string) => void;
+  textSizeMode: 0 | 1 | 2;
+  onCycleTextSizeMode: () => void;
 }
 
 function rollDie(sides: number): number {
@@ -73,6 +76,8 @@ export function CenterZone({
   onToggleFullscreen,
   notes,
   onNotesChange,
+  textSizeMode,
+  onCycleTextSizeMode,
 }: CenterZoneProps) {
   type RollEntry = { label: string; rolls: (number | string)[]; total: number | null; color: string };
   const [history, setHistory] = useState<RollEntry[]>([]);
@@ -273,6 +278,19 @@ export function CenterZone({
           >
             <NotesIcon sx={{ fontSize: 20 }} />
           </IconButton>
+
+          {/* Text size cycle toggle (0=normal, 1=large, 2=xl) */}
+          <Tooltip title={textSizeMode === 0 ? 'Normal Text' : textSizeMode === 1 ? 'Large Text' : 'Extra-Large Text'} placement="top">
+            <IconButton
+              onClick={onCycleTextSizeMode}
+              sx={{
+                position: 'absolute', bottom: 6, left: 62,
+                color: textSizeMode === 2 ? 'warning.main' : textSizeMode === 1 ? 'primary.main' : 'text.secondary',
+              }}
+            >
+              <TextFieldsIcon sx={{ fontSize: textSizeMode === 2 ? 24 : textSizeMode === 1 ? 22 : 20 }} />
+            </IconButton>
+          </Tooltip>
 
           {/* Dice & More toggle */}
           <IconButton

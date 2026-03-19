@@ -34,6 +34,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
   const [firstPlayerIdx, setFirstPlayerIdx] = useState(isResumed ? state.currentPlayerIdx : 0);
   const [winner, setWinner] = useState<PlayerState | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [textSizeMode, setTextSizeMode] = useState<0 | 1 | 2>(0);
   const [poisonKillPrompt, setPoisonKillPrompt] = useState<{ targetIdx: number; newPlayers: PlayerState[] } | null>(null);
   const [lifeKillPrompt, setLifeKillPrompt] = useState<{ targetIdx: number; pendingWinner: PlayerState | null } | null>(null);
 
@@ -415,6 +416,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
                 isCurrentPlayer={firstPlayerSet && currentPlayerIdx === idx}
                 elapsedSeconds={firstPlayerSet && currentPlayerIdx === idx ? elapsedSeconds : 0}
                 turnTimerSeconds={turnTimerSeconds}
+                textSizeMode={textSizeMode}
                 onLifeChange={handleLifeChange}
                 onPoisonChange={handlePoisonChange}
                 onCommanderTaxChange={handleCommanderTaxChange}
@@ -454,6 +456,8 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
           onToggleFullscreen={toggleFullscreen}
           notes={state.notes}
           onNotesChange={(n) => updateState({ notes: n })}
+          textSizeMode={textSizeMode}
+          onCycleTextSizeMode={() => setTextSizeMode((m) => ((m + 1) % 3) as 0 | 1 | 2)}
         />
       </Box>
 
