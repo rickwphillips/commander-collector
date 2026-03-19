@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { keyframes } from '@emotion/react';
 import { Box, Stack, Typography, IconButton, Button, TextField, Tooltip } from '@mui/material';
 import CrownIcon from '@mui/icons-material/EmojiEvents';
@@ -56,6 +56,27 @@ export function PlayerPanel({
 }: PlayerPanelProps) {
   const [eliminateTurnInput, setEliminateTurnInput] = useState('');
   const [showEliminateConfirm, setShowEliminateConfirm] = useState(false);
+  const [lpKey, setLpKey] = useState<string | null>(null);
+  const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lpFired = useRef(false);
+
+  const startLongPress = (key: string, cb: () => void) => {
+    lpFired.current = false;
+    lpTimer.current = setTimeout(() => {
+      lpFired.current = true;
+      cb();
+      setLpKey(key);
+      setTimeout(() => setLpKey(prev => prev === key ? null : prev), 700);
+    }, 500);
+  };
+  const cancelLongPress = () => {
+    if (lpTimer.current) clearTimeout(lpTimer.current);
+    lpTimer.current = null;
+  };
+  const guardClick = (cb: () => void) => () => {
+    if (lpFired.current) { lpFired.current = false; return; }
+    cb();
+  };
 
   const timerProgress = Math.min(elapsedSeconds / Math.max(turnTimerSeconds, 1), 1);
   const isTimerExpired = isCurrentPlayer && elapsedSeconds >= turnTimerSeconds;
@@ -521,30 +542,38 @@ export function PlayerPanel({
                 <Typography key={`${sourceIdx}-name`} sx={{ fontSize: 12, color: sourceEliminated ? 'text.disabled' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none' }}>
                   {source.commander.name}
                 </Typography>,
-                <IconButton key={`${sourceIdx}-dec`} disabled={sourceEliminated} onClick={() => onCommanderDamageChange(playerIdx, sourceIdx, false, -1)} sx={{ p: 0, minWidth: 32, minHeight: 32 }}>
-                  <Typography sx={{ fontSize: 18, fontWeight: 700, lineHeight: 1 }}>−</Typography>
-                </IconButton>,
+                <Tooltip key={`${sourceIdx}-dec`} open={lpKey === `${sourceIdx}-dec`} title="-5" placement="top" disableFocusListener disableHoverListener disableTouchListener>
+                  <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => onCommanderDamageChange(playerIdx, sourceIdx, false, -1))} onPointerDown={() => startLongPress(`${sourceIdx}-dec`, () => onCommanderDamageChange(playerIdx, sourceIdx, false, -5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: 32, minHeight: 32 }}>
+                    <Typography sx={{ fontSize: 18, fontWeight: 700, lineHeight: 1 }}>−</Typography>
+                  </IconButton></span>
+                </Tooltip>,
                 <Typography key={`${sourceIdx}-val`} sx={{ fontSize: 16, fontWeight: 700, textAlign: 'center', color: dmg[0] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary' }}>
                   {dmg[0]}
                 </Typography>,
-                <IconButton key={`${sourceIdx}-inc`} disabled={sourceEliminated} onClick={() => onCommanderDamageChange(playerIdx, sourceIdx, false, 1)} sx={{ p: 0, minWidth: 32, minHeight: 32 }}>
-                  <Typography sx={{ fontSize: 18, fontWeight: 700, lineHeight: 1 }}>+</Typography>
-                </IconButton>,
+                <Tooltip key={`${sourceIdx}-inc`} open={lpKey === `${sourceIdx}-inc`} title="+5" placement="top" disableFocusListener disableHoverListener disableTouchListener>
+                  <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => onCommanderDamageChange(playerIdx, sourceIdx, false, 1))} onPointerDown={() => startLongPress(`${sourceIdx}-inc`, () => onCommanderDamageChange(playerIdx, sourceIdx, false, 5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: 32, minHeight: 32 }}>
+                    <Typography sx={{ fontSize: 18, fontWeight: 700, lineHeight: 1 }}>+</Typography>
+                  </IconButton></span>
+                </Tooltip>,
               ];
               if (source.partner) {
                 rows.push(
                   <Typography key={`${sourceIdx}-pname`} sx={{ fontSize: 12, color: sourceEliminated ? 'text.disabled' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none' }}>
                     {source.partner.name}
                   </Typography>,
-                  <IconButton key={`${sourceIdx}-pdec`} disabled={sourceEliminated} onClick={() => onCommanderDamageChange(playerIdx, sourceIdx, true, -1)} sx={{ p: 0, minWidth: 32, minHeight: 32 }}>
-                    <Typography sx={{ fontSize: 18, fontWeight: 700, lineHeight: 1 }}>−</Typography>
-                  </IconButton>,
+                  <Tooltip key={`${sourceIdx}-pdec`} open={lpKey === `${sourceIdx}-pdec`} title="-5" placement="top" disableFocusListener disableHoverListener disableTouchListener>
+                    <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => onCommanderDamageChange(playerIdx, sourceIdx, true, -1))} onPointerDown={() => startLongPress(`${sourceIdx}-pdec`, () => onCommanderDamageChange(playerIdx, sourceIdx, true, -5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: 32, minHeight: 32 }}>
+                      <Typography sx={{ fontSize: 18, fontWeight: 700, lineHeight: 1 }}>−</Typography>
+                    </IconButton></span>
+                  </Tooltip>,
                   <Typography key={`${sourceIdx}-pval`} sx={{ fontSize: 16, fontWeight: 700, textAlign: 'center', color: dmg[1] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary' }}>
                     {dmg[1]}
                   </Typography>,
-                  <IconButton key={`${sourceIdx}-pinc`} disabled={sourceEliminated} onClick={() => onCommanderDamageChange(playerIdx, sourceIdx, true, 1)} sx={{ p: 0, minWidth: 32, minHeight: 32 }}>
-                    <Typography sx={{ fontSize: 18, fontWeight: 700, lineHeight: 1 }}>+</Typography>
-                  </IconButton>,
+                  <Tooltip key={`${sourceIdx}-pinc`} open={lpKey === `${sourceIdx}-pinc`} title="+5" placement="top" disableFocusListener disableHoverListener disableTouchListener>
+                    <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => onCommanderDamageChange(playerIdx, sourceIdx, true, 1))} onPointerDown={() => startLongPress(`${sourceIdx}-pinc`, () => onCommanderDamageChange(playerIdx, sourceIdx, true, 5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: 32, minHeight: 32 }}>
+                      <Typography sx={{ fontSize: 18, fontWeight: 700, lineHeight: 1 }}>+</Typography>
+                    </IconButton></span>
+                  </Tooltip>,
                 );
               }
               return rows;
@@ -586,15 +615,19 @@ export function PlayerPanel({
             Counters
           </Typography>
           {([
-            ['Poison', player.poison, () => onPoisonChange(playerIdx, -1), () => onPoisonChange(playerIdx, 1), player.poison >= 10 ? 'error.main' : player.poison > 0 ? 'warning.main' : 'text.disabled'],
-            ['Energy', player.energy, () => onEnergyChange(playerIdx, -1), () => onEnergyChange(playerIdx, 1), player.energy > 0 ? 'primary.main' : 'text.disabled'],
-            ['Experience', player.experience, () => onExperienceChange(playerIdx, -1), () => onExperienceChange(playerIdx, 1), player.experience > 0 ? 'primary.main' : 'text.disabled'],
-            ['Commander Tax', player.commanderTax, () => onCommanderTaxChange(playerIdx, -1), () => onCommanderTaxChange(playerIdx, 1), player.commanderTax > 0 ? 'warning.main' : 'text.disabled'],
-          ] as [string, number, () => void, () => void, string][]).flatMap(([label, value, onDec, onInc, color]) => [
+            ['Poison', player.poison, () => onPoisonChange(playerIdx, -1), () => onPoisonChange(playerIdx, 1), () => onPoisonChange(playerIdx, -5), () => onPoisonChange(playerIdx, 5), player.poison >= 10 ? 'error.main' : player.poison > 0 ? 'warning.main' : 'text.disabled'],
+            ['Energy', player.energy, () => onEnergyChange(playerIdx, -1), () => onEnergyChange(playerIdx, 1), () => onEnergyChange(playerIdx, -5), () => onEnergyChange(playerIdx, 5), player.energy > 0 ? 'primary.main' : 'text.disabled'],
+            ['Experience', player.experience, () => onExperienceChange(playerIdx, -1), () => onExperienceChange(playerIdx, 1), () => onExperienceChange(playerIdx, -5), () => onExperienceChange(playerIdx, 5), player.experience > 0 ? 'primary.main' : 'text.disabled'],
+            ['Commander Tax', player.commanderTax, () => onCommanderTaxChange(playerIdx, -1), () => onCommanderTaxChange(playerIdx, 1), () => onCommanderTaxChange(playerIdx, -5), () => onCommanderTaxChange(playerIdx, 5), player.commanderTax > 0 ? 'warning.main' : 'text.disabled'],
+          ] as [string, number, () => void, () => void, () => void, () => void, string][]).flatMap(([label, value, onDec, onInc, onDec5, onInc5, color]) => [
             <Typography key={`${label}-lbl`} sx={{ fontSize: 12, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none' }}>{label}</Typography>,
-            <IconButton key={`${label}-dec`} onClick={onDec} sx={{ p: 0, minWidth: 32, minHeight: 32 }}><Typography sx={{ fontSize: 18, fontWeight: 700 }}>−</Typography></IconButton>,
+            <Tooltip key={`${label}-dec`} open={lpKey === `${label}-dec`} title="-5" placement="top" disableFocusListener disableHoverListener disableTouchListener>
+              <IconButton onClick={guardClick(onDec)} onPointerDown={() => startLongPress(`${label}-dec`, onDec5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: 32, minHeight: 32 }}><Typography sx={{ fontSize: 18, fontWeight: 700 }}>−</Typography></IconButton>
+            </Tooltip>,
             <Typography key={`${label}-val`} sx={{ fontSize: 16, fontWeight: 700, textAlign: 'center', color, filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none', ...(label === 'Poison' && value === 9 && { animation: 'poisonPulse 2.5s ease-in-out infinite', '@keyframes poisonPulse': { '0%, 100%': { opacity: 1, transform: 'scale(1)', textShadow: '0 0 8px rgba(0,200,60,0.9), 0 0 20px rgba(0,200,60,0.5)' }, '50%': { opacity: 0.3, transform: 'scale(0.85)', textShadow: '0 0 2px rgba(0,200,60,0.2)' } } }) }}>{value}</Typography>,
-            <IconButton key={`${label}-inc`} onClick={onInc} sx={{ p: 0, minWidth: 32, minHeight: 32 }}><Typography sx={{ fontSize: 18, fontWeight: 700 }}>+</Typography></IconButton>,
+            <Tooltip key={`${label}-inc`} open={lpKey === `${label}-inc`} title="+5" placement="top" disableFocusListener disableHoverListener disableTouchListener>
+              <IconButton onClick={guardClick(onInc)} onPointerDown={() => startLongPress(`${label}-inc`, onInc5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: 32, minHeight: 32 }}><Typography sx={{ fontSize: 18, fontWeight: 700 }}>+</Typography></IconButton>
+            </Tooltip>,
           ])}
         </Box>
       </Box>
