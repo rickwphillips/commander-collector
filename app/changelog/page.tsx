@@ -38,6 +38,26 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.11.0',
+    date: '2026-03-18',
+    title: 'Game Manager — Kill Attribution, Auto-Elimination & Notes',
+    changes: [
+      { type: 'added', text: 'Auto-eliminate players when life reaches 0, poison reaches 10, or commander damage from a single source reaches 21 — reversed automatically if the condition is undone' },
+      { type: 'added', text: 'Kill attribution prompt for life kills — asks who dealt the final blow and records it in game notes' },
+      { type: 'added', text: 'Kill attribution prompt for poison kills — asks who applied the lethal poison and records it in game notes' },
+      { type: 'added', text: 'Commander damage kills auto-record the source commander (and partner) in game notes' },
+      { type: 'added', text: 'Game notes modal — Notes icon in the center zone opens an editable notes dialog; highlights when notes are present' },
+      { type: 'added', text: 'Kill events auto-populate game notes with turn number and attribution; notes are saved to the game record on log' },
+      { type: 'added', text: 'Play Game button on games page linking directly to the game manager' },
+      { type: 'improved', text: 'Win dialog deferred until kill attribution prompt is resolved — ensures final blow note is captured before saving' },
+      { type: 'improved', text: 'Commander damage controls disabled and struck through for eliminated players' },
+      { type: 'improved', text: 'Commander damage number column widened to prevent wrapping on two-digit values' },
+      { type: 'improved', text: 'First player roll animation is noticeably faster' },
+      { type: 'fixed', text: 'Game save navigation corrected to /games/detail?id= route' },
+      { type: 'fixed', text: 'Game notes saved with kill events stripped of internal tracking tags' },
+    ],
+  },
+  {
     version: '1.10.0',
     date: '2026-03-18',
     title: 'Query Sentence & Comparison Builder Overhaul',
