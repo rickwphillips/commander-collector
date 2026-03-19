@@ -252,6 +252,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
     };
     const prevTotal = current[0] + current[1];
     const cmdDmgTotal = newDmg[0] + newDmg[1];
+    const actualDelta = cmdDmgTotal - prevTotal;
     const isNewElimination = !players[targetIdx].isEliminated && cmdDmgTotal >= 21;
     const isUndoElimination = players[targetIdx].isEliminated && prevTotal >= 21 && cmdDmgTotal < 21;
     const target = players[targetIdx];
@@ -273,7 +274,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
       if (i !== targetIdx) return p;
       return {
         ...p,
-        life: p.life - delta,
+        life: p.life - actualDelta,
         ...(isNewElimination ? { isEliminated: true, eliminatedTurn: state.turnNumber } : {}),
         ...(isUndoElimination ? { isEliminated: false, eliminatedTurn: null } : {}),
       };
