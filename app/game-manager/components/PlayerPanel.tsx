@@ -141,6 +141,7 @@ const CityIcon = ({ active, ...props }: React.ComponentProps<typeof SvgIcon> & {
 import ElimIcon from '@mui/icons-material/PersonOff';
 const XP_ICON_SRC = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRPxc2Yz21vbnc5VP3Muxnx5VtQGAynItuNWg&s';
 import type { PlayerState, CommanderDamageMap } from '../types';
+import { ASSET_BASE } from '@/lib/api';
 
 interface PlayerPanelProps {
   player: PlayerState;
@@ -486,7 +487,7 @@ export function PlayerPanel({
           {/* Stone wall texture */}
           <Box sx={{
             position: 'absolute', inset: 0, opacity: 0.3,
-            backgroundImage: 'url(/dungeon.jpg)',
+            backgroundImage: `url(${ASSET_BASE}/dungeon.jpg)`,
             backgroundRepeat: 'no-repeat',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
