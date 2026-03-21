@@ -38,7 +38,7 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
-    version: '1.13.5',
+    version: '1.13.4',
     date: '2026-03-21',
     title: 'Game Manager — Life Total Visual Overhaul',
     changes: [
