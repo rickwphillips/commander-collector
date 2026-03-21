@@ -24,8 +24,8 @@ interface GameBoardProps {
   isResumed?: boolean;
 }
 
-export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame, onSaveGame, isResumed = false }: GameBoardProps) {
-  const { players, commanderDamage, currentPlayerIdx, turnNumber, turnTimerSeconds, turnStartTime } = state;
+export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGame, isResumed = false }: GameBoardProps) {
+  const { players, commanderDamage, currentPlayerIdx, turnNumber, turnTimerSeconds, turnStartTime, startingLife } = state;
 
   const [rollState, setRollState] = useState<RollState>({ phase: 'idle', highlightIdx: null, finalIdx: null });
   const [firstPlayerSet, setFirstPlayerSet] = useState(isResumed);
@@ -423,6 +423,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
                 isCurrentPlayer={firstPlayerSet && currentPlayerIdx === idx}
                 elapsedSeconds={firstPlayerSet && currentPlayerIdx === idx ? elapsedSeconds : 0}
                 turnTimerSeconds={turnTimerSeconds}
+                startingLife={startingLife}
                 textSizeMode={textSizeMode}
                 onLifeChange={handleLifeChange}
                 onPoisonChange={handlePoisonChange}

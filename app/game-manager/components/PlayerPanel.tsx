@@ -163,6 +163,7 @@ interface PlayerPanelProps {
   isCurrentPlayer?: boolean;
   elapsedSeconds?: number;
   turnTimerSeconds?: number;
+  startingLife?: number;
   textSizeMode?: 0 | 1 | 2;
 }
 
@@ -188,6 +189,7 @@ export function PlayerPanel({
   isCurrentPlayer = false,
   elapsedSeconds = 0,
   turnTimerSeconds = 300,
+  startingLife = 40,
   textSizeMode = 0,
 }: PlayerPanelProps) {
   const ts = textSizeMode;
@@ -220,6 +222,17 @@ export function PlayerPanel({
     }
     prevExperience.current = player.experience;
   }, [player.experience]);
+
+  const [damageFlash, setDamageFlash] = useState(0);
+  const prevLife = useRef(player.life);
+  useEffect(() => {
+    if (player.life < prevLife.current) {
+      const delta = prevLife.current - player.life;
+      setDamageFlash(delta);
+      setTimeout(() => setDamageFlash(0), 1000);
+    }
+    prevLife.current = player.life;
+  }, [player.life]);
 
   const [lpKey, setLpKey] = useState<string | null>(null);
   const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -295,6 +308,160 @@ export function PlayerPanel({
     65%  { text-shadow: ${energyGlowPeak}; }
     100% { text-shadow: ${energyGlow}; }
   ` : null, [player.energy]);
+
+  const damageFlashAnim = useMemo(() => keyframes`
+    0%   { text-shadow: 0 0 0px rgba(180,0,0,0); filter: brightness(1); }
+    20%  { text-shadow: 0 0 32px rgba(220,0,0,1), 0 0 64px rgba(180,0,0,0.7); filter: brightness(1.8); }
+    100% { text-shadow: 0 0 0px rgba(180,0,0,0); filter: brightness(1); }
+  `, []);
+
+  const lostRatio = player.life <= 0 ? 1 : Math.max(0, Math.min((startingLife - player.life) / startingLife, 1));
+
+  // life color: green above startingLife, blood red below, primary at starting
+  function lifeColor(life: number): string {
+    if (life <= 0) return '#6B0000';
+    if (life > startingLife) {
+      const gain = Math.min((life - startingLife) / startingLife, 1);
+      const r = Math.round(180 - 140 * gain);
+      const g = Math.round(120 + 102 * gain);
+      const b = Math.round(60 - 36 * gain);
+      return `rgb(${r},${g},${b})`;
+    }
+    const ratio = Math.max(0, Math.min((startingLife - life) / startingLife, 1));
+    if (ratio <= 0) return '';
+    const r = Math.round(180 + 71 * ratio);
+    const g = Math.round(120 - 120 * ratio);
+    const b = Math.round(60 - 60 * ratio);
+    return `rgb(${r},${g},${b})`;
+  }
+  const computedLifeColor = lifeColor(player.life);
+
+  const crackAlpha = (from: number) => Math.min(Math.max((lostRatio - from) / 0.15, 0), 1);
+
+  function buildCrackSvg(): string {
+    const p = (d: string, w: number, op: number) =>
+      `<path d="${d}" stroke="rgba(15,0,0,${op})" stroke-width="${w}" fill="none" stroke-linecap="round"/>`;
+    const grp = (from: number, paths: string) => {
+      const o = crackAlpha(from).toFixed(2);
+      return o === '0.00' ? '' : `<g opacity="${o}">${paths}</g>`;
+    };
+
+    // "1" is a narrow vertical stroke — horizontal branches just look like hash marks.
+    // Use diagonal/vertical-dominant cracks instead.
+    if (player.life === 1) {
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        ${grp(0.2,
+          p('M50,0 L47,14 L52,28 L48,44 L53,60 L49,76 L51,100', 1.4, 0.95) +
+          p('M47,14 L38,24 L34,38 L40,50',  0.9, 0.88) +
+          p('M52,28 L61,38 L64,52 L58,64',  0.9, 0.88) +
+          p('M48,44 L38,52 L34,64 L40,76',  0.8, 0.82) +
+          p('M53,60 L62,68 L66,80 L60,92',  0.8, 0.82)
+        )}
+        ${grp(0.35,
+          p('M34,38 L26,46 L30,58 L24,70',  0.75, 0.85) +
+          p('M64,52 L72,60 L68,72 L76,84',  0.75, 0.85) +
+          p('M40,50 L32,58 L36,70 L28,80',  0.7, 0.8)  +
+          p('M58,64 L66,72 L62,84 L70,94',  0.7, 0.8)  +
+          p('M38,24 L30,14 L34,4',          0.65, 0.78) +
+          p('M61,38 L70,28 L66,16 L72,6',   0.65, 0.78)
+        )}
+        ${grp(0.5,
+          p('M26,46 L18,54 L22,66 L16,78',  0.65, 0.82) +
+          p('M72,60 L80,68 L76,80 L82,90',  0.65, 0.82) +
+          p('M30,58 L22,66 L26,78 L20,88',  0.6, 0.78)  +
+          p('M68,72 L76,80 L72,90 L78,100', 0.6, 0.78)  +
+          p('M34,4 L28,14 L32,24',          0.55, 0.75) +
+          p('M72,6 L78,16 L74,28',          0.55, 0.75)
+        )}
+        ${grp(0.7,
+          p('M18,54 L10,62 L14,74 L8,86',   0.55, 0.85) +
+          p('M80,68 L88,76 L84,88 L90,98',  0.55, 0.85) +
+          p('M22,66 L14,76 L18,88 L12,98',  0.5, 0.8)   +
+          p('M76,80 L84,88 L80,98',         0.5, 0.8)   +
+          p('M28,14 L20,24 L24,36',         0.48, 0.75) +
+          p('M78,16 L86,26 L82,38',         0.48, 0.75)
+        )}
+        ${grp(0.85,
+          p('M10,62 L4,70 L8,82',           0.45, 0.8)  +
+          p('M88,76 L94,84 L90,94',         0.45, 0.8)  +
+          p('M14,74 L6,82 L10,94',          0.42, 0.75) +
+          p('M84,88 L90,96 L96,90',         0.42, 0.75) +
+          p('M20,24 L12,34 L16,44',         0.4, 0.72)  +
+          p('M86,26 L92,36 L88,48',         0.4, 0.72)
+        )}
+      </svg>`;
+    }
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+      ${grp(0.2,
+        // main spine top→bottom
+        p('M51,0 L48,10 L53,22 L49,34 L54,46 L47,58 L52,70 L49,82 L51,100', 1.4, 0.95) +
+        // branches reaching all four corners
+        p('M48,10 L36,6 L22,10 L8,4',   0.9, 0.88) +   // top-left
+        p('M53,22 L66,16 L80,20 L94,12', 0.9, 0.88) +   // top-right
+        p('M49,34 L34,28 L18,34 L4,26',  0.85, 0.85) +  // mid-left upper
+        p('M54,46 L68,40 L84,44 L98,36', 0.85, 0.85) +  // mid-right upper
+        p('M47,58 L32,52 L16,56 L2,48',  0.8, 0.82) +   // mid-left lower
+        p('M52,70 L66,64 L82,68 L96,60', 0.8, 0.82) +   // mid-right lower
+        p('M49,82 L34,78 L18,82 L4,76',  0.75, 0.78) +  // bottom-left
+        p('M51,100 L62,94 L76,98',        0.7, 0.75)    // bottom-right
+      )}
+      ${grp(0.35,
+        // sub-branches off the main spine arms
+        p('M22,10 L14,18 L6,14 L2,24',   0.8, 0.85) +
+        p('M80,20 L88,28 L96,22 L100,32', 0.8, 0.85) +
+        p('M18,34 L8,42 L2,36 L4,48',    0.75, 0.82) +
+        p('M84,44 L94,50 L100,44 L98,56', 0.75, 0.82) +
+        p('M16,56 L6,62 L2,72 L8,80',    0.72, 0.8)  +
+        p('M82,68 L92,74 L98,68 L100,80', 0.72, 0.8)  +
+        p('M18,82 L8,88 L4,96 L12,100',  0.68, 0.78) +
+        p('M76,98 L86,92 L96,96 L100,88', 0.68, 0.78) +
+        // cross-connects between branches
+        p('M8,4 L4,14 L10,24',            0.65, 0.75) +
+        p('M94,12 L100,22 L96,32',        0.65, 0.75) +
+        p('M4,26 L2,36',                  0.6,  0.72) +
+        p('M98,36 L100,44',               0.6,  0.72)
+      )}
+      ${grp(0.5,
+        // fill interior gaps
+        p('M36,6 L30,16 L38,26 L32,36',   0.7, 0.8) +
+        p('M66,16 L72,26 L64,36 L70,46',  0.7, 0.8) +
+        p('M34,28 L28,38 L22,46 L28,54',  0.65, 0.78) +
+        p('M68,40 L74,50 L78,60 L72,68',  0.65, 0.78) +
+        p('M32,52 L24,60 L30,70 L22,78',  0.62, 0.75) +
+        p('M66,64 L74,72 L68,80 L76,88',  0.62, 0.75) +
+        p('M34,78 L28,86 L36,94 L28,100', 0.58, 0.72) +
+        p('M62,94 L68,86 L74,92',         0.58, 0.72)
+      )}
+      ${grp(0.7,
+        // dense secondary network
+        p('M14,18 L20,28 L14,38 L20,48',  0.6, 0.85) +
+        p('M88,28 L82,38 L88,48 L82,58',  0.6, 0.85) +
+        p('M6,62 L14,68 L8,78 L16,86',    0.55, 0.8) +
+        p('M92,74 L84,80 L90,90 L82,96',  0.55, 0.8) +
+        p('M30,16 L24,26 L30,34',         0.52, 0.78) +
+        p('M72,26 L78,34 L72,44',         0.52, 0.78) +
+        p('M28,54 L20,62 L26,70',         0.5,  0.75) +
+        p('M74,50 L82,58 L76,66',         0.5,  0.75) +
+        p('M24,60 L16,66 L22,76',         0.48, 0.72) +
+        p('M78,60 L86,66 L80,76',         0.48, 0.72)
+      )}
+      ${grp(0.85,
+        // hairline fill — everywhere
+        p('M10,24 L16,32 L10,40',         0.45, 0.8) +
+        p('M92,32 L86,40 L92,48',         0.45, 0.8) +
+        p('M20,48 L14,56 L20,64',         0.42, 0.78) +
+        p('M82,58 L88,64 L82,72',         0.42, 0.78) +
+        p('M4,48 L10,56 L4,64',           0.4,  0.75) +
+        p('M98,56 L92,62 L98,70',         0.4,  0.75) +
+        p('M16,86 L22,92 L16,100',        0.38, 0.72) +
+        p('M82,96 L76,100',               0.38, 0.72) +
+        p('M38,26 L44,34 L38,42',         0.38, 0.7)  +
+        p('M64,36 L58,44 L64,52',         0.38, 0.7)  +
+        p('M28,38 L34,46 L28,54',         0.36, 0.68) +
+        p('M74,72 L80,78 L74,86',         0.36, 0.68)
+      )}
+    </svg>`;
+  }
 
   const isLifeLow = player.life <= 0;
   const isPoisoned = player.poison >= 10;
@@ -951,7 +1118,7 @@ export function PlayerPanel({
                   }} /></Tooltip>}
                   {source.hasCitysBlessing && <Tooltip title="City's Blessing" placement="top" slotProps={ttSlotProps} arrow><span><CityIcon active sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10 }} /></span></Tooltip>}
                   {source.hasInitiative && <Tooltip title="Initiative" placement="top" slotProps={ttSlotProps} arrow><InitiativeIcon sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, color: '#4FC3F7' }} /></Tooltip>}
-                  <Tooltip title={`Life: ${source.life}`} placement="top" slotProps={ttSlotProps} arrow><Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: source.life <= 0 ? 'error.main' : 'primary.main', lineHeight: 1 }}>♥{source.life}</Typography></Tooltip>
+                  <Tooltip title={`Life: ${source.life}`} placement="top" slotProps={ttSlotProps} arrow><Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: lifeColor(source.life) || 'primary.main', lineHeight: 1 }}>♥{source.life}</Typography></Tooltip>
                   {source.poison > 0 && <Tooltip title={`Poison: ${source.poison}`} placement="top" slotProps={ttSlotProps} arrow><Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: source.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1 }}>☠{source.poison}</Typography></Tooltip>}
                   {source.energy > 0 && <Tooltip title={`Energy: ${source.energy}`} placement="top" slotProps={ttSlotProps} arrow><Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: '#4FC8FF', lineHeight: 1 }}>⚡{source.energy}</Typography></Tooltip>}
                   {source.experience > 0 && <Tooltip title={`Experience: ${source.experience}`} placement="top" slotProps={ttSlotProps} arrow><Stack direction="row" alignItems="center" spacing={0.25}><Box sx={{ bgcolor: 'background.paper', display: 'inline-flex' }}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: ts === 2 ? 14 : ts === 1 ? 12 : 10, height: ts === 2 ? 14 : ts === 1 ? 12 : 10, objectFit: 'contain', mixBlendMode: 'multiply', transition: 'width 0.2s ease, height 0.2s ease' }} /></Box><Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: '#DAA520', lineHeight: 1 }}>{source.experience}</Typography></Stack></Tooltip>}
@@ -1014,9 +1181,111 @@ export function PlayerPanel({
                 },
               }} />
             )}
-            <Typography sx={{ fontWeight: 900, fontSize: ts === 2 ? 128 : ts === 1 ? 96 : 80, lineHeight: 1, color: isLifeLow ? 'error.main' : 'primary.main', transition: 'font-size 0.2s ease', ...(energyPulseAnim && { animation: `${energyPulseAnim} ${energyPulseDuration.toFixed(2)}s ease-in-out infinite` }) }}>
-              {player.life}
-            </Typography>
+            {/* Overflow-hidden wrapper keeps the swipe clipped to the number */}
+            <Box sx={{ position: 'relative', overflow: 'hidden', lineHeight: 1, display: 'inline-block' }}>
+              <Typography sx={{
+                fontWeight: 900,
+                fontSize: ts === 2 ? 128 : ts === 1 ? 96 : 80,
+                lineHeight: 1,
+                color: computedLifeColor || ((theme: import('@mui/material').Theme) => theme.palette.primary.main),
+                transition: 'color 0.4s ease, font-size 0.2s ease',
+                ...(damageFlash > 0 && { animation: `${damageFlashAnim} 0.6s ease-out forwards` }),
+                ...(damageFlash === 0 && energyPulseAnim && { animation: `${energyPulseAnim} ${energyPulseDuration.toFixed(2)}s ease-in-out infinite` }),
+              }}>
+                {player.life}
+              </Typography>
+              {/* Crack texture — background-clip:text confines to exact glyph shapes */}
+              {lostRatio > 0.2 && (
+                <Box sx={{
+                  position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                  fontWeight: 900,
+                  fontSize: ts === 2 ? 128 : ts === 1 ? 96 : 80,
+                  lineHeight: 1,
+                  color: 'transparent',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(buildCrackSvg())}")`,
+                  backgroundSize: '100% 100%',
+                  WebkitBackgroundClip: 'text',
+                  backgroundClip: 'text',
+                  pointerEvents: 'none',
+                  userSelect: 'none',
+                  fontFamily: 'inherit',
+                }}>
+                  {player.life}
+                </Box>
+              )}
+              {/* Swipe 1 — left → right, angled down ~22deg */}
+              {damageFlash > 0 && (
+                <Box sx={{
+                  position: 'absolute', top: '44%', left: 0,
+                  width: '70%', height: '10%',
+                  background: 'linear-gradient(to right, transparent, rgba(200,0,0,0.5) 35%, rgba(235,0,0,0.88) 50%, rgba(200,0,0,0.5) 65%, transparent)',
+                  pointerEvents: 'none',
+                  animation: 'lifeSwipe1 0.6s ease-in forwards',
+                  '@keyframes lifeSwipe1': {
+                    '0%':   { transform: 'translate(-170%, -300%) rotate(22deg)' },
+                    '100%': { transform: 'translate(370%, 300%) rotate(22deg)' },
+                  },
+                }} />
+              )}
+              {/* Swipe 2 — right → left, angled up ~-16deg (asymmetric X) */}
+              {damageFlash > 0 && (
+                <Box sx={{
+                  position: 'absolute', top: '44%', left: 0,
+                  width: '70%', height: '10%',
+                  background: 'linear-gradient(to left, transparent, rgba(180,0,0,0.45) 35%, rgba(215,0,0,0.78) 50%, rgba(180,0,0,0.45) 65%, transparent)',
+                  pointerEvents: 'none',
+                  opacity: 0,
+                  animation: 'lifeSwipe2 0.6s ease-in 0.12s forwards',
+                  '@keyframes lifeSwipe2': {
+                    '0%':   { transform: 'translate(-170%, 300%) rotate(-16deg)', opacity: 1 },
+                    '100%': { transform: 'translate(370%, -300%) rotate(-16deg)', opacity: 1 },
+                  },
+                }} />
+              )}
+              {/* Swipe 3 — -5 only, right→left descending */}
+              {damageFlash >= 5 && (
+                <Box sx={{
+                  position: 'absolute', top: '44%', left: 0,
+                  width: '70%', height: '10%',
+                  background: 'linear-gradient(to left, transparent, rgba(220,0,0,0.4) 35%, rgba(255,20,20,0.68) 50%, rgba(220,0,0,0.4) 65%, transparent)',
+                  pointerEvents: 'none', opacity: 0,
+                  animation: 'lifeSwipe3 0.58s ease-in 0.28s forwards',
+                  '@keyframes lifeSwipe3': {
+                    '0%':   { transform: 'translate(370%, -300%) rotate(30deg)', opacity: 1 },
+                    '100%': { transform: 'translate(-170%, 300%) rotate(30deg)', opacity: 1 },
+                  },
+                }} />
+              )}
+              {/* Swipe 4 — -5 only, right→left ascending */}
+              {damageFlash >= 5 && (
+                <Box sx={{
+                  position: 'absolute', top: '44%', left: 0,
+                  width: '70%', height: '10%',
+                  background: 'linear-gradient(to left, transparent, rgba(200,0,0,0.38) 35%, rgba(235,10,10,0.62) 50%, rgba(200,0,0,0.38) 65%, transparent)',
+                  pointerEvents: 'none', opacity: 0,
+                  animation: 'lifeSwipe4 0.6s ease-in 0.4s forwards',
+                  '@keyframes lifeSwipe4': {
+                    '0%':   { transform: 'translate(370%, 300%) rotate(-22deg)', opacity: 1 },
+                    '100%': { transform: 'translate(-170%, -300%) rotate(-22deg)', opacity: 1 },
+                  },
+                }} />
+              )}
+              {/* Swipe 5 — -5 only, left→right, steeper angle */}
+              {damageFlash >= 5 && (
+                <Box sx={{
+                  position: 'absolute', top: '44%', left: 0,
+                  width: '70%', height: '10%',
+                  background: 'linear-gradient(to right, transparent, rgba(180,0,0,0.35) 35%, rgba(220,10,10,0.58) 50%, rgba(180,0,0,0.35) 65%, transparent)',
+                  pointerEvents: 'none', opacity: 0,
+                  animation: 'lifeSwipe5 0.58s ease-in 0.54s forwards',
+                  '@keyframes lifeSwipe5': {
+                    '0%':   { transform: 'translate(-170%, -350%) rotate(38deg)', opacity: 1 },
+                    '100%': { transform: 'translate(370%, 350%) rotate(38deg)', opacity: 1 },
+                  },
+                }} />
+              )}
+            </Box>
           </Box>
           <Stack direction="row" alignItems="center" spacing={ts === 2 ? 3 : ts === 1 ? 1.5 : 0} sx={{ mt: ts === 2 ? -1.5 : ts === 1 ? -0.5 : 0.5, transition: 'gap 0.2s ease, margin-top 0.2s ease' }}>
             <Tooltip open={lpKey === 'life-dec'} title="-5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>

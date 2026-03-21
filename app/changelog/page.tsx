@@ -38,6 +38,17 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.13.5',
+    date: '2026-03-21',
+    title: 'Game Manager — Life Total Visual Overhaul',
+    changes: [
+      { type: 'added', text: 'Life total color shifts proportionally — blood red as life decreases from starting total, green as it rises above it' },
+      { type: 'added', text: 'Commander status panel life total (♥) uses the same proportional color as the main life number' },
+      { type: 'added', text: 'Crack texture appears on the life total number and intensifies with damage — clipped to exact glyph shapes via CSS background-clip' },
+      { type: 'added', text: 'Damage swipe animation: two angled slashes cross the life total on each hit, forming an asymmetric X; three additional slashes fire on long-press (−5)' },
+    ],
+  },
+  {
     version: '1.13.3',
     date: '2026-03-21',
     title: 'Game Manager — Turn Timer Enhancements',
