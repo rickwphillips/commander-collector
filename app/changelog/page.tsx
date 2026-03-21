@@ -38,6 +38,22 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.13.2',
+    date: '2026-03-21',
+    title: 'Game Manager — iPad Layout & Text Scaling',
+    changes: [
+      { type: 'improved', text: 'Center zone no longer dominates on iPad Pro — row height capped at 220px so player panels fill the remaining space' },
+      { type: 'improved', text: 'Left and right player panels widened from 220px to 260px for more room' },
+      { type: 'improved', text: 'Text size toggle now scales the center panel (Next Turn button, turn tracker text, roll/accept buttons) and player panel header (commander art, player name, status icons)' },
+      { type: 'fixed', text: 'Commander Damage section converted to CSS grid with safe-center alignment — title no longer clips at the top when content overflows' },
+      { type: 'fixed', text: 'Two-digit values (e.g. 21 commander damage, 10 poison) no longer wrap in the Commander Damage and Counters columns at large text sizes — columns widen at XL and nowrap is enforced' },
+      { type: 'fixed', text: 'Counters section is now scrollable so Commander Tax is always reachable when the panel is short' },
+      { type: 'fixed', text: 'Center panel turn tracker text no longer overflows the card at large text sizes — Stack width set to 80% keeping text centered and contained' },
+      { type: 'added', text: 'Commander Damage section has a CMD / Player toggle button to switch between displaying commander names and player names' },
+      { type: 'changed', text: 'Next Turn button changed from filled to outlined style' },
+    ],
+  },
+  {
     version: '1.13.1',
     date: '2026-03-19',
     title: 'Game Manager — Bug Fixes',

@@ -107,6 +107,7 @@ export function CenterZone({
   };
 
   const lastEntry = history.length > 0 ? history[history.length - 1] : null;
+  const ts = textSizeMode;
 
   const currentPlayer = players[currentPlayerIdx];
 
@@ -133,23 +134,22 @@ export function CenterZone({
 
           {/* Turn tracker */}
           {firstPlayerSet && (
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '100%', px: 1 }}>
-              {/* Left side — rotated for left-panel player */}
-              <Box sx={{ transform: 'rotate(90deg)', textAlign: 'center', whiteSpace: 'normal', overflowWrap: 'break-word', maxWidth: 120 }}>
-                <Typography sx={{ fontWeight: 900, fontSize: 36, color: 'primary.main', lineHeight: 1 }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '80%', px: 1 }}>
+              <Box sx={{ transform: 'rotate(90deg)', maxWidth: 120, flexShrink: 0, textAlign: 'center' }}>
+                <Typography sx={{ fontWeight: 900, fontSize: ts === 2 ? 46 : ts === 1 ? 40 : 36, color: 'primary.main', lineHeight: 1 }}>
                   Turn {turnNumber}
                 </Typography>
-                <Typography sx={{ fontSize: 16, fontWeight: 600, color: 'text.primary', lineHeight: 1.2 }}>
+                <Typography sx={{ fontSize: ts === 2 ? 20 : ts === 1 ? 18 : 16, fontWeight: 600, color: 'text.primary', lineHeight: 1.2 }}>
                   {currentPlayer?.commander.name ?? '—'}
                 </Typography>
-                <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.3 }}>
+                <Typography sx={{ fontSize: ts === 2 ? 17 : ts === 1 ? 15 : 13, color: 'text.secondary', lineHeight: 1.3 }}>
                   {currentPlayer?.playerName ?? '—'}
                 </Typography>
               </Box>
 
               <Tooltip open={prevTurnTooltip} title="Previous Turn" placement="top" disableFocusListener disableHoverListener disableTouchListener>
                 <Button
-                  variant="contained"
+                  variant="outlined"
                   onClick={() => { if (lpFired.current) { lpFired.current = false; return; } onNextTurn(); }}
                   onPointerDown={() => {
                     lpFired.current = false;
@@ -163,21 +163,20 @@ export function CenterZone({
                   onPointerUp={() => { if (lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; } }}
                   onPointerLeave={() => { if (lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; } }}
                   onPointerCancel={() => { if (lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; } }}
-                  sx={{ width: 150, height: 150, fontSize: 24, fontWeight: 700, borderRadius: 2, lineHeight: 1.2, flexShrink: 0 }}
+                  sx={{ width: ts === 2 ? 175 : ts === 1 ? 160 : 150, height: ts === 2 ? 175 : ts === 1 ? 160 : 150, fontSize: ts === 2 ? 32 : ts === 1 ? 28 : 24, fontWeight: 700, borderRadius: 2, lineHeight: 1.2, flexShrink: 0 }}
                 >
                   Next<br />Turn
                 </Button>
               </Tooltip>
 
-              {/* Right side — rotated for right-panel player */}
-              <Box sx={{ transform: 'rotate(-90deg)', textAlign: 'center', whiteSpace: 'normal', overflowWrap: 'break-word', maxWidth: 120 }}>
-                <Typography sx={{ fontWeight: 900, fontSize: 36, color: 'primary.main', lineHeight: 1 }}>
+              <Box sx={{ transform: 'rotate(-90deg)', maxWidth: 120, flexShrink: 0, textAlign: 'center' }}>
+                <Typography sx={{ fontWeight: 900, fontSize: ts === 2 ? 46 : ts === 1 ? 40 : 36, color: 'primary.main', lineHeight: 1 }}>
                   Turn {turnNumber}
                 </Typography>
-                <Typography sx={{ fontSize: 16, fontWeight: 600, color: 'text.primary', lineHeight: 1.2 }}>
+                <Typography sx={{ fontSize: ts === 2 ? 20 : ts === 1 ? 18 : 16, fontWeight: 600, color: 'text.primary', lineHeight: 1.2 }}>
                   {currentPlayer?.commander.name ?? '—'}
                 </Typography>
-                <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.3 }}>
+                <Typography sx={{ fontSize: ts === 2 ? 17 : ts === 1 ? 15 : 13, color: 'text.secondary', lineHeight: 1.3 }}>
                   {currentPlayer?.playerName ?? '—'}
                 </Typography>
               </Box>
@@ -187,11 +186,11 @@ export function CenterZone({
           {/* Roll for first player */}
           {!firstPlayerSet && <Box sx={{ textAlign: 'center', width: '100%' }}>
             {(rollPhase === 'rolling') && rolledPlayerName && (
-              <Typography variant="caption" sx={{ fontWeight: 600, color: '#DAA520', display: 'block', mb: 0.75, fontSize: 13 }}>
-                <Box key={rolledPlayerName} component="span" sx={{ display: 'inline-block', fontSize: 22, fontWeight: 900, fontStyle: 'italic', letterSpacing: 0.5, animation: 'nameFlash 0.18s cubic-bezier(0.34,1.56,0.64,1)', '@keyframes nameFlash': { '0%': { opacity: 0, transform: 'scale(0.7) translateY(-6px)' }, '100%': { opacity: 1, transform: 'scale(1) translateY(0)' } } }}>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: '#DAA520', display: 'block', mb: 0.75, fontSize: ts === 2 ? 17 : ts === 1 ? 15 : 13 }}>
+                <Box key={rolledPlayerName} component="span" sx={{ display: 'inline-block', fontSize: ts === 2 ? 28 : ts === 1 ? 25 : 22, fontWeight: 900, fontStyle: 'italic', letterSpacing: 0.5, animation: 'nameFlash 0.18s cubic-bezier(0.34,1.56,0.64,1)', '@keyframes nameFlash': { '0%': { opacity: 0, transform: 'scale(0.7) translateY(-6px)' }, '100%': { opacity: 1, transform: 'scale(1) translateY(0)' } } }}>
                   {rolledPlayerName}
                 </Box>
-                <Box component="span" sx={{ color: 'text.primary', fontStyle: 'normal', fontWeight: 300, fontSize: 18 }}>{' goes first!'}</Box>
+                <Box component="span" sx={{ color: 'text.primary', fontStyle: 'normal', fontWeight: 300, fontSize: ts === 2 ? 22 : ts === 1 ? 20 : 18 }}>{' goes first!'}</Box>
               </Typography>
             )}
             {(rollPhase === 'idle' || rollPhase === 'rolling') && !choosingFirst && (
@@ -200,7 +199,7 @@ export function CenterZone({
                   variant="contained"
                   onClick={onRollForFirst}
                   disabled={rollPhase === 'rolling'}
-                  sx={{ width: 110, height: 110, flexDirection: 'column', gap: 0.75, fontSize: 13, fontWeight: 700, borderRadius: 2, flexShrink: 0 }}
+                  sx={{ width: ts === 2 ? 135 : ts === 1 ? 120 : 110, height: ts === 2 ? 135 : ts === 1 ? 120 : 110, flexDirection: 'column', gap: 0.75, fontSize: ts === 2 ? 17 : ts === 1 ? 15 : 13, fontWeight: 700, borderRadius: 2, flexShrink: 0 }}
                 >
                   <svg viewBox="0 0 24 24" width="40" height="40" fill="currentColor">
                     <path d="M12 2L2 19h20L12 2zm0 4l7 13H5l7-13zm-1 5v4h2v-4h-2zm0 5v2h2v-2h-2z" />
@@ -211,7 +210,7 @@ export function CenterZone({
                   variant="outlined"
                   onClick={() => setChoosingFirst(true)}
                   disabled={rollPhase === 'rolling'}
-                  sx={{ width: 80, height: 80, flexDirection: 'column', fontSize: 11, fontWeight: 600, borderRadius: 2, flexShrink: 0 }}
+                  sx={{ width: ts === 2 ? 100 : ts === 1 ? 90 : 80, height: ts === 2 ? 100 : ts === 1 ? 90 : 80, flexDirection: 'column', fontSize: ts === 2 ? 15 : ts === 1 ? 13 : 11, fontWeight: 600, borderRadius: 2, flexShrink: 0 }}
                 >
                   Choose
                 </Button>
@@ -224,7 +223,7 @@ export function CenterZone({
                 </Typography>
                 <Stack spacing={0.5}>
                   {players.map((p, idx) => (
-                    <Button key={idx} variant="outlined" onClick={() => { onChooseFirstPlayer(idx); setChoosingFirst(false); }} sx={{ fontSize: 12, py: 0.75 }}>
+                    <Button key={idx} variant="outlined" onClick={() => { onChooseFirstPlayer(idx); setChoosingFirst(false); }} sx={{ fontSize: ts === 2 ? 16 : ts === 1 ? 14 : 12, py: 0.75 }}>
                       {p.playerName}
                     </Button>
                   ))}
@@ -236,10 +235,10 @@ export function CenterZone({
             )}
             {rollPhase === 'done' && (
               <Box>
-                <Typography variant="caption" sx={{ fontWeight: 600, color: '#DAA520', display: 'block', mb: 0.75, fontSize: 13 }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: '#DAA520', display: 'block', mb: 0.75, fontSize: ts === 2 ? 17 : ts === 1 ? 15 : 13 }}>
                   <Box component="span" sx={{
                     display: 'inline-block',
-                    fontSize: 22, fontWeight: 900, fontStyle: 'italic', letterSpacing: 0.5,
+                    fontSize: ts === 2 ? 28 : ts === 1 ? 25 : 22, fontWeight: 900, fontStyle: 'italic', letterSpacing: 0.5,
                     animation: 'nameSizzle 0.5s cubic-bezier(0.34,1.56,0.64,1), nameGlow 2s ease-in-out 0.5s infinite alternate',
                     '@keyframes nameSizzle': {
                       '0%':   { opacity: 0, transform: 'scale(1.5)', textShadow: '0 0 32px rgba(255,215,0,1)' },
@@ -253,11 +252,11 @@ export function CenterZone({
                   }}>
                     {rolledPlayerName}
                   </Box>
-                  <Box component="span" sx={{ color: 'text.primary', fontStyle: 'normal', fontWeight: 300, fontSize: 18 }}>{' goes first!'}</Box>
+                  <Box component="span" sx={{ color: 'text.primary', fontStyle: 'normal', fontWeight: 300, fontSize: ts === 2 ? 22 : ts === 1 ? 20 : 18 }}>{' goes first!'}</Box>
                 </Typography>
                 <Stack direction="row" spacing={1.5} justifyContent="center" alignItems="flex-end">
-                  <Button variant="contained" onClick={onAcceptFirstPlayer} sx={{ width: 110, height: 110, fontSize: 13, fontWeight: 700, borderRadius: 2 }}>Accept</Button>
-                  <Button variant="outlined" onClick={onRollAgain} sx={{ width: 80, height: 80, fontSize: 11, fontWeight: 600, borderRadius: 2 }}>Roll Again</Button>
+                  <Button variant="contained" onClick={onAcceptFirstPlayer} sx={{ width: ts === 2 ? 135 : ts === 1 ? 120 : 110, height: ts === 2 ? 135 : ts === 1 ? 120 : 110, fontSize: ts === 2 ? 17 : ts === 1 ? 15 : 13, fontWeight: 700, borderRadius: 2 }}>Accept</Button>
+                  <Button variant="outlined" onClick={onRollAgain} sx={{ width: ts === 2 ? 100 : ts === 1 ? 90 : 80, height: ts === 2 ? 100 : ts === 1 ? 90 : 80, fontSize: ts === 2 ? 15 : ts === 1 ? 13 : 11, fontWeight: 600, borderRadius: 2 }}>Roll Again</Button>
                 </Stack>
               </Box>
             )}

@@ -1,9 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { Box, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, Stack } from '@mui/material';
-import FullscreenIcon from '@mui/icons-material/Fullscreen';
-import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
+import { Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, Stack } from '@mui/material';
 import { PlayerPanel } from './PlayerPanel';
 import { CenterZone } from './CenterZone';
 import type { GameManagerState, CommanderDamageMap, PlayerState } from '../types';
@@ -363,7 +361,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
   };
 
   const playerCount = players.length;
-  const sideColumnWidth = playerCount === 2 ? '0px' : '220px';
+  const sideColumnWidth = playerCount === 2 ? '0px' : '260px';
   const gridTemplateColumns = `${sideColumnWidth} 1fr ${sideColumnWidth}`;
 
   return (
@@ -373,7 +371,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
         inset: 0,
         display: 'grid',
         gridTemplateColumns,
-        gridTemplateRows: '220px 1fr 220px',
+        gridTemplateRows: '1fr minmax(160px, 220px) 1fr',
         bgcolor: (theme) =>
           theme.palette.mode === 'dark' ? '#1A1410' : '#FFF8F0',
         gap: 0.5,
@@ -406,7 +404,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
                       top: '50%',
                       left: '50%',
                       width: '100dvh',
-                      height: '220px',
+                      height: '260px',
                       transform: `translate(-50%, -50%) ${rotation}`,
                     }
                   : {
