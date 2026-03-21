@@ -457,6 +457,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onLogGame
           onChooseFirstPlayer={handleChooseFirstPlayer}
           onRollAgain={handleRollAgain}
           onRestartGame={handleRestartGame}
+          elapsedSeconds={elapsedSeconds}
           turnTimerSeconds={turnTimerSeconds}
           onTimerChange={(s) => updateState({ turnTimerSeconds: s })}
           isFullscreen={isFullscreen}

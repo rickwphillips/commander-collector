@@ -38,6 +38,15 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.13.3',
+    date: '2026-03-21',
+    title: 'Game Manager — Turn Timer Enhancements',
+    changes: [
+      { type: 'added', text: 'Next Turn button pulses with increasing urgency as the turn timer counts down — slow pulse at 30s, faster at 20s, rapid orange-red glow at 10s' },
+      { type: 'added', text: 'Turn timer can now be set to 0 to disable the time limit entirely (no countdown, no pulse)' },
+    ],
+  },
+  {
     version: '1.13.2',
     date: '2026-03-21',
     title: 'Game Manager — iPad Layout & Text Scaling',

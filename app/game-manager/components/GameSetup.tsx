@@ -493,12 +493,12 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
               Starting life: <strong>{startingLife}</strong>
             </Typography>
             <TextField
-              label="Turn Timer (seconds)"
+              label="Turn Timer (seconds, 0 = no limit)"
               type="number"
               size="small"
               value={turnTimerSeconds}
-              onChange={(e) => setTurnTimerSeconds(Math.max(1, Number(e.target.value)))}
-              inputProps={{ min: 1 }}
+              onChange={(e) => setTurnTimerSeconds(Math.max(0, Number(e.target.value)))}
+              inputProps={{ min: 0 }}
               sx={{ mt: 2, width: 180 }}
             />
           </CardContent>

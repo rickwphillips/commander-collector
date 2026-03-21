@@ -41,6 +41,7 @@ interface CenterZoneProps {
   onChooseFirstPlayer: (idx: number) => void;
   onRollAgain: () => void;
   onRestartGame: () => void;
+  elapsedSeconds: number;
   turnTimerSeconds: number;
   onTimerChange: (seconds: number) => void;
   isFullscreen: boolean;
@@ -72,6 +73,7 @@ export function CenterZone({
   onRestartGame,
   turnTimerSeconds,
   onTimerChange,
+  elapsedSeconds,
   isFullscreen,
   onToggleFullscreen,
   notes,
@@ -108,6 +110,11 @@ export function CenterZone({
 
   const lastEntry = history.length > 0 ? history[history.length - 1] : null;
   const ts = textSizeMode;
+
+  const remaining = turnTimerSeconds > 0 ? Math.max(0, turnTimerSeconds - elapsedSeconds) : null;
+  const pulseSpeed = remaining !== null && remaining <= 30
+    ? remaining <= 10 ? 0.5 : remaining <= 20 ? 1 : 1.8
+    : null;
 
   const currentPlayer = players[currentPlayerIdx];
 
@@ -163,7 +170,7 @@ export function CenterZone({
                   onPointerUp={() => { if (lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; } }}
                   onPointerLeave={() => { if (lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; } }}
                   onPointerCancel={() => { if (lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; } }}
-                  sx={{ width: ts === 2 ? 175 : ts === 1 ? 160 : 150, height: ts === 2 ? 175 : ts === 1 ? 160 : 150, fontSize: ts === 2 ? 32 : ts === 1 ? 28 : 24, fontWeight: 700, borderRadius: 2, lineHeight: 1.2, flexShrink: 0 }}
+                  sx={{ width: ts === 2 ? 175 : ts === 1 ? 160 : 150, height: ts === 2 ? 175 : ts === 1 ? 160 : 150, fontSize: ts === 2 ? 32 : ts === 1 ? 28 : 24, fontWeight: 700, borderRadius: 2, lineHeight: 1.2, flexShrink: 0, ...(pulseSpeed !== null && { animation: `nextTurnPulse ${pulseSpeed}s ease-in-out infinite`, '@keyframes nextTurnPulse': { '0%, 100%': { boxShadow: '0 0 0 0 rgba(255,100,50,0)', borderColor: 'primary.main' }, '50%': { boxShadow: `0 0 12px 4px rgba(255,80,30,${remaining! <= 10 ? 0.9 : 0.5})`, borderColor: 'error.main' } } }) }}
                 >
                   Next<br />Turn
                 </Button>
