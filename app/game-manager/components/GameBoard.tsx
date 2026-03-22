@@ -315,29 +315,38 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   const handleNextTurn = () => {
     const currentPos = players[currentPlayerIdx].position;
     const curCW = CLOCKWISE.indexOf(currentPos);
+    const firstCW = CLOCKWISE.indexOf(players[firstPlayerIdx].position);
     let nextPlayerIdx = -1;
+    let stepsToNext = 0;
     for (let step = 1; step <= 4; step++) {
       const nextPos = CLOCKWISE[(curCW + step) % 4];
       const idx = players.findIndex(p => p.position === nextPos && !p.isEliminated);
-      if (idx !== -1) { nextPlayerIdx = idx; break; }
+      if (idx !== -1) { nextPlayerIdx = idx; stepsToNext = step; break; }
     }
     if (nextPlayerIdx === -1) return;
-    const newTurnNumber = nextPlayerIdx === firstPlayerIdx ? turnNumber + 1 : turnNumber;
+    // Increment turn when we cross through the first player's position (even if they're eliminated)
+    const distToFirst = (firstCW - curCW + 4) % 4;
+    const newTurnNumber = distToFirst >= 1 && distToFirst <= stepsToNext ? turnNumber + 1 : turnNumber;
     updateState({ currentPlayerIdx: nextPlayerIdx, turnNumber: newTurnNumber, turnStartTime: Date.now() });
   };
 
   const handlePrevTurn = () => {
-    if (currentPlayerIdx === firstPlayerIdx && turnNumber === 1) return;
     const currentPos = players[currentPlayerIdx].position;
     const curCW = CLOCKWISE.indexOf(currentPos);
+    const firstCW = CLOCKWISE.indexOf(players[firstPlayerIdx].position);
     let prevPlayerIdx = -1;
+    let stepsBack = 0;
     for (let step = 1; step <= 4; step++) {
       const prevPos = CLOCKWISE[(curCW - step + 4) % 4];
       const idx = players.findIndex(p => p.position === prevPos && !p.isEliminated);
-      if (idx !== -1) { prevPlayerIdx = idx; break; }
+      if (idx !== -1) { prevPlayerIdx = idx; stepsBack = step; break; }
     }
     if (prevPlayerIdx === -1) return;
-    const newTurnNumber = currentPlayerIdx === firstPlayerIdx ? Math.max(1, turnNumber - 1) : turnNumber;
+    // Decrement turn when we depart through the first player's position going backward (including when current IS first player)
+    const distBackToFirst = (curCW - firstCW + 4) % 4;
+    const wouldDecrement = distBackToFirst < stepsBack;
+    if (wouldDecrement && turnNumber === 1) return;
+    const newTurnNumber = wouldDecrement ? Math.max(1, turnNumber - 1) : turnNumber;
     updateState({ currentPlayerIdx: prevPlayerIdx, turnNumber: newTurnNumber, turnStartTime: Date.now() });
   };
 

@@ -139,6 +139,11 @@ export default function GameManagerPage() {
     setState(DEFAULT_STATE);
   };
 
+  const handleDiscard = () => {
+    localStorage.removeItem(GAME_STATE_KEY);
+    router.push('/games');
+  };
+
   const handleRestartGame = (currentPlayers: PlayerState[]) => {
     localStorage.removeItem(GAME_STATE_KEY);
     setIsResumed(false);
@@ -179,6 +184,7 @@ export default function GameManagerPage() {
       commanderDamage={state.commanderDamage}
       onLogGame={handleLogGame}
       onNewGame={handleNewGame}
+      onDiscard={handleDiscard}
     />
   );
 }

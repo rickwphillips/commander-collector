@@ -12,17 +12,44 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  FormControlLabel,
+  Switch,
   TextField,
   IconButton,
   Tooltip,
 } from '@mui/material';
 import CasinoIcon from '@mui/icons-material/Casino';
 import CloseIcon from '@mui/icons-material/Close';
+import FlagIcon from '@mui/icons-material/Flag';
+import TollIcon from '@mui/icons-material/Toll';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
-import NotesIcon from '@mui/icons-material/Notes';
+import ReplayIcon from '@mui/icons-material/Replay';
+import SettingsIcon from '@mui/icons-material/Settings';
 import TextFieldsIcon from '@mui/icons-material/TextFields';
 import type { PlayerState } from '../types';
+
+function D20Icon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinejoin="round"
+      strokeLinecap="round"
+    >
+      {/* Outer hexagon (pointy-top) */}
+      <path d="M12 1 L21 6.5 L21 17.5 L12 23 L3 17.5 L3 6.5 Z" />
+      {/* Triangle pointing up: top vertex → lower-right → lower-left */}
+      <path d="M12 1 L21 17.5 L3 17.5 Z" />
+      {/* Triangle pointing down: upper-left → upper-right → bottom vertex */}
+      <path d="M3 6.5 L21 6.5 L12 23 Z" />
+    </svg>
+  );
+}
 
 type RollPhase = 'idle' | 'rolling' | 'done';
 
@@ -92,6 +119,8 @@ export function CenterZone({
   const [notesDraft, setNotesDraft] = useState('');
   const [prevTurnTooltip, setPrevTurnTooltip] = useState(false);
   const [choosingFirst, setChoosingFirst] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const lastTimerRef = useRef(turnTimerSeconds > 0 ? turnTimerSeconds : 300);
   const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lpFired = useRef(false);
 
@@ -103,7 +132,7 @@ export function CenterZone({
       const rolls = Array.from({ length: diceCount }, () => rollDie(sides));
       const total = rolls.reduce((a, b) => (a as number) + (b as number), 0) as number;
       const color = sides === 20 && diceCount === 1 ? (rolls[0] === 20 ? '#DAA520' : rolls[0] === 1 ? 'error.main' : 'primary.main') : 'primary.main';
-      setHistory((prev) => [...prev, { label: diceCount === 1 ? `d${sides}` : `${diceCount}d${sides}`, rolls, total: diceCount > 1 ? total : null, color }]);
+      setHistory((prev) => [...prev, { label: `d${sides}`, rolls, total: diceCount > 1 ? total : null, color }]);
     }
     setResultKey((k) => k + 1);
   };
@@ -272,19 +301,10 @@ export function CenterZone({
           {/* Fullscreen toggle */}
           <IconButton
             onClick={onToggleFullscreen}
-            sx={{ position: 'absolute', bottom: 6, left: 6, color: 'text.secondary' }}
+            sx={{ position: 'absolute', top: 6, left: 6, color: 'text.secondary' }}
             title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
           >
             {isFullscreen ? <FullscreenExitIcon sx={{ fontSize: 20 }} /> : <FullscreenIcon sx={{ fontSize: 20 }} />}
-          </IconButton>
-
-          {/* Notes button */}
-          <IconButton
-            onClick={() => { setNotesDraft(notes); setNotesOpen(true); }}
-            sx={{ position: 'absolute', bottom: 6, left: 34, color: notes.trim() ? 'primary.main' : 'text.secondary' }}
-            title="Game Notes"
-          >
-            <NotesIcon sx={{ fontSize: 20 }} />
           </IconButton>
 
           {/* Text size cycle toggle (0=normal, 1=large, 2=xl) */}
@@ -292,7 +312,7 @@ export function CenterZone({
             <IconButton
               onClick={onCycleTextSizeMode}
               sx={{
-                position: 'absolute', bottom: 6, left: 62,
+                position: 'absolute', bottom: 6, left: 6,
                 color: textSizeMode === 2 ? 'warning.main' : textSizeMode === 1 ? 'primary.main' : 'text.secondary',
               }}
             >
@@ -300,15 +320,103 @@ export function CenterZone({
             </IconButton>
           </Tooltip>
 
+          {/* Settings toggle */}
+          <IconButton
+            onClick={() => setSettingsOpen(true)}
+            sx={{ position: 'absolute', top: 6, right: 6, color: 'text.secondary' }}
+            title="Settings"
+          >
+            <SettingsIcon sx={{ fontSize: 20 }} />
+          </IconButton>
+
           {/* Dice & More toggle */}
           <IconButton
             onClick={() => setDiceOpen(true)}
             sx={{ position: 'absolute', bottom: 6, right: 6, color: 'text.secondary' }}
             title="Dice & More"
           >
-            <CasinoIcon sx={{ fontSize: 20 }} />
+            <CasinoIcon sx={{ fontSize: 28 }} />
           </IconButton>
         </CardContent>
+
+        {/* Settings overlay */}
+        {settingsOpen && (
+          <Box sx={{
+            position: 'absolute',
+            inset: 0,
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? '#1A1410EE' : '#FFF8F0EE',
+            zIndex: 10,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 2,
+            p: 1.5,
+          }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '100%' }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Settings
+              </Typography>
+              <IconButton size="small" onClick={() => setSettingsOpen(false)} sx={{ p: 0.25 }}>
+                <CloseIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Stack>
+
+            <Stack spacing={1.5} sx={{ width: '100%' }}>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => { setSettingsOpen(false); setNotesDraft(notes); setNotesOpen(true); }}
+                startIcon={<TextFieldsIcon sx={{ fontSize: 16 }} />}
+                sx={{ fontSize: 12, py: 1, width: '50%', alignSelf: 'center', color: notes.trim() ? 'primary.main' : undefined, borderColor: notes.trim() ? 'primary.main' : undefined }}
+              >
+                Game Notes
+              </Button>
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={turnTimerSeconds > 0}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        onTimerChange(lastTimerRef.current);
+                      } else {
+                        lastTimerRef.current = turnTimerSeconds;
+                        onTimerChange(0);
+                      }
+                    }}
+                  />
+                }
+                label={<Typography sx={{ fontSize: 13 }}>Turn Timer</Typography>}
+                sx={{ mx: 0, alignSelf: 'center' }}
+              />
+
+              <Stack direction="row" spacing={1}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => { setSettingsOpen(false); setConfirmRestart(true); }}
+                  startIcon={<ReplayIcon sx={{ fontSize: 16 }} />}
+                  fullWidth
+                  sx={{ fontSize: 12, py: 1 }}
+                >
+                  Restart
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  size="small"
+                  onClick={() => { setSettingsOpen(false); setConfirmEnd(true); }}
+                  startIcon={<FlagIcon sx={{ fontSize: 16 }} />}
+                  fullWidth
+                  sx={{ fontSize: 12, py: 1 }}
+                >
+                  End Game
+                </Button>
+              </Stack>
+            </Stack>
+          </Box>
+        )}
 
         {/* Dice & More overlay */}
         {diceOpen && (
@@ -377,28 +485,24 @@ export function CenterZone({
 
 
             {/* Buttons */}
-            <Box sx={{ width: '100%' }}>
-              <Stack direction="row" spacing={0.5} justifyContent="center" sx={{ mb: 0.75 }}>
-                <Button variant="outlined" size="small" onClick={() => addRoll('d6', 6)} sx={{ fontSize: 11, px: 1.5 }}>d6</Button>
-                <Button variant="outlined" size="small" onClick={() => addRoll('d20', 20)} sx={{ fontSize: 11, px: 1.5 }}>d20</Button>
-                <Button variant="outlined" size="small" onClick={() => addRoll('coin', null)} sx={{ fontSize: 11, px: 1.5 }}>Flip Coin</Button>
+            <Stack spacing={1.5} sx={{ width: '100%' }}>
+              <Stack direction="row" spacing={1}>
+                <Button variant="outlined" fullWidth onClick={() => addRoll('d6', 6)} startIcon={<CasinoIcon sx={{ fontSize: 16 }} />} sx={{ fontSize: 12, py: 1 }}>d6</Button>
+                <Button variant="outlined" fullWidth onClick={() => addRoll('d20', 20)} startIcon={<D20Icon size={16} />} sx={{ fontSize: 12, py: 1 }}>d20</Button>
+                <Button variant="outlined" fullWidth onClick={() => addRoll('coin', null)} startIcon={<TollIcon sx={{ fontSize: 16 }} />} sx={{ fontSize: 12, py: 1 }}>Flip Coin</Button>
               </Stack>
               <Stack direction="row" alignItems="center" justifyContent="space-between">
-                {/* Dice count — bottom left */}
-                <Stack direction="row" alignItems="center" spacing={0.5}>
-                  <Button size="small" variant="outlined" onClick={() => setDiceCount((c) => Math.max(1, c - 1))} sx={{ minWidth: 24, px: 0, fontSize: 14 }}>−</Button>
-                  <Typography sx={{ fontWeight: 700, fontSize: 13, minWidth: 20, textAlign: 'center' }}>{diceCount}</Typography>
-                  <Button size="small" variant="outlined" onClick={() => setDiceCount((c) => Math.min(20, c + 1))} sx={{ minWidth: 24, px: 0, fontSize: 14 }}>+</Button>
-                  <Typography sx={{ fontSize: 10, color: 'text.secondary' }}>dice</Typography>
+                <Stack direction="row" alignItems="center" spacing={0.75}>
+                  <Button variant="outlined" onClick={() => setDiceCount((c) => Math.max(1, c - 1))} sx={{ minWidth: 36, px: 0, fontSize: 18, py: 0.75 }}>−</Button>
+                  <Typography sx={{ fontWeight: 700, fontSize: 15, minWidth: 24, textAlign: 'center' }}>{diceCount}</Typography>
+                  <Button variant="outlined" onClick={() => setDiceCount((c) => Math.min(20, c + 1))} sx={{ minWidth: 36, px: 0, fontSize: 18, py: 0.75 }}>+</Button>
+                  <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>dice</Typography>
                 </Stack>
-                {/* Game actions — bottom right */}
-                <Stack direction="row" spacing={0.5} alignItems="center">
-                  {history.length > 0 && <Button variant="text" size="small" onClick={() => setHistory([])} sx={{ fontSize: 10, px: 0.5, color: 'text.disabled' }}>Clear</Button>}
-                  <Button variant="outlined" color="error" size="small" onClick={() => setConfirmEnd(true)} sx={{ fontSize: 11, px: 1 }}>End Game</Button>
-                  <Button variant="outlined" size="small" onClick={() => setConfirmRestart(true)} sx={{ fontSize: 11, px: 1 }}>Restart</Button>
-                </Stack>
+                {history.length > 0 && (
+                  <Button variant="text" size="small" onClick={() => setHistory([])} sx={{ fontSize: 10, px: 0.5, color: 'text.disabled' }}>Clear</Button>
+                )}
               </Stack>
-            </Box>
+            </Stack>
           </Box>
         )}
       </Card>

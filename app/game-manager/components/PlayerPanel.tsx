@@ -256,10 +256,12 @@ export function PlayerPanel({
     cb();
   };
 
-  const timerProgress = Math.min(elapsedSeconds / Math.max(turnTimerSeconds, 1), 1);
-  const isTimerExpired = isCurrentPlayer && elapsedSeconds >= turnTimerSeconds;
+  const timerOff = turnTimerSeconds === 0;
+  const timerProgress = timerOff ? 0 : Math.min(elapsedSeconds / turnTimerSeconds, 1);
+  const isTimerExpired = isCurrentPlayer && !timerOff && elapsedSeconds >= turnTimerSeconds;
 
   function timerColor(): string {
+    if (timerOff) return '#42A5F5';
     if (timerProgress <= 0.5) {
       const p = timerProgress * 2;
       return `rgb(${Math.round(102 + 153 * p)},${Math.round(187 - 20 * p)},${Math.round(106 - 68 * p)})`;

@@ -260,8 +260,8 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
       playerCount === 2
         ? ['bottom', 'top']
         : playerCount === 3
-        ? ['bottom', 'left', 'right']
-        : ['bottom', 'top', 'left', 'right'];
+        ? ['bottom', 'left', 'top']
+        : ['bottom', 'left', 'top', 'right'];
 
     const playerSetups: PlayerSetup[] = activeSlots.map((s, i) => {
       const deck = decks.find((d) => d.id === s.deckId);
@@ -322,8 +322,8 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
 
   const POSITIONS_BY_COUNT: Record<number, string[]> = {
     2: ['bottom', 'top'],
-    3: ['bottom', 'left', 'right'],
-    4: ['bottom', 'top', 'left', 'right'],
+    3: ['bottom', 'left', 'top'],
+    4: ['bottom', 'left', 'top', 'right'],
   };
 
   const positionIcons: Record<string, React.ReactElement> = {

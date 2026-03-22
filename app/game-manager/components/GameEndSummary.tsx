@@ -21,6 +21,7 @@ interface GameEndSummaryProps {
   commanderDamage: CommanderDamageMap;
   onLogGame: () => void;
   onNewGame: () => void;
+  onDiscard: () => void;
 }
 
 export function GameEndSummary({
@@ -30,6 +31,7 @@ export function GameEndSummary({
   commanderDamage,
   onLogGame,
   onNewGame,
+  onDiscard,
 }: GameEndSummaryProps) {
   const [finishPositions, setFinishPositions] = useState<(number | '')[]>(
     players.map(() => '')
@@ -197,6 +199,15 @@ export function GameEndSummary({
             fullWidth
           >
             New Game
+          </Button>
+          <Button
+            variant="outlined"
+            size="large"
+            color="error"
+            onClick={onDiscard}
+            fullWidth
+          >
+            Discard Results
           </Button>
         </Stack>
       </Box>
