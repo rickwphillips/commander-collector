@@ -38,6 +38,21 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.14.0',
+    date: '2026-03-22',
+    title: 'Game Manager — Settings Panel & UX Polish',
+    changes: [
+      { type: 'added', text: 'In-game settings panel (gear icon, top-right): toggle turn timer on/off, open game notes, restart or end game — restoring last timer value when re-enabled' },
+      { type: 'added', text: 'Discard Results button on the end game screen — clears the session and returns to the games list without logging' },
+      { type: 'added', text: 'Custom D20 SVG icon for the d20 dice button — two overlapping inscribed triangles forming the icosahedron face pattern' },
+      { type: 'fixed', text: 'Turn number no longer stalls when the first player is eliminated — increment now tracks when turn order crosses the first player\'s seat position rather than requiring a landing' },
+      { type: 'fixed', text: 'Seat assignment order corrected: 3-player uses bottom/left/top, 4-player uses bottom/left/top/right' },
+      { type: 'fixed', text: 'Turn timer set to 0 no longer causes an instant red border flash — shows a calm blue outline instead' },
+      { type: 'improved', text: 'Dice panel buttons restyled to match settings panel — larger, full-width, with icons for d6, d20, and coin flip' },
+      { type: 'improved', text: 'Game notes and game controls (restart, end game) consolidated into the settings panel' },
+    ],
+  },
+  {
     version: '1.13.4',
     date: '2026-03-21',
     title: 'Game Manager — Life Total Visual Overhaul',
