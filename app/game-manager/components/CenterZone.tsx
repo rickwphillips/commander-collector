@@ -77,6 +77,8 @@ interface CenterZoneProps {
   onNotesChange: (notes: string) => void;
   textSizeMode: 0 | 1 | 2;
   onCycleTextSizeMode: () => void;
+  highlightMode: boolean;
+  onToggleHighlightMode: () => void;
 }
 
 function rollDie(sides: number): number {
@@ -107,6 +109,8 @@ export function CenterZone({
   onNotesChange,
   textSizeMode,
   onCycleTextSizeMode,
+  highlightMode,
+  onToggleHighlightMode,
 }: CenterZoneProps) {
   type RollEntry = { label: string; rolls: (number | string)[]; total: number | null; color: string };
   const [history, setHistory] = useState<RollEntry[]>([]);
@@ -373,23 +377,30 @@ export function CenterZone({
                 Game Notes
               </Button>
 
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={turnTimerSeconds > 0}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        onTimerChange(lastTimerRef.current);
-                      } else {
-                        lastTimerRef.current = turnTimerSeconds;
-                        onTimerChange(0);
-                      }
-                    }}
-                  />
-                }
-                label={<Typography sx={{ fontSize: 13 }}>Turn Timer</Typography>}
-                sx={{ mx: 0, alignSelf: 'center' }}
-              />
+              <Stack direction="row" justifyContent="center" spacing={2}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={turnTimerSeconds > 0}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          onTimerChange(lastTimerRef.current);
+                        } else {
+                          lastTimerRef.current = turnTimerSeconds;
+                          onTimerChange(0);
+                        }
+                      }}
+                    />
+                  }
+                  label={<Typography sx={{ fontSize: 13 }}>Turn Timer</Typography>}
+                  sx={{ mx: 0 }}
+                />
+                <FormControlLabel
+                  control={<Switch checked={highlightMode} onChange={onToggleHighlightMode} />}
+                  label={<Typography sx={{ fontSize: 13 }}>Header Highlight</Typography>}
+                  sx={{ mx: 0 }}
+                />
+              </Stack>
 
               <Stack direction="row" spacing={1}>
                 <Button

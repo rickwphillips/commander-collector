@@ -9,6 +9,8 @@ const CrownIcon = (props: React.ComponentProps<typeof SvgIcon>) => (
   </SvgIcon>
 );
 import InitiativeIcon from '@mui/icons-material/Castle';
+import AddIcon from '@mui/icons-material/Add';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 
 const FW_DIRS: [number, number][] = [
   [0, -58], [41, -41], [58, 0], [41, 41], [0, 58], [-41, 41], [-58, 0], [-41, -41],
@@ -124,6 +126,34 @@ const fwSparks = FW_DIRS.map(([dx, dy]) => keyframes`
   94%     { transform:translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px)) scale(0.5); opacity:0.45; }
   100%    { transform:translate(calc(-50% + ${dx * 1.55}px),calc(-50% + ${dy * 1.55}px)) scale(0); opacity:0; }
 `);
+const crownShimmerBig = keyframes`
+  0%, 100% { filter: drop-shadow(0 0 3px #DAA520) brightness(1); }
+  50%       { filter: drop-shadow(0 0 10px #FFD700) brightness(1.6); }
+`;
+const tearFall = keyframes`
+  0%   { transform: translateY(-12px) translateX(0px) scaleY(1);    opacity: 0; }
+  8%   { opacity: 0.85; }
+  40%  { transform: translateY(40%)  translateX(4px)  scaleY(1.1);  opacity: 0.75; }
+  75%  { transform: translateY(80%)  translateX(-3px) scaleY(0.95); opacity: 0.4; }
+  100% { transform: translateY(110%) translateX(1px)  scaleY(1);    opacity: 0; }
+`;
+const TEARS = [
+  { left: '12%', delay: '0s',    dur: '2.9s' },
+  { left: '28%', delay: '1.1s',  dur: '3.2s' },
+  { left: '45%', delay: '0.4s',  dur: '2.6s' },
+  { left: '60%', delay: '1.7s',  dur: '3.4s' },
+  { left: '76%', delay: '0.7s',  dur: '2.8s' },
+  { left: '88%', delay: '2.0s',  dur: '3.1s' },
+];
+const crownEnterFromTop = keyframes`
+  from { transform: translateY(-80px) rotate(-25deg); opacity: 0; }
+  to   { transform: translateY(0) rotate(-25deg); opacity: 1; }
+`;
+const crownExitToTop = keyframes`
+  from { transform: translateY(0) rotate(-25deg); opacity: 1; }
+  to   { transform: translateY(-80px) rotate(-25deg); opacity: 0; }
+`;
+
 const CityIcon = ({ active, ...props }: React.ComponentProps<typeof SvgIcon> & { active?: boolean }) => (
   <SvgIcon {...props} viewBox="0 0 1024 1024">
     {active && (
@@ -165,6 +195,8 @@ interface PlayerPanelProps {
   turnTimerSeconds?: number;
   startingLife?: number;
   textSizeMode?: 0 | 1 | 2;
+  monarchTransfer?: { fromPos: string | null; toPos: string | null };
+  highlightMode?: boolean;
 }
 
 const BTN = { p: 0, minWidth: 26, minHeight: 26 } as const;
@@ -191,12 +223,25 @@ export function PlayerPanel({
   turnTimerSeconds = 300,
   startingLife = 40,
   textSizeMode = 0,
+  monarchTransfer = { fromPos: null, toPos: null },
+  highlightMode = false,
 }: PlayerPanelProps) {
   const ts = textSizeMode;
   const ttRotate = player.position === 'top' ? '180deg' : player.position === 'left' ? '90deg' : player.position === 'right' ? '270deg' : '0deg';
   const ttSlotProps = { tooltip: { sx: { rotate: ttRotate } } };
+  const ttHeaderPlacement = player.position === 'top' ? 'top' as const : player.position === 'left' ? 'top' as const : player.position === 'right' ? 'bottom' as const : 'bottom' as const;
+  const ttHeaderSlotProps = { tooltip: { sx: { rotate: ttRotate } }, popper: { modifiers: [{ name: 'flip', enabled: false }] } };
   const [eliminateTurnInput, setEliminateTurnInput] = useState('');
   const [showEliminateConfirm, setShowEliminateConfirm] = useState(false);
+  const [stateMenuOpen, setStateMenuOpen] = useState(false);
+  const [rulesOpenLabel, setRulesOpenLabel] = useState<string | null>(null);
+  const toggleRules = (label: string) => setRulesOpenLabel(l => l === label ? null : label);
+  useEffect(() => {
+    if (!rulesOpenLabel) return;
+    const close = () => setRulesOpenLabel(null);
+    const id = setTimeout(() => document.addEventListener('mousedown', close), 0);
+    return () => { clearTimeout(id); document.removeEventListener('mousedown', close); };
+  }, [rulesOpenLabel]);
   const [cmdDmgShowPlayer, setCmdDmgShowPlayer] = useState(false);
   const [cityBlessingVisible, setCityBlessingVisible] = useState(player.hasCitysBlessing);
   const [cityBlessingExiting, setCityBlessingExiting] = useState(false);
@@ -234,6 +279,36 @@ export function PlayerPanel({
     prevLife.current = player.life;
   }, [player.life]);
 
+  const [monarchAnim, setMonarchAnim] = useState<'hidden' | 'entering' | 'exiting' | 'idle'>(
+    player.isMonarch ? 'idle' : 'hidden'
+  );
+  const [monarchEnterIsTransfer, setMonarchEnterIsTransfer] = useState(false);
+  // Keep a ref in sync with the prop so the effect can read the latest value
+  const monarchTransferRef = useRef(monarchTransfer);
+  monarchTransferRef.current = monarchTransfer;
+  const prevIsMonarchRef = useRef(player.isMonarch);
+  useEffect(() => {
+    const was = prevIsMonarchRef.current;
+    const is = player.isMonarch;
+    prevIsMonarchRef.current = is;
+    if (!was && is) {
+      const isXfer = monarchTransferRef.current.fromPos !== null && monarchTransferRef.current.toPos !== null;
+      setMonarchEnterIsTransfer(isXfer);
+      setMonarchAnim('entering');
+      const t = setTimeout(() => setMonarchAnim('idle'), isXfer ? 1800 : 700);
+      return () => clearTimeout(t);
+    } else if (was && !is) {
+      setMonarchAnim('exiting');
+      const t = setTimeout(() => setMonarchAnim('hidden'), 600);
+      return () => clearTimeout(t);
+    }
+  }, [player.isMonarch]);
+  const showCrown = player.isMonarch || monarchAnim === 'exiting';
+  const monarchAnimStr =
+    monarchAnim === 'exiting'  ? `${crownExitToTop} 0.5s ease-in forwards` :
+    monarchAnim === 'entering' ? `${crownEnterFromTop} ${monarchEnterIsTransfer ? '1s' : '0.5s'} ${monarchEnterIsTransfer ? '0.5s' : '0s'} ease-out both, ${crownShimmerBig} 2s ease-in-out infinite` :
+    `${crownShimmerBig} 2s ease-in-out infinite`;
+
   const [lpKey, setLpKey] = useState<string | null>(null);
   const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lpFired = useRef(false);
@@ -260,15 +335,22 @@ export function PlayerPanel({
   const timerProgress = timerOff ? 0 : Math.min(elapsedSeconds / turnTimerSeconds, 1);
   const isTimerExpired = isCurrentPlayer && !timerOff && elapsedSeconds >= turnTimerSeconds;
 
-  function timerColor(): string {
-    if (timerOff) return '#42A5F5';
+  function timerColorChannels(): [number, number, number] {
+    if (timerOff) return [66, 165, 245];
     if (timerProgress <= 0.5) {
       const p = timerProgress * 2;
-      return `rgb(${Math.round(102 + 153 * p)},${Math.round(187 - 20 * p)},${Math.round(106 - 68 * p)})`;
-    } else {
-      const p = (timerProgress - 0.5) * 2;
-      return `rgb(${Math.round(255 - 26 * p)},${Math.round(167 - 110 * p)},${Math.round(38 + 15 * p)})`;
+      return [Math.round(102 + 153 * p), Math.round(187 - 20 * p), Math.round(106 - 68 * p)];
     }
+    const p = (timerProgress - 0.5) * 2;
+    return [Math.round(255 - 26 * p), Math.round(167 - 110 * p), Math.round(38 + 15 * p)];
+  }
+  function timerColor(): string {
+    const [r, g, b] = timerColorChannels();
+    return `rgb(${r},${g},${b})`;
+  }
+  function timerColorRgba(alpha: number): string {
+    const [r, g, b] = timerColorChannels();
+    return `rgba(${r},${g},${b},${alpha})`;
   }
 
   const currentPlayerBorder = isCurrentPlayer ? `3px solid ${timerColor()}` : undefined;
@@ -488,18 +570,18 @@ export function PlayerPanel({
             ? theme.palette.mode === 'dark' ? 'rgba(180,40,40,0.18)' : 'rgba(220,80,80,0.08)'
             : theme.palette.mode === 'dark' ? '#2A1F14' : '#FFF8F0',
         border: showEliminateConfirm
-          ? '3px solid #e53935'
+          ? '3px solid #DAA520'
           : isHighlighted
           ? '3px solid #DAA520'
-          : currentPlayerBorder
+          : (highlightMode ? undefined : currentPlayerBorder)
           ?? (isWarning ? '2px solid #e53935' : undefined)
           ?? ((theme: import('@mui/material').Theme) => `1px solid ${theme.palette.divider}`),
         boxShadow: showEliminateConfirm
-          ? '0 0 24px 6px rgba(229,57,53,0.6)'
+          ? '0 0 24px 6px rgba(218,165,32,0.6)'
           : isHighlighted
           ? '0 0 24px 6px rgba(218,165,32,0.6)'
-          : currentPlayerShadow ?? 'none',
-        ...(isTimerExpired && {
+          : (highlightMode ? null : currentPlayerShadow) ?? 'none',
+        ...(!highlightMode && isTimerExpired && {
           animation: 'timerBlink 0.5s step-end infinite',
           '@keyframes timerBlink': {
             '0%, 100%': { borderColor: '#e53935', boxShadow: '0 0 24px 6px rgba(229,57,53,0.6)' },
@@ -939,26 +1021,50 @@ export function PlayerPanel({
         </>
       )}
 
-      {/* Eliminate confirm overlay */}
+      {/* Concede confirm overlay */}
       {showEliminateConfirm && (
-        <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5, pointerEvents: 'none', bgcolor: 'rgba(180,0,0,0.12)' }}>
-          <Typography sx={{ fontWeight: 900, color: 'error.main', fontSize: 22, letterSpacing: 2, textShadow: '0 2px 8px rgba(0,0,0,0.5)', transform: 'rotate(-10deg)' }}>
-            ELIMINATE?
+        <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5, pointerEvents: 'none', bgcolor: 'rgba(218,165,32,0.12)' }}>
+          <Typography sx={{ fontWeight: 900, color: '#DAA520', fontSize: 22, letterSpacing: 2, textShadow: '0 2px 8px rgba(0,0,0,0.5)', transform: 'rotate(-10deg)' }}>
+            CONCEDE?
           </Typography>
         </Box>
       )}
 
       {/* Eliminated overlay */}
       {player.isEliminated && (
-        <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 11, pointerEvents: 'none' }}>
-          <Typography sx={{ fontWeight: 900, letterSpacing: 4, fontSize: 48, transform: 'rotate(-15deg)', color: isPoisoned ? undefined : 'error.main' }} style={{ color: isPoisoned ? '#00c853' : undefined, WebkitTextFillColor: isPoisoned ? '#00c853' : undefined, WebkitTextStroke: isPoisoned ? '2px black' : undefined }}>
-            {isPoisoned ? 'POISONED' : 'ELIMINATED'}
+        <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 11, pointerEvents: 'none', bgcolor: player.isConceded && !isPoisoned ? 'rgba(218,165,32,0.12)' : 'transparent', overflow: 'hidden' }}>
+          {player.isConceded && !isPoisoned && TEARS.map((t, i) => (
+            <Box key={i} sx={{
+              position: 'absolute', top: 0, left: t.left,
+              width: 7, height: 11,
+              borderRadius: '50% 50% 50% 50% / 70% 70% 30% 30%',
+              bgcolor: 'rgba(120, 190, 255, 0.8)',
+              boxShadow: '0 0 5px rgba(120,190,255,0.5)',
+              animation: `${tearFall} ${t.dur} ${t.delay} ease-in infinite`,
+            }} />
+          ))}
+          <Typography
+            sx={{ fontWeight: 900, letterSpacing: 4, fontSize: 48, transform: 'rotate(-15deg)', color: isPoisoned ? undefined : player.isConceded ? '#DAA520' : 'error.main' }}
+            style={isPoisoned ? { color: '#00c853', WebkitTextFillColor: '#00c853', WebkitTextStroke: '2px black' } : player.isConceded ? { WebkitTextStroke: '2px black' } : undefined}
+          >
+            {isPoisoned ? 'POISONED' : player.isConceded ? 'CONCEDED' : 'ELIMINATED'}
           </Typography>
         </Box>
       )}
 
       {/* ── Header ── */}
-      <Box sx={{ px: 1, py: 0.5, bgcolor: 'rgba(0,0,0,0.08)', flexShrink: 0, filter: 'none', position: 'relative', zIndex: 3, display: 'flex', alignItems: 'center' }}>
+      <Box sx={{
+        px: 1, py: 0.5, flexShrink: 0, filter: 'none', position: 'relative', zIndex: 3, display: 'flex', alignItems: 'center',
+        bgcolor: isCurrentPlayer && highlightMode ? timerColorRgba(0.6) : 'rgba(0,0,0,0.08)',
+        transition: 'background-color 0.3s ease',
+        ...(isTimerExpired && highlightMode && {
+          animation: 'headerBlink 0.5s step-end infinite',
+          '@keyframes headerBlink': {
+            '0%, 100%': { backgroundColor: '#e9353540' },
+            '50%': { backgroundColor: 'rgba(0,0,0,0.08)' },
+          },
+        }),
+      }}>
         {/* Left: commander art + tax */}
         <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0, zIndex: 1 }}>
           {player.commander.artCropUrl && (
@@ -1021,59 +1127,170 @@ export function PlayerPanel({
             {player.deckName} · {player.commander.name}{player.partner ? ` / ${player.partner.name}` : ''}
           </Typography>
         </Box>
-          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ ml: 'auto', zIndex: 1 }}>
-            <Tooltip title="Monarch" placement="bottom" arrow>
-              <IconButton size="small" onClick={() => onToggleMonarch(playerIdx)} sx={{ p: 0.5, color: player.isMonarch ? '#DAA520' : 'text.disabled' }}>
-                <CrownIcon sx={{
-                  fontSize: player.isMonarch ? (ts === 2 ? 30 : ts === 1 ? 28 : 26) : (ts === 2 ? 22 : ts === 1 ? 20 : 18),
-                  transition: 'font-size 0.25s ease',
-                  ...(player.isMonarch && {
-                    animation: 'crownShimmer 2s ease-in-out infinite',
-                    '@keyframes crownShimmer': {
-                      '0%, 100%': { filter: 'drop-shadow(0 0 2px #DAA520) brightness(1)', },
-                      '50%': { filter: 'drop-shadow(0 0 7px #FFD700) brightness(1.5)', },
-                    },
-                  }),
-                }} />
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: 'auto', zIndex: 1 }}>
+            {/* Active game state indicators */}
+            <>
+              {player.isMonarch && (
+                <Tooltip open={rulesOpenLabel === 'h:Monarch'} onClose={() => setRulesOpenLabel(null)} title={<Typography sx={{ fontSize: 12, maxWidth: 240 }}>Draw a card at the beginning of your end step. Whenever a creature deals combat damage to you, its controller becomes the monarch.</Typography>} placement={ttHeaderPlacement} arrow disableHoverListener disableFocusListener disableTouchListener slotProps={ttHeaderSlotProps}>
+                  <CrownIcon
+                    onClick={guardClick(() => toggleRules('h:Monarch'))}
+                    onPointerDown={() => startLongPress('off-monarch', () => onToggleMonarch(playerIdx))}
+                    onPointerUp={cancelLongPress}
+                    onPointerLeave={cancelLongPress}
+                    onPointerCancel={cancelLongPress}
+                    sx={{ fontSize: ts === 2 ? 26 : ts === 1 ? 24 : 22, color: '#DAA520', cursor: 'pointer', animation: 'crownShimmer 2s ease-in-out infinite', '@keyframes crownShimmer': { '0%, 100%': { filter: 'drop-shadow(0 0 2px #DAA520) brightness(1)' }, '50%': { filter: 'drop-shadow(0 0 7px #FFD700) brightness(1.5)' } } }}
+                  />
+                </Tooltip>
+              )}
+              {!player.isMonarch && allPlayers.some(p => p.isMonarch) && (
+                <Tooltip open={rulesOpenLabel === 'h:Monarch'} onClose={() => setRulesOpenLabel(null)} title={<Typography sx={{ fontSize: 12, maxWidth: 240 }}>Draw a card at the beginning of your end step. Whenever a creature deals combat damage to you, its controller becomes the monarch.</Typography>} placement={ttHeaderPlacement} arrow disableHoverListener disableFocusListener disableTouchListener slotProps={ttHeaderSlotProps}>
+                  <CrownIcon
+                    onClick={guardClick(() => toggleRules('h:Monarch'))}
+                    onPointerDown={() => startLongPress('take-monarch', () => onToggleMonarch(playerIdx))}
+                    onPointerUp={cancelLongPress}
+                    onPointerLeave={cancelLongPress}
+                    onPointerCancel={cancelLongPress}
+                    sx={{ fontSize: ts === 2 ? 26 : ts === 1 ? 24 : 22, color: 'text.disabled', cursor: 'pointer', opacity: 0.4 }}
+                  />
+                </Tooltip>
+              )}
+              {player.hasInitiative && (
+                <Tooltip open={rulesOpenLabel === 'h:Initiative'} onClose={() => setRulesOpenLabel(null)} title={<Typography sx={{ fontSize: 12, maxWidth: 240 }}>When you take the initiative, venture into the Undercity. At the beginning of your upkeep, venture into the Undercity. Whenever a creature deals combat damage to you, its controller takes the initiative.</Typography>} placement={ttHeaderPlacement} arrow disableHoverListener disableFocusListener disableTouchListener slotProps={ttHeaderSlotProps}>
+                  <InitiativeIcon
+                    onClick={guardClick(() => toggleRules('h:Initiative'))}
+                    onPointerDown={() => startLongPress('off-initiative', () => onToggleInitiative(playerIdx))}
+                    onPointerUp={cancelLongPress}
+                    onPointerLeave={cancelLongPress}
+                    onPointerCancel={cancelLongPress}
+                    sx={{ fontSize: ts === 2 ? 26 : ts === 1 ? 24 : 22, color: '#4FC3F7', cursor: 'pointer' }}
+                  />
+                </Tooltip>
+              )}
+              {!player.hasInitiative && allPlayers.some(p => p.hasInitiative) && (
+                <Tooltip open={rulesOpenLabel === 'h:Initiative'} onClose={() => setRulesOpenLabel(null)} title={<Typography sx={{ fontSize: 12, maxWidth: 240 }}>When you take the initiative, venture into the Undercity. At the beginning of your upkeep, venture into the Undercity. Whenever a creature deals combat damage to you, its controller takes the initiative.</Typography>} placement={ttHeaderPlacement} arrow disableHoverListener disableFocusListener disableTouchListener slotProps={ttHeaderSlotProps}>
+                  <InitiativeIcon
+                    onClick={guardClick(() => toggleRules('h:Initiative'))}
+                    onPointerDown={() => startLongPress('take-initiative', () => onToggleInitiative(playerIdx))}
+                    onPointerUp={cancelLongPress}
+                    onPointerLeave={cancelLongPress}
+                    onPointerCancel={cancelLongPress}
+                    sx={{ fontSize: ts === 2 ? 26 : ts === 1 ? 24 : 22, color: 'text.disabled', cursor: 'pointer', opacity: 0.4 }}
+                  />
+                </Tooltip>
+              )}
+              {player.hasCitysBlessing && (
+                <Tooltip open={rulesOpenLabel === "h:City's Blessing"} onClose={() => setRulesOpenLabel(null)} title={<Typography sx={{ fontSize: 12, maxWidth: 240 }}>You have the city's blessing for the rest of the game. Gained when you control ten or more permanents — it persists even if that number later drops below ten.</Typography>} placement={ttHeaderPlacement} arrow disableHoverListener disableFocusListener disableTouchListener slotProps={ttHeaderSlotProps}>
+                  <CityIcon
+                    active
+                    onClick={guardClick(() => toggleRules("h:City's Blessing"))}
+                    onPointerDown={() => startLongPress("off-citys-blessing", () => onToggleCitysBlessing(playerIdx))}
+                    onPointerUp={cancelLongPress}
+                    onPointerLeave={cancelLongPress}
+                    onPointerCancel={cancelLongPress}
+                    sx={{ fontSize: ts === 2 ? 26 : ts === 1 ? 24 : 22, cursor: 'pointer' }}
+                  />
+                </Tooltip>
+              )}
+              {/* Submenu trigger */}
+              <IconButton size="small" onClick={() => setStateMenuOpen(o => !o)} sx={{ p: 0.5, color: stateMenuOpen ? 'primary.main' : 'text.secondary' }}>
+                <AddIcon sx={{ fontSize: ts === 2 ? 20 : 18, transition: 'transform 0.2s ease', transform: stateMenuOpen ? 'rotate(45deg)' : 'none' }} />
               </IconButton>
-            </Tooltip>
-            <Tooltip title="Initiative" placement="bottom" arrow>
-              <IconButton size="small" onClick={() => onToggleInitiative(playerIdx)} sx={{ p: 0.5, color: player.hasInitiative ? '#4FC3F7' : 'text.disabled' }}>
-                <InitiativeIcon sx={{ fontSize: player.hasInitiative ? (ts === 2 ? 30 : ts === 1 ? 28 : 26) : (ts === 2 ? 22 : ts === 1 ? 20 : 18), transition: 'font-size 0.25s ease' }} />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="City's Blessing" placement="bottom" arrow>
-              <IconButton size="small" onClick={() => onToggleCitysBlessing(playerIdx)} sx={{ p: 0.5, color: player.hasCitysBlessing ? '#7851A9' : 'text.disabled' }}>
-                <CityIcon active={player.hasCitysBlessing} sx={{ fontSize: player.hasCitysBlessing ? (ts === 2 ? 30 : ts === 1 ? 28 : 26) : (ts === 2 ? 22 : ts === 1 ? 20 : 18), transition: 'font-size 0.25s ease' }} />
-              </IconButton>
-            </Tooltip>
-            {player.isEliminated ? (
-              <Tooltip title="Undo Eliminate" placement="bottom" arrow>
-                <IconButton size="small" onClick={() => onUndoEliminate(playerIdx)} sx={{ p: 0.5, color: 'error.main' }}>
-                  <ElimIcon sx={{ fontSize: ts === 2 ? 22 : ts === 1 ? 20 : 18 }} />
-                </IconButton>
-              </Tooltip>
-            ) : showEliminateConfirm ? (
-              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ ml: 0.5 }}>
-                <TextField size="small" label="Eliminated Turn" type="number" value={eliminateTurnInput}
-                  onChange={(e) => setEliminateTurnInput(e.target.value)}
-                  inputProps={{ min: 1 }} sx={{ width: 80 }} />
-                <Button size="small" variant="contained" color="error"
-                  onClick={() => { onEliminate(playerIdx); setShowEliminateConfirm(false); setEliminateTurnInput(''); }}
-                  sx={{ fontSize: 9, py: 0, px: 0.5 }}>✓</Button>
-                <Button size="small" variant="outlined"
-                  onClick={() => setShowEliminateConfirm(false)}
-                  sx={{ fontSize: 9, py: 0, px: 0.5 }}>✕</Button>
-              </Stack>
-            ) : (
-              <Tooltip title="Eliminate" placement="bottom" arrow>
-                <IconButton size="small" onClick={() => setShowEliminateConfirm(true)} sx={{ p: 0.5, color: 'text.disabled' }}>
-                  <ElimIcon sx={{ fontSize: ts === 2 ? 22 : ts === 1 ? 20 : 18 }} />
-                </IconButton>
-              </Tooltip>
-            )}
+            </>
           </Stack>
       </Box>
+
+      {/* ── Game state submenu ── */}
+      {stateMenuOpen && (
+        <>
+          <Box sx={{ position: 'absolute', inset: 0, zIndex: 19 }} onClick={() => { setStateMenuOpen(false); setShowEliminateConfirm(false); }} />
+          <Box sx={{
+            position: 'absolute',
+            top: ts === 2 ? 54 : ts === 1 ? 50 : 46,
+            right: 0,
+            zIndex: 20,
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? '#1E1510EE' : '#FFFAF5EE',
+            borderLeft: (theme) => `1px solid ${theme.palette.divider}`,
+            borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+            borderBottomLeftRadius: 8,
+            minWidth: 160,
+            overflow: 'hidden',
+            animation: 'stateMenuSlide 0.18s ease-out both',
+            '@keyframes stateMenuSlide': {
+              from: { transform: 'translateY(-6px)', opacity: 0 },
+              to: { transform: 'translateY(0)', opacity: 1 },
+            },
+          }}>
+            {([
+              { label: 'Monarch', icon: <CrownIcon sx={{ fontSize: 18, color: player.isMonarch ? '#DAA520' : 'inherit' }} />, active: player.isMonarch, color: '#DAA520', toggle: () => { onToggleMonarch(playerIdx); setStateMenuOpen(false); }, rulesText: 'Draw a card at the beginning of your end step. Whenever a creature deals combat damage to you, its controller becomes the monarch.' },
+              { label: 'Initiative', icon: <InitiativeIcon sx={{ fontSize: 18 }} />, active: player.hasInitiative, color: '#4FC3F7', toggle: () => { onToggleInitiative(playerIdx); setStateMenuOpen(false); }, rulesText: "When you take the initiative, venture into the Undercity. At the beginning of your upkeep, venture into the Undercity. Whenever a creature deals combat damage to you, its controller takes the initiative." },
+              { label: "City's Blessing", icon: <CityIcon active={player.hasCitysBlessing} sx={{ fontSize: 18 }} />, active: player.hasCitysBlessing, color: '#7851A9', toggle: () => { onToggleCitysBlessing(playerIdx); setStateMenuOpen(false); }, rulesText: "You have the city's blessing for the rest of the game. Gained when you control ten or more permanents — it persists even if that number later drops below ten." },
+            ] as { label: string; icon: React.ReactNode; active: boolean; color: string; toggle: () => void; rulesText: string }[]).map(({ label, icon, active, color, toggle, rulesText }) => (
+              <Box key={label} onClick={toggle} sx={{
+                display: 'flex', alignItems: 'center', gap: 1.25,
+                px: 1.5, py: 0.875,
+                cursor: 'pointer',
+                color: active ? color : 'text.disabled',
+                borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+                '&:last-child': { borderBottom: 'none' },
+                '&:hover': { bgcolor: 'action.hover' },
+                transition: 'background-color 0.15s ease',
+              }}>
+                {icon}
+                <Typography sx={{ fontSize: 13, fontWeight: active ? 700 : 400, lineHeight: 1 }}>{label}</Typography>
+                <Tooltip
+                  open={rulesOpenLabel === `m:${label}`}
+                  onClose={() => setRulesOpenLabel(null)}
+                  title={<Typography sx={{ fontSize: 12, maxWidth: 240 }}>{rulesText}</Typography>}
+                  placement="left"
+                  arrow
+                  disableHoverListener
+                  disableFocusListener
+                  disableTouchListener
+                  slotProps={{ tooltip: { sx: { rotate: ttRotate } } }}
+                >
+                  <IconButton
+                    size="small"
+                    onClick={(e) => { e.stopPropagation(); toggleRules(`m:${label}`); }}
+                    sx={{ p: 0.25, ml: 'auto', color: rulesOpenLabel === `m:${label}` ? 'primary.main' : 'text.disabled' }}
+                  >
+                    <InfoOutlinedIcon sx={{ fontSize: 14 }} />
+                  </IconButton>
+                </Tooltip>
+                {active && <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: color, flexShrink: 0 }} />}
+              </Box>
+            ))}
+            {/* Eliminate row */}
+            <Box sx={{ borderTop: (theme) => `1px solid ${theme.palette.divider}` }}>
+              {player.isEliminated ? (
+                <Box onClick={() => { onUndoEliminate(playerIdx); setStateMenuOpen(false); }} sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 0.875, cursor: 'pointer', color: 'error.main', '&:hover': { bgcolor: 'action.hover' }, transition: 'background-color 0.15s ease' }}>
+                  <ElimIcon sx={{ fontSize: 18 }} />
+                  <Typography sx={{ fontSize: 13, fontWeight: 700, lineHeight: 1 }}>Undo Concede</Typography>
+                </Box>
+              ) : showEliminateConfirm ? (
+                <Stack spacing={0.75} sx={{ px: 1.5, py: 0.875, bgcolor: 'rgba(218,165,32,0.12)' }}>
+                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#DAA520', lineHeight: 1.3 }}>Are you sure you want to quit?</Typography>
+                  <Stack direction="row" spacing={0.5} alignItems="center">
+                    <TextField size="small" label="Turn #" type="number" value={eliminateTurnInput}
+                      onChange={(e) => setEliminateTurnInput(e.target.value)}
+                      slotProps={{ htmlInput: { min: 1 } }} sx={{ width: 72 }} />
+                    <Button size="small" variant="contained"
+                      onClick={() => { onEliminate(playerIdx); setShowEliminateConfirm(false); setEliminateTurnInput(''); setStateMenuOpen(false); }}
+                      sx={{ fontSize: 9, py: 0, px: 0.5, minWidth: 0, bgcolor: '#DAA520', '&:hover': { bgcolor: '#c49a18' } }}>✓</Button>
+                    <Button size="small" variant="outlined"
+                      onClick={() => setShowEliminateConfirm(false)}
+                      sx={{ fontSize: 9, py: 0, px: 0.5, minWidth: 0, borderColor: '#DAA520', color: '#DAA520' }}>✕</Button>
+                  </Stack>
+                </Stack>
+              ) : (
+                <Box onClick={() => setShowEliminateConfirm(true)} sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 0.875, cursor: 'pointer', color: 'text.disabled', '&:hover': { bgcolor: 'action.hover' }, transition: 'background-color 0.15s ease' }}>
+                  <ElimIcon sx={{ fontSize: 18 }} />
+                  <Typography sx={{ fontSize: 13, lineHeight: 1 }}>Concede</Typography>
+                </Box>
+              )}
+            </Box>
+          </Box>
+        </>
+      )}
 
       {/* ── Main: Commander Damage (left) + Life (right) ── */}
       <Box sx={{ display: 'flex', flex: 1, minHeight: 0, borderTop: (theme) => `1px solid ${theme.palette.divider}`, filter: 'none', position: 'relative', zIndex: 3 }}>
@@ -1167,7 +1384,7 @@ export function PlayerPanel({
         {/* Life total + controls */}
         <Box sx={{ width: '33%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5 }}>
           <Box sx={{ position: 'relative', lineHeight: 1 }}>
-            {player.isMonarch && (
+            {showCrown && (
               <CrownIcon sx={{
                 fontSize: ts === 2 ? 72 : ts === 1 ? 60 : 48,
                 color: '#DAA520',
@@ -1176,11 +1393,7 @@ export function PlayerPanel({
                 position: 'absolute',
                 top: ts === 2 ? -36 : ts === 1 ? -30 : -24,
                 left: ts === 2 ? -44 : ts === 1 ? -36 : -28,
-                animation: 'crownShimmerBig 2s ease-in-out infinite',
-                '@keyframes crownShimmerBig': {
-                  '0%, 100%': { filter: 'drop-shadow(0 0 3px #DAA520) brightness(1)' },
-                  '50%': { filter: 'drop-shadow(0 0 10px #FFD700) brightness(1.6)' },
-                },
+                animation: monarchAnimStr,
               }} />
             )}
             {/* Overflow-hidden wrapper keeps the swipe clipped to the number */}

@@ -53,6 +53,7 @@ function buildInitialState(playerSetups: PlayerSetup[], startingLife: number): G
     energy: 0,
     experience: 0,
     isEliminated: false,
+    isConceded: false,
     eliminatedTurn: null,
   }));
 

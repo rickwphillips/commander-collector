@@ -23,6 +23,7 @@ export interface PlayerState extends PlayerSetup {
   energy: number;
   experience: number;
   isEliminated: boolean;
+  isConceded: boolean;
   eliminatedTurn: number | null;
 }
 

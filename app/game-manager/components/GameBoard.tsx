@@ -35,6 +35,8 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   const [textSizeMode, setTextSizeMode] = useState<0 | 1 | 2>(0);
   const [poisonKillPrompt, setPoisonKillPrompt] = useState<{ targetIdx: number; newPlayers: PlayerState[] } | null>(null);
   const [lifeKillPrompt, setLifeKillPrompt] = useState<{ targetIdx: number; pendingWinner: PlayerState | null } | null>(null);
+  const [monarchTransfer, setMonarchTransfer] = useState<{ fromPos: string | null; toPos: string | null }>({ fromPos: null, toPos: null });
+  const [highlightMode, setHighlightMode] = useState(true);
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -202,6 +204,11 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   };
 
   const handleToggleMonarch = (idx: number) => {
+    const currentMonarchIdx = players.findIndex(p => p.isMonarch);
+    const fromPos = currentMonarchIdx >= 0 ? players[currentMonarchIdx].position : null;
+    const toPos = !players[idx].isMonarch ? players[idx].position : null;
+    setMonarchTransfer({ fromPos, toPos });
+    setTimeout(() => setMonarchTransfer({ fromPos: null, toPos: null }), 900);
     const newPlayers = players.map((p, i) => ({
       ...p,
       isMonarch: i === idx ? !p.isMonarch : false,
@@ -295,7 +302,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   const handleEliminate = (idx: number) => {
     const newPlayers = players.map((p, i) =>
       i === idx
-        ? { ...p, isEliminated: true, eliminatedTurn: state.turnNumber }
+        ? { ...p, isEliminated: true, isConceded: true, eliminatedTurn: state.turnNumber }
         : p
     );
     updateState({ players: newPlayers });
@@ -305,7 +312,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
 
   const handleUndoEliminate = (idx: number) => {
     const newPlayers = players.map((p, i) =>
-      i === idx ? { ...p, isEliminated: false, eliminatedTurn: null } : p
+      i === idx ? { ...p, isEliminated: false, isConceded: false, eliminatedTurn: null } : p
     );
     updateState({ players: newPlayers });
   };
@@ -434,11 +441,13 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
                 turnTimerSeconds={turnTimerSeconds}
                 startingLife={startingLife}
                 textSizeMode={textSizeMode}
+                highlightMode={highlightMode}
                 onLifeChange={handleLifeChange}
                 onPoisonChange={handlePoisonChange}
                 onCommanderTaxChange={handleCommanderTaxChange}
                 onEnergyChange={handleEnergyChange}
                 onExperienceChange={handleExperienceChange}
+                monarchTransfer={monarchTransfer}
                 onToggleMonarch={handleToggleMonarch}
                 onToggleInitiative={handleToggleInitiative}
                 onToggleCitysBlessing={handleToggleCitysBlessing}
@@ -476,6 +485,8 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
           onNotesChange={(n) => updateState({ notes: n })}
           textSizeMode={textSizeMode}
           onCycleTextSizeMode={() => setTextSizeMode((m) => ((m + 1) % 3) as 0 | 1 | 2)}
+          highlightMode={highlightMode}
+          onToggleHighlightMode={() => setHighlightMode(m => !m)}
         />
       </Box>
 

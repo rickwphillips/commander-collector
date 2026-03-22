@@ -38,6 +38,30 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.15.0',
+    date: '2026-03-22',
+    title: 'Game Manager — Game State Submenu & Concede Flow',
+    changes: [
+      { type: 'added', text: 'Game state icons (Monarch, Initiative, City\'s Blessing) moved into a slide-in submenu opened by a + button; active icons remain as passive indicators in the header' },
+      { type: 'added', text: 'Long press any active game state icon in the header to turn it off' },
+      { type: 'added', text: 'Concede flow moved into the game state submenu with a confirmation step; card flashes gold border and glow with a CONCEDE? overlay' },
+      { type: 'added', text: 'Conceded players show a gold-tinted panel, CONCEDED text, and animated falling tear drops' },
+      { type: 'improved', text: 'Rules tooltips now correctly positioned for all rotated player panels (left, right, top) without clipping off screen edges' },
+      { type: 'improved', text: 'Initiative rules text corrected to reference the Undercity for both the initial trigger and upkeep trigger' },
+      { type: 'improved', text: 'Concede state visually distinct from combat/poison elimination — gold styling vs red' },
+    ],
+  },
+  {
+    version: '1.14.1',
+    date: '2026-03-22',
+    title: 'Game Manager — Monarch Animation & Turn Highlight',
+    changes: [
+      { type: 'added', text: 'Monarch crown enter/exit animations — crown drops in from above on grant, floats upward on loss; transfers delay the receiving crown until the departing one has left' },
+      { type: 'added', text: 'Header Highlight mode — translucent colored bar on the current player\'s name strip instead of a card border; color tracks the turn timer (blue when off, green → yellow → red as time runs out)' },
+      { type: 'improved', text: 'Header Highlight is now the default current-turn indicator; border outline mode still available via the settings toggle' },
+    ],
+  },
+  {
     version: '1.14.0',
     date: '2026-03-22',
     title: 'Game Manager — Settings Panel & UX Polish',
