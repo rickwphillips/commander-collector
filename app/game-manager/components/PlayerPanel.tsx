@@ -229,8 +229,11 @@ export function PlayerPanel({
   const ts = textSizeMode;
   const ttRotate = player.position === 'top' ? '180deg' : player.position === 'left' ? '90deg' : player.position === 'right' ? '270deg' : '0deg';
   const ttSlotProps = { tooltip: { sx: { rotate: ttRotate } } };
-  const ttHeaderPlacement = player.position === 'top' ? 'top' as const : player.position === 'left' ? 'top' as const : player.position === 'right' ? 'bottom' as const : 'bottom' as const;
-  const ttHeaderSlotProps = { tooltip: { sx: { rotate: ttRotate } }, popper: { modifiers: [{ name: 'flip', enabled: false }] } };
+  const ttHeaderPlacement = player.position === 'top' ? 'top' as const : player.position === 'left' ? 'left' as const : player.position === 'right' ? 'left' as const : 'bottom' as const;
+  const ttHeaderSlotProps = {
+    tooltip: { sx: { rotate: ttRotate } },
+    popper: { modifiers: [{ name: 'flip', enabled: false }] },
+  };
   const [eliminateTurnInput, setEliminateTurnInput] = useState('');
   const [showEliminateConfirm, setShowEliminateConfirm] = useState(false);
   const [stateMenuOpen, setStateMenuOpen] = useState(false);
@@ -1055,13 +1058,15 @@ export function PlayerPanel({
       {/* ── Header ── */}
       <Box sx={{
         px: 1, py: 0.5, flexShrink: 0, filter: 'none', position: 'relative', zIndex: 3, display: 'flex', alignItems: 'center',
-        bgcolor: isCurrentPlayer && highlightMode ? timerColorRgba(0.6) : 'rgba(0,0,0,0.08)',
+        background: isCurrentPlayer && highlightMode
+          ? `linear-gradient(90deg, ${timerColorRgba(0.3)} 0%, ${timerColorRgba(0.7)} 50%, ${timerColorRgba(0.3)} 100%)`
+          : 'rgba(0,0,0,0.08)',
         transition: 'background-color 0.3s ease',
         ...(isTimerExpired && highlightMode && {
           animation: 'headerBlink 0.5s step-end infinite',
           '@keyframes headerBlink': {
-            '0%, 100%': { backgroundColor: '#e9353540' },
-            '50%': { backgroundColor: 'rgba(0,0,0,0.08)' },
+            '0%, 100%': { background: '#e9353540' },
+            '50%': { background: 'rgba(0,0,0,0.08)' },
           },
         }),
       }}>

@@ -38,6 +38,17 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.15.1',
+    date: '2026-03-23',
+    title: 'Game Manager — Player Positioning & Tooltip Fixes',
+    changes: [
+      { type: 'fixed', text: 'Player 2 now correctly placed on the left, player 4 on the right (was reversed)' },
+      { type: 'fixed', text: 'Player 2 no longer missing in 3-player games' },
+      { type: 'improved', text: 'Left player given more horizontal space (340px) in 3-player games' },
+      { type: 'fixed', text: 'Header tooltip for left and right players no longer clips off screen edge' },
+    ],
+  },
+  {
     version: '1.15.0',
     date: '2026-03-22',
     title: 'Game Manager — Game State Submenu & Concede Flow',
