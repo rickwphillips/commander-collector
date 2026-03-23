@@ -38,6 +38,18 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.15.2',
+    date: '2026-03-23',
+    title: 'Game Manager — Responsive Scaling & Scrollable Damage',
+    changes: [
+      { type: 'improved', text: 'Player panels and center tile now scale fluidly across phone (landscape), iPad, and desktop using dvh/dvw viewport units with clamp()' },
+      { type: 'improved', text: 'Side panel column widths scale with viewport width (clamp 140–340px); center tile row height scales with viewport height (clamp 120–220px)' },
+      { type: 'improved', text: 'Life total font size scales with viewport height (clamp 34–128px depending on text size mode) so it no longer overflows on small screens' },
+      { type: 'improved', text: 'Center tile Next Turn button, roll buttons, and all text scale with the smaller of dvh/dvw for consistent proportions' },
+      { type: 'improved', text: 'Commander damage section is now scrollable — header stays fixed, damage rows scroll when they overflow available height' },
+    ],
+  },
+  {
     version: '1.15.1',
     date: '2026-03-23',
     title: 'Game Manager — Player Positioning & Tooltip Fixes',

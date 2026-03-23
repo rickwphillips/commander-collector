@@ -1306,15 +1306,14 @@ export function PlayerPanel({
           flexShrink: 0,
           borderRight: (theme) => `1px solid ${theme.palette.divider}`,
           px: ts === 2 ? 0.1 : ts === 1 ? 0.25 : 0.5,
-          py: ts === 2 ? 0 : ts === 1 ? 0.1 : 0.25,
-          display: 'grid',
-          gridTemplateColumns: `1fr ${ts === 2 ? 38 : 32}px ${ts === 2 ? 38 : 30}px ${ts === 2 ? 38 : 32}px`,
-          alignContent: 'safe center',
-          alignItems: 'center',
-          rowGap: ts > 0 ? 0 : 0.1,
-          transition: 'padding 0.2s ease, row-gap 0.2s ease',
+          pt: ts === 2 ? 0 : ts === 1 ? 0.1 : 0.25,
+          pb: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          transition: 'padding 0.2s ease',
         }}>
-          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ gridColumn: '1 / -1', mb: ts === 2 ? 0 : ts === 1 ? 0.1 : 0.25 }}>
+          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: ts === 2 ? 0 : ts === 1 ? 0.1 : 0.25, flexShrink: 0 }}>
             <Typography sx={{ fontSize: ts === 2 ? 15 : ts === 1 ? 13 : 11, fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
               Commander Damage{isCmdDmgHigh && <Typography component="span" sx={{ fontSize: ts === 2 ? 15 : ts === 1 ? 13 : 11, color: 'error.main', ml: 0.5 }}>⚠</Typography>}
             </Typography>
@@ -1322,6 +1321,17 @@ export function PlayerPanel({
               {cmdDmgShowPlayer ? 'Player' : 'CMD'}
             </Button>
           </Stack>
+          <Box sx={{
+            display: 'grid',
+            gridTemplateColumns: `1fr ${ts === 2 ? 38 : 32}px ${ts === 2 ? 38 : 30}px ${ts === 2 ? 38 : 32}px`,
+            alignContent: 'start',
+            alignItems: 'center',
+            rowGap: ts > 0 ? 0 : 0.1,
+            overflowY: 'auto',
+            flex: 1,
+            minHeight: 0,
+            transition: 'row-gap 0.2s ease',
+          }}>
           {opponents.flatMap(({ player: source, idx: sourceIdx }) => {
             const dmg = commanderDamage[playerIdx]?.[sourceIdx] ?? [0, 0];
             const sourceEliminated = source.isEliminated;
@@ -1384,6 +1394,7 @@ export function PlayerPanel({
             }
             return rows;
           })}
+          </Box>
         </Box>
 
         {/* Life total + controls */}
@@ -1405,7 +1416,7 @@ export function PlayerPanel({
             <Box sx={{ position: 'relative', overflow: 'hidden', lineHeight: 1, display: 'inline-block' }}>
               <Typography sx={{
                 fontWeight: 900,
-                fontSize: ts === 2 ? 128 : ts === 1 ? 96 : 80,
+                fontSize: ts === 2 ? 'clamp(50px, 14dvh, 128px)' : ts === 1 ? 'clamp(40px, 11dvh, 96px)' : 'clamp(34px, 9dvh, 80px)',
                 lineHeight: 1,
                 color: computedLifeColor || ((theme: import('@mui/material').Theme) => theme.palette.primary.main),
                 transition: 'color 0.4s ease, font-size 0.2s ease',
@@ -1419,7 +1430,7 @@ export function PlayerPanel({
                 <Box sx={{
                   position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
                   fontWeight: 900,
-                  fontSize: ts === 2 ? 128 : ts === 1 ? 96 : 80,
+                  fontSize: ts === 2 ? 'clamp(50px, 14dvh, 128px)' : ts === 1 ? 'clamp(40px, 11dvh, 96px)' : 'clamp(34px, 9dvh, 80px)',
                   lineHeight: 1,
                   color: 'transparent',
                   WebkitTextFillColor: 'transparent',

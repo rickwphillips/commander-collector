@@ -377,8 +377,11 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   };
 
   const playerCount = players.length;
-  const sideColumnWidth = playerCount === 2 ? '0px' : '260px';
-  const gridTemplateColumns = `${sideColumnWidth} 1fr ${sideColumnWidth}`;
+  const leftPanelCss = playerCount === 3 ? 'clamp(180px, 22dvw, 340px)' : 'clamp(140px, 18dvw, 260px)';
+  const rightPanelCss = 'clamp(140px, 18dvw, 260px)';
+  const leftColumnWidth = playerCount >= 3 ? leftPanelCss : '0px';
+  const rightColumnWidth = playerCount >= 4 ? rightPanelCss : '0px';
+  const gridTemplateColumns = `${leftColumnWidth} 1fr ${rightColumnWidth}`;
 
   return (
     <Box
@@ -387,7 +390,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
         inset: 0,
         display: 'grid',
         gridTemplateColumns,
-        gridTemplateRows: '1fr minmax(160px, 220px) 1fr',
+        gridTemplateRows: '1fr clamp(120px, 18dvh, 220px) 1fr',
         bgcolor: (theme) =>
           theme.palette.mode === 'dark' ? '#1A1410' : '#FFF8F0',
         gap: 0.5,
@@ -400,8 +403,8 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
         const rotation = getRotation(player.position);
         const isVertical = player.position === 'left' || player.position === 'right';
 
-        if (player.position === 'right' && playerCount === 2) return null;
-        if (player.position === 'left' && playerCount <= 3) return null;
+        if (player.position === 'right' && playerCount <= 3) return null;
+        if (player.position === 'left' && playerCount <= 2) return null;
 
         return (
           <Box
@@ -420,7 +423,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
                       top: '50%',
                       left: '50%',
                       width: '100dvh',
-                      height: '260px',
+                      height: player.position === 'left' ? leftPanelCss : rightPanelCss,
                       transform: `translate(-50%, -50%) ${rotation}`,
                     }
                   : {
