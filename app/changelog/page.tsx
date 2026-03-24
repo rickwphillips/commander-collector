@@ -38,6 +38,14 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.16.2',
+    date: '2026-03-24',
+    title: 'Remote Panel — No Login Required',
+    changes: [
+      { type: 'fixed', text: 'Remote player panel no longer redirects to login — the seat code is all you need to access your panel' },
+    ],
+  },
+  {
     version: '1.16.1',
     date: '2026-03-24',
     title: 'Scrollable Game Overlays',
