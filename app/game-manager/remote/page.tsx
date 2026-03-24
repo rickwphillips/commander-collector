@@ -86,7 +86,7 @@ function RemotePageInner() {
     if (phase !== 'connected' || !code) return;
 
     const poll = async () => {
-      if (Date.now() - lastWriteTimeRef.current < 500) return;
+      if (Date.now() - lastWriteTimeRef.current < POLL_INTERVAL_MS) return;
       if (document.visibilityState === 'hidden') return;
       try {
         const res = await api.getLiveGame(code);
