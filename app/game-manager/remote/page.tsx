@@ -9,7 +9,6 @@ import { api } from '@/lib/api';
 import type { GameManagerState, PlayerState, CommanderDamageMap } from '@/lib/types';
 
 const POLL_INTERVAL_MS = 3000;
-const STORAGE_KEY = 'commander_remote_code';
 
 type RemotePhase = 'enter-code' | 'loading' | 'connected' | 'not-found' | 'ended';
 
@@ -43,12 +42,11 @@ function RemotePageInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state?.currentPlayerIdx, phase]);
 
-  // ── Auto-connect from URL param or localStorage ──────────────────────────
+  // ── Auto-connect from URL param ───────────────────────────────────────────
   useEffect(() => {
-    const saved = urlCode || localStorage.getItem(STORAGE_KEY) || '';
-    if (saved) {
-      setCodeInput(saved);
-      connect(saved);
+    if (urlCode) {
+      setCodeInput(urlCode);
+      connect(urlCode);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -62,11 +60,9 @@ function RemotePageInner() {
     try {
       const res = await api.getLiveGame(trimmed);
       if (!res.is_active) {
-        localStorage.removeItem(STORAGE_KEY);
         setPhase('ended');
         return;
       }
-      localStorage.setItem(STORAGE_KEY, trimmed);
       setCode(trimmed);
       setSeat(res.seat);
       // Write checkin so host sees us immediately
@@ -76,7 +72,6 @@ function RemotePageInner() {
       lastWriteTimeRef.current = Date.now();
       setPhase('connected');
     } catch {
-      localStorage.removeItem(STORAGE_KEY);
       setPhase('enter-code');
       setErrorMsg('Code not found or session expired.');
     }
@@ -98,7 +93,6 @@ function RemotePageInner() {
         const res = await api.getLiveGame(code);
         if (!res.is_active) {
           setPhase('ended');
-          localStorage.removeItem(STORAGE_KEY);
           return;
         }
         setState((prev) => {
@@ -460,7 +454,7 @@ function RemotePageInner() {
         <Stack spacing={2} alignItems="center">
           <Typography variant="h6">Game Over</Typography>
           <Typography variant="body2" color="text.secondary">The game has ended.</Typography>
-          <Button variant="outlined" onClick={() => { localStorage.removeItem(STORAGE_KEY); setPhase('enter-code'); setCodeInput(''); }}>
+          <Button variant="outlined" onClick={() => { setPhase('enter-code'); setCodeInput(''); }}>
             Join Another Game
           </Button>
         </Stack>

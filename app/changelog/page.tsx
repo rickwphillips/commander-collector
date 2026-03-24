@@ -38,6 +38,14 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.17.1',
+    date: '2026-03-24T00:00:00',
+    title: 'Remove localStorage from remote panel',
+    changes: [
+      { type: 'fixed', text: 'Remote panel no longer caches the game code in localStorage — the database and URL code param are now the sole source of truth, preventing stale sessions from auto-loading after a game has ended' },
+    ],
+  },
+  {
     version: '1.17.0',
     date: '2026-03-24',
     title: 'Live Game Session — Remote Player Panel',
