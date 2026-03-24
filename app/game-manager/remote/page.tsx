@@ -28,7 +28,6 @@ function RemotePageInner() {
   const [textSizeMode, setTextSizeMode] = useState<0 | 1 | 2>(0);
 
   const lastWriteTimeRef = useRef<number>(0);
-  const lastSeenUpdatedAtRef = useRef<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const tickTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -70,7 +69,6 @@ function RemotePageInner() {
       setCode(trimmed);
       setSeat(res.seat);
       setState(res.state);
-      lastSeenUpdatedAtRef.current = res.updated_at;
       setPhase('connected');
     } catch {
       setPhase('enter-code');
@@ -97,8 +95,6 @@ function RemotePageInner() {
           localStorage.removeItem(STORAGE_KEY);
           return;
         }
-        if (res.updated_at === lastSeenUpdatedAtRef.current) return;
-        lastSeenUpdatedAtRef.current = res.updated_at;
         setState((prev) => {
           if (!prev) return res.state;
           if (JSON.stringify(prev) === JSON.stringify(res.state)) return prev;
