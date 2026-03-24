@@ -1615,7 +1615,7 @@ export function PlayerPanel({
       {/* QR overlay — in-panel, does not take over the board */}
       {seatCode && qrOpen && (
         <Box
-          onClick={() => setQrOpen(false)}
+          onClick={() => { navigator.clipboard?.writeText(seatCode).catch(() => {}); setQrOpen(false); }}
           sx={{
             position: 'absolute',
             inset: 0,
@@ -1639,7 +1639,7 @@ export function PlayerPanel({
             {seatCode}
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            tap to close
+            tap to copy &amp; close
           </Typography>
         </Box>
       )}
