@@ -1144,7 +1144,13 @@ export function PlayerPanel({
         </Stack>
 
         {/* Center: absolutely positioned so it's always centered relative to the full header */}
-        <Box sx={{ position: 'absolute', left: 0, right: 0, textAlign: 'center', pointerEvents: 'none', px: 6 }}>
+        <Box
+          onPointerDown={seatCode ? () => { headerLpFired.current = false; headerLpTimer.current = setTimeout(() => { headerLpFired.current = true; setQrOpen(true); }, 600); } : undefined}
+          onPointerUp={seatCode ? () => { if (headerLpTimer.current) { clearTimeout(headerLpTimer.current); headerLpTimer.current = null; } } : undefined}
+          onPointerLeave={seatCode ? () => { if (headerLpTimer.current) { clearTimeout(headerLpTimer.current); headerLpTimer.current = null; } } : undefined}
+          onPointerCancel={seatCode ? () => { if (headerLpTimer.current) { clearTimeout(headerLpTimer.current); headerLpTimer.current = null; } } : undefined}
+          sx={{ position: 'absolute', left: 0, right: 0, textAlign: 'center', px: 6, cursor: seatCode ? 'pointer' : 'default' }}
+        >
           <Typography noWrap sx={{ fontWeight: 700, fontSize: ts === 2 ? 16 : ts === 1 ? 14 : 12, lineHeight: 1.2 }}>
             {player.playerName}
           </Typography>
