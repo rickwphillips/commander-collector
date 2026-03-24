@@ -50,6 +50,8 @@ function getUserFromToken(token: string): AuthUser | null {
   }
 }
 
+const PUBLIC_PATHS = ['/game-manager/remote'];
+
 export function AuthGuard({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [checking, setChecking] = useState(true);
@@ -61,6 +63,12 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    // Skip auth for public routes
+    if (PUBLIC_PATHS.some(p => window.location.pathname.includes(p))) {
+      setChecking(false);
+      return;
+    }
+
     // Check for token passed via URL param (needed for cross-origin dev flow)
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get('token');
