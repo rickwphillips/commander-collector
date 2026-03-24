@@ -370,9 +370,10 @@ export function CenterZone({
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
+            justifyContent: 'flex-start',
             gap: 2,
             p: 1.5,
+            overflowY: 'auto',
           }}>
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '100%' }}>
               <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -485,12 +486,13 @@ export function CenterZone({
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
+            justifyContent: 'flex-start',
             gap: 1,
             p: 1.5,
+            overflowY: 'auto',
           }}>
             {/* Header */}
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '100%' }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '100%', flexShrink: 0 }}>
               <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                 Dice / Flips
               </Typography>

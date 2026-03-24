@@ -1230,8 +1230,8 @@ export function PlayerPanel({
           sx={{
             position: 'absolute', inset: 0, zIndex: 20,
             bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(20,12,6,0.93)' : 'rgba(255,248,240,0.95)',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            gap: 0,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start',
+            overflowY: 'auto', py: 2, gap: 0,
             animation: 'stateMenuFadeIn 0.15s ease-out both',
             '@keyframes stateMenuFadeIn': { from: { opacity: 0 }, to: { opacity: 1 } },
           }}

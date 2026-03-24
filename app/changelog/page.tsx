@@ -38,6 +38,14 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.16.1',
+    date: '2026-03-24',
+    title: 'Scrollable Game Overlays',
+    changes: [
+      { type: 'fixed', text: 'Game state menu, settings, and dice overlays are now scrollable — content no longer gets cut off on small panels or phones' },
+    ],
+  },
+  {
     version: '1.16.0',
     date: '2026-03-24',
     title: 'Remote Player Panel',
