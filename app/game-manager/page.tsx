@@ -146,6 +146,7 @@ export default function GameManagerPage() {
   }, [state.phase, state.sessionCode]);
 
   const handleStart = async (playerSetups: PlayerSetup[], startingLife: number, turnTimerSeconds: number) => {
+    if (state.sessionCode) api.deleteLiveGame(state.sessionCode).catch(() => {});
     const newState = { ...buildInitialState(playerSetups, startingLife), turnTimerSeconds };
     setState(newState);
     // Create live session — fire-and-forget, failures don't block the game
@@ -167,7 +168,10 @@ export default function GameManagerPage() {
   };
 
   const handleEndGame = () => {
-    setState((prev) => ({ ...prev, phase: 'ended' }));
+    setState((prev) => {
+      if (prev.sessionCode) api.deleteLiveGame(prev.sessionCode).catch(() => {});
+      return { ...prev, phase: 'ended' };
+    });
   };
 
   const handleLogGame = () => {
