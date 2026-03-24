@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Box, Typography, TextField, Button, Stack, CircularProgress } from '@mui/material';
+import { Box, Typography, TextField, Button, Stack, CircularProgress, IconButton } from '@mui/material';
+import TextFieldsIcon from '@mui/icons-material/TextFields';
 import { PlayerPanel } from '../components/PlayerPanel';
 import { api } from '@/lib/api';
 import type { GameManagerState, PlayerState, CommanderDamageMap } from '@/lib/types';
@@ -24,6 +25,7 @@ function RemotePageInner() {
   const [seat, setSeat] = useState('');
   const [state, setState] = useState<GameManagerState | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [textSizeMode, setTextSizeMode] = useState<0 | 1 | 2>(0);
 
   const lastWriteTimeRef = useRef<number>(0);
   const lastSeenUpdatedAtRef = useRef<string | null>(null);
@@ -485,31 +487,30 @@ function RemotePageInner() {
         turnTimerSeconds={state.turnTimerSeconds}
         isCurrentPlayer={isMyTurn}
         elapsedSeconds={isMyTurn ? elapsedSeconds : 0}
-        textSizeMode={0}
+        textSizeMode={textSizeMode}
         highlightMode={true}
       />
       {/* Pass Turn button — only shown when it's this player's turn */}
       {isMyTurn && (
-        <Box
-          sx={{
-            position: 'absolute',
-            bottom: 16,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 10,
-          }}
-        >
-          <Button
-            variant="contained"
-            color="primary"
-            size="large"
-            onClick={handlePassTurn}
-            sx={{ px: 4, fontWeight: 700, borderRadius: 3 }}
-          >
+        <Box sx={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 10 }}>
+          <Button variant="contained" color="primary" size="large" onClick={handlePassTurn} sx={{ px: 4, fontWeight: 700, borderRadius: 3 }}>
             Pass Turn
           </Button>
         </Box>
       )}
+
+      {/* Text size toggle */}
+      <IconButton
+        onClick={() => setTextSizeMode((m) => ((m + 1) % 3) as 0 | 1 | 2)}
+        sx={{
+          position: 'absolute', bottom: 10, left: 10, zIndex: 10,
+          color: textSizeMode === 2 ? 'warning.main' : textSizeMode === 1 ? 'primary.main' : 'text.secondary',
+          bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.6)',
+          '&:hover': { bgcolor: 'action.hover' },
+        }}
+      >
+        <TextFieldsIcon sx={{ fontSize: textSizeMode === 2 ? 24 : textSizeMode === 1 ? 22 : 20 }} />
+      </IconButton>
     </Box>
   );
 }
