@@ -1,48 +1,12 @@
-export interface CommanderInfo {
-  name: string;
-  artCropUrl?: string;
-}
-
-export interface PlayerSetup {
-  playerId: number;
-  deckId: number;
-  playerName: string;
-  deckName: string;
-  commander: CommanderInfo;
-  partner?: CommanderInfo;
-}
-
-export interface PlayerState extends PlayerSetup {
-  position: 'bottom' | 'top' | 'left' | 'right';
-  life: number;
-  poison: number;
-  commanderTax: number;
-  isMonarch: boolean;
-  hasInitiative: boolean;
-  hasCitysBlessing: boolean;
-  energy: number;
-  experience: number;
-  isEliminated: boolean;
-  isConceded: boolean;
-  eliminatedTurn: number | null;
-}
-
-// commanderDamage[targetPlayerIdx][sourcePlayerIdx] = [mainCmdDmg, partnerCmdDmg]
-export type CommanderDamageMap = Record<number, Record<number, [number, number]>>;
-
-export type GamePhase = 'setup' | 'playing' | 'ended';
-
-export interface GameManagerState {
-  players: PlayerState[];
-  commanderDamage: CommanderDamageMap;
-  currentPlayerIdx: number;
-  turnNumber: number;
-  startingLife: number;
-  phase: GamePhase;
-  turnTimerSeconds: number;
-  turnStartTime: number; // Date.now() when current turn began
-  notes: string;
-}
+// Shared game manager types live in lib/types.ts (also used by remote panel and api.ts)
+export type {
+  CommanderInfo,
+  PlayerSetup,
+  PlayerState,
+  CommanderDamageMap,
+  GamePhase,
+  GameManagerState,
+} from '@/lib/types';
 
 export interface GameManagerPrefill {
   playedAt: string;

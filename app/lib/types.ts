@@ -403,34 +403,52 @@ export interface LiveGameSeatResponse {
   is_active: boolean;
 }
 
-// GameManagerState — mirrors the shape in game-manager/page.tsx
-// Defined here so api.ts and remote page can reference it without importing from the page
-export interface GameManagerPlayerState {
-  id: string;
+// Game Manager shared types (also used by remote panel page and api.ts)
+export interface CommanderInfo {
   name: string;
+  artCropUrl?: string;
+}
+
+export interface PlayerSetup {
+  playerId: number;
+  deckId: number;
+  playerName: string;
   deckName: string;
-  commander: string;
-  colors: string;
+  commander: CommanderInfo;
+  partner?: CommanderInfo;
+}
+
+export interface PlayerState extends PlayerSetup {
   position: 'bottom' | 'top' | 'left' | 'right';
   life: number;
   poison: number;
-  commanderDamage: number[][];
-  isEliminated: boolean;
-  eliminatedTurn: number | null;
-  hasMonarch: boolean;
+  commanderTax: number;
+  isMonarch: boolean;
   hasInitiative: boolean;
   hasCitysBlessing: boolean;
-  hasConceded: boolean;
-  deckId?: number;
-  playerId?: number;
+  energy: number;
+  experience: number;
+  isEliminated: boolean;
+  isConceded: boolean;
+  eliminatedTurn: number | null;
 }
 
+export type CommanderDamageMap = Record<number, Record<number, [number, number]>>;
+
+export type GamePhase = 'setup' | 'playing' | 'ended';
+
 export interface GameManagerState {
-  phase: 'setup' | 'playing' | 'ended';
-  players: GameManagerPlayerState[];
-  currentTurn: number;
-  startTime: number | null;
-  sessionCode?: string | null;
+  players: PlayerState[];
+  commanderDamage: CommanderDamageMap;
+  currentPlayerIdx: number;
+  turnNumber: number;
+  startingLife: number;
+  phase: GamePhase;
+  turnTimerSeconds: number;
+  turnStartTime: number;
+  notes: string;
+  sessionCode?: string | null;      // hex code for live session; null = no active session
+  sessionSeats?: Record<string, string> | null; // { bottom: 'a3f9c12b', ... }
 }
 
 // Form input types

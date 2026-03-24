@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { GameSetup } from './components/GameSetup';
 import { GameBoard } from './components/GameBoard';
@@ -26,6 +26,8 @@ const DEFAULT_STATE: GameManagerState = {
   turnTimerSeconds: 300,
   turnStartTime: 0,
   notes: '',
+  sessionCode: null,
+  sessionSeats: null,
 };
 
 function loadSavedState(): GameManagerState | null {
@@ -81,6 +83,8 @@ function buildInitialState(playerSetups: PlayerSetup[], startingLife: number): G
   };
 }
 
+const POLL_INTERVAL_MS = 3000;
+
 export default function GameManagerPage() {
   const router = useRouter();
   const [isResumed, setIsResumed] = useState(() => {
@@ -93,6 +97,11 @@ export default function GameManagerPage() {
   });
   const [setupPrefill, setSetupPrefill] = useState<PlayerSetup[] | null>(null);
 
+  // Refs for live session sync
+  const lastWriteTimeRef = useRef<number>(0);
+  const lastSeenUpdatedAtRef = useRef<string | null>(null);
+
+  // Persist to localStorage
   useEffect(() => {
     if (state.phase !== 'setup') {
       localStorage.setItem(GAME_STATE_KEY, JSON.stringify(state));
@@ -101,8 +110,56 @@ export default function GameManagerPage() {
     }
   }, [state]);
 
-  const handleStart = (playerSetups: PlayerSetup[], startingLife: number, turnTimerSeconds: number) => {
-    setState({ ...buildInitialState(playerSetups, startingLife), turnTimerSeconds });
+  // Fire-and-forget DB write on every state change while playing
+  useEffect(() => {
+    if (state.phase !== 'playing' || !state.sessionCode) return;
+    lastWriteTimeRef.current = Date.now();
+    api.updateLiveGame(state.sessionCode, state).catch(() => {/* silent */});
+  }, [state]);
+
+  // Poll for incoming remote changes
+  useEffect(() => {
+    if (state.phase !== 'playing' || !state.sessionCode) return;
+    const code = state.sessionCode;
+
+    const poll = async () => {
+      // Skip if we just wrote (avoid reading back our own write)
+      if (Date.now() - lastWriteTimeRef.current < 500) return;
+      // Skip if tab is hidden
+      if (document.visibilityState === 'hidden') return;
+      try {
+        const res = await api.getLiveGame(code);
+        if (!res.is_active) return;
+        if (res.updated_at === lastSeenUpdatedAtRef.current) return;
+        lastSeenUpdatedAtRef.current = res.updated_at;
+        // Only apply if the incoming state is different from ours
+        // (prevents stomping local state with stale data)
+        setState((prev) => {
+          if (JSON.stringify(prev) === JSON.stringify(res.state)) return prev;
+          return { ...res.state, sessionCode: prev.sessionCode, sessionSeats: prev.sessionSeats };
+        });
+      } catch {/* silent */}
+    };
+
+    const id = setInterval(poll, POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [state.phase, state.sessionCode]);
+
+  const handleStart = async (playerSetups: PlayerSetup[], startingLife: number, turnTimerSeconds: number) => {
+    const newState = { ...buildInitialState(playerSetups, startingLife), turnTimerSeconds };
+    setState(newState);
+    // Create live session — fire-and-forget, failures don't block the game
+    try {
+      const seats = playerSetups.map((_, i) =>
+        (POSITIONS_BY_COUNT[playerSetups.length] ?? POSITIONS_BY_COUNT[4])[i]
+      );
+      const session = await api.createLiveGame(newState, seats);
+      setState((prev) => ({
+        ...prev,
+        sessionCode: session.seats[prev.players.find((p) => p.position === 'bottom')?.position ?? 'bottom'] ?? null,
+        sessionSeats: session.seats,
+      }));
+    } catch {/* silent — live session is optional */}
   };
 
   const handleUpdate = (newState: GameManagerState) => {
@@ -119,6 +176,9 @@ export default function GameManagerPage() {
   };
 
   const handleSaveGame = async (currentState: GameManagerState) => {
+    if (currentState.sessionCode) {
+      api.deleteLiveGame(currentState.sessionCode).catch(() => {/* silent */});
+    }
     const d = new Date();
     const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const winner = currentState.players.find((p) => !p.isEliminated);
@@ -136,17 +196,26 @@ export default function GameManagerPage() {
   };
 
   const handleNewGame = () => {
+    if (state.sessionCode) {
+      api.deleteLiveGame(state.sessionCode).catch(() => {/* silent */});
+    }
     localStorage.removeItem(GAME_STATE_KEY);
     setSetupPrefill(null);
     setState(DEFAULT_STATE);
   };
 
   const handleDiscard = () => {
+    if (state.sessionCode) {
+      api.deleteLiveGame(state.sessionCode).catch(() => {/* silent */});
+    }
     localStorage.removeItem(GAME_STATE_KEY);
     router.push('/games');
   };
 
   const handleRestartGame = (currentPlayers: PlayerState[]) => {
+    if (state.sessionCode) {
+      api.deleteLiveGame(state.sessionCode).catch(() => {/* silent */});
+    }
     localStorage.removeItem(GAME_STATE_KEY);
     setIsResumed(false);
     setSetupPrefill(currentPlayers.map((p) => ({
