@@ -486,6 +486,7 @@ function RemotePageInner() {
         startingLife={state.startingLife}
         turnTimerSeconds={state.turnTimerSeconds}
         isCurrentPlayer={isMyTurn}
+        activePlayerIdx={isMyTurn ? undefined : state.currentPlayerIdx}
         elapsedSeconds={isMyTurn ? elapsedSeconds : 0}
         textSizeMode={textSizeMode}
         highlightMode={true}

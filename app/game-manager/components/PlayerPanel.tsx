@@ -200,6 +200,7 @@ interface PlayerPanelProps {
   monarchTransfer?: { fromPos: string | null; toPos: string | null };
   highlightMode?: boolean;
   seatCode?: string;
+  activePlayerIdx?: number;
 }
 
 const BTN = { p: 0, minWidth: 26, minHeight: 26 } as const;
@@ -229,6 +230,7 @@ export function PlayerPanel({
   monarchTransfer = { fromPos: null, toPos: null },
   highlightMode = false,
   seatCode,
+  activePlayerIdx,
 }: PlayerPanelProps) {
   const ts = textSizeMode;
   const ttRotate = player.position === 'top' ? '180deg' : player.position === 'left' ? '90deg' : player.position === 'right' ? '270deg' : '0deg';
@@ -1336,40 +1338,38 @@ export function PlayerPanel({
           flexShrink: 0,
           borderRight: (theme) => `1px solid ${theme.palette.divider}`,
           px: ts === 2 ? 0.1 : ts === 1 ? 0.25 : 0.5,
-          pt: ts === 2 ? 0 : ts === 1 ? 0.1 : 0.25,
-          pb: 0,
-          display: 'flex',
-          flexDirection: 'column',
+          py: ts === 2 ? 0 : ts === 1 ? 0.1 : 0.25,
+          display: 'grid',
+          gridTemplateColumns: `1fr ${ts === 2 ? 38 : 32}px ${ts === 2 ? 38 : 30}px ${ts === 2 ? 38 : 32}px`,
+          alignContent: 'center',
+          alignItems: 'center',
+          rowGap: ts > 0 ? 0 : 0.1,
+          overflowY: 'auto',
           overflow: 'hidden',
-          transition: 'padding 0.2s ease',
+          transition: 'padding 0.2s ease, row-gap 0.2s ease',
         }}>
-          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: ts === 2 ? 0 : ts === 1 ? 0.1 : 0.25, flexShrink: 0 }}>
-            <Typography sx={{ fontSize: ts === 2 ? 15 : ts === 1 ? 13 : 11, fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              Commander Damage{isCmdDmgHigh && <Typography component="span" sx={{ fontSize: ts === 2 ? 15 : ts === 1 ? 13 : 11, color: 'error.main', ml: 0.5 }}>⚠</Typography>}
+          {/* Title row — spans full width, same pattern as Counters */}
+          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ gridColumn: '1 / -1', mb: ts === 2 ? 0 : ts === 1 ? 0.1 : 0.25 }}>
+            <Typography sx={{ fontSize: ts === 2 ? 15 : ts === 1 ? 13 : 11, fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5, flex: 1 }}>
+              CMD Damage{isCmdDmgHigh && <Typography component="span" sx={{ fontSize: ts === 2 ? 15 : ts === 1 ? 13 : 11, color: 'error.main', ml: 0.5 }}>⚠</Typography>}
             </Typography>
             <Button size="small" variant={cmdDmgShowPlayer ? 'contained' : 'outlined'} onClick={() => setCmdDmgShowPlayer(p => !p)} sx={{ minWidth: 0, px: 0.75, py: 0, fontSize: ts === 2 ? 11 : 9, lineHeight: 1.4, flexShrink: 0 }}>
               {cmdDmgShowPlayer ? 'Player' : 'CMD'}
             </Button>
           </Stack>
-          <Box sx={{
-            display: 'grid',
-            gridTemplateColumns: `1fr ${ts === 2 ? 38 : 32}px ${ts === 2 ? 38 : 30}px ${ts === 2 ? 38 : 32}px`,
-            alignContent: 'center',
-            alignItems: 'center',
-            rowGap: ts > 0 ? 0 : 0.1,
-            overflowY: 'auto',
-            flex: 1,
-            minHeight: 0,
-            transition: 'row-gap 0.2s ease',
-          }}>
           {opponents.flatMap(({ player: source, idx: sourceIdx }) => {
             const dmg = commanderDamage[playerIdx]?.[sourceIdx] ?? [0, 0];
             const sourceEliminated = source.isEliminated;
             const rows = [
               <Box key={`${sourceIdx}-name`} sx={{ overflow: 'hidden', pt: 0 }}>
-                <Typography sx={{ fontSize: ts === 2 ? 19 : ts === 1 ? 16 : 14, color: sourceEliminated ? 'text.disabled' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none' }}>
-                  {cmdDmgShowPlayer ? source.playerName : source.commander.name}
-                </Typography>
+                <Stack direction="row" alignItems="center" spacing={0.5} sx={{ overflow: 'hidden' }}>
+                  {activePlayerIdx === sourceIdx && (
+                    <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0, boxShadow: '0 0 4px 1px rgba(var(--mui-palette-primary-mainChannel) / 0.7)' }} />
+                  )}
+                  <Typography sx={{ fontSize: ts === 2 ? 19 : ts === 1 ? 16 : 14, color: sourceEliminated ? 'text.disabled' : activePlayerIdx === sourceIdx ? 'primary.main' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', fontWeight: activePlayerIdx === sourceIdx ? 700 : 400 }}>
+                    {cmdDmgShowPlayer ? source.playerName : source.commander.name}
+                  </Typography>
+                </Stack>
                 <Stack direction="row" spacing={0.5} sx={{ mt: ts > 0 ? 0 : 0.15, flexWrap: 'wrap', alignItems: 'center' }}>
                   {source.isMonarch && <Tooltip title="Monarch" placement="top" slotProps={ttSlotProps} arrow><CrownIcon sx={{
                     fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10,
@@ -1424,7 +1424,6 @@ export function PlayerPanel({
             }
             return rows;
           })}
-          </Box>
         </Box>
 
         {/* Life total + controls */}
