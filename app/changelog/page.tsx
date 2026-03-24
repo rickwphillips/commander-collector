@@ -38,6 +38,16 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.16.0',
+    date: '2026-03-24',
+    title: 'Remote Player Panel — Foundation',
+    changes: [
+      { type: 'added', text: 'Live game session DB tables (live_game_sessions, live_game_seats) to persist game state server-side' },
+      { type: 'added', text: 'Per-seat unique codes — each player gets their own code to connect to their panel on any device' },
+      { type: 'added', text: 'PHP API for creating, reading, updating, and ending live game sessions (no auth required — seat code is the credential)' },
+    ],
+  },
+  {
     version: '1.15.3',
     date: '2026-03-24',
     title: 'Date Timezone Fix',

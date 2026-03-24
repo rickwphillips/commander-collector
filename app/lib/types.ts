@@ -389,6 +389,50 @@ export interface StatPanelsResponse {
   shared: StatPanel[];
 }
 
+// Live game session types
+export interface LiveGameSession {
+  session_id: number;
+  seats: Record<string, string>; // { bottom: 'a3f9c12b', top: '...', ... }
+  expires_at: string;
+}
+
+export interface LiveGameSeatResponse {
+  seat: string;              // 'bottom' | 'top' | 'left' | 'right'
+  state: GameManagerState;
+  updated_at: string;
+  is_active: boolean;
+}
+
+// GameManagerState — mirrors the shape in game-manager/page.tsx
+// Defined here so api.ts and remote page can reference it without importing from the page
+export interface GameManagerPlayerState {
+  id: string;
+  name: string;
+  deckName: string;
+  commander: string;
+  colors: string;
+  position: 'bottom' | 'top' | 'left' | 'right';
+  life: number;
+  poison: number;
+  commanderDamage: number[][];
+  isEliminated: boolean;
+  eliminatedTurn: number | null;
+  hasMonarch: boolean;
+  hasInitiative: boolean;
+  hasCitysBlessing: boolean;
+  hasConceded: boolean;
+  deckId?: number;
+  playerId?: number;
+}
+
+export interface GameManagerState {
+  phase: 'setup' | 'playing' | 'ended';
+  players: GameManagerPlayerState[];
+  currentTurn: number;
+  startTime: number | null;
+  sessionCode?: string | null;
+}
+
 // Form input types
 export interface CreatePlayerInput {
   name: string;

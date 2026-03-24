@@ -150,6 +150,22 @@ export const api = {
   deleteStatPanel: (id: number) =>
     apiFetch<{ success: boolean }>(`/stat-panels?id=${id}`, { method: 'DELETE' }),
 
+  // Live Game Sessions (no auth — seat code is the credential)
+  createLiveGame: (state: import('./types').GameManagerState, seats: string[]) =>
+    apiFetch<import('./types').LiveGameSession>('/live-game', {
+      method: 'POST',
+      body: JSON.stringify({ state, seats }),
+    }),
+  getLiveGame: (code: string) =>
+    apiFetch<import('./types').LiveGameSeatResponse>(`/live-game?code=${code}`),
+  updateLiveGame: (code: string, state: import('./types').GameManagerState) =>
+    apiFetch<{ updated_at: string }>(`/live-game?code=${code}`, {
+      method: 'PUT',
+      body: JSON.stringify({ state }),
+    }),
+  deleteLiveGame: (code: string) =>
+    apiFetch<{ success: boolean }>(`/live-game?code=${code}`, { method: 'DELETE' }),
+
   // Users (admin)
   getUsers: () =>
     apiFetch<{ id: number; username: string; display_name: string; role: string }[]>('/auth/users'),
