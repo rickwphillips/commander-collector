@@ -40,11 +40,16 @@ const releases: Release[] = [
   {
     version: '1.16.0',
     date: '2026-03-24',
-    title: 'Remote Player Panel — Foundation',
+    title: 'Remote Player Panel',
     changes: [
-      { type: 'added', text: 'Live game session DB tables (live_game_sessions, live_game_seats) to persist game state server-side' },
-      { type: 'added', text: 'Per-seat unique codes — each player gets their own code to connect to their panel on any device' },
-      { type: 'added', text: 'PHP API for creating, reading, updating, and ending live game sessions (no auth required — seat code is the credential)' },
+      { type: 'added', text: 'Live game session infrastructure — DB tables and PHP API for persisting game state server-side with per-seat unique access codes' },
+      { type: 'added', text: 'QR codes and seat codes in the game state menu and player panel header for easy remote access from any device' },
+      { type: 'added', text: 'In-panel QR overlay (long-press header or tap seat code in state menu) — tapping copies the code to clipboard and closes' },
+      { type: 'improved', text: 'State menu converted to a full-panel centered overlay for easier tapping on phone screens' },
+      { type: 'added', text: 'Text size controls on the remote player panel' },
+      { type: 'fixed', text: 'Remote panel turn timer now counts up correctly and blinks red when time is up' },
+      { type: 'improved', text: 'Active player highlighted in the commander damage section on the remote panel so you can see whose turn it is' },
+      { type: 'improved', text: 'CMD Damage title moved inside the grid, commander damage rows vertically centered like life and counters' },
     ],
   },
   {
