@@ -14,6 +14,7 @@ import InitiativeIcon from '@mui/icons-material/Castle';
 import AddIcon from '@mui/icons-material/Add';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import QrCodeIcon from '@mui/icons-material/QrCode';
+import SmartphoneIcon from '@mui/icons-material/Smartphone';
 
 const FW_DIRS: [number, number][] = [
   [0, -58], [41, -41], [58, 0], [41, 41], [0, 58], [-41, 41], [-58, 0], [-41, -41],
@@ -201,6 +202,7 @@ interface PlayerPanelProps {
   highlightMode?: boolean;
   seatCode?: string;
   activePlayerIdx?: number;
+  remoteConnected?: boolean;
 }
 
 const BTN = { p: 0, minWidth: 26, minHeight: 26 } as const;
@@ -231,6 +233,7 @@ export function PlayerPanel({
   highlightMode = false,
   seatCode,
   activePlayerIdx,
+  remoteConnected = false,
 }: PlayerPanelProps) {
   const ts = textSizeMode;
   const ttRotate = player.position === 'top' ? '180deg' : player.position === 'left' ? '90deg' : player.position === 'right' ? '270deg' : '0deg';
@@ -324,6 +327,9 @@ export function PlayerPanel({
   const [qrOpen, setQrOpen] = useState(false);
   const headerLpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const headerLpFired = useRef(false);
+
+  // Auto-close QR when remote player connects
+  useEffect(() => { if (remoteConnected && qrOpen) setQrOpen(false); }, [remoteConnected, qrOpen]);
 
   const startLongPress = (key: string, cb: () => void) => {
     lpFired.current = false;
@@ -1221,6 +1227,10 @@ export function PlayerPanel({
                     sx={{ fontSize: ts === 2 ? 26 : ts === 1 ? 24 : 22, cursor: 'pointer' }}
                   />
                 </Tooltip>
+              )}
+              {/* Remote connected indicator */}
+              {remoteConnected && (
+                <SmartphoneIcon sx={{ fontSize: ts === 2 ? 16 : 14, color: 'success.main', animation: 'remotePulse 2s ease-in-out infinite', '@keyframes remotePulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.4 } }, flexShrink: 0 }} />
               )}
               {/* Submenu trigger */}
               <IconButton size="small" onClick={() => setStateMenuOpen(o => !o)} onPointerDown={(e) => e.stopPropagation()} sx={{ p: 0.5, color: stateMenuOpen ? 'primary.main' : 'text.secondary' }}>

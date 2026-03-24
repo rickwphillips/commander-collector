@@ -446,6 +446,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
                 textSizeMode={textSizeMode}
                 highlightMode={highlightMode}
                 seatCode={state.sessionSeats?.[player.position] ?? undefined}
+                remoteConnected={!!state.remoteCheckins?.[player.position] && Date.now() - (state.remoteCheckins[player.position] ?? 0) < 15000}
                 onLifeChange={handleLifeChange}
                 onPoisonChange={handlePoisonChange}
                 onCommanderTaxChange={handleCommanderTaxChange}

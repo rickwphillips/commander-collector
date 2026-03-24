@@ -68,7 +68,11 @@ function RemotePageInner() {
       localStorage.setItem(STORAGE_KEY, trimmed);
       setCode(trimmed);
       setSeat(res.seat);
-      setState(res.state);
+      // Write checkin so host sees us immediately
+      const checkinState = { ...res.state, remoteCheckins: { ...(res.state.remoteCheckins ?? {}), [res.seat]: Date.now() } };
+      setState(checkinState);
+      api.updateLiveGame(trimmed, checkinState).catch(() => {});
+      lastWriteTimeRef.current = Date.now();
       setPhase('connected');
     } catch {
       setPhase('enter-code');
@@ -104,8 +108,20 @@ function RemotePageInner() {
     };
 
     const id = setInterval(poll, POLL_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [phase, code]);
+
+    // Heartbeat every 9s — keeps the "remote connected" indicator alive on the host
+    const heartbeat = setInterval(() => {
+      setState((prev) => {
+        if (!prev || !seat) return prev;
+        const next = { ...prev, remoteCheckins: { ...(prev.remoteCheckins ?? {}), [seat]: Date.now() } };
+        api.updateLiveGame(code, next).catch(() => {});
+        lastWriteTimeRef.current = Date.now();
+        return next;
+      });
+    }, 9000);
+
+    return () => { clearInterval(id); clearInterval(heartbeat); };
+  }, [phase, code, seat]);
 
   // ── Write helper — optimistic update + fire-and-forget DB write ───────────
   const write = useCallback((newState: GameManagerState) => {

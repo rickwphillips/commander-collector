@@ -450,6 +450,7 @@ export interface GameManagerState {
   firstPlayerIdx?: number;          // index of the player who goes first (set when first player is chosen)
   sessionCode?: string | null;      // hex code for live session; null = no active session
   sessionSeats?: Record<string, string> | null; // { bottom: 'a3f9c12b', ... }
+  remoteCheckins?: Record<string, number> | null; // { bottom: <timestamp ms> } — set by remote panel on connect/heartbeat
 }
 
 // Form input types
