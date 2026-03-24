@@ -38,6 +38,20 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.17.0',
+    date: '2026-03-24',
+    title: 'Live Game Session — Remote Player Panel',
+    changes: [
+      { type: 'added', text: 'Remote player panels let each player connect to their own panel on any device using a unique seat code' },
+      { type: 'added', text: 'QR codes in the game state menu and panel header for instant remote access — long-press the player name to open' },
+      { type: 'added', text: 'Remote panel shows whose turn it is, highlights the active player in the commander damage section, and supports text size controls' },
+      { type: 'added', text: 'Host board shows a pulsing phone icon when a remote player is connected; QR overlay closes automatically on checkin' },
+      { type: 'fixed', text: 'Game sessions are now properly marked inactive when a game ends, is discarded, or a new game starts' },
+      { type: 'fixed', text: 'Remote panel no longer requires login — the seat code is the credential' },
+      { type: 'improved', text: 'Game state menu, settings, and dice overlays are now scrollable on small screens' },
+    ],
+  },
+  {
     version: '1.16.2',
     date: '2026-03-24',
     title: 'Remote Panel Fixes & QR Polish',
