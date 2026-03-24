@@ -38,6 +38,14 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.17.2',
+    date: '2026-03-24T00:00:00',
+    title: 'Fix remote heartbeat overwriting host turn in DB',
+    changes: [
+      { type: 'fixed', text: 'Remote panel heartbeat now reads the current game state from the database before writing the check-in timestamp, preventing stale local state from overwriting the host\'s most recent turn change' },
+    ],
+  },
+  {
     version: '1.17.1',
     date: '2026-03-24T00:00:00',
     title: 'Remove localStorage from remote panel',

@@ -105,14 +105,22 @@ function RemotePageInner() {
 
     const id = setInterval(poll, POLL_INTERVAL_MS);
 
-    // Heartbeat every 9s — keeps the "remote connected" indicator alive on the host
-    const heartbeat = setInterval(() => {
-      setState((prev) => {
-        if (!prev || !seat) return prev;
-        const next = { ...prev, remoteCheckins: { ...(prev.remoteCheckins ?? {}), [seat]: Date.now() } };
+    // Heartbeat every 9s — keeps the "remote connected" indicator alive on the host.
+    // Reads current DB state first so we never overwrite a stale local copy into the DB.
+    const heartbeat = setInterval(async () => {
+      if (!seat) return;
+      try {
+        const res = await api.getLiveGame(code);
+        if (!res.is_active) return;
+        const now = Date.now();
+        const next = { ...res.state, remoteCheckins: { ...(res.state.remoteCheckins ?? {}), [seat]: now } };
         api.updateLiveGame(code, next).catch(() => {});
-        return next;
-      });
+        // Sync local state with latest DB state + updated checkin
+        setState((prev) => {
+          if (!prev) return prev;
+          return { ...res.state, remoteCheckins: { ...(res.state.remoteCheckins ?? {}), [seat]: now } };
+        });
+      } catch {/* silent */}
     }, 9000);
 
     return () => { clearInterval(id); clearInterval(heartbeat); };
