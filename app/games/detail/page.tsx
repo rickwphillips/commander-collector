@@ -130,7 +130,7 @@ export default function GameDetailPage() {
             <Stack direction="row" alignItems="center" spacing={2}>
               <CalendarTodayIcon color="action" />
               <Typography variant="h6">
-                {new Date(game.played_at).toLocaleDateString('en-US', {
+                {new Date(game.played_at + 'T00:00:00').toLocaleDateString('en-US', {
                   weekday: 'long',
                   year: 'numeric',
                   month: 'long',

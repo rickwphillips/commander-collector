@@ -285,7 +285,7 @@ export default function DeckDetailPage() {
                             />
                           )}
                           <Typography variant="body2" color="text.secondary">
-                            {new Date(game.played_at).toLocaleDateString()}
+                            {new Date(game.played_at + 'T00:00:00').toLocaleDateString()}
                           </Typography>
                         </Stack>
                       </Stack>

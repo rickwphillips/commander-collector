@@ -74,7 +74,10 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [playedAt, setPlayedAt] = useState(new Date().toISOString().split('T')[0]);
+  const [playedAt, setPlayedAt] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   const [notes, setNotes] = useState('');
   const [results, setResults] = useState<PlayerResult[]>(defaultResults);
   const [gameType, setGameType] = useState<GameType>('standard');

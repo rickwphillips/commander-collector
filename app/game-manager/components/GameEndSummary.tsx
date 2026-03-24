@@ -42,7 +42,7 @@ export function GameEndSummary({
 
   const handleLogGame = () => {
     const prefill: GameManagerPrefill = {
-      playedAt: new Date().toISOString().split('T')[0],
+      playedAt: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(),
       results: players.map((p, i) => ({
         playerId: p.playerId,
         deckId: p.deckId,

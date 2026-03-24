@@ -38,6 +38,15 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.15.3',
+    date: '2026-03-24',
+    title: 'Date Timezone Fix',
+    changes: [
+      { type: 'fixed', text: 'Game dates now display correctly in local time (EST) — previously showed one day behind due to JavaScript parsing date-only strings as UTC midnight' },
+      { type: 'fixed', text: 'New game form and Game Manager now default to today\'s local date instead of the UTC date' },
+    ],
+  },
+  {
     version: '1.15.2',
     date: '2026-03-23',
     title: 'Game Manager — Responsive Scaling & Scrollable Damage',

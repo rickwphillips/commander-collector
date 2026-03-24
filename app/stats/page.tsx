@@ -715,7 +715,7 @@ function StatsPageInner() {
                     <TableRow key={game.id}>
                       <TableCell>
                         <Typography variant="body2">
-                          {new Date(game.played_at).toLocaleDateString()}
+                          {new Date(game.played_at + 'T00:00:00').toLocaleDateString()}
                         </Typography>
                       </TableCell>
                       <TableCell>

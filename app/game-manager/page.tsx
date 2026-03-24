@@ -11,8 +11,8 @@ import { api } from '@/lib/api';
 
 const POSITIONS_BY_COUNT: Record<number, Array<PlayerState['position']>> = {
   2: ['bottom', 'top'],
-  3: ['bottom', 'right', 'top'],
-  4: ['bottom', 'right', 'top', 'left'],
+  3: ['bottom', 'left', 'top'],
+  4: ['bottom', 'left', 'top', 'right'],
 };
 const GAME_STATE_KEY = 'commander_game_state';
 
@@ -119,7 +119,8 @@ export default function GameManagerPage() {
   };
 
   const handleSaveGame = async (currentState: GameManagerState) => {
-    const today = new Date().toISOString().split('T')[0];
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const winner = currentState.players.find((p) => !p.isEliminated);
     const losers = currentState.players
       .filter((p) => p.isEliminated)
