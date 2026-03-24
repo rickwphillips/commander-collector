@@ -1165,7 +1165,7 @@ export function PlayerPanel({
                 <Tooltip open={rulesOpenLabel === 'h:Monarch'} onClose={() => setRulesOpenLabel(null)} title={<Typography sx={{ fontSize: 12, maxWidth: 240 }}>Draw a card at the beginning of your end step. Whenever a creature deals combat damage to you, its controller becomes the monarch.</Typography>} placement={ttHeaderPlacement} arrow disableHoverListener disableFocusListener disableTouchListener slotProps={ttHeaderSlotProps}>
                   <CrownIcon
                     onClick={guardClick(() => toggleRules('h:Monarch'))}
-                    onPointerDown={() => startLongPress('off-monarch', () => onToggleMonarch(playerIdx))}
+                    onPointerDown={(e) => { e.stopPropagation(); startLongPress('off-monarch', () => onToggleMonarch(playerIdx)); }}
                     onPointerUp={cancelLongPress}
                     onPointerLeave={cancelLongPress}
                     onPointerCancel={cancelLongPress}
@@ -1177,7 +1177,7 @@ export function PlayerPanel({
                 <Tooltip open={rulesOpenLabel === 'h:Monarch'} onClose={() => setRulesOpenLabel(null)} title={<Typography sx={{ fontSize: 12, maxWidth: 240 }}>Draw a card at the beginning of your end step. Whenever a creature deals combat damage to you, its controller becomes the monarch.</Typography>} placement={ttHeaderPlacement} arrow disableHoverListener disableFocusListener disableTouchListener slotProps={ttHeaderSlotProps}>
                   <CrownIcon
                     onClick={guardClick(() => toggleRules('h:Monarch'))}
-                    onPointerDown={() => startLongPress('take-monarch', () => onToggleMonarch(playerIdx))}
+                    onPointerDown={(e) => { e.stopPropagation(); startLongPress('take-monarch', () => onToggleMonarch(playerIdx)); }}
                     onPointerUp={cancelLongPress}
                     onPointerLeave={cancelLongPress}
                     onPointerCancel={cancelLongPress}
@@ -1189,7 +1189,7 @@ export function PlayerPanel({
                 <Tooltip open={rulesOpenLabel === 'h:Initiative'} onClose={() => setRulesOpenLabel(null)} title={<Typography sx={{ fontSize: 12, maxWidth: 240 }}>When you take the initiative, venture into the Undercity. At the beginning of your upkeep, venture into the Undercity. Whenever a creature deals combat damage to you, its controller takes the initiative.</Typography>} placement={ttHeaderPlacement} arrow disableHoverListener disableFocusListener disableTouchListener slotProps={ttHeaderSlotProps}>
                   <InitiativeIcon
                     onClick={guardClick(() => toggleRules('h:Initiative'))}
-                    onPointerDown={() => startLongPress('off-initiative', () => onToggleInitiative(playerIdx))}
+                    onPointerDown={(e) => { e.stopPropagation(); startLongPress('off-initiative', () => onToggleInitiative(playerIdx)); }}
                     onPointerUp={cancelLongPress}
                     onPointerLeave={cancelLongPress}
                     onPointerCancel={cancelLongPress}
@@ -1201,7 +1201,7 @@ export function PlayerPanel({
                 <Tooltip open={rulesOpenLabel === 'h:Initiative'} onClose={() => setRulesOpenLabel(null)} title={<Typography sx={{ fontSize: 12, maxWidth: 240 }}>When you take the initiative, venture into the Undercity. At the beginning of your upkeep, venture into the Undercity. Whenever a creature deals combat damage to you, its controller takes the initiative.</Typography>} placement={ttHeaderPlacement} arrow disableHoverListener disableFocusListener disableTouchListener slotProps={ttHeaderSlotProps}>
                   <InitiativeIcon
                     onClick={guardClick(() => toggleRules('h:Initiative'))}
-                    onPointerDown={() => startLongPress('take-initiative', () => onToggleInitiative(playerIdx))}
+                    onPointerDown={(e) => { e.stopPropagation(); startLongPress('take-initiative', () => onToggleInitiative(playerIdx)); }}
                     onPointerUp={cancelLongPress}
                     onPointerLeave={cancelLongPress}
                     onPointerCancel={cancelLongPress}
@@ -1214,7 +1214,7 @@ export function PlayerPanel({
                   <CityIcon
                     active
                     onClick={guardClick(() => toggleRules("h:City's Blessing"))}
-                    onPointerDown={() => startLongPress("off-citys-blessing", () => onToggleCitysBlessing(playerIdx))}
+                    onPointerDown={(e) => { e.stopPropagation(); startLongPress("off-citys-blessing", () => onToggleCitysBlessing(playerIdx)); }}
                     onPointerUp={cancelLongPress}
                     onPointerLeave={cancelLongPress}
                     onPointerCancel={cancelLongPress}
@@ -1223,7 +1223,7 @@ export function PlayerPanel({
                 </Tooltip>
               )}
               {/* Submenu trigger */}
-              <IconButton size="small" onClick={() => setStateMenuOpen(o => !o)} sx={{ p: 0.5, color: stateMenuOpen ? 'primary.main' : 'text.secondary' }}>
+              <IconButton size="small" onClick={() => setStateMenuOpen(o => !o)} onPointerDown={(e) => e.stopPropagation()} sx={{ p: 0.5, color: stateMenuOpen ? 'primary.main' : 'text.secondary' }}>
                 <AddIcon sx={{ fontSize: ts === 2 ? 20 : 18, transition: 'transform 0.2s ease', transform: stateMenuOpen ? 'rotate(45deg)' : 'none' }} />
               </IconButton>
             </>
