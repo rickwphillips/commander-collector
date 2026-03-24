@@ -1354,7 +1354,7 @@ export function PlayerPanel({
           <Box sx={{
             display: 'grid',
             gridTemplateColumns: `1fr ${ts === 2 ? 38 : 32}px ${ts === 2 ? 38 : 30}px ${ts === 2 ? 38 : 32}px`,
-            alignContent: 'start',
+            alignContent: 'center',
             alignItems: 'center',
             rowGap: ts > 0 ? 0 : 0.1,
             overflowY: 'auto',
