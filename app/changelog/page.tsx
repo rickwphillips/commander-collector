@@ -45,6 +45,7 @@ const releases: Release[] = [
       { type: 'fixed', text: 'Remote player panel no longer redirects to login — the seat code is all you need to access your panel' },
       { type: 'fixed', text: 'Remote panel now reliably syncs with the host — DB is the source of truth, polling no longer reverts local changes' },
       { type: 'improved', text: 'Long-pressing the player name / commander in the panel header now opens the QR code overlay' },
+      { type: 'fixed', text: 'Long-pressing the Monarch, Initiative, or City\'s Blessing icons no longer accidentally opens the QR overlay' },
     ],
   },
   {
