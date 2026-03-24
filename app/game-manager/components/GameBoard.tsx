@@ -106,7 +106,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
     const player = players[rollState.finalIdx];
     const note = `First player (rolled): ${player?.playerName ?? '?'}`;
     const newNotes = state.notes ? `${state.notes}\n${note}` : note;
-    onUpdate({ ...state, currentPlayerIdx: rollState.finalIdx, turnStartTime: Date.now(), notes: newNotes });
+    onUpdate({ ...state, currentPlayerIdx: rollState.finalIdx, firstPlayerIdx: rollState.finalIdx, turnStartTime: Date.now(), notes: newNotes });
     setRollState({ phase: 'idle', highlightIdx: null, finalIdx: null });
     setFirstPlayerIdx(rollState.finalIdx);
     setFirstPlayerSet(true);
@@ -116,7 +116,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
     const player = players[idx];
     const note = `First player (chosen): ${player?.playerName ?? '?'}`;
     const newNotes = state.notes ? `${state.notes}\n${note}` : note;
-    onUpdate({ ...state, currentPlayerIdx: idx, turnStartTime: Date.now(), notes: newNotes });
+    onUpdate({ ...state, currentPlayerIdx: idx, firstPlayerIdx: idx, turnStartTime: Date.now(), notes: newNotes });
     setRollState({ phase: 'idle', highlightIdx: null, finalIdx: null });
     setFirstPlayerIdx(idx);
     setFirstPlayerSet(true);
