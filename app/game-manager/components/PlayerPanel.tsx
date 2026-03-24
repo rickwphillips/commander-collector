@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { keyframes } from '@emotion/react';
-import { Box, Stack, Typography, IconButton, Button, TextField, Tooltip, SvgIcon, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { Box, Stack, Typography, IconButton, Button, TextField, Tooltip, SvgIcon } from '@mui/material';
 import { QRCodeSVG } from 'qrcode.react';
 import { ASSET_BASE } from '@/lib/api';
 const CrownIcon = (props: React.ComponentProps<typeof SvgIcon>) => (
@@ -569,7 +569,6 @@ export function PlayerPanel({
     .filter(({ idx }) => idx !== playerIdx);
 
   return (
-    <>
     <Box
       sx={{
         width: '100%',
@@ -1225,25 +1224,27 @@ export function PlayerPanel({
 
       {/* ── Game state submenu ── */}
       {stateMenuOpen && (
-        <>
-          <Box sx={{ position: 'absolute', inset: 0, zIndex: 19 }} onClick={() => { setStateMenuOpen(false); setShowEliminateConfirm(false); }} />
-          <Box sx={{
-            position: 'absolute',
-            top: ts === 2 ? 54 : ts === 1 ? 50 : 46,
-            right: 0,
-            zIndex: 20,
-            bgcolor: (theme) => theme.palette.mode === 'dark' ? '#1E1510EE' : '#FFFAF5EE',
-            borderLeft: (theme) => `1px solid ${theme.palette.divider}`,
-            borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
-            borderBottomLeftRadius: 8,
-            minWidth: 160,
-            overflow: 'hidden',
-            animation: 'stateMenuSlide 0.18s ease-out both',
-            '@keyframes stateMenuSlide': {
-              from: { transform: 'translateY(-6px)', opacity: 0 },
-              to: { transform: 'translateY(0)', opacity: 1 },
-            },
-          }}>
+        <Box
+          sx={{
+            position: 'absolute', inset: 0, zIndex: 20,
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(20,12,6,0.93)' : 'rgba(255,248,240,0.95)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            gap: 0,
+            animation: 'stateMenuFadeIn 0.15s ease-out both',
+            '@keyframes stateMenuFadeIn': { from: { opacity: 0 }, to: { opacity: 1 } },
+          }}
+          onClick={() => { setStateMenuOpen(false); setShowEliminateConfirm(false); }}
+        >
+          <Box
+            sx={{
+              width: '90%', maxWidth: 220,
+              bgcolor: (theme) => theme.palette.mode === 'dark' ? '#1E1510' : '#FFFAF5',
+              border: (theme) => `1px solid ${theme.palette.divider}`,
+              borderRadius: 2,
+              overflow: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
             {([
               { label: 'Monarch', icon: <CrownIcon sx={{ fontSize: 18, color: player.isMonarch ? '#DAA520' : 'inherit' }} />, active: player.isMonarch, color: '#DAA520', toggle: () => { onToggleMonarch(playerIdx); setStateMenuOpen(false); }, rulesText: 'Draw a card at the beginning of your end step. Whenever a creature deals combat damage to you, its controller becomes the monarch.' },
               { label: 'Initiative', icon: <InitiativeIcon sx={{ fontSize: 18 }} />, active: player.hasInitiative, color: '#4FC3F7', toggle: () => { onToggleInitiative(playerIdx); setStateMenuOpen(false); }, rulesText: "When you take the initiative, venture into the Undercity. At the beginning of your upkeep, venture into the Undercity. Whenever a creature deals combat damage to you, its controller takes the initiative." },
@@ -1251,11 +1252,10 @@ export function PlayerPanel({
             ] as { label: string; icon: React.ReactNode; active: boolean; color: string; toggle: () => void; rulesText: string }[]).map(({ label, icon, active, color, toggle, rulesText }) => (
               <Box key={label} onClick={toggle} sx={{
                 display: 'flex', alignItems: 'center', gap: 1.25,
-                px: 1.5, py: 0.875,
+                px: 1.5, py: 1,
                 cursor: 'pointer',
                 color: active ? color : 'text.disabled',
                 borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
-                '&:last-child': { borderBottom: 'none' },
                 '&:hover': { bgcolor: 'action.hover' },
                 transition: 'background-color 0.15s ease',
               }}>
@@ -1284,39 +1284,37 @@ export function PlayerPanel({
               </Box>
             ))}
             {/* Eliminate row */}
-            <Box sx={{ borderTop: (theme) => `1px solid ${theme.palette.divider}` }}>
-              {player.isEliminated ? (
-                <Box onClick={() => { onUndoEliminate(playerIdx); setStateMenuOpen(false); }} sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 0.875, cursor: 'pointer', color: 'error.main', '&:hover': { bgcolor: 'action.hover' }, transition: 'background-color 0.15s ease' }}>
-                  <ElimIcon sx={{ fontSize: 18 }} />
-                  <Typography sx={{ fontSize: 13, fontWeight: 700, lineHeight: 1 }}>Undo Concede</Typography>
-                </Box>
-              ) : showEliminateConfirm ? (
-                <Stack spacing={0.75} sx={{ px: 1.5, py: 0.875, bgcolor: 'rgba(218,165,32,0.12)' }}>
-                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#DAA520', lineHeight: 1.3 }}>Are you sure you want to quit?</Typography>
-                  <Stack direction="row" spacing={0.5} alignItems="center">
-                    <TextField size="small" label="Turn #" type="number" value={eliminateTurnInput}
-                      onChange={(e) => setEliminateTurnInput(e.target.value)}
-                      slotProps={{ htmlInput: { min: 1 } }} sx={{ width: 72 }} />
-                    <Button size="small" variant="contained"
-                      onClick={() => { onEliminate(playerIdx); setShowEliminateConfirm(false); setEliminateTurnInput(''); setStateMenuOpen(false); }}
-                      sx={{ fontSize: 9, py: 0, px: 0.5, minWidth: 0, bgcolor: '#DAA520', '&:hover': { bgcolor: '#c49a18' } }}>✓</Button>
-                    <Button size="small" variant="outlined"
-                      onClick={() => setShowEliminateConfirm(false)}
-                      sx={{ fontSize: 9, py: 0, px: 0.5, minWidth: 0, borderColor: '#DAA520', color: '#DAA520' }}>✕</Button>
-                  </Stack>
+            {player.isEliminated ? (
+              <Box onClick={() => { onUndoEliminate(playerIdx); setStateMenuOpen(false); }} sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 1, cursor: 'pointer', color: 'error.main', borderTop: (theme) => `1px solid ${theme.palette.divider}`, '&:hover': { bgcolor: 'action.hover' }, transition: 'background-color 0.15s ease' }}>
+                <ElimIcon sx={{ fontSize: 18 }} />
+                <Typography sx={{ fontSize: 13, fontWeight: 700, lineHeight: 1 }}>Undo Concede</Typography>
+              </Box>
+            ) : showEliminateConfirm ? (
+              <Stack spacing={0.75} sx={{ px: 1.5, py: 1, bgcolor: 'rgba(218,165,32,0.12)', borderTop: (theme) => `1px solid ${theme.palette.divider}` }}>
+                <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#DAA520', lineHeight: 1.3 }}>Are you sure you want to quit?</Typography>
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                  <TextField size="small" label="Turn #" type="number" value={eliminateTurnInput}
+                    onChange={(e) => setEliminateTurnInput(e.target.value)}
+                    slotProps={{ htmlInput: { min: 1 } }} sx={{ width: 72 }} />
+                  <Button size="small" variant="contained"
+                    onClick={() => { onEliminate(playerIdx); setShowEliminateConfirm(false); setEliminateTurnInput(''); setStateMenuOpen(false); }}
+                    sx={{ fontSize: 9, py: 0, px: 0.5, minWidth: 0, bgcolor: '#DAA520', '&:hover': { bgcolor: '#c49a18' } }}>✓</Button>
+                  <Button size="small" variant="outlined"
+                    onClick={() => setShowEliminateConfirm(false)}
+                    sx={{ fontSize: 9, py: 0, px: 0.5, minWidth: 0, borderColor: '#DAA520', color: '#DAA520' }}>✕</Button>
                 </Stack>
-              ) : (
-                <Box onClick={() => setShowEliminateConfirm(true)} sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 0.875, cursor: 'pointer', color: 'text.disabled', '&:hover': { bgcolor: 'action.hover' }, transition: 'background-color 0.15s ease' }}>
-                  <ElimIcon sx={{ fontSize: 18 }} />
-                  <Typography sx={{ fontSize: 13, lineHeight: 1 }}>Concede</Typography>
-                </Box>
-              )}
-            </Box>
+              </Stack>
+            ) : (
+              <Box onClick={() => setShowEliminateConfirm(true)} sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 1, cursor: 'pointer', color: 'text.disabled', borderTop: (theme) => `1px solid ${theme.palette.divider}`, '&:hover': { bgcolor: 'action.hover' }, transition: 'background-color 0.15s ease' }}>
+                <ElimIcon sx={{ fontSize: 18 }} />
+                <Typography sx={{ fontSize: 13, lineHeight: 1 }}>Concede</Typography>
+              </Box>
+            )}
             {/* Seat code row */}
             {seatCode && (
               <Box
                 onClick={(e) => { e.stopPropagation(); setQrOpen(true); setStateMenuOpen(false); }}
-                sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 0.875, cursor: 'pointer', borderTop: (theme) => `1px solid ${theme.palette.divider}`, color: 'text.secondary', '&:hover': { bgcolor: 'action.hover' }, transition: 'background-color 0.15s ease' }}
+                sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 1, cursor: 'pointer', borderTop: (theme) => `1px solid ${theme.palette.divider}`, color: 'text.secondary', '&:hover': { bgcolor: 'action.hover' }, transition: 'background-color 0.15s ease' }}
               >
                 <Typography sx={{ fontSize: 12, fontFamily: 'monospace', letterSpacing: 1.5, fontWeight: 700, flex: 1 }}>
                   {seatCode}
@@ -1325,7 +1323,8 @@ export function PlayerPanel({
               </Box>
             )}
           </Box>
-        </>
+          <Typography variant="caption" sx={{ color: 'text.disabled', mt: 1.5 }}>tap outside to close</Typography>
+        </Box>
       )}
 
       {/* ── Main: Commander Damage (left) + Life (right) ── */}
@@ -1613,30 +1612,38 @@ export function PlayerPanel({
         </Box>
       </Box>
 
-    </Box>
-
-    {seatCode && (
-      <Dialog open={qrOpen} onClose={() => setQrOpen(false)} maxWidth="xs">
-        <DialogTitle sx={{ pb: 1 }}>{player.playerName}</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, pb: 3 }}>
-          <Box sx={{ p: 1.5, bgcolor: '#fff', borderRadius: 1 }}>
+      {/* QR overlay — in-panel, does not take over the board */}
+      {seatCode && qrOpen && (
+        <Box
+          onClick={() => setQrOpen(false)}
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 30,
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(20,12,6,0.93)' : 'rgba(255,248,240,0.95)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1.5,
+            cursor: 'pointer',
+          }}
+        >
+          <Box sx={{ p: 1, bgcolor: '#fff', borderRadius: 1 }}>
             <QRCodeSVG
               value={`${typeof window !== 'undefined' ? window.location.origin : ''}${ASSET_BASE}/game-manager/remote/?code=${seatCode}`}
-              size={200}
+              size={140}
             />
           </Box>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: 18, letterSpacing: 3, fontWeight: 700 }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: 15, letterSpacing: 3, fontWeight: 700 }}>
             {seatCode}
           </Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary', textAlign: 'center' }}>
-            Scan to join as {player.playerName}
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            tap to close
           </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setQrOpen(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
-    )}
-    </>
+        </Box>
+      )}
+
+    </Box>
   );
 }
