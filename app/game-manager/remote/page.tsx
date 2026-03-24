@@ -62,6 +62,7 @@ function RemotePageInner() {
     try {
       const res = await api.getLiveGame(trimmed);
       if (!res.is_active) {
+        localStorage.removeItem(STORAGE_KEY);
         setPhase('ended');
         return;
       }
@@ -75,6 +76,7 @@ function RemotePageInner() {
       lastWriteTimeRef.current = Date.now();
       setPhase('connected');
     } catch {
+      localStorage.removeItem(STORAGE_KEY);
       setPhase('enter-code');
       setErrorMsg('Code not found or session expired.');
     }
@@ -115,7 +117,6 @@ function RemotePageInner() {
         if (!prev || !seat) return prev;
         const next = { ...prev, remoteCheckins: { ...(prev.remoteCheckins ?? {}), [seat]: Date.now() } };
         api.updateLiveGame(code, next).catch(() => {});
-        lastWriteTimeRef.current = Date.now();
         return next;
       });
     }, 9000);
