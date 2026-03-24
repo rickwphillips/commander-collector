@@ -27,6 +27,9 @@ import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import ReplayIcon from '@mui/icons-material/Replay';
 import SettingsIcon from '@mui/icons-material/Settings';
 import TextFieldsIcon from '@mui/icons-material/TextFields';
+import QrCodeIcon from '@mui/icons-material/QrCode';
+import { QRCodeSVG } from 'qrcode.react';
+import { ASSET_BASE } from '@/lib/api';
 import type { PlayerState } from '../types';
 
 function D20Icon({ size = 16 }: { size?: number }) {
@@ -79,6 +82,7 @@ interface CenterZoneProps {
   onCycleTextSizeMode: () => void;
   highlightMode: boolean;
   onToggleHighlightMode: () => void;
+  sessionSeats?: Record<string, string> | null;
 }
 
 function rollDie(sides: number): number {
@@ -111,6 +115,7 @@ export function CenterZone({
   onCycleTextSizeMode,
   highlightMode,
   onToggleHighlightMode,
+  sessionSeats,
 }: CenterZoneProps) {
   type RollEntry = { label: string; rolls: (number | string)[]; total: number | null; color: string };
   const [history, setHistory] = useState<RollEntry[]>([]);
@@ -118,6 +123,7 @@ export function CenterZone({
   const [diceCount, setDiceCount] = useState(1);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [confirmRestart, setConfirmRestart] = useState(false);
+  const [qrDialogSeat, setQrDialogSeat] = useState<{ playerName: string; code: string } | null>(null);
   const [diceOpen, setDiceOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesDraft, setNotesDraft] = useState('');
@@ -436,6 +442,35 @@ export function CenterZone({
                   End Game
                 </Button>
               </Stack>
+
+              {sessionSeats && Object.keys(sessionSeats).length > 0 && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 0.75 }}>
+                    Remote Players
+                  </Typography>
+                  <Stack spacing={0.5}>
+                    {players.map((p) => {
+                      const code = sessionSeats[p.position];
+                      if (!code) return null;
+                      return (
+                        <Stack key={p.position} direction="row" alignItems="center" justifyContent="space-between">
+                          <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.primary', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {p.playerName}
+                          </Typography>
+                          <Stack direction="row" alignItems="center" spacing={0.75}>
+                            <Typography sx={{ fontSize: 11, fontFamily: 'monospace', color: 'text.secondary', letterSpacing: 1 }}>
+                              {code}
+                            </Typography>
+                            <IconButton size="small" sx={{ p: 0.25 }} onClick={() => setQrDialogSeat({ playerName: p.playerName, code })}>
+                              <QrCodeIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </Stack>
+                        </Stack>
+                      );
+                    })}
+                  </Stack>
+                </Box>
+              )}
             </Stack>
           </Box>
         )}
@@ -579,6 +614,31 @@ export function CenterZone({
         <DialogActions>
           <Button onClick={() => setNotesOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={() => { onNotesChange(notesDraft); setNotesOpen(false); }}>Save</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!qrDialogSeat} onClose={() => setQrDialogSeat(null)} maxWidth="xs">
+        <DialogTitle sx={{ pb: 1 }}>{qrDialogSeat?.playerName}</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, pb: 3 }}>
+          {qrDialogSeat && (
+            <>
+              <Box sx={{ p: 1.5, bgcolor: '#fff', borderRadius: 1 }}>
+                <QRCodeSVG
+                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}${ASSET_BASE}/game-manager/remote/?code=${qrDialogSeat.code}`}
+                  size={200}
+                />
+              </Box>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: 18, letterSpacing: 3, fontWeight: 700 }}>
+                {qrDialogSeat.code}
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary', textAlign: 'center' }}>
+                Scan to join as {qrDialogSeat.playerName}
+              </Typography>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setQrDialogSeat(null)}>Close</Button>
         </DialogActions>
       </Dialog>
     </>

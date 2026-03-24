@@ -2,7 +2,9 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { keyframes } from '@emotion/react';
-import { Box, Stack, Typography, IconButton, Button, TextField, Tooltip, SvgIcon } from '@mui/material';
+import { Box, Stack, Typography, IconButton, Button, TextField, Tooltip, SvgIcon, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { QRCodeSVG } from 'qrcode.react';
+import { ASSET_BASE } from '@/lib/api';
 const CrownIcon = (props: React.ComponentProps<typeof SvgIcon>) => (
   <SvgIcon {...props} viewBox="0 0 24 24">
     <path d="M5 16l-3-10 5.5 4L12 2l4.5 8L22 6l-3 10H5zm0 2h14v2H5v-2z" />
@@ -11,6 +13,7 @@ const CrownIcon = (props: React.ComponentProps<typeof SvgIcon>) => (
 import InitiativeIcon from '@mui/icons-material/Castle';
 import AddIcon from '@mui/icons-material/Add';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import QrCodeIcon from '@mui/icons-material/QrCode';
 
 const FW_DIRS: [number, number][] = [
   [0, -58], [41, -41], [58, 0], [41, 41], [0, 58], [-41, 41], [-58, 0], [-41, -41],
@@ -171,7 +174,6 @@ const CityIcon = ({ active, ...props }: React.ComponentProps<typeof SvgIcon> & {
 import ElimIcon from '@mui/icons-material/PersonOff';
 const XP_ICON_SRC = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRPxc2Yz21vbnc5VP3Muxnx5VtQGAynItuNWg&s';
 import type { PlayerState, CommanderDamageMap } from '../types';
-import { ASSET_BASE } from '@/lib/api';
 
 interface PlayerPanelProps {
   player: PlayerState;
@@ -197,6 +199,7 @@ interface PlayerPanelProps {
   textSizeMode?: 0 | 1 | 2;
   monarchTransfer?: { fromPos: string | null; toPos: string | null };
   highlightMode?: boolean;
+  seatCode?: string;
 }
 
 const BTN = { p: 0, minWidth: 26, minHeight: 26 } as const;
@@ -225,6 +228,7 @@ export function PlayerPanel({
   textSizeMode = 0,
   monarchTransfer = { fromPos: null, toPos: null },
   highlightMode = false,
+  seatCode,
 }: PlayerPanelProps) {
   const ts = textSizeMode;
   const ttRotate = player.position === 'top' ? '180deg' : player.position === 'left' ? '90deg' : player.position === 'right' ? '270deg' : '0deg';
@@ -315,6 +319,9 @@ export function PlayerPanel({
   const [lpKey, setLpKey] = useState<string | null>(null);
   const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lpFired = useRef(false);
+  const [qrOpen, setQrOpen] = useState(false);
+  const headerLpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const headerLpFired = useRef(false);
 
   const startLongPress = (key: string, cb: () => void) => {
     lpFired.current = false;
@@ -562,6 +569,7 @@ export function PlayerPanel({
     .filter(({ idx }) => idx !== playerIdx);
 
   return (
+    <>
     <Box
       sx={{
         width: '100%',
@@ -1056,7 +1064,18 @@ export function PlayerPanel({
       )}
 
       {/* ── Header ── */}
-      <Box sx={{
+      <Box
+        onPointerDown={seatCode ? () => {
+          headerLpFired.current = false;
+          headerLpTimer.current = setTimeout(() => {
+            headerLpFired.current = true;
+            setQrOpen(true);
+          }, 600);
+        } : undefined}
+        onPointerUp={seatCode ? () => { if (headerLpTimer.current) { clearTimeout(headerLpTimer.current); headerLpTimer.current = null; } } : undefined}
+        onPointerLeave={seatCode ? () => { if (headerLpTimer.current) { clearTimeout(headerLpTimer.current); headerLpTimer.current = null; } } : undefined}
+        onPointerCancel={seatCode ? () => { if (headerLpTimer.current) { clearTimeout(headerLpTimer.current); headerLpTimer.current = null; } } : undefined}
+        sx={{
         px: 1, py: 0.5, flexShrink: 0, filter: 'none', position: 'relative', zIndex: 3, display: 'flex', alignItems: 'center',
         background: isCurrentPlayer && highlightMode
           ? `linear-gradient(90deg, ${timerColorRgba(0.3)} 0%, ${timerColorRgba(0.7)} 50%, ${timerColorRgba(0.3)} 100%)`
@@ -1293,6 +1312,18 @@ export function PlayerPanel({
                 </Box>
               )}
             </Box>
+            {/* Seat code row */}
+            {seatCode && (
+              <Box
+                onClick={(e) => { e.stopPropagation(); setQrOpen(true); setStateMenuOpen(false); }}
+                sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 0.875, cursor: 'pointer', borderTop: (theme) => `1px solid ${theme.palette.divider}`, color: 'text.secondary', '&:hover': { bgcolor: 'action.hover' }, transition: 'background-color 0.15s ease' }}
+              >
+                <Typography sx={{ fontSize: 12, fontFamily: 'monospace', letterSpacing: 1.5, fontWeight: 700, flex: 1 }}>
+                  {seatCode}
+                </Typography>
+                <QrCodeIcon sx={{ fontSize: 16 }} />
+              </Box>
+            )}
           </Box>
         </>
       )}
@@ -1583,5 +1614,29 @@ export function PlayerPanel({
       </Box>
 
     </Box>
+
+    {seatCode && (
+      <Dialog open={qrOpen} onClose={() => setQrOpen(false)} maxWidth="xs">
+        <DialogTitle sx={{ pb: 1 }}>{player.playerName}</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, pb: 3 }}>
+          <Box sx={{ p: 1.5, bgcolor: '#fff', borderRadius: 1 }}>
+            <QRCodeSVG
+              value={`${typeof window !== 'undefined' ? window.location.origin : ''}${ASSET_BASE}/game-manager/remote/?code=${seatCode}`}
+              size={200}
+            />
+          </Box>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: 18, letterSpacing: 3, fontWeight: 700 }}>
+            {seatCode}
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'text.secondary', textAlign: 'center' }}>
+            Scan to join as {player.playerName}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setQrOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+    )}
+    </>
   );
 }

@@ -445,6 +445,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
                 startingLife={startingLife}
                 textSizeMode={textSizeMode}
                 highlightMode={highlightMode}
+                seatCode={state.sessionSeats?.[player.position] ?? undefined}
                 onLifeChange={handleLifeChange}
                 onPoisonChange={handlePoisonChange}
                 onCommanderTaxChange={handleCommanderTaxChange}
@@ -490,6 +491,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
           onCycleTextSizeMode={() => setTextSizeMode((m) => ((m + 1) % 3) as 0 | 1 | 2)}
           highlightMode={highlightMode}
           onToggleHighlightMode={() => setHighlightMode(m => !m)}
+          sessionSeats={state.sessionSeats}
         />
       </Box>
 
