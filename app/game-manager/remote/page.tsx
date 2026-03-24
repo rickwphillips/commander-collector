@@ -27,6 +27,20 @@ function RemotePageInner() {
 
   const lastWriteTimeRef = useRef<number>(0);
   const lastSeenUpdatedAtRef = useRef<string | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const tickTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Tick elapsed seconds every second, reset on turn change
+  useEffect(() => {
+    if (tickTimer.current) clearInterval(tickTimer.current);
+    if (phase !== 'connected' || !state) { setElapsedSeconds(0); return; }
+    setElapsedSeconds(Math.round((Date.now() - state.turnStartTime) / 1000));
+    tickTimer.current = setInterval(() => {
+      setElapsedSeconds(Math.round((Date.now() - (state?.turnStartTime ?? Date.now())) / 1000));
+    }, 1000);
+    return () => { if (tickTimer.current) clearInterval(tickTimer.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state?.currentPlayerIdx, phase]);
 
   // ── Auto-connect from URL param or localStorage ──────────────────────────
   useEffect(() => {
@@ -470,9 +484,9 @@ function RemotePageInner() {
         startingLife={state.startingLife}
         turnTimerSeconds={state.turnTimerSeconds}
         isCurrentPlayer={isMyTurn}
-        elapsedSeconds={0}
+        elapsedSeconds={isMyTurn ? elapsedSeconds : 0}
         textSizeMode={0}
-        highlightMode={false}
+        highlightMode={true}
       />
       {/* Pass Turn button — only shown when it's this player's turn */}
       {isMyTurn && (
