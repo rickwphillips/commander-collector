@@ -39,7 +39,7 @@ const changeTypeConfig: Record<
 const releases: Release[] = [
   {
     version: '1.21.0',
-    date: '2026-03-25T00:00:00',
+    date: '2026-03-25',
     title: 'Remote sync fixes, life panel redesign',
     changes: [
       { type: 'fixed', text: 'Remote player panel now always uses the server as source of truth — eliminates the life total reverting after changes' },
@@ -52,7 +52,7 @@ const releases: Release[] = [
   },
   {
     version: '1.20.0',
-    date: '2026-03-25T00:00:00',
+    date: '2026-03-25',
     title: 'Kill attribution panels, compact menus, dice UX',
     changes: [
       { type: 'improved', text: 'Kill attribution prompt ("Who brought X to 0?" / "Who poisoned X?") now appears as an overlay on the affected player\'s own panel instead of a modal dialog, keeping it spatially connected to the action' },
@@ -67,7 +67,7 @@ const releases: Release[] = [
   },
   {
     version: '1.19.0',
-    date: '2026-03-25T00:00:00',
+    date: '2026-03-25',
     title: 'Delta event queue for live sync',
     changes: [
       { type: 'improved', text: 'Remote players now send lightweight actions (life change, pass turn, etc.) instead of full game state — eliminating the race condition where a remote write could revert the host\'s turn advance' },
@@ -84,7 +84,7 @@ const releases: Release[] = [
   },
   {
     version: '1.18.0',
-    date: '2026-03-25T00:00:00',
+    date: '2026-03-25',
     title: 'Live game session stability',
     changes: [
       { type: 'improved', text: 'Remote player actions (life, poison, commander damage, Pass Turn) now reliably reflect the host\'s current game state — stale data from delayed polling can no longer overwrite the host\'s turn or player changes' },
@@ -95,7 +95,7 @@ const releases: Release[] = [
   },
   {
     version: '1.17.4',
-    date: '2026-03-25T00:00:00',
+    date: '2026-03-25',
     title: 'Fix stale game state persisting across sessions',
     changes: [
       { type: 'fixed', text: 'When resuming a game after a page reload, the host now verifies the session is still active before writing — preventing stale saved state from overwriting a live session that has since moved on' },
@@ -104,7 +104,7 @@ const releases: Release[] = [
   },
   {
     version: '1.17.3',
-    date: '2026-03-25T00:00:00',
+    date: '2026-03-25',
     title: 'Fix remote panel overwriting host state on any action',
     changes: [
       { type: 'fixed', text: 'All remote panel actions (life changes, poison, commander damage, Pass Turn, and more) now fetch the current game state from the database before writing — preventing any remote tap from overwriting the host\'s most recent turn or state changes' },
@@ -112,7 +112,7 @@ const releases: Release[] = [
   },
   {
     version: '1.17.2',
-    date: '2026-03-24T00:00:00',
+    date: '2026-03-24',
     title: 'Fix remote heartbeat overwriting host turn in DB',
     changes: [
       { type: 'fixed', text: 'Remote panel heartbeat now reads the current game state from the database before writing the check-in timestamp, preventing stale local state from overwriting the host\'s most recent turn change' },
@@ -120,7 +120,7 @@ const releases: Release[] = [
   },
   {
     version: '1.17.1',
-    date: '2026-03-24T00:00:00',
+    date: '2026-03-24',
     title: 'Remove localStorage from remote panel',
     changes: [
       { type: 'fixed', text: 'Remote panel no longer caches the game code in localStorage — the database and URL code param are now the sole source of truth, preventing stale sessions from auto-loading after a game has ended' },
