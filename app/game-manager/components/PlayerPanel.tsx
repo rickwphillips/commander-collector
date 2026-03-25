@@ -1443,19 +1443,7 @@ export function PlayerPanel({
         </Box>
 
         {/* Life total + controls */}
-        <Box sx={{ width: '33%', flexShrink: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', px: 0.5 }}>
-          <Tooltip open={lpKey === 'life-dec'} title="-5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-            <IconButton
-              onClick={guardClick(() => onLifeChange(playerIdx, -1))}
-              onPointerDown={() => startLongPress('life-dec', () => onLifeChange(playerIdx, -5))}
-              onPointerUp={cancelLongPress}
-              onPointerLeave={cancelLongPress}
-              onPointerCancel={cancelLongPress}
-              sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, transition: 'padding 0.2s ease' }}
-            >
-              <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 60 : ts === 1 ? 48 : 36 }}>−</Typography>
-            </IconButton>
-          </Tooltip>
+        <Box sx={{ width: '33%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5 }}>
           <Box sx={{ position: 'relative', lineHeight: 1, overflow: 'visible' }}>
             {showCrown && (
               <CrownIcon sx={{
@@ -1579,18 +1567,32 @@ export function PlayerPanel({
               )}
             </Box>
           </Box>
-          <Tooltip open={lpKey === 'life-inc'} title="+5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-            <IconButton
-              onClick={guardClick(() => onLifeChange(playerIdx, 1))}
-              onPointerDown={() => startLongPress('life-inc', () => onLifeChange(playerIdx, 5))}
-              onPointerUp={cancelLongPress}
-              onPointerLeave={cancelLongPress}
-              onPointerCancel={cancelLongPress}
-              sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, transition: 'padding 0.2s ease' }}
-            >
-              <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 60 : ts === 1 ? 48 : 36 }}>+</Typography>
-            </IconButton>
-          </Tooltip>
+          <Stack direction="row" alignItems="center" spacing={ts === 2 ? 1 : 0.5} sx={{ mt: 0, transition: 'gap 0.2s ease' }}>
+            <Tooltip open={lpKey === 'life-dec'} title="-5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
+              <IconButton
+                onClick={guardClick(() => onLifeChange(playerIdx, -1))}
+                onPointerDown={() => startLongPress('life-dec', () => onLifeChange(playerIdx, -5))}
+                onPointerUp={cancelLongPress}
+                onPointerLeave={cancelLongPress}
+                onPointerCancel={cancelLongPress}
+                sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, transition: 'padding 0.2s ease' }}
+              >
+                <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 60 : ts === 1 ? 48 : 36 }}>−</Typography>
+              </IconButton>
+            </Tooltip>
+            <Tooltip open={lpKey === 'life-inc'} title="+5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
+              <IconButton
+                onClick={guardClick(() => onLifeChange(playerIdx, 1))}
+                onPointerDown={() => startLongPress('life-inc', () => onLifeChange(playerIdx, 5))}
+                onPointerUp={cancelLongPress}
+                onPointerLeave={cancelLongPress}
+                onPointerCancel={cancelLongPress}
+                sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, transition: 'padding 0.2s ease' }}
+              >
+                <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 60 : ts === 1 ? 48 : 36 }}>+</Typography>
+              </IconButton>
+            </Tooltip>
+          </Stack>
         </Box>
 
         {/* Counters — right column */}
