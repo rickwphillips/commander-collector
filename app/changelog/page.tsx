@@ -38,6 +38,16 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.23.1',
+    date: '2026-03-25',
+    title: 'Auto-save countdown on game end',
+    changes: [
+      { type: 'improved', text: 'When the last player is eliminated, a banner counts down 15 seconds then automatically saves the game and navigates to the results screen' },
+      { type: 'improved', text: 'Cancel button during the countdown returns to the live game, allowing corrections before saving' },
+      { type: 'fixed', text: 'If a correction during the countdown restores more than one active player, the countdown cancels automatically' },
+    ],
+  },
+  {
     version: '1.23.0',
     date: '2026-03-25',
     title: 'Commander damage threat visuals & auto-elimination',
