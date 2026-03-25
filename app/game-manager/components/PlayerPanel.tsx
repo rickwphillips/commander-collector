@@ -295,6 +295,7 @@ export function PlayerPanel({
 
   const [damageFlash, setDamageFlash] = useState(0);
   const [lastCmdDmgSourceIdx, setLastCmdDmgSourceIdx] = useState<number | null>(null);
+  const [openSnapshotKey, setOpenSnapshotKey] = useState<string | null>(null);
   const prevLife = useRef(player.life);
   useEffect(() => {
     if (player.life < prevLife.current) {
@@ -1611,8 +1612,8 @@ export function PlayerPanel({
             const sourceEliminated = source.isEliminated;
             const rows = [
               <Box key={`${sourceIdx}-name`} sx={{ overflow: 'hidden', pt: 0 }}>
-                <Tooltip title={renderSourceSnapshot(source, sourceIdx)} placement={snapshotPlacement} componentsProps={{ tooltip: { sx: { bgcolor: 'background.paper', border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, p: 0, maxWidth: 220, boxShadow: 8, color: 'text.primary' } } }} enterDelay={250} disableFocusListener disableTouchListener>
-                <Stack direction="row" alignItems="center" spacing={0.5} sx={{ overflow: 'hidden', cursor: 'default' }}>
+                <Tooltip title={renderSourceSnapshot(source, sourceIdx)} placement={snapshotPlacement} componentsProps={{ tooltip: { sx: { bgcolor: 'background.paper', border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, p: 0, maxWidth: 220, boxShadow: 8, color: 'text.primary' } } }} open={openSnapshotKey === `${sourceIdx}-snap`} onClose={() => setOpenSnapshotKey(null)} disableHoverListener disableFocusListener disableTouchListener>
+                <Stack direction="row" alignItems="center" spacing={0.5} sx={{ overflow: 'hidden', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setOpenSnapshotKey(k => k === `${sourceIdx}-snap` ? null : `${sourceIdx}-snap`); }}>
                   {activePlayerIdx === sourceIdx && (
                     <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0, boxShadow: '0 0 4px 1px rgba(var(--mui-palette-primary-mainChannel) / 0.7)' }} />
                   )}
@@ -1655,8 +1656,8 @@ export function PlayerPanel({
             ];
             if (source.partner) {
               rows.push(
-                <Tooltip key={`${sourceIdx}-pname`} title={renderSourceSnapshot(source, sourceIdx)} placement={snapshotPlacement} componentsProps={{ tooltip: { sx: { bgcolor: 'background.paper', border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, p: 0, maxWidth: 220, boxShadow: 8, color: 'text.primary' } } }} enterDelay={250} disableFocusListener disableTouchListener>
-                <Typography sx={{ fontSize: ts === 2 ? 19 : ts === 1 ? 16 : 14, color: sourceEliminated ? 'text.disabled' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', cursor: 'default' }}>
+                <Tooltip key={`${sourceIdx}-pname`} title={renderSourceSnapshot(source, sourceIdx)} placement={snapshotPlacement} componentsProps={{ tooltip: { sx: { bgcolor: 'background.paper', border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, p: 0, maxWidth: 220, boxShadow: 8, color: 'text.primary' } } }} open={openSnapshotKey === `${sourceIdx}-psnap`} onClose={() => setOpenSnapshotKey(null)} disableHoverListener disableFocusListener disableTouchListener>
+                <Typography onClick={(e) => { e.stopPropagation(); setOpenSnapshotKey(k => k === `${sourceIdx}-psnap` ? null : `${sourceIdx}-psnap`); }} sx={{ fontSize: ts === 2 ? 19 : ts === 1 ? 16 : 14, color: sourceEliminated ? 'text.disabled' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', cursor: 'pointer' }}>
                   {source.partner.name}
                 </Typography>
                 </Tooltip>,

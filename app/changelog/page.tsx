@@ -38,6 +38,17 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.23.3',
+    date: '2026-03-25',
+    title: 'CMD damage snapshot tooltip refinements',
+    changes: [
+      { type: 'improved', text: 'CMD damage source name tooltip is now click-only — tap or click the name to open, tap/click again or tap outside to close' },
+      { type: 'improved', text: 'City\'s Blessing status now appears in the snapshot tooltip alongside Monarch and Initiative' },
+      { type: 'improved', text: 'All counters (poison, energy, XP, commander tax) are always visible in the snapshot, dimmed when zero rather than hidden' },
+      { type: 'fixed', text: 'Snapshot tooltip only triggers on the player/commander name text, not the stats row below it' },
+    ],
+  },
+  {
     version: '1.23.2',
     date: '2026-03-25',
     title: 'Dice panel & CMD damage tooltip improvements',
