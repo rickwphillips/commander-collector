@@ -609,7 +609,7 @@ export function PlayerPanel({
         transition: 'box-shadow 0.1s ease, border 0.1s ease, filter 1s ease',
         '& .MuiTypography-root': { textShadow: energyGlow, transition: 'font-size 0.2s ease, margin 0.2s ease, text-shadow 0.4s ease' },
         filter: poisonProgress > 0 ? `saturate(${1 + poisonProgress * 0.5})` : 'none',
-        borderRadius: 2,
+        borderRadius: 2, '& .MuiTouchRipple-root': { borderRadius: 2 },
         overflow: 'hidden',
         position: 'relative',
         opacity: player.isEliminated ? 0.5 : 1,
@@ -1258,7 +1258,7 @@ export function PlayerPanel({
               width: '90%', maxWidth: 220,
               bgcolor: (theme) => theme.palette.mode === 'dark' ? '#1E1510' : '#FFFAF5',
               border: (theme) => `1px solid ${theme.palette.divider}`,
-              borderRadius: 2,
+              borderRadius: 2, '& .MuiTouchRipple-root': { borderRadius: 2 },
               overflow: 'hidden',
             }}
             onClick={(e) => e.stopPropagation()}
@@ -1575,7 +1575,7 @@ export function PlayerPanel({
                 onPointerUp={cancelLongPress}
                 onPointerLeave={cancelLongPress}
                 onPointerCancel={cancelLongPress}
-                sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, borderRadius: 2, transition: 'padding 0.2s ease' }}
+                sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, borderRadius: 2, '& .MuiTouchRipple-root': { borderRadius: 2 }, transition: 'padding 0.2s ease' }}
               >
                 <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 60 : ts === 1 ? 48 : 36 }}>−</Typography>
               </IconButton>
@@ -1587,7 +1587,7 @@ export function PlayerPanel({
                 onPointerUp={cancelLongPress}
                 onPointerLeave={cancelLongPress}
                 onPointerCancel={cancelLongPress}
-                sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, borderRadius: 2, transition: 'padding 0.2s ease' }}
+                sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, borderRadius: 2, '& .MuiTouchRipple-root': { borderRadius: 2 }, transition: 'padding 0.2s ease' }}
               >
                 <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 60 : ts === 1 ? 48 : 36 }}>+</Typography>
               </IconButton>
