@@ -47,8 +47,11 @@ const releases: Release[] = [
       { type: 'improved', text: 'Multiple remote players can now make changes simultaneously without one stomping the other\'s update' },
       { type: 'improved', text: 'Host polls for remote events every 1 second (down from 3 seconds) for noticeably faster sync' },
       { type: 'added', text: 'Remote panel connection check-in now uses the event queue, keeping the connected indicator alive without full state writes' },
-      { type: 'improved', text: 'Life total on the remote panel is larger and displayed between the − and + buttons for easier one-handed play' },
+      { type: 'improved', text: 'Life total on the remote panel is larger for easier reading across the table' },
       { type: 'added', text: 'Dark mode toggle added to the bottom of the remote panel' },
+      { type: 'improved', text: 'Life +/− buttons styled as rounded squares with a matching ripple shape' },
+      { type: 'improved', text: 'Energy counter life total now shows an emanating glow ripple, a constant darker-blue spread shadow, and an electrical sizzle jitter that scales with energy count' },
+      { type: 'added', text: 'Experience counter badge now animates on gain: diagonal shimmer sweep, level-up scale flash, floating ember particles, and a slow breathing rune glow' },
     ],
   },
   {

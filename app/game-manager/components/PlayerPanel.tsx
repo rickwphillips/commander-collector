@@ -405,6 +405,34 @@ export function PlayerPanel({
     0%   { transform: translate(-50%,-50%) rotate(45deg) scale(0.4); opacity: 0.9; }
     100% { transform: translate(-50%,-50%) rotate(45deg) scale(4);   opacity: 0; }
   `, []);
+  const xpLevelUpAnim = useMemo(() => keyframes`
+    0%   { transform: scale(1); }
+    25%  { transform: scale(1.3); }
+    60%  { transform: scale(0.93); }
+    100% { transform: scale(1); }
+  `, []);
+  const xpShimmerSweepAnim = useMemo(() => player.experience > 0 ? keyframes`
+    0%   { transform: translateX(-120%); opacity: 0; }
+    6%   { transform: translateX(-120%); opacity: 0; }
+    7%   { opacity: 0.8; }
+    17%  { transform: translateX(180%); opacity: 0.8; }
+    21%  { transform: translateX(300%); opacity: 0; }
+    22%  { transform: translateX(-120%); opacity: 0; }
+    57%  { transform: translateX(-120%); opacity: 0; }
+    58%  { opacity: 0.5; }
+    65%  { transform: translateX(160%); opacity: 0.5; }
+    69%  { transform: translateX(300%); opacity: 0; }
+    70%  { transform: translateX(-120%); opacity: 0; }
+    100% { transform: translateX(-120%); opacity: 0; }
+  ` : null, [player.experience]);
+  const xpEmberAnim = useMemo(() => player.experience > 0 ? keyframes`
+    0%   { transform: translateY(0) scale(1); opacity: 0.9; }
+    100% { transform: translateY(-26px) scale(0.2); opacity: 0; }
+  ` : null, [player.experience]);
+  const xpRuneGlowAnim = useMemo(() => player.experience > 0 ? keyframes`
+    0%, 100% { filter: drop-shadow(0 0 2px rgba(218,165,32,0.35)); }
+    50%       { filter: drop-shadow(0 0 9px rgba(255,215,0,0.85)); }
+  ` : null, [player.experience]);
 
   const energyStaticShadow = player.energy > 5
     ? `0 0 18px rgba(30,100,210,0.55), 0 0 36px rgba(20,70,180,0.3)`
@@ -1138,8 +1166,26 @@ export function PlayerPanel({
             </Tooltip>
           )}
           {player.experience > 0 && (
-            <Box sx={{ position: 'relative', flexShrink: 0, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {/* Diamond shape */}
+            <Box sx={{
+              position: 'relative', flexShrink: 0, width: 34, height: 34,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              overflow: 'visible',
+              ...(xpRuneGlowAnim && { animation: `${xpRuneGlowAnim} 2.5s ease-in-out infinite${xpFlashing ? `, ${xpLevelUpAnim} 0.7s ease-out` : ''}` }),
+            }}>
+              {/* Ember particles drifting upward */}
+              {xpEmberAnim && [0, 1, 2, 3].map((i) => (
+                <Box key={i} sx={{
+                  position: 'absolute',
+                  width: i % 2 === 0 ? 3 : 2, height: i % 2 === 0 ? 3 : 2,
+                  borderRadius: '50%',
+                  bgcolor: i % 2 === 0 ? '#FFD700' : '#FFA040',
+                  bottom: '55%',
+                  left: `${15 + i * 20}%`,
+                  pointerEvents: 'none',
+                  animation: `${xpEmberAnim} ${1.1 + i * 0.35}s ease-out ${i * 0.38}s infinite`,
+                }} />
+              ))}
+              {/* Diamond shape with shimmer sweep inside */}
               <Box sx={{
                 position: 'absolute',
                 width: 26, height: 26,
@@ -1147,8 +1193,19 @@ export function PlayerPanel({
                 background: 'linear-gradient(135deg, #FFD700, #8B6914)',
                 border: '1.5px solid rgba(255,215,0,0.85)',
                 boxShadow: '0 2px 8px rgba(218,165,32,0.55)',
+                overflow: 'hidden',
                 ...(xpFlashing && { animation: `${xpFlashAnim} 0.7s ease-out` }),
-              }} />
+              }}>
+                {xpShimmerSweepAnim && (
+                  <Box sx={{
+                    position: 'absolute', top: '-20%', left: 0,
+                    width: '28%', height: '140%',
+                    background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.72), transparent)',
+                    pointerEvents: 'none',
+                    animation: `${xpShimmerSweepAnim} 7.5s linear infinite`,
+                  }} />
+                )}
+              </Box>
               {/* Ripple — also diamond */}
               <Box key={xpRippleKey} sx={{
                 position: 'absolute', top: '50%', left: '50%',
