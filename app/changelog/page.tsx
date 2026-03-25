@@ -38,6 +38,15 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.17.4',
+    date: '2026-03-25T00:00:00',
+    title: 'Fix stale game state persisting across sessions',
+    changes: [
+      { type: 'fixed', text: 'When resuming a game after a page reload, the host now verifies the session is still active before writing — preventing stale saved state from overwriting a live session that has since moved on' },
+      { type: 'fixed', text: 'Starting a new game now waits for the previous session to be fully deleted before creating the new one, preventing the old session from lingering in the database' },
+    ],
+  },
+  {
     version: '1.17.3',
     date: '2026-03-25T00:00:00',
     title: 'Fix remote panel overwriting host state on any action',

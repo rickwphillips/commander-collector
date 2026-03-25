@@ -101,6 +101,14 @@ export default function GameManagerPage() {
   const lastWriteTimeRef = useRef<number>(0);
   const lastSeenUpdatedAtRef = useRef<string | null>(null);
 
+  // On reload from localStorage we must verify the saved sessionCode is still active before
+  // writing — otherwise we replay stale local state into a live session that may have moved on.
+  // Starts false only when a playing session was resumed; becomes true after the GET verifies it.
+  const sessionVerifiedRef = useRef<boolean>(
+    typeof window === 'undefined' ||
+    (() => { const s = loadSavedState(); return !s?.sessionCode || s.phase !== 'playing'; })(),
+  );
+
   // Persist to localStorage
   useEffect(() => {
     if (state.phase !== 'setup') {
@@ -110,12 +118,42 @@ export default function GameManagerPage() {
     }
   }, [state]);
 
-  // Fire-and-forget DB write on every state change while playing
+  // Fire-and-forget DB write on every state change while playing.
+  // Gated on sessionVerifiedRef so a reload never replays stale localStorage state into DB
+  // before we've confirmed the session is still active.
   useEffect(() => {
     if (state.phase !== 'playing' || !state.sessionCode) return;
+    if (!sessionVerifiedRef.current) return;
     lastWriteTimeRef.current = Date.now();
     api.updateLiveGame(state.sessionCode, state).catch(() => {/* silent */});
   }, [state]);
+
+  // On mount: if we resumed a playing session from localStorage, verify it's still active.
+  // If yes  → sync to current DB state (don't replay potentially stale localStorage).
+  // If no   → clear the sessionCode so we don't write to a dead session.
+  useEffect(() => {
+    if (sessionVerifiedRef.current) return;
+    const saved = loadSavedState();
+    if (!saved?.sessionCode) { sessionVerifiedRef.current = true; return; }
+    api.getLiveGame(saved.sessionCode)
+      .then((res) => {
+        sessionVerifiedRef.current = true;
+        if (res.is_active) {
+          setState((prev) => ({
+            ...res.state,
+            sessionCode: prev.sessionCode,
+            sessionSeats: prev.sessionSeats,
+          }));
+        } else {
+          setState((prev) => ({ ...prev, sessionCode: null, sessionSeats: null }));
+        }
+      })
+      .catch(() => {
+        sessionVerifiedRef.current = true;
+        setState((prev) => ({ ...prev, sessionCode: null, sessionSeats: null }));
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Poll for incoming remote changes
   useEffect(() => {
@@ -146,7 +184,13 @@ export default function GameManagerPage() {
   }, [state.phase, state.sessionCode]);
 
   const handleStart = async (playerSetups: PlayerSetup[], startingLife: number, turnTimerSeconds: number) => {
-    if (state.sessionCode) api.deleteLiveGame(state.sessionCode).catch(() => {});
+    // Mark verified immediately — this is a fresh game, no localStorage session to worry about
+    sessionVerifiedRef.current = true;
+    // Await the delete so the old session is gone before the new one is created.
+    // If it fails we proceed anyway — the new game gets a new code so it's isolated.
+    if (state.sessionCode) {
+      try { await api.deleteLiveGame(state.sessionCode); } catch {/* ok to proceed */}
+    }
     const newState = { ...buildInitialState(playerSetups, startingLife), turnTimerSeconds };
     setState(newState);
     // Create live session — fire-and-forget, failures don't block the game
