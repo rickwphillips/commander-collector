@@ -52,6 +52,16 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [winner]);
 
+  // Detect winner from any source (direct handlers OR remote events applied via setState)
+  useEffect(() => {
+    if (winner) return;
+    if (!firstPlayerSet) return;
+    const remaining = players.filter((p) => !p.isEliminated);
+    if (remaining.length === 1 && players.some((p) => p.isEliminated)) {
+      setWinner(remaining[0]);
+    }
+  }, [players, winner, firstPlayerSet]);
+
   // Cancel countdown if a correction restores more than one active player
   useEffect(() => {
     if (!winner) return;
@@ -543,9 +553,6 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
           <Typography sx={{ fontWeight: 900, fontSize: 18, flex: 1 }}>
             🏆 {winner.playerName} wins — saving in {winnerCountdown}s
           </Typography>
-          <Button size="small" variant="outlined" onClick={() => { setWinner(null); setWinnerCountdown(null); }}>
-            Cancel
-          </Button>
           <Button size="small" variant="contained" onClick={() => {
             const s = winnerStateRef.current ?? state;
             setWinner(null); setWinnerCountdown(null); onSaveGame(s);

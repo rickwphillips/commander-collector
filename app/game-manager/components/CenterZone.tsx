@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Box,
   Stack,
@@ -116,6 +116,9 @@ export function CenterZone({
   const [history, setHistory] = useState<RollEntry[]>([]);
   const [resultKey, setResultKey] = useState(0);
   const [diceCount, setDiceCount] = useState(1);
+  type RollingEntry = { label: string; color: string; finalRolls: (number|string)[]; revealed: boolean[]; total: number|null; sides: number|null };
+  const [rollingEntry, setRollingEntry] = useState<RollingEntry | null>(null);
+  const animTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [confirmRestart, setConfirmRestart] = useState(false);
   const [diceOpen, setDiceOpen] = useState(false);
@@ -129,16 +132,40 @@ export function CenterZone({
   const lpFired = useRef(false);
 
   const addRoll = (label: string, sides: number | null) => {
+    animTimers.current.forEach(clearTimeout);
+    animTimers.current = [];
+
+    let finalRolls: (number | string)[];
+    let total: number | null;
+    let color: string;
     if (sides === null) {
-      const rolls = Array.from({ length: diceCount }, () => Math.random() < 0.5 ? 'Heads' : 'Tails');
-      setHistory((prev) => [...prev, { label: diceCount === 1 ? 'Coin Flip' : `${diceCount}× Coin`, rolls, total: null, color: 'primary.main' }]);
+      finalRolls = Array.from({ length: diceCount }, () => Math.random() < 0.5 ? 'Heads' : 'Tails');
+      total = null;
+      color = 'primary.main';
     } else {
-      const rolls = Array.from({ length: diceCount }, () => rollDie(sides));
-      const total = rolls.reduce((a, b) => (a as number) + (b as number), 0) as number;
-      const color = sides === 20 && diceCount === 1 ? (rolls[0] === 20 ? '#DAA520' : rolls[0] === 1 ? 'error.main' : 'primary.main') : 'primary.main';
-      setHistory((prev) => [...prev, { label: `d${sides}`, rolls, total: diceCount > 1 ? total : null, color }]);
+      finalRolls = Array.from({ length: diceCount }, () => rollDie(sides));
+      const sum = finalRolls.reduce((a, b) => (a as number) + (b as number), 0) as number;
+      total = diceCount > 1 ? sum : null;
+      color = sides === 20 && diceCount === 1 ? (finalRolls[0] === 20 ? '#DAA520' : finalRolls[0] === 1 ? 'error.main' : 'primary.main') : 'primary.main';
     }
-    setResultKey((k) => k + 1);
+    const histLabel = sides === null ? (diceCount === 1 ? 'Coin Flip' : `${diceCount}× Coin`) : `d${sides}`;
+
+    setRollingEntry({ label: histLabel, color, finalRolls, revealed: finalRolls.map(() => false), total, sides });
+
+    const revealDelay = 600;
+    const stagger = 230;
+    finalRolls.forEach((_, i) => {
+      const t = setTimeout(() => {
+        setRollingEntry(prev => prev ? { ...prev, revealed: prev.revealed.map((v, j) => j === i ? true : v) } : null);
+      }, revealDelay + i * stagger);
+      animTimers.current.push(t);
+    });
+    const doneT = setTimeout(() => {
+      setHistory(prev => [...prev, { label: histLabel, rolls: finalRolls, total, color }]);
+      setRollingEntry(null);
+      setResultKey(k => k + 1);
+    }, revealDelay + (finalRolls.length - 1) * stagger + 350);
+    animTimers.current.push(doneT);
   };
 
   const lastEntry = history.length > 0 ? history[history.length - 1] : null;
@@ -480,7 +507,60 @@ export function CenterZone({
 
             {/* Latest result */}
             <Box sx={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {lastEntry ? (
+              {rollingEntry ? (() => {
+                const isCoin = rollingEntry.sides === null;
+                const isD6 = rollingEntry.sides === 6;
+                const spinSx = {
+                  display: 'inline-flex',
+                  animation: isCoin ? 'coinFlip 0.18s linear infinite' : 'dieRoll 0.25s linear infinite',
+                  '@keyframes dieRoll': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } },
+                  '@keyframes coinFlip': { '0%': { transform: 'rotateY(0deg)' }, '100%': { transform: 'rotateY(360deg)' } },
+                  perspective: '120px',
+                };
+                const popSx = {
+                  animation: 'rollPop 0.3s cubic-bezier(0.34,1.56,0.64,1)',
+                  '@keyframes rollPop': {
+                    '0%': { opacity: 0, transform: 'scale(0.3)' },
+                    '100%': { opacity: 1, transform: 'scale(1)' },
+                  },
+                };
+                const RollingIcon = ({ large }: { large?: boolean }) => isCoin
+                  ? <TollIcon sx={{ fontSize: large ? 52 : 32, color: 'text.disabled' }} />
+                  : isD6
+                  ? <CasinoIcon sx={{ fontSize: large ? 52 : 32, color: 'text.disabled' }} />
+                  : <Box sx={{ display: 'inline-flex', opacity: 0.5 }}><D20Icon size={large ? 52 : 32} /></Box>;
+                if (rollingEntry.finalRolls.length === 1) {
+                  return rollingEntry.revealed[0] ? (
+                    <Typography key="r0" sx={{ fontWeight: 900, fontSize: 52, lineHeight: 1, color: rollingEntry.color, ...popSx }}>
+                      {rollingEntry.finalRolls[0]}
+                    </Typography>
+                  ) : (
+                    <Box sx={spinSx}><RollingIcon large /></Box>
+                  );
+                }
+                return (
+                  <Stack direction="row" flexWrap="wrap" justifyContent="center" alignItems="center" gap={0.5}>
+                    {rollingEntry.finalRolls.map((r, i) => (
+                      <React.Fragment key={i}>
+                        {i > 0 && (isCoin
+                          ? <TollIcon sx={{ fontSize: 10, color: 'text.disabled', alignSelf: 'flex-end', mb: '10px' }} />
+                          : isD6
+                          ? <CasinoIcon sx={{ fontSize: 10, color: 'text.disabled', alignSelf: 'flex-end', mb: '10px' }} />
+                          : <Box sx={{ alignSelf: 'flex-end', mb: '10px', display: 'inline-flex' }}><D20Icon size={10} /></Box>
+                        )}
+                        <Box sx={{ textAlign: 'center', height: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
+                          <Typography sx={{ fontSize: 9, color: 'text.disabled', lineHeight: 1, mb: 0.25 }}>{i + 1}</Typography>
+                          {rollingEntry.revealed[i] ? (
+                            <Typography key={`rv${i}`} sx={{ fontWeight: 900, fontSize: 32, lineHeight: 1, color: rollingEntry.color, ...popSx }}>{r}</Typography>
+                          ) : (
+                            <Box sx={{ ...spinSx, fontSize: 32, lineHeight: 1 }}><RollingIcon /></Box>
+                          )}
+                        </Box>
+                      </React.Fragment>
+                    ))}
+                  </Stack>
+                );
+              })() : lastEntry ? (
                 <Box key={resultKey} sx={{
                   width: '100%', textAlign: 'center',
                   animation: 'diceResultPop 0.35s cubic-bezier(0.34,1.56,0.64,1)',
@@ -490,16 +570,25 @@ export function CenterZone({
                   },
                 }}>
                   {lastEntry.rolls.length === 1 ? (
-                    <Typography sx={{ fontWeight: 900, fontSize: 40, lineHeight: 1, color: lastEntry.color }}>
+                    <Typography sx={{ fontWeight: 900, fontSize: 52, lineHeight: 1, color: lastEntry.color }}>
                       {lastEntry.rolls[0]}
                     </Typography>
                   ) : (
-                    <Stack direction="row" flexWrap="wrap" justifyContent="center" gap={0.5}>
+                    <Stack direction="row" flexWrap="wrap" justifyContent="center" alignItems="center" gap={0.5}>
                       {lastEntry.rolls.map((r, i) => (
-                        <Box key={i} sx={{ textAlign: 'center' }}>
-                          <Typography sx={{ fontSize: 9, color: 'text.disabled' }}>{i + 1}</Typography>
-                          <Typography sx={{ fontWeight: 900, fontSize: 26, lineHeight: 1, color: lastEntry.color }}>{r}</Typography>
-                        </Box>
+                        <React.Fragment key={i}>
+                          {i > 0 && (
+                            lastEntry.label === 'd6'
+                              ? <CasinoIcon sx={{ fontSize: 10, color: 'text.disabled', flexShrink: 0, alignSelf: 'flex-end', mb: '10px' }} />
+                              : lastEntry.label.startsWith('d')
+                              ? <Box sx={{ alignSelf: 'flex-end', mb: '10px', display: 'inline-flex' }}><D20Icon size={10} /></Box>
+                              : <TollIcon sx={{ fontSize: 10, color: 'text.disabled', flexShrink: 0, alignSelf: 'flex-end', mb: '10px' }} />
+                          )}
+                          <Box sx={{ textAlign: 'center', height: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
+                            <Typography sx={{ fontSize: 9, color: 'text.disabled', lineHeight: 1, mb: 0.25 }}>{i + 1}</Typography>
+                            <Typography sx={{ fontWeight: 900, fontSize: 32, lineHeight: 1, color: lastEntry.color }}>{r}</Typography>
+                          </Box>
+                        </React.Fragment>
                       ))}
                     </Stack>
                   )}
@@ -510,23 +599,16 @@ export function CenterZone({
             </Box>
 
             {/* Buttons */}
-            <Stack spacing={0.75} sx={{ width: '100%' }}>
-              <Stack direction="row" spacing={1}>
-                <Button variant="outlined" fullWidth onClick={() => addRoll('d6', 6)} startIcon={lastRolledType === 'd6' ? null : <CasinoIcon sx={{ fontSize: 14 }} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'd6' ? 900 : 400, py: 0.5, ...(lastRolledType === 'd6' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'd6' && lastRolledDisplay ? `total ${lastRolledDisplay}` : 'd6'}</Button>
-                <Button variant="outlined" fullWidth onClick={() => addRoll('d20', 20)} startIcon={lastRolledType === 'd20' ? null : <D20Icon size={14} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'd20' ? 900 : 400, py: 0.5, ...(lastRolledType === 'd20' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'd20' && lastRolledDisplay ? `total ${lastRolledDisplay}` : 'd20'}</Button>
-                <Button variant="outlined" fullWidth onClick={() => addRoll('coin', null)} startIcon={lastRolledType === 'coin' ? null : <TollIcon sx={{ fontSize: 14 }} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'coin' ? 900 : 400, py: 0.5, ...(lastRolledType === 'coin' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'coin' && lastRolledDisplay ? lastRolledDisplay : 'Flip'}</Button>
-              </Stack>
-              <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Stack direction="row" alignItems="center" spacing={0.5}>
-                  <Button variant="outlined" onClick={() => setDiceCount((c) => Math.max(1, c - 1))} sx={{ minWidth: 32, px: 0, fontSize: 16, py: 0.5 }}>−</Button>
-                  <Typography sx={{ fontWeight: 700, fontSize: 14, minWidth: 20, textAlign: 'center' }}>{diceCount}</Typography>
-                  <Button variant="outlined" onClick={() => setDiceCount((c) => Math.min(20, c + 1))} sx={{ minWidth: 32, px: 0, fontSize: 16, py: 0.5 }}>+</Button>
-                  <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>dice</Typography>
-                </Stack>
-                {history.length > 0 && (
-                  <Button variant="text" size="small" onClick={() => setHistory([])} sx={{ fontSize: 10, px: 0.5, color: 'text.disabled' }}>Clear</Button>
-                )}
-              </Stack>
+            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ width: '100%' }}>
+              <Button variant="outlined" onClick={() => setDiceCount((c) => Math.max(1, c - 1))} sx={{ minWidth: 28, px: 0, fontSize: 16, py: 0.5, flexShrink: 0 }}>−</Button>
+              <Typography sx={{ fontWeight: 700, fontSize: 14, minWidth: 18, textAlign: 'center', flexShrink: 0 }}>{diceCount}</Typography>
+              <Button variant="outlined" onClick={() => setDiceCount((c) => Math.min(20, c + 1))} sx={{ minWidth: 28, px: 0, fontSize: 16, py: 0.5, flexShrink: 0 }}>+</Button>
+              <Button variant="outlined" fullWidth onClick={() => addRoll('d6', 6)} startIcon={lastRolledType === 'd6' ? null : <CasinoIcon sx={{ fontSize: 14 }} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'd6' ? 900 : 400, py: 0.5, minWidth: 0, ...(lastRolledType === 'd6' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'd6' && lastRolledDisplay ? `total ${lastRolledDisplay}` : 'd6'}</Button>
+              <Button variant="outlined" fullWidth onClick={() => addRoll('d20', 20)} startIcon={lastRolledType === 'd20' ? null : <D20Icon size={14} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'd20' ? 900 : 400, py: 0.5, minWidth: 0, ...(lastRolledType === 'd20' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'd20' && lastRolledDisplay ? `total ${lastRolledDisplay}` : 'd20'}</Button>
+              <Button variant="outlined" fullWidth onClick={() => addRoll('coin', null)} startIcon={lastRolledType === 'coin' ? null : <TollIcon sx={{ fontSize: 14 }} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'coin' ? 900 : 400, py: 0.5, minWidth: 0, ...(lastRolledType === 'coin' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'coin' && lastRolledDisplay ? lastRolledDisplay : 'Flip'}</Button>
+              {history.length > 0 && (
+                <Button variant="text" size="small" onClick={() => setHistory([])} sx={{ fontSize: 10, px: 0.5, color: 'text.disabled', flexShrink: 0 }}>Clear</Button>
+              )}
             </Stack>
           </Box>
         )}

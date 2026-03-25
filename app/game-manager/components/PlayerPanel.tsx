@@ -251,6 +251,7 @@ export function PlayerPanel({
   const ttRotate = player.position === 'top' ? '180deg' : player.position === 'left' ? '90deg' : player.position === 'right' ? '270deg' : '0deg';
   const ttSlotProps = { tooltip: { sx: { rotate: ttRotate } } };
   const ttHeaderPlacement = player.position === 'top' ? 'top' as const : player.position === 'left' ? 'left' as const : player.position === 'right' ? 'left' as const : 'bottom' as const;
+  const snapshotPlacement = player.position === 'bottom' ? 'top' as const : player.position === 'top' ? 'bottom' as const : player.position === 'left' ? 'right' as const : 'left' as const;
   const ttHeaderSlotProps = {
     tooltip: { sx: { rotate: ttRotate } },
     popper: { modifiers: [{ name: 'flip', enabled: false }] },
@@ -545,6 +546,68 @@ export function PlayerPanel({
   }, [commanderDamage, playerIdx, allPlayers, player.isEliminated, lastCmdDmgSourceIdx]);
 
   const crackAlpha = (from: number) => Math.min(Math.max((lostRatio - from) / 0.15, 0), 1);
+
+  // Mini snapshot card shown on hover of a source player's name in the CMD damage section
+  const renderSourceSnapshot = (src: PlayerState, srcIdx: number) => {
+    const dealtRows = allPlayers.flatMap((tgt, tgtIdx) => {
+      if (tgtIdx === srcIdx) return [];
+      const d = commanderDamage[tgtIdx]?.[srcIdx] ?? [0, 0];
+      if (d[0] === 0 && d[1] === 0) return [];
+      return [{ tgt, d }];
+    });
+    const srcLifeColor = lifeColor(src.life);
+    return (
+      <Box sx={{ width: 190, position: 'relative', overflow: 'hidden' }}>
+        {src.commander.artCropUrl && (
+          <Box sx={{ position: 'absolute', inset: 0, backgroundImage: `url(${src.commander.artCropUrl})`, backgroundSize: 'cover', backgroundPosition: 'center top', opacity: 0.12, pointerEvents: 'none' }} />
+        )}
+        <Stack direction="row" alignItems="flex-start" spacing={0.75} sx={{ position: 'relative', p: 1, pb: 0.5 }}>
+          {src.commander.artCropUrl && (
+            <Box component="img" src={src.commander.artCropUrl} alt="" sx={{ height: 36, width: 'auto', borderRadius: 0.5, flexShrink: 0 }} />
+          )}
+          <Box sx={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <Typography sx={{ fontSize: 12, fontWeight: 800, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{src.playerName}</Typography>
+              {src.isMonarch && <CrownIcon sx={{ fontSize: 12, color: '#DAA520', flexShrink: 0 }} />}
+              {src.hasInitiative && <InitiativeIcon sx={{ fontSize: 12, color: '#4FC3F7', flexShrink: 0 }} />}
+              {src.hasCitysBlessing && <CityIcon active sx={{ fontSize: 12, flexShrink: 0 }} />}
+            </Stack>
+            <Typography sx={{ fontSize: 10, color: 'text.secondary', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.commander.name}</Typography>
+            {src.partner && <Typography sx={{ fontSize: 10, color: 'text.secondary', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.partner.name}</Typography>}
+          </Box>
+        </Stack>
+        <Box sx={{ borderTop: '1px solid', borderColor: 'divider', mx: 1 }} />
+        <Stack direction="row" alignItems="center" sx={{ position: 'relative', px: 1, py: 0.5 }}>
+          <Typography sx={{ fontSize: 40, fontWeight: 900, lineHeight: 1, flex: 1, textAlign: 'center', color: srcLifeColor || 'text.primary', textDecoration: src.isEliminated ? 'line-through' : 'none' }}>{src.life}</Typography>
+          <Stack spacing={0.25} sx={{ minWidth: 60 }}>
+            <Typography sx={{ fontSize: 11, fontWeight: 700, color: src.poison >= 10 ? 'error.main' : src.poison > 0 ? '#66BB6A' : 'text.disabled' }}>☠ {src.poison}</Typography>
+            <Typography sx={{ fontSize: 11, fontWeight: 700, color: src.energy > 0 ? '#4FC8FF' : 'text.disabled' }}>⚡ {src.energy}</Typography>
+            <Stack direction="row" alignItems="center" spacing={0.25}>
+              <Box sx={{ bgcolor: 'background.paper', display: 'inline-flex' }}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: 11, height: 11, objectFit: 'contain', mixBlendMode: 'multiply' }} /></Box>
+              <Typography sx={{ fontSize: 11, fontWeight: 700, color: src.experience > 0 ? '#DAA520' : 'text.disabled' }}>{src.experience}</Typography>
+            </Stack>
+            <Typography sx={{ fontSize: 11, fontWeight: 700, color: src.commanderTax > 0 ? 'text.secondary' : 'text.disabled' }}>Tax +{src.commanderTax * 2}</Typography>
+          </Stack>
+        </Stack>
+        {dealtRows.length > 0 && (
+          <>
+            <Box sx={{ borderTop: '1px solid', borderColor: 'divider', mx: 1 }} />
+            <Box sx={{ position: 'relative', px: 1, pt: 0.5, pb: 0.75 }}>
+              <Typography sx={{ fontSize: 9, fontWeight: 700, color: 'text.disabled', textTransform: 'uppercase', letterSpacing: 0.5, mb: 0.25 }}>CMD Damage Dealt</Typography>
+              {dealtRows.map(({ tgt, d }) => (
+                <Stack key={tgt.playerName} direction="row" alignItems="center" justifyContent="space-between">
+                  <Typography sx={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, color: 'text.secondary' }}>{tgt.playerName}</Typography>
+                  <Typography sx={{ fontSize: 12, fontWeight: 700, color: (d[0] >= 21 || d[1] >= 21) ? 'error.main' : 'text.primary', ml: 1 }}>
+                    {src.partner ? `${d[0]} / ${d[1]}` : d[0]}
+                  </Typography>
+                </Stack>
+              ))}
+            </Box>
+          </>
+        )}
+      </Box>
+    );
+  };
 
   // Fixed per player — does not depend on player.life so the pattern never shifts
   const ox = 38 + (playerIdx % 7);
@@ -1548,7 +1611,8 @@ export function PlayerPanel({
             const sourceEliminated = source.isEliminated;
             const rows = [
               <Box key={`${sourceIdx}-name`} sx={{ overflow: 'hidden', pt: 0 }}>
-                <Stack direction="row" alignItems="center" spacing={0.5} sx={{ overflow: 'hidden' }}>
+                <Tooltip title={renderSourceSnapshot(source, sourceIdx)} placement={snapshotPlacement} componentsProps={{ tooltip: { sx: { bgcolor: 'background.paper', border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, p: 0, maxWidth: 220, boxShadow: 8, color: 'text.primary' } } }} enterDelay={250} disableFocusListener disableTouchListener>
+                <Stack direction="row" alignItems="center" spacing={0.5} sx={{ overflow: 'hidden', cursor: 'default' }}>
                   {activePlayerIdx === sourceIdx && (
                     <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0, boxShadow: '0 0 4px 1px rgba(var(--mui-palette-primary-mainChannel) / 0.7)' }} />
                   )}
@@ -1556,6 +1620,7 @@ export function PlayerPanel({
                     {cmdDmgShowPlayer ? source.playerName : source.commander.name}
                   </Typography>
                 </Stack>
+                </Tooltip>
                 <Stack direction="row" spacing={0.5} sx={{ mt: ts > 0 ? 0 : 0.15, flexWrap: 'wrap', alignItems: 'center' }}>
                   {source.isMonarch && <Tooltip title="Monarch" placement="top" slotProps={ttSlotProps} arrow><CrownIcon sx={{
                     fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10,
@@ -1590,9 +1655,11 @@ export function PlayerPanel({
             ];
             if (source.partner) {
               rows.push(
-                <Typography key={`${sourceIdx}-pname`} sx={{ fontSize: ts === 2 ? 19 : ts === 1 ? 16 : 14, color: sourceEliminated ? 'text.disabled' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none' }}>
+                <Tooltip key={`${sourceIdx}-pname`} title={renderSourceSnapshot(source, sourceIdx)} placement={snapshotPlacement} componentsProps={{ tooltip: { sx: { bgcolor: 'background.paper', border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, p: 0, maxWidth: 220, boxShadow: 8, color: 'text.primary' } } }} enterDelay={250} disableFocusListener disableTouchListener>
+                <Typography sx={{ fontSize: ts === 2 ? 19 : ts === 1 ? 16 : 14, color: sourceEliminated ? 'text.disabled' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', cursor: 'default' }}>
                   {source.partner.name}
-                </Typography>,
+                </Typography>
+                </Tooltip>,
                 <Tooltip key={`${sourceIdx}-pdec`} open={lpKey === `${sourceIdx}-pdec`} title="-5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
                   <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, true, -1))} onPointerDown={() => startLongPress(`${sourceIdx}-pdec`, () => handleCmdDmgChange(playerIdx, sourceIdx, true, -5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: ts === 2 ? 38 : 32, minHeight: ts === 2 ? 24 : ts === 1 ? 28 : 32, transition: 'min-height 0.2s ease' }}>
                     <Typography sx={{ fontSize: ts === 2 ? 28 : ts === 1 ? 24 : 22, fontWeight: 700, lineHeight: 1 }}>−</Typography>
@@ -1653,19 +1720,25 @@ export function PlayerPanel({
                 ].map(({ top, left, rotate }, i) => (
                   <Typography key={`threat-${i}`} sx={{
                     position: 'absolute', top, left,
-                    transform: `rotate(${rotate + (playerIdx % 3) * 5}deg)`,
-                    fontSize: 8 + (i % 3),
+                    fontSize: 18 + (i % 3) * 4,
                     fontWeight: 900,
+                    fontFamily: '"Georgia", "Palatino Linotype", serif',
+                    fontStyle: 'italic',
                     color: 'error.main',
-                    opacity: threatSource.intensity * (0.09 + i * 0.02),
                     pointerEvents: 'none',
                     userSelect: 'none',
                     whiteSpace: 'nowrap',
                     zIndex: 0,
                     transition: 'opacity 0.6s ease',
-                    letterSpacing: 0.5,
+                    letterSpacing: 1.5,
                     textTransform: 'uppercase',
                     lineHeight: 1,
+                    textShadow: `0 0 8px rgba(180,0,0,${(threatSource.intensity * 0.4).toFixed(2)})`,
+                    animation: `threatNamePulse ${1.8 + i * 0.3}s ease-in-out infinite`,
+                    '@keyframes threatNamePulse': {
+                      '0%, 100%': { opacity: threatSource.intensity * (0.09 + i * 0.02), transform: `rotate(${rotate + (playerIdx % 3) * 5}deg) scale(1)` },
+                      '50%': { opacity: threatSource.intensity * (0.18 + i * 0.04), transform: `rotate(${rotate + (playerIdx % 3) * 5}deg) scale(1.06)` },
+                    },
                   }}>
                     {threatSource.cmdName}
                   </Typography>
