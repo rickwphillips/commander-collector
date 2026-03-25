@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { StatsCard } from '@/app/components/StatsCard';
+import { StatsCard } from '@/components/StatsCard';
 
 describe('StatsCard', () => {
   it('renders title', () => {

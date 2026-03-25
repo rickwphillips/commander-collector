@@ -4,7 +4,7 @@ import {
   DEFAULT_SECTION_ORDER,
   VALID_SECTION_IDS,
   getSectionDef,
-} from '@/app/lib/statsSections';
+} from '@/lib/statsSections';
 
 describe('getSectionDef', () => {
   it('returns correct definition for "overall"', () => {

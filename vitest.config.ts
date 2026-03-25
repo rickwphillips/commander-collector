@@ -16,6 +16,7 @@ export default defineConfig({
     },
   },
   resolve: {
-    alias: { '@': path.resolve(__dirname, '.') },
+    // Match tsconfig "@/*": ["./app/*"] so test imports resolve the same as app imports
+    alias: { '@': path.resolve(__dirname, 'app') },
   },
 });

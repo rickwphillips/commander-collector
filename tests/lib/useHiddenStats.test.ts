@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { useHiddenStats } from '@/app/lib/useHiddenStats';
+import { useHiddenStats } from '@/lib/useHiddenStats';
 
 const HIDDEN_SECTIONS_KEY = 'commander_hidden_stats';
 const HIDDEN_PANELS_KEY = 'commander_hidden_shared_panels';

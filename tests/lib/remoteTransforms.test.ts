@@ -12,7 +12,7 @@ import {
   applyEliminate,
   applyUndoEliminate,
   applyPassTurn,
-} from '@/app/game-manager/remoteTransforms';
+} from '@/game-manager/remoteTransforms';
 import type { GameManagerState, PlayerState } from '@/lib/types';
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { apiFetch, api, API_BASE } from '@/app/lib/api';
+import { apiFetch, api, API_BASE } from '@/lib/api';
 
 const AUTH_TOKEN_KEY = 'auth_token';
 
