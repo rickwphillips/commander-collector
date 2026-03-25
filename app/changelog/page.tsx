@@ -38,6 +38,19 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.23.2',
+    date: '2026-03-25',
+    title: 'Dice panel & CMD damage tooltip improvements',
+    changes: [
+      { type: 'improved', text: 'Dice panel controls and all three roll buttons are now on a single row' },
+      { type: 'improved', text: 'Roll results display larger; multi-dice results animate with a spinning die or coin icon then reveal one at a time with a stagger' },
+      { type: 'improved', text: 'Separator icons between multi-dice results are positioned at the number\'s midpoint and stay stable throughout the animation' },
+      { type: 'improved', text: 'Hovering a commander name in the CMD damage section shows a mini snapshot panel with that player\'s current life, all counters (poison, energy, XP, tax), and game statuses (Monarch, Initiative, City\'s Blessing)' },
+      { type: 'improved', text: 'Snapshot tooltip placement rotates to face the center of the board based on panel position' },
+      { type: 'fixed', text: 'Snapshot tooltip now only triggers on the player/commander name, not the stats row' },
+    ],
+  },
+  {
     version: '1.23.1',
     date: '2026-03-25',
     title: 'Auto-save countdown on game end',
