@@ -192,6 +192,7 @@ interface PlayerPanelProps {
   onCommanderDamageChange: (targetIdx: number, sourceIdx: number, isPartner: boolean, delta: number) => void;
   onEliminate: (idx: number) => void;
   onUndoEliminate: (idx: number) => void;
+  onPassTurn?: () => void;
   isHighlighted?: boolean;
   isCurrentPlayer?: boolean;
   elapsedSeconds?: number;
@@ -224,6 +225,7 @@ export function PlayerPanel({
   onCommanderDamageChange,
   onEliminate,
   onUndoEliminate,
+  onPassTurn,
   isHighlighted = false,
   isCurrentPlayer = false,
   elapsedSeconds = 0,
@@ -329,6 +331,20 @@ export function PlayerPanel({
   const [qrOpen, setQrOpen] = useState(false);
   const headerLpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const headerLpFired = useRef(false);
+  const [passTurnHolding, setPassTurnHolding] = useState(false);
+  const passTurnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startPassTurnHold = () => {
+    if (!onPassTurn || !isCurrentPlayer) return;
+    setPassTurnHolding(true);
+    passTurnTimer.current = setTimeout(() => {
+      setPassTurnHolding(false);
+      onPassTurn();
+    }, 700);
+  };
+  const cancelPassTurnHold = () => {
+    setPassTurnHolding(false);
+    if (passTurnTimer.current) { clearTimeout(passTurnTimer.current); passTurnTimer.current = null; }
+  };
 
   // Auto-close QR when remote player connects
   useEffect(() => { if (remoteConnected && qrOpen) setQrOpen(false); }, [remoteConnected, qrOpen]);
@@ -1239,6 +1255,41 @@ export function PlayerPanel({
           </Typography>
         </Box>
           <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: 'auto', zIndex: 1 }}>
+            {/* Pass Turn — long press, remote panel only */}
+            {remoteMode && isCurrentPlayer && onPassTurn && !player.isEliminated && (
+              <Box
+                onPointerDown={startPassTurnHold}
+                onPointerUp={cancelPassTurnHold}
+                onPointerLeave={cancelPassTurnHold}
+                onPointerCancel={cancelPassTurnHold}
+                sx={{
+                  position: 'relative', overflow: 'hidden',
+                  px: 0.75, py: 0.25,
+                  borderRadius: 1,
+                  border: '1.5px solid',
+                  borderColor: 'primary.main',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  ...(passTurnHolding && {
+                    '&::after': {
+                      content: '""',
+                      position: 'absolute', top: 0, left: 0, height: '100%', width: '100%',
+                      bgcolor: 'primary.main',
+                      transformOrigin: 'left center',
+                      animation: 'passFill 0.7s linear forwards',
+                      '@keyframes passFill': {
+                        '0%': { transform: 'scaleX(0)' },
+                        '100%': { transform: 'scaleX(1)' },
+                      },
+                    },
+                  }),
+                }}
+              >
+                <Typography sx={{ fontSize: ts === 2 ? 11 : 10, fontWeight: 700, position: 'relative', zIndex: 1, color: 'primary.main', whiteSpace: 'nowrap', lineHeight: 1.4 }}>
+                  PASS
+                </Typography>
+              </Box>
+            )}
             {/* Active game state indicators */}
             <>
               {player.isMonarch && (

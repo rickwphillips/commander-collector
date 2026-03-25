@@ -292,7 +292,7 @@ function RemotePageInner() {
   const isMyTurn = state.players[state.currentPlayerIdx]?.position === seat;
 
   return (
-    <Box sx={{ width: '100dvw', height: '100dvh', overflow: 'hidden', position: 'relative', pb: isMyTurn ? '64px' : 0 }}>
+    <Box sx={{ width: '100dvw', height: '100dvh', overflow: 'hidden', position: 'relative' }}>
       <PlayerPanel
         player={displayPlayer}
         playerIdx={playerIdx}
@@ -317,15 +317,8 @@ function RemotePageInner() {
         textSizeMode={textSizeMode}
         highlightMode={true}
         remoteMode={true}
+        onPassTurn={isMyTurn ? handlePassTurn : undefined}
       />
-      {/* Pass Turn button — only shown when it's this player's turn */}
-      {isMyTurn && (
-        <Box sx={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 10 }}>
-          <Button variant="contained" color="primary" size="large" onClick={handlePassTurn} sx={{ px: 4, fontWeight: 700, borderRadius: 3 }}>
-            Pass Turn
-          </Button>
-        </Box>
-      )}
 
       {/* Text size toggle */}
       <IconButton
