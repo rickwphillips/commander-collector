@@ -38,6 +38,17 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.18.0',
+    date: '2026-03-25T00:00:00',
+    title: 'Live game session stability',
+    changes: [
+      { type: 'improved', text: 'Remote player actions (life, poison, commander damage, Pass Turn) now reliably reflect the host\'s current game state — stale data from delayed polling can no longer overwrite the host\'s turn or player changes' },
+      { type: 'improved', text: 'Remote panel heartbeat and all action writes use a read-modify-write pattern, ensuring only the intended change is applied on top of the latest database state' },
+      { type: 'improved', text: 'Host page reload no longer replays stale saved state into a live session — the session is verified active before any writes are permitted' },
+      { type: 'fixed', text: 'Starting a new game now ensures the previous session is fully cleaned up before creating the new one' },
+    ],
+  },
+  {
     version: '1.17.4',
     date: '2026-03-25T00:00:00',
     title: 'Fix stale game state persisting across sessions',
