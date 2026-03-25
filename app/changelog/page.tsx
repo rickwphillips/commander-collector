@@ -38,6 +38,21 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.20.0',
+    date: '2026-03-25T00:00:00',
+    title: 'Kill attribution panels, compact menus, dice UX',
+    changes: [
+      { type: 'improved', text: 'Kill attribution prompt ("Who brought X to 0?" / "Who poisoned X?") now appears as an overlay on the affected player\'s own panel instead of a modal dialog, keeping it spatially connected to the action' },
+      { type: 'added', text: 'Remote panel now shows kill attribution overlays when the remote player\'s life hits 0 or poison reaches 10, and sends the attribution to the host as a queued event' },
+      { type: 'improved', text: 'Settings menu condensed to fit without scrolling — Timer, Highlight, and Notes controls on one row; Restart and End Game on the next' },
+      { type: 'changed', text: 'Remote player code list removed from settings menu — QR codes remain accessible via long press on each player\'s panel header' },
+      { type: 'improved', text: 'Dice menu condensed to fit without scrolling' },
+      { type: 'improved', text: 'Last-used dice button turns yellow after a roll to indicate which type was most recently rolled' },
+      { type: 'improved', text: 'Last-used dice button displays the result inline (e.g. "total 17")' },
+      { type: 'improved', text: 'All roll results (including single-die and coin flip) now display in the result area above the buttons' },
+    ],
+  },
+  {
     version: '1.19.0',
     date: '2026-03-25T00:00:00',
     title: 'Delta event queue for live sync',
