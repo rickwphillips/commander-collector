@@ -107,6 +107,12 @@ switch ($method) {
         try {
             $pdo->beginTransaction();
 
+            // Deactivate any previously active sessions — prevents stale sessions
+            // from accumulating when the host starts a new game without explicitly
+            // ending the previous one (e.g. hard refresh, old browser sessions).
+            $pdo->prepare('UPDATE live_game_sessions SET is_active = 0 WHERE is_active = 1')
+                ->execute();
+
             // Create session
             $stmt = $pdo->prepare('
                 INSERT INTO live_game_sessions (state, expires_at)

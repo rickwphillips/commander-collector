@@ -20,6 +20,7 @@ import {
   IconButton,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import CasinoIcon from '@mui/icons-material/Casino';
 import SouthIcon from '@mui/icons-material/South';
 import NorthIcon from '@mui/icons-material/North';
 import EastIcon from '@mui/icons-material/East';
@@ -239,6 +240,39 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
     });
   };
 
+  const handleRandom = useCallback(() => {
+    setError(null);
+    const shuffled = [...decks].sort(() => Math.random() - 0.5);
+    const seen = new Set<number>();
+    const picked: DeckWithPlayer[] = [];
+    for (const deck of shuffled) {
+      if (seen.has(deck.player_id)) continue;
+      seen.add(deck.player_id);
+      picked.push(deck);
+      if (picked.length === playerCount) break;
+    }
+    if (picked.length < playerCount) {
+      setError('Not enough players with decks to fill all slots randomly.');
+      return;
+    }
+    const newSlots: PlayerSlot[] = picked.map((deck) => ({
+      playerId: deck.player_id,
+      deckId: deck.id,
+      commander: { name: deck.commander ?? '', artCropUrl: undefined, options: [], loading: false },
+      hasPartner: false,
+      partner: emptyCommander(),
+    }));
+    setSlots((prev) => {
+      const next = [...newSlots];
+      while (next.length < prev.length) next.push(emptySlot());
+      return next;
+    });
+    picked.forEach((deck, i) => {
+      if (deck.commander) fetchCommanderArt(i, 'commander', deck.commander);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [decks, playerCount]);
+
   const handleStart = () => {
     const activeSlots = slots.slice(0, playerCount);
     for (let i = 0; i < activeSlots.length; i++) {
@@ -449,9 +483,12 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
           <Button startIcon={<ArrowBackIcon />} onClick={() => router.push('/games')} sx={{ mr: 1 }}>
             Back
           </Button>
-          <Typography variant="h4" sx={{ fontWeight: 700, flex: 1, textAlign: 'center', pr: 5 }}>
+          <Typography variant="h4" sx={{ fontWeight: 700, flex: 1, textAlign: 'center' }}>
             Game Setup
           </Typography>
+          <Button startIcon={<CasinoIcon />} onClick={handleRandom} sx={{ ml: 1 }}>
+            Random
+          </Button>
         </Stack>
 
         {error && (

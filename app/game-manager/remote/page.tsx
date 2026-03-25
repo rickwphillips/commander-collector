@@ -14,9 +14,10 @@ import { applyEvent } from '../remoteTransforms';
 import { useThemeMode } from '@/components/ThemeProvider';
 
 const POLL_INTERVAL_MS = 1000;
-// After sending an event, suppress polls for this long to avoid flickering
-// back to a DB state that hasn't reflected the event yet. By 2s the host
-// will have processed and written the merged state.
+// After sending an event, suppress DB state application for this long.
+// The host polls at 500ms — so within ~600ms the event is processed and
+// written to DB. 1500ms gives 2+ host cycles of margin before we re-sync.
+const POST_EVENT_GRACE_MS = 1500;
 // Heartbeat interval — sends a checkin event so the host knows we're still here
 const CHECKIN_INTERVAL_MS = 9000;
 
@@ -40,6 +41,7 @@ function RemotePageInner() {
   const { mode, toggleTheme } = useThemeMode();
 
   const lastSuccessfulPollRef = useRef<number>(Date.now());
+  const lastEventTimeRef = useRef<number>(0);
   const pollFailCountRef = useRef(0);
   const inactiveCountRef = useRef(0);
   const [showReconnect, setShowReconnect] = useState(false);
@@ -107,10 +109,11 @@ function RemotePageInner() {
     if (phase !== 'connected' || !code) return;
 
     const poll = async () => {
-      // Grace period after sending an event — wait for host to process it
-      // before updating local state from DB, to avoid flickering
+      debugLog('REMOTE poll', 'tick', { code });
       try {
         const res = await api.getLiveGame(code); // remote never passes consume=true
+        const dbLives = res.state?.players?.map((p: { playerName: string; life: number }) => `${p.playerName}:${p.life}`);
+        debugLog('REMOTE poll', 'raw DB response', { is_active: res.is_active, dbLives });
         if (!res.is_active) {
           // Require 3 consecutive inactive responses before ending — guards against
           // transient bad responses during server deploys or PHP file uploads
@@ -123,14 +126,15 @@ function RemotePageInner() {
         pollFailCountRef.current = 0;
         lastSuccessfulPollRef.current = Date.now();
         if (showReconnect) setShowReconnect(false);
-        setState((prev) => {
-          const dbLives = res.state?.players?.map((p: { playerName: string; life: number }) => `${p.playerName}:${p.life}`);
-          if (!prev) { debugLog('REMOTE poll', 'initial state from DB', { dbLives }); return res.state; }
-          if (JSON.stringify(prev) === JSON.stringify(res.state)) return prev;
-          const prevLives = prev.players.map((p) => `${p.playerName}:${p.life}`);
-          debugLog('REMOTE poll', 'state updated from DB', { prevLives, dbLives });
-          return res.state;
-        });
+        // Skip applying DB state during the grace period — the optimistic
+        // update is ahead of the DB until the host processes the event.
+        const msSinceEvent = Date.now() - lastEventTimeRef.current;
+        if (msSinceEvent < POST_EVENT_GRACE_MS) {
+          debugLog('REMOTE poll', 'grace period — skipping DB state', { msSinceEvent });
+          return;
+        }
+        debugLog('REMOTE poll', 'applying DB state', { dbLives });
+        setState(res.state);
       } catch (err) {
         pollFailCountRef.current++;
         debugLog('REMOTE poll', 'error', { err: String(err), failCount: pollFailCountRef.current }, 'error');
@@ -170,7 +174,11 @@ function RemotePageInner() {
   const sendEvent = useCallback((eventData: Omit<LiveGameEvent, 'seat' | 'ts'>) => {
     const event: LiveGameEvent = { ...eventData, seat, ts: Date.now() };
     debugLog('REMOTE send', event.type, eventData);
-    // Fire and forget — DB is source of truth; remote re-syncs on next poll
+    // Optimistic update — apply instantly so the panel feels responsive.
+    setState((prev) => prev ? applyEvent(prev, event) : prev);
+    // Start grace period so the poll doesn't overwrite optimistic state
+    // before the host has had time to process and write this event to DB.
+    lastEventTimeRef.current = Date.now();
     api.sendLiveGameEvent(code, event)
       .then(() => debugLog('REMOTE send', `OK: ${event.type}`))
       .catch((err) => debugLog('REMOTE send', `FAILED: ${event.type}`, { err: String(err) }, 'error'));

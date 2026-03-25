@@ -56,6 +56,9 @@ header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 header('Access-Control-Allow-Credentials: true');
 header('Content-Type: application/json');
+// Prevent LiteSpeed/CDN/browser from caching live API responses
+header('Cache-Control: no-store, no-cache, must-revalidate');
+header('Pragma: no-cache');
 
 // Handle preflight requests
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
