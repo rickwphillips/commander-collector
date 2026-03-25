@@ -38,6 +38,14 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.21.1',
+    date: '2026-03-25',
+    title: 'Changelog date fix',
+    changes: [
+      { type: 'fixed', text: 'Changelog entries since v1.18.0 were displaying one day early due to a duplicate timezone suffix — all dates now render correctly' },
+    ],
+  },
+  {
     version: '1.21.0',
     date: '2026-03-25',
     title: 'Remote sync fixes, life panel redesign',
