@@ -1462,7 +1462,7 @@ export function PlayerPanel({
               <Typography sx={{
                 fontWeight: 900,
                 fontSize: highlightMode
-                  ? (ts === 2 ? 'clamp(70px, 18dvh, 160px)' : ts === 1 ? 'clamp(60px, 15dvh, 130px)' : 'clamp(50px, 12dvh, 110px)')
+                  ? (ts === 2 ? 'clamp(100px, 26dvh, 220px)' : ts === 1 ? 'clamp(85px, 22dvh, 190px)' : 'clamp(72px, 18dvh, 160px)')
                   : (ts === 2 ? 'clamp(50px, 14dvh, 128px)' : ts === 1 ? 'clamp(40px, 11dvh, 96px)' : 'clamp(34px, 9dvh, 80px)'),
                 lineHeight: 1,
                 color: computedLifeColor || ((theme: import('@mui/material').Theme) => theme.palette.primary.main),
@@ -1478,7 +1478,7 @@ export function PlayerPanel({
                   position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
                   fontWeight: 900,
                   fontSize: highlightMode
-                    ? (ts === 2 ? 'clamp(70px, 18dvh, 160px)' : ts === 1 ? 'clamp(60px, 15dvh, 130px)' : 'clamp(50px, 12dvh, 110px)')
+                    ? (ts === 2 ? 'clamp(100px, 26dvh, 220px)' : ts === 1 ? 'clamp(85px, 22dvh, 190px)' : 'clamp(72px, 18dvh, 160px)')
                     : (ts === 2 ? 'clamp(50px, 14dvh, 128px)' : ts === 1 ? 'clamp(40px, 11dvh, 96px)' : 'clamp(34px, 9dvh, 80px)'),
                   lineHeight: 1,
                   color: 'transparent',
