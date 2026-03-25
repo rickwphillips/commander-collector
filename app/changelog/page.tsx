@@ -38,6 +38,17 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.22.0',
+    date: '2026-03-25',
+    title: 'Remote panel sync & Game Setup random fill',
+    changes: [
+      { type: 'fixed', text: 'Remote panel now correctly receives live game state updates — root cause was LiteSpeed caching GET responses, serving stale data on every poll' },
+      { type: 'fixed', text: 'Starting a new game now deactivates all previous active sessions, preventing the remote from reconnecting to a stale old game' },
+      { type: 'fixed', text: 'Remote optimistic updates restored with a grace period — taps on the remote panel reflect instantly without reverting' },
+      { type: 'added', text: 'Random button on the Game Setup page fills all player slots automatically with shuffled deck and player assignments' },
+    ],
+  },
+  {
     version: '1.21.1',
     date: '2026-03-25',
     title: 'Changelog date fix',
