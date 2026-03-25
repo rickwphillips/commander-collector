@@ -459,6 +459,23 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
                 onCommanderDamageChange={handleCommanderDamageChange}
                 onEliminate={handleEliminate}
                 onUndoEliminate={handleUndoEliminate}
+                {...(lifeKillPrompt?.targetIdx === idx && {
+                  lifeKillOpponents: players
+                    .map((p, i) => ({ name: p.playerName, idx: i }))
+                    .filter((_, i) => i !== idx && !players[i].isEliminated),
+                  onLifeKillSelect: (sourceIdx) => {
+                    const target = players[lifeKillPrompt.targetIdx];
+                    const source = sourceIdx !== null ? players[sourceIdx] : null;
+                    const lifeNoteTag = `[lifekill:${lifeKillPrompt.targetIdx}]`;
+                    const noteLine = source
+                      ? `${lifeNoteTag} ${target.playerName} brought to 0 life by ${source.playerName} (turn ${state.turnNumber})`
+                      : `${lifeNoteTag} ${target.playerName} brought to 0 life (turn ${state.turnNumber})`;
+                    updateState({ notes: [state.notes, noteLine].filter(Boolean).join('\n') });
+                    const pending = lifeKillPrompt.pendingWinner;
+                    setLifeKillPrompt(null);
+                    if (pending) setWinner(pending);
+                  },
+                })}
               />
             </Box>
           </Box>
@@ -496,42 +513,6 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
         />
       </Box>
 
-      {/* Life kill attribution prompt */}
-      {lifeKillPrompt && (() => {
-        const target = players[lifeKillPrompt.targetIdx];
-        const opponents = players.filter((_, i) => i !== lifeKillPrompt.targetIdx && !players[i].isEliminated);
-        const lifeNoteTag = `[lifekill:${lifeKillPrompt.targetIdx}]`;
-        const handleSelect = (sourceIdx: number | null) => {
-          const source = sourceIdx !== null ? players[sourceIdx] : null;
-          const noteLine = source
-            ? `${lifeNoteTag} ${target.playerName} brought to 0 life by ${source.playerName} (turn ${state.turnNumber})`
-            : `${lifeNoteTag} ${target.playerName} brought to 0 life (turn ${state.turnNumber})`;
-          updateState({ notes: [state.notes, noteLine].filter(Boolean).join('\n') });
-          const pending = lifeKillPrompt.pendingWinner;
-          setLifeKillPrompt(null);
-          if (pending) setWinner(pending);
-        };
-        return (
-          <Dialog open maxWidth="xs" fullWidth>
-            <DialogTitle sx={{ fontWeight: 700 }}>Who brought {target.playerName} to 0?</DialogTitle>
-            <DialogContent>
-              <Stack spacing={1}>
-                {opponents.map((opp) => {
-                  const oppIdx = players.indexOf(opp);
-                  return (
-                    <Button key={oppIdx} variant="outlined" fullWidth onClick={() => handleSelect(oppIdx)}>
-                      {opp.playerName}
-                    </Button>
-                  );
-                })}
-              </Stack>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => handleSelect(null)}>Skip</Button>
-            </DialogActions>
-          </Dialog>
-        );
-      })()}
 
       {/* Poison kill attribution prompt */}
       {poisonKillPrompt && (() => {

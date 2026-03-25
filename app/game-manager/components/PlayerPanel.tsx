@@ -193,6 +193,8 @@ interface PlayerPanelProps {
   onEliminate: (idx: number) => void;
   onUndoEliminate: (idx: number) => void;
   onPassTurn?: () => void;
+  lifeKillOpponents?: { name: string; idx: number }[];
+  onLifeKillSelect?: (sourceIdx: number | null) => void;
   isHighlighted?: boolean;
   isCurrentPlayer?: boolean;
   elapsedSeconds?: number;
@@ -226,6 +228,8 @@ export function PlayerPanel({
   onEliminate,
   onUndoEliminate,
   onPassTurn,
+  lifeKillOpponents,
+  onLifeKillSelect,
   isHighlighted = false,
   isCurrentPlayer = false,
   elapsedSeconds = 0,
@@ -1073,6 +1077,24 @@ export function PlayerPanel({
           >
             {isPoisoned ? 'POISONED' : player.isConceded ? 'CONCEDED' : 'ELIMINATED'}
           </Typography>
+        </Box>
+      )}
+
+      {/* Life kill attribution overlay */}
+      {lifeKillOpponents && onLifeKillSelect && (
+        <Box sx={{ position: 'absolute', inset: 0, zIndex: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, bgcolor: 'rgba(0,0,0,0.72)', px: 2 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 15 : 13, color: '#fff', mb: 0.5, textAlign: 'center' }}>
+            Who brought {player.playerName} to 0?
+          </Typography>
+          {lifeKillOpponents.map((opp) => (
+            <Button key={opp.idx} variant="outlined" fullWidth onClick={() => onLifeKillSelect(opp.idx)}
+              sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.5)', '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,0.1)' } }}>
+              {opp.name}
+            </Button>
+          ))}
+          <Button onClick={() => onLifeKillSelect(null)} sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, mt: 0.5 }}>
+            Skip
+          </Button>
         </Box>
       )}
 
