@@ -292,7 +292,7 @@ function RemotePageInner() {
   const isMyTurn = state.players[state.currentPlayerIdx]?.position === seat;
 
   return (
-    <Box sx={{ width: '100dvw', height: '100dvh', overflow: 'hidden', position: 'relative' }}>
+    <Box sx={{ width: '100dvw', height: '100dvh', overflow: 'hidden', position: 'relative', pb: isMyTurn ? '64px' : 0 }}>
       <PlayerPanel
         player={displayPlayer}
         playerIdx={playerIdx}
