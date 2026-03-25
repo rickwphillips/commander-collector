@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography } from '@mui/material';
+import { Box, Button, Typography } from '@mui/material';
 import { PlayerPanel } from './PlayerPanel';
 import { CenterZone } from './CenterZone';
 import type { GameManagerState, PlayerState } from '../types';
@@ -32,12 +32,48 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   const [firstPlayerSet, setFirstPlayerSet] = useState(isResumed);
   const [firstPlayerIdx, setFirstPlayerIdx] = useState(isResumed ? state.currentPlayerIdx : 0);
   const [winner, setWinner] = useState<PlayerState | null>(null);
+  const [winnerCountdown, setWinnerCountdown] = useState<number | null>(null);
+  const winnerStateRef = useRef<GameManagerState | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [textSizeMode, setTextSizeMode] = useState<0 | 1 | 2>(0);
   const [lifeKillPrompt, setLifeKillPrompt] = useState<{ targetIdx: number; pendingWinner: PlayerState | null } | null>(null);
   const [poisonKillPrompt, setPoisonKillPrompt] = useState<{ targetIdx: number; newPlayers: PlayerState[] } | null>(null);
   const [monarchTransfer, setMonarchTransfer] = useState<{ fromPos: string | null; toPos: string | null }>({ fromPos: null, toPos: null });
   const [highlightMode, setHighlightMode] = useState(true);
+
+  // Start a 15s countdown when a winner is detected; auto-save when it hits 0
+  useEffect(() => {
+    if (winner) {
+      winnerStateRef.current = state;
+      setWinnerCountdown(15);
+    } else {
+      setWinnerCountdown(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [winner]);
+
+  // Cancel countdown if a correction restores more than one active player
+  useEffect(() => {
+    if (!winner) return;
+    const remaining = players.filter((p) => !p.isEliminated);
+    if (remaining.length !== 1) {
+      setWinner(null);
+      setWinnerCountdown(null);
+    }
+  }, [players, winner]);
+
+  useEffect(() => {
+    if (winnerCountdown === null) return;
+    if (winnerCountdown === 0) {
+      const savedState = winnerStateRef.current;
+      setWinner(null);
+      setWinnerCountdown(null);
+      if (savedState) onSaveGame(savedState);
+      return;
+    }
+    const t = setTimeout(() => setWinnerCountdown((c) => (c !== null ? c - 1 : null)), 1000);
+    return () => clearTimeout(t);
+  }, [winnerCountdown, onSaveGame]);
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -136,7 +172,9 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   };
 
   const updateState = (patch: Partial<GameManagerState>) => {
-    onUpdate({ ...state, ...patch });
+    const next = { ...state, ...patch };
+    if (winner) winnerStateRef.current = next;
+    onUpdate(next);
   };
 
   const handleLifeChange = (idx: number, delta: number) => {
@@ -493,22 +531,29 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
       </Box>
 
 
-      {/* Win dialog */}
-      <Dialog open={!!winner} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ textAlign: 'center', fontWeight: 900, fontSize: 24 }}>
-          🏆 {winner?.playerName} Wins!
-        </DialogTitle>
-        <DialogContent sx={{ textAlign: 'center' }}>
-          <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>
-            {winner?.commander.name}
+      {/* Winner countdown banner */}
+      {winner && winnerCountdown !== null && (
+        <Box sx={{
+          position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 50,
+          bgcolor: 'background.paper',
+          borderTop: (theme) => `2px solid ${theme.palette.primary.main}`,
+          px: 2, py: 1.5,
+          display: 'flex', alignItems: 'center', gap: 1.5,
+        }}>
+          <Typography sx={{ fontWeight: 900, fontSize: 18, flex: 1 }}>
+            🏆 {winner.playerName} wins — saving in {winnerCountdown}s
           </Typography>
-          <Typography sx={{ mt: 1 }}>Would you like to save this game?</Typography>
-        </DialogContent>
-        <DialogActions sx={{ justifyContent: 'center', gap: 1, pb: 2 }}>
-          <Button variant="outlined" onClick={() => { setWinner(null); onEndGame(); }}>Skip</Button>
-          <Button variant="contained" onClick={() => { setWinner(null); onSaveGame(state); }}>Save Game</Button>
-        </DialogActions>
-      </Dialog>
+          <Button size="small" variant="outlined" onClick={() => { setWinner(null); setWinnerCountdown(null); }}>
+            Cancel
+          </Button>
+          <Button size="small" variant="contained" onClick={() => {
+            const s = winnerStateRef.current ?? state;
+            setWinner(null); setWinnerCountdown(null); onSaveGame(s);
+          }}>
+            Save Now
+          </Button>
+        </Box>
+      )}
     </Box>
   );
 }
