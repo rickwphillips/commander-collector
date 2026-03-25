@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { keyframes } from '@emotion/react';
 import { Box, Stack, Typography, IconButton, Button, TextField, Tooltip, SvgIcon } from '@mui/material';
 import { QRCodeSVG } from 'qrcode.react';
@@ -293,6 +293,7 @@ export function PlayerPanel({
   }, [player.experience]);
 
   const [damageFlash, setDamageFlash] = useState(0);
+  const [lastCmdDmgSourceIdx, setLastCmdDmgSourceIdx] = useState<number | null>(null);
   const prevLife = useRef(player.life);
   useEffect(() => {
     if (player.life < prevLife.current) {
@@ -506,6 +507,42 @@ export function PlayerPanel({
     return `rgb(${r},${g},${b})`;
   }
   const computedLifeColor = lifeColor(player.life);
+
+  const handleCmdDmgChange = useCallback((targetIdx: number, sourceIdx: number, isPartner: boolean, delta: number) => {
+    setLastCmdDmgSourceIdx(sourceIdx);
+    onCommanderDamageChange(targetIdx, sourceIdx, isPartner, delta);
+  }, [onCommanderDamageChange]);
+
+  // Determine the biggest commander damage threat against this player
+  const threatSource = useMemo(() => {
+    if (player.isEliminated) return null;
+    const myDmg = commanderDamage[playerIdx] ?? {};
+    type Candidate = { srcIdx: number; isPartner: boolean; dmg: number; hasArt: boolean };
+    const candidates: Candidate[] = [];
+    for (const [sidxStr, dmgTuple] of Object.entries(myDmg)) {
+      const sidx = Number(sidxStr);
+      const srcPlayer = allPlayers[sidx];
+      if (!srcPlayer) continue;
+      const [main, partner] = dmgTuple;
+      if (main > 0) candidates.push({ srcIdx: sidx, isPartner: false, dmg: main, hasArt: !!srcPlayer.commander.artCropUrl });
+      if (partner > 0) candidates.push({ srcIdx: sidx, isPartner: true, dmg: partner, hasArt: !!(srcPlayer.partner?.artCropUrl) });
+    }
+    if (candidates.length === 0) return null;
+    // Highest damage first, then prefer art, then prefer last-tapped source
+    candidates.sort((a, b) => {
+      if (b.dmg !== a.dmg) return b.dmg - a.dmg;
+      if (a.hasArt !== b.hasArt) return a.hasArt ? -1 : 1;
+      if (a.srcIdx === lastCmdDmgSourceIdx) return -1;
+      if (b.srcIdx === lastCmdDmgSourceIdx) return 1;
+      return 0;
+    });
+    const best = candidates[0];
+    const srcPlayer = allPlayers[best.srcIdx];
+    const artUrl = best.isPartner ? srcPlayer.partner?.artCropUrl : srcPlayer.commander.artCropUrl;
+    const cmdName = best.isPartner ? (srcPlayer.partner?.name ?? '') : srcPlayer.commander.name;
+    const intensity = Math.max(0, Math.min((best.dmg - 7) / 14, 1));
+    return { artUrl, cmdName, intensity, dmg: best.dmg };
+  }, [commanderDamage, playerIdx, allPlayers, player.isEliminated, lastCmdDmgSourceIdx]);
 
   const crackAlpha = (from: number) => Math.min(Math.max((lostRatio - from) / 0.15, 0), 1);
 
@@ -1225,7 +1262,7 @@ export function PlayerPanel({
             </Box>
           )}
           {/* Pass Turn — long press, remote panel only */}
-          {remoteMode && isCurrentPlayer && onPassTurn && !player.isEliminated && (
+          {remoteMode && isCurrentPlayer && onPassTurn && (
             <Box
               onPointerDown={startPassTurnHold}
               onPointerUp={cancelPassTurnHold}
@@ -1474,8 +1511,29 @@ export function PlayerPanel({
           rowGap: ts > 0 ? 0 : 0.1,
           overflowY: 'auto',
           overflow: 'hidden',
+          position: 'relative',
           transition: 'padding 0.2s ease, row-gap 0.2s ease',
         }}>
+          {/* Threat vignette — commander art fades in as damage approaches 21 */}
+          {threatSource?.artUrl && threatSource.intensity > 0 && (
+            <Box sx={{
+              position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+              backgroundImage: `url(${threatSource.artUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center top',
+              opacity: threatSource.intensity * 0.28,
+              transition: 'opacity 0.6s ease',
+              pointerEvents: 'none',
+            }} />
+          )}
+          {(threatSource?.intensity ?? 0) > 0 && (
+            <Box sx={{
+              position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+              boxShadow: `inset 0 0 24px rgba(160,0,0,${((threatSource?.intensity ?? 0) * 0.65).toFixed(2)})`,
+              transition: 'box-shadow 0.6s ease',
+              pointerEvents: 'none',
+            }} />
+          )}
           {/* Title row — spans full width, same pattern as Counters */}
           <Stack direction="row" alignItems="center" spacing={0.5} sx={{ gridColumn: '1 / -1', mb: ts === 2 ? 0 : ts === 1 ? 0.1 : 0.25 }}>
             <Typography sx={{ fontSize: ts === 2 ? 15 : ts === 1 ? 13 : 11, fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5, flex: 1 }}>
@@ -1517,7 +1575,7 @@ export function PlayerPanel({
                 </Stack>
               </Box>,
               <Tooltip key={`${sourceIdx}-dec`} open={lpKey === `${sourceIdx}-dec`} title="-5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-                <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => onCommanderDamageChange(playerIdx, sourceIdx, false, -1))} onPointerDown={() => startLongPress(`${sourceIdx}-dec`, () => onCommanderDamageChange(playerIdx, sourceIdx, false, -5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: ts === 2 ? 38 : 32, minHeight: ts === 2 ? 24 : ts === 1 ? 28 : 32, transition: 'min-height 0.2s ease' }}>
+                <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, false, -1))} onPointerDown={() => startLongPress(`${sourceIdx}-dec`, () => handleCmdDmgChange(playerIdx, sourceIdx, false, -5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: ts === 2 ? 38 : 32, minHeight: ts === 2 ? 24 : ts === 1 ? 28 : 32, transition: 'min-height 0.2s ease' }}>
                   <Typography sx={{ fontSize: ts === 2 ? 28 : ts === 1 ? 24 : 22, fontWeight: 700, lineHeight: 1 }}>−</Typography>
                 </IconButton></span>
               </Tooltip>,
@@ -1525,7 +1583,7 @@ export function PlayerPanel({
                 {dmg[0]}
               </Typography>,
               <Tooltip key={`${sourceIdx}-inc`} open={lpKey === `${sourceIdx}-inc`} title="+5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-                <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => onCommanderDamageChange(playerIdx, sourceIdx, false, 1))} onPointerDown={() => startLongPress(`${sourceIdx}-inc`, () => onCommanderDamageChange(playerIdx, sourceIdx, false, 5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: ts === 2 ? 38 : 32, minHeight: ts === 2 ? 24 : ts === 1 ? 28 : 32, transition: 'min-height 0.2s ease' }}>
+                <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, false, 1))} onPointerDown={() => startLongPress(`${sourceIdx}-inc`, () => handleCmdDmgChange(playerIdx, sourceIdx, false, 5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: ts === 2 ? 38 : 32, minHeight: ts === 2 ? 24 : ts === 1 ? 28 : 32, transition: 'min-height 0.2s ease' }}>
                   <Typography sx={{ fontSize: ts === 2 ? 28 : ts === 1 ? 24 : 22, fontWeight: 700, lineHeight: 1 }}>+</Typography>
                 </IconButton></span>
               </Tooltip>,
@@ -1536,7 +1594,7 @@ export function PlayerPanel({
                   {source.partner.name}
                 </Typography>,
                 <Tooltip key={`${sourceIdx}-pdec`} open={lpKey === `${sourceIdx}-pdec`} title="-5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-                  <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => onCommanderDamageChange(playerIdx, sourceIdx, true, -1))} onPointerDown={() => startLongPress(`${sourceIdx}-pdec`, () => onCommanderDamageChange(playerIdx, sourceIdx, true, -5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: ts === 2 ? 38 : 32, minHeight: ts === 2 ? 24 : ts === 1 ? 28 : 32, transition: 'min-height 0.2s ease' }}>
+                  <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, true, -1))} onPointerDown={() => startLongPress(`${sourceIdx}-pdec`, () => handleCmdDmgChange(playerIdx, sourceIdx, true, -5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: ts === 2 ? 38 : 32, minHeight: ts === 2 ? 24 : ts === 1 ? 28 : 32, transition: 'min-height 0.2s ease' }}>
                     <Typography sx={{ fontSize: ts === 2 ? 28 : ts === 1 ? 24 : 22, fontWeight: 700, lineHeight: 1 }}>−</Typography>
                   </IconButton></span>
                 </Tooltip>,
@@ -1544,7 +1602,7 @@ export function PlayerPanel({
                   {dmg[1]}
                 </Typography>,
                 <Tooltip key={`${sourceIdx}-pinc`} open={lpKey === `${sourceIdx}-pinc`} title="+5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-                  <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => onCommanderDamageChange(playerIdx, sourceIdx, true, 1))} onPointerDown={() => startLongPress(`${sourceIdx}-pinc`, () => onCommanderDamageChange(playerIdx, sourceIdx, true, 5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: ts === 2 ? 38 : 32, minHeight: ts === 2 ? 24 : ts === 1 ? 28 : 32, transition: 'min-height 0.2s ease' }}>
+                  <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, true, 1))} onPointerDown={() => startLongPress(`${sourceIdx}-pinc`, () => handleCmdDmgChange(playerIdx, sourceIdx, true, 5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: ts === 2 ? 38 : 32, minHeight: ts === 2 ? 24 : ts === 1 ? 28 : 32, transition: 'min-height 0.2s ease' }}>
                     <Typography sx={{ fontSize: ts === 2 ? 28 : ts === 1 ? 24 : 22, fontWeight: 700, lineHeight: 1 }}>+</Typography>
                   </IconButton></span>
                 </Tooltip>,
@@ -1584,6 +1642,35 @@ export function PlayerPanel({
                   transition: 'opacity 0.5s ease',
                 }} />
               ))}
+              {/* Scattered commander name — ghost text warning as damage builds */}
+              {threatSource?.cmdName && threatSource.intensity > 0 && (
+                [
+                  { top: '10%',  left: '6%',  rotate: -18 },
+                  { top: '74%',  left: '55%', rotate:  11 },
+                  { top: '42%',  left: '62%', rotate:  -6 },
+                  { top: '84%',  left: '8%',  rotate:  20 },
+                  { top: '22%',  left: '48%', rotate:  -9 },
+                ].map(({ top, left, rotate }, i) => (
+                  <Typography key={`threat-${i}`} sx={{
+                    position: 'absolute', top, left,
+                    transform: `rotate(${rotate + (playerIdx % 3) * 5}deg)`,
+                    fontSize: 8 + (i % 3),
+                    fontWeight: 900,
+                    color: 'error.main',
+                    opacity: threatSource.intensity * (0.09 + i * 0.02),
+                    pointerEvents: 'none',
+                    userSelect: 'none',
+                    whiteSpace: 'nowrap',
+                    zIndex: 0,
+                    transition: 'opacity 0.6s ease',
+                    letterSpacing: 0.5,
+                    textTransform: 'uppercase',
+                    lineHeight: 1,
+                  }}>
+                    {threatSource.cmdName}
+                  </Typography>
+                ))
+              )}
               <Typography sx={{
                 position: 'relative', zIndex: 1,
                 fontWeight: 900,

@@ -146,20 +146,32 @@ export function applyCommanderDamageChange(
   const prevTotal = current[0] + current[1];
   const cmdDmgTotal = newDmg[0] + newDmg[1];
   const actualDelta = cmdDmgTotal - prevTotal;
-  const isNewElimination = !players[targetIdx].isEliminated && cmdDmgTotal >= 21;
-  const isUndoElimination =
-    players[targetIdx].isEliminated && prevTotal >= 21 && cmdDmgTotal < 21;
   const target = players[targetIdx];
   const source = players[sourceIdx];
+  const newLife = target.life - actualDelta;
+
+  // 21 from a single commander is a cmd kill; life hitting 0 is attributed to source player
+  const isNewCmdKill = !target.isEliminated && (newDmg[0] >= 21 || newDmg[1] >= 21);
+  const isNewLifeKill = !target.isEliminated && target.life > 0 && newLife <= 0 && !isNewCmdKill;
+  const isNewElimination = isNewCmdKill || isNewLifeKill;
+  const isUndoCmdElim = target.isEliminated && (current[0] >= 21 || current[1] >= 21) && newDmg[0] < 21 && newDmg[1] < 21;
+  const isUndoLifeElim = !isUndoCmdElim && target.isEliminated && target.life <= 0 && newLife > 0 && target.poison < 10;
+  const isUndoElimination = isUndoCmdElim || isUndoLifeElim;
+
   const cmdLabel = source.partner
     ? `${source.commander.name} / ${source.partner.name}`
     : source.commander.name;
-  const noteTag = `[cmdkill:${targetIdx}:${sourceIdx}]`;
-  const noteLine = `${noteTag} ${target.playerName} eliminated by ${cmdLabel} commander damage (turn ${turnNumber})`;
+  const cmdKillNoteTag = `[cmdkill:${targetIdx}:${sourceIdx}]`;
+  const lifeKillNoteTag = `[lifekill:${targetIdx}]`;
+  const cmdKillLine = `${cmdKillNoteTag} ${target.playerName} eliminated by ${cmdLabel} (${source.playerName}) commander damage (turn ${turnNumber})`;
+  const lifeKillLine = `${lifeKillNoteTag} ${target.playerName} brought to 0 life by ${cmdLabel} (${source.playerName}) (turn ${turnNumber})`;
+
   let newNotes = notes;
-  if (isNewElimination) newNotes = [notes, noteLine].filter(Boolean).join('\n');
-  else if (isUndoElimination)
-    newNotes = notes.split('\n').filter((l) => !l.includes(noteTag)).join('\n');
+  if (isNewCmdKill) newNotes = [notes, cmdKillLine].filter(Boolean).join('\n');
+  else if (isNewLifeKill) newNotes = [notes, lifeKillLine].filter(Boolean).join('\n');
+  else if (isUndoCmdElim) newNotes = notes.split('\n').filter((l) => !l.includes(cmdKillNoteTag)).join('\n');
+  else if (isUndoLifeElim) newNotes = notes.split('\n').filter((l) => !l.includes(lifeKillNoteTag)).join('\n');
+
   const newPlayers = players.map((p, i) => {
     if (i !== targetIdx) return p;
     return {

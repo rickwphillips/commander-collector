@@ -4,7 +4,8 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography } from '@mui/material';
 import { PlayerPanel } from './PlayerPanel';
 import { CenterZone } from './CenterZone';
-import type { GameManagerState, CommanderDamageMap, PlayerState } from '../types';
+import type { GameManagerState, PlayerState } from '../types';
+import { applyCommanderDamageChange } from '../remoteTransforms';
 
 type RollPhase = 'idle' | 'rolling' | 'done';
 
@@ -33,8 +34,8 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   const [winner, setWinner] = useState<PlayerState | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [textSizeMode, setTextSizeMode] = useState<0 | 1 | 2>(0);
-  const [poisonKillPrompt, setPoisonKillPrompt] = useState<{ targetIdx: number; newPlayers: PlayerState[] } | null>(null);
   const [lifeKillPrompt, setLifeKillPrompt] = useState<{ targetIdx: number; pendingWinner: PlayerState | null } | null>(null);
+  const [poisonKillPrompt, setPoisonKillPrompt] = useState<{ targetIdx: number; newPlayers: PlayerState[] } | null>(null);
   const [monarchTransfer, setMonarchTransfer] = useState<{ fromPos: string | null; toPos: string | null }>({ fromPos: null, toPos: null });
   const [highlightMode, setHighlightMode] = useState(true);
 
@@ -251,50 +252,11 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
     isPartner: boolean,
     delta: number
   ) => {
-    const current = commanderDamage[targetIdx]?.[sourceIdx] ?? [0, 0];
-    const newDmg: [number, number] = [
-      isPartner ? current[0] : Math.max(0, current[0] + delta),
-      isPartner ? Math.max(0, current[1] + delta) : current[1],
-    ];
-    const newCommanderDamage: CommanderDamageMap = {
-      ...commanderDamage,
-      [targetIdx]: {
-        ...(commanderDamage[targetIdx] ?? {}),
-        [sourceIdx]: newDmg,
-      },
-    };
-    const prevTotal = current[0] + current[1];
-    const cmdDmgTotal = newDmg[0] + newDmg[1];
-    const actualDelta = cmdDmgTotal - prevTotal;
-    const isNewElimination = !players[targetIdx].isEliminated && cmdDmgTotal >= 21;
-    const isUndoElimination = players[targetIdx].isEliminated && prevTotal >= 21 && cmdDmgTotal < 21;
-    const target = players[targetIdx];
-    const source = players[sourceIdx];
-    const cmdLabel = source.partner
-      ? `${source.commander.name} / ${source.partner.name}`
-      : source.commander.name;
-    const noteTag = `[cmdkill:${targetIdx}:${sourceIdx}]`;
-    const noteLine = `${noteTag} ${target.playerName} eliminated by ${cmdLabel} commander damage (turn ${state.turnNumber})`;
-
-    let newNotes = state.notes;
-    if (isNewElimination) {
-      newNotes = [state.notes, noteLine].filter(Boolean).join('\n');
-    } else if (isUndoElimination) {
-      newNotes = state.notes.split('\n').filter((l) => !l.includes(noteTag)).join('\n');
-    }
-
-    const newPlayers = players.map((p, i) => {
-      if (i !== targetIdx) return p;
-      return {
-        ...p,
-        life: p.life - actualDelta,
-        ...(isNewElimination ? { isEliminated: true, eliminatedTurn: state.turnNumber } : {}),
-        ...(isUndoElimination ? { isEliminated: false, eliminatedTurn: null } : {}),
-      };
-    });
-    updateState({ commanderDamage: newCommanderDamage, players: newPlayers, notes: newNotes });
-    if (isNewElimination) {
-      const remaining = newPlayers.filter((p) => !p.isEliminated);
+    const wasEliminated = players[targetIdx].isEliminated;
+    const newState = applyCommanderDamageChange(state, targetIdx, sourceIdx, isPartner, delta);
+    onUpdate(newState);
+    if (!wasEliminated && newState.players[targetIdx].isEliminated) {
+      const remaining = newState.players.filter((p) => !p.isEliminated);
       if (remaining.length === 1) setWinner(remaining[0]);
     }
   };
