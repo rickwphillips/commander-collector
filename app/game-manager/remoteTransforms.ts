@@ -188,6 +188,34 @@ export function applyUndoEliminate(state: GameManagerState, idx: number): GameMa
   return { ...state, players: newPlayers };
 }
 
+export function applyLifeKillAttr(
+  state: GameManagerState,
+  targetIdx: number,
+  sourcePlayerIdx: number | null,
+): GameManagerState {
+  const target = state.players[targetIdx];
+  const source = sourcePlayerIdx !== null ? state.players[sourcePlayerIdx] : null;
+  const lifeNoteTag = `[lifekill:${targetIdx}]`;
+  const noteLine = source
+    ? `${lifeNoteTag} ${target.playerName} brought to 0 life by ${source.playerName} (turn ${state.turnNumber})`
+    : `${lifeNoteTag} ${target.playerName} brought to 0 life (turn ${state.turnNumber})`;
+  return { ...state, notes: [state.notes, noteLine].filter(Boolean).join('\n') };
+}
+
+export function applyPoisonKillAttr(
+  state: GameManagerState,
+  targetIdx: number,
+  sourcePlayerIdx: number | null,
+): GameManagerState {
+  const target = state.players[targetIdx];
+  const source = sourcePlayerIdx !== null ? state.players[sourcePlayerIdx] : null;
+  const poisonNoteTag = `[poisonkill:${targetIdx}]`;
+  const noteLine = source
+    ? `${poisonNoteTag} ${target.playerName} eliminated by ${source.playerName}'s poison (turn ${state.turnNumber})`
+    : `${poisonNoteTag} ${target.playerName} eliminated by poison (turn ${state.turnNumber})`;
+  return { ...state, notes: [state.notes, noteLine].filter(Boolean).join('\n') };
+}
+
 export function applyCheckin(state: GameManagerState, seat: string, ts: number): GameManagerState {
   return {
     ...state,
@@ -259,6 +287,10 @@ export function applyEvent(state: GameManagerState, event: LiveGameEvent): GameM
       return applyPassTurn(state);
     case 'checkin':
       return applyCheckin(state, event.seat, event.ts);
+    case 'life_kill_attr':
+      return applyLifeKillAttr(state, event.playerIdx!, event.sourcePlayerIdx ?? null);
+    case 'poison_kill_attr':
+      return applyPoisonKillAttr(state, event.playerIdx!, event.sourcePlayerIdx ?? null);
     default:
       return state;
   }

@@ -195,6 +195,8 @@ interface PlayerPanelProps {
   onPassTurn?: () => void;
   lifeKillOpponents?: { name: string; idx: number }[];
   onLifeKillSelect?: (sourceIdx: number | null) => void;
+  poisonKillOpponents?: { name: string; idx: number }[];
+  onPoisonKillSelect?: (sourceIdx: number | null) => void;
   isHighlighted?: boolean;
   isCurrentPlayer?: boolean;
   elapsedSeconds?: number;
@@ -230,6 +232,8 @@ export function PlayerPanel({
   onPassTurn,
   lifeKillOpponents,
   onLifeKillSelect,
+  poisonKillOpponents,
+  onPoisonKillSelect,
   isHighlighted = false,
   isCurrentPlayer = false,
   elapsedSeconds = 0,
@@ -1093,6 +1097,24 @@ export function PlayerPanel({
             </Button>
           ))}
           <Button onClick={() => onLifeKillSelect(null)} sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, mt: 0.5 }}>
+            Skip
+          </Button>
+        </Box>
+      )}
+
+      {/* Poison kill attribution overlay */}
+      {poisonKillOpponents && onPoisonKillSelect && (
+        <Box sx={{ position: 'absolute', inset: 0, zIndex: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, bgcolor: 'rgba(0,40,0,0.78)', px: 2 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 15 : 13, color: '#7fff7f', mb: 0.5, textAlign: 'center' }}>
+            Who poisoned {player.playerName}?
+          </Typography>
+          {poisonKillOpponents.map((opp) => (
+            <Button key={opp.idx} variant="outlined" fullWidth onClick={() => onPoisonKillSelect(opp.idx)}
+              sx={{ color: '#7fff7f', borderColor: 'rgba(100,255,100,0.4)', '&:hover': { borderColor: '#7fff7f', bgcolor: 'rgba(100,255,100,0.1)' } }}>
+              {opp.name}
+            </Button>
+          ))}
+          <Button onClick={() => onPoisonKillSelect(null)} sx={{ color: 'rgba(100,255,100,0.4)', fontSize: 12, mt: 0.5 }}>
             Skip
           </Button>
         </Box>

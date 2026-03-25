@@ -35,6 +35,8 @@ function RemotePageInner() {
   const [state, setState] = useState<GameManagerState | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [textSizeMode, setTextSizeMode] = useState<0 | 1 | 2>(0);
+  const [lifeKillPending, setLifeKillPending] = useState(false);
+  const [poisonKillPending, setPoisonKillPending] = useState(false);
   const { mode, toggleTheme } = useThemeMode();
 
   const lastEventTimeRef = useRef<number>(0);
@@ -147,12 +149,24 @@ function RemotePageInner() {
   // ── Action handlers ───────────────────────────────────────────────────────
 
   const handleLifeChange = useCallback((idx: number, delta: number) => {
+    if (state) {
+      const target = state.players[idx];
+      if (target.life > 0 && target.life + delta <= 0 && !target.isEliminated) {
+        setLifeKillPending(true);
+      }
+    }
     sendEvent({ type: 'life_change', playerIdx: idx, delta });
-  }, [sendEvent]);
+  }, [sendEvent, state]);
 
   const handlePoisonChange = useCallback((idx: number, delta: number) => {
+    if (state) {
+      const target = state.players[idx];
+      if (!target.isEliminated && Math.max(0, target.poison + delta) >= 10 && target.poison < 10) {
+        setPoisonKillPending(true);
+      }
+    }
     sendEvent({ type: 'poison_change', playerIdx: idx, delta });
-  }, [sendEvent]);
+  }, [sendEvent, state]);
 
   const handleCommanderTaxChange = useCallback((idx: number, delta: number) => {
     sendEvent({ type: 'commander_tax_change', playerIdx: idx, delta });
@@ -324,6 +338,24 @@ function RemotePageInner() {
         highlightMode={true}
         remoteMode={true}
         onPassTurn={isMyTurn ? handlePassTurn : undefined}
+        {...(lifeKillPending && {
+          lifeKillOpponents: state.players
+            .map((p, i) => ({ name: p.playerName, idx: i }))
+            .filter((_, i) => i !== playerIdx && !state.players[i].isEliminated),
+          onLifeKillSelect: (sourceIdx) => {
+            sendEvent({ type: 'life_kill_attr', playerIdx, sourcePlayerIdx: sourceIdx });
+            setLifeKillPending(false);
+          },
+        })}
+        {...(poisonKillPending && {
+          poisonKillOpponents: state.players
+            .map((p, i) => ({ name: p.playerName, idx: i }))
+            .filter((_, i) => i !== playerIdx && !state.players[i].isEliminated),
+          onPoisonKillSelect: (sourceIdx) => {
+            sendEvent({ type: 'poison_kill_attr', playerIdx, sourcePlayerIdx: sourceIdx });
+            setPoisonKillPending(false);
+          },
+        })}
       />
 
       {/* Text size toggle */}

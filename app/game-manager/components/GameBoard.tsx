@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, Stack } from '@mui/material';
+import { Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography } from '@mui/material';
 import { PlayerPanel } from './PlayerPanel';
 import { CenterZone } from './CenterZone';
 import type { GameManagerState, CommanderDamageMap, PlayerState } from '../types';
@@ -476,6 +476,24 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
                     if (pending) setWinner(pending);
                   },
                 })}
+                {...(poisonKillPrompt?.targetIdx === idx && {
+                  poisonKillOpponents: players
+                    .map((p, i) => ({ name: p.playerName, idx: i }))
+                    .filter((_, i) => i !== idx && !players[i].isEliminated),
+                  onPoisonKillSelect: (sourceIdx) => {
+                    const target = players[poisonKillPrompt.targetIdx];
+                    const source = sourceIdx !== null ? players[sourceIdx] : null;
+                    const poisonNoteTag = `[poisonkill:${poisonKillPrompt.targetIdx}]`;
+                    const noteLine = source
+                      ? `${poisonNoteTag} ${target.playerName} eliminated by ${source.playerName}'s poison (turn ${state.turnNumber})`
+                      : `${poisonNoteTag} ${target.playerName} eliminated by poison (turn ${state.turnNumber})`;
+                    updateState({ notes: [state.notes, noteLine].filter(Boolean).join('\n') });
+                    const remaining = poisonKillPrompt.newPlayers.filter((p) => !p.isEliminated);
+                    const pending = remaining.length === 1 ? remaining[0] : null;
+                    setPoisonKillPrompt(null);
+                    if (pending) setWinner(pending);
+                  },
+                })}
               />
             </Box>
           </Box>
@@ -509,48 +527,9 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
           onCycleTextSizeMode={() => setTextSizeMode((m) => ((m + 1) % 3) as 0 | 1 | 2)}
           highlightMode={highlightMode}
           onToggleHighlightMode={() => setHighlightMode(m => !m)}
-          sessionSeats={state.sessionSeats}
         />
       </Box>
 
-
-      {/* Poison kill attribution prompt */}
-      {poisonKillPrompt && (() => {
-        const target = players[poisonKillPrompt.targetIdx];
-        const opponents = players.filter((_, i) => i !== poisonKillPrompt.targetIdx && !players[i].isEliminated);
-        const poisonNoteTag = `[poisonkill:${poisonKillPrompt.targetIdx}]`;
-        const handleSelect = (sourceIdx: number | null) => {
-          const source = sourceIdx !== null ? players[sourceIdx] : null;
-          const noteLine = source
-            ? `${poisonNoteTag} ${target.playerName} eliminated by ${source.playerName}'s poison (turn ${state.turnNumber})`
-            : `${poisonNoteTag} ${target.playerName} eliminated by poison (turn ${state.turnNumber})`;
-          updateState({ notes: [state.notes, noteLine].filter(Boolean).join('\n') });
-          const remaining = poisonKillPrompt.newPlayers.filter((p) => !p.isEliminated);
-          const pending = remaining.length === 1 ? remaining[0] : null;
-          setPoisonKillPrompt(null);
-          if (pending) setWinner(pending);
-        };
-        return (
-          <Dialog open maxWidth="xs" fullWidth>
-            <DialogTitle sx={{ fontWeight: 700 }}>Who poisoned {target.playerName}?</DialogTitle>
-            <DialogContent>
-              <Stack spacing={1}>
-                {opponents.map((opp, i) => {
-                  const oppIdx = players.indexOf(opp);
-                  return (
-                    <Button key={i} variant="outlined" fullWidth onClick={() => handleSelect(oppIdx)}>
-                      {opp.playerName}
-                    </Button>
-                  );
-                })}
-              </Stack>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => handleSelect(null)}>Skip</Button>
-            </DialogActions>
-          </Dialog>
-        );
-      })()}
 
       {/* Win dialog */}
       <Dialog open={!!winner} maxWidth="xs" fullWidth>

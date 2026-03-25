@@ -27,9 +27,6 @@ import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import ReplayIcon from '@mui/icons-material/Replay';
 import SettingsIcon from '@mui/icons-material/Settings';
 import TextFieldsIcon from '@mui/icons-material/TextFields';
-import QrCodeIcon from '@mui/icons-material/QrCode';
-import { QRCodeSVG } from 'qrcode.react';
-import { ASSET_BASE } from '@/lib/api';
 import type { PlayerState } from '../types';
 
 function D20Icon({ size = 16 }: { size?: number }) {
@@ -82,7 +79,6 @@ interface CenterZoneProps {
   onCycleTextSizeMode: () => void;
   highlightMode: boolean;
   onToggleHighlightMode: () => void;
-  sessionSeats?: Record<string, string> | null;
 }
 
 function rollDie(sides: number): number {
@@ -115,7 +111,6 @@ export function CenterZone({
   onCycleTextSizeMode,
   highlightMode,
   onToggleHighlightMode,
-  sessionSeats,
 }: CenterZoneProps) {
   type RollEntry = { label: string; rolls: (number | string)[]; total: number | null; color: string };
   const [history, setHistory] = useState<RollEntry[]>([]);
@@ -123,7 +118,6 @@ export function CenterZone({
   const [diceCount, setDiceCount] = useState(1);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [confirmRestart, setConfirmRestart] = useState(false);
-  const [qrDialogSeat, setQrDialogSeat] = useState<{ playerName: string; code: string } | null>(null);
   const [diceOpen, setDiceOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesDraft, setNotesDraft] = useState('');
@@ -148,6 +142,22 @@ export function CenterZone({
   };
 
   const lastEntry = history.length > 0 ? history[history.length - 1] : null;
+  const lastRolledType: 'd6' | 'd20' | 'coin' | null = lastEntry
+    ? lastEntry.label === 'd6' ? 'd6'
+      : lastEntry.label === 'd20' ? 'd20'
+      : lastEntry.label.includes('Coin') ? 'coin'
+      : null
+    : null;
+  // Value to show inside the highlighted button: total for multi-dice, roll for single, H/T for coin
+  const lastRolledDisplay: string | null = lastEntry
+    ? lastEntry.total !== null
+      ? String(lastEntry.total)
+      : lastEntry.rolls.length === 1
+        ? lastEntry.label.includes('Coin')
+          ? (lastEntry.rolls[0] === 'Heads' ? 'H' : 'T')
+          : String(lastEntry.rolls[0])
+        : null
+    : null;
   const ts = textSizeMode;
 
   // dvh/dvw-based sizing so the center tile scales across phone, tablet, and desktop
@@ -370,10 +380,9 @@ export function CenterZone({
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'flex-start',
-            gap: 2,
-            p: 1.5,
-            overflowY: 'auto',
+            justifyContent: 'center',
+            gap: 1,
+            p: 1,
           }}>
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '100%' }}>
               <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -384,94 +393,63 @@ export function CenterZone({
               </IconButton>
             </Stack>
 
-            <Stack spacing={1.5} sx={{ width: '100%' }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '100%' }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    size="small"
+                    checked={turnTimerSeconds > 0}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        onTimerChange(lastTimerRef.current);
+                      } else {
+                        lastTimerRef.current = turnTimerSeconds;
+                        onTimerChange(0);
+                      }
+                    }}
+                  />
+                }
+                label={<Typography sx={{ fontSize: 12 }}>Timer</Typography>}
+                sx={{ mx: 0 }}
+              />
+              <FormControlLabel
+                control={<Switch size="small" checked={highlightMode} onChange={onToggleHighlightMode} />}
+                label={<Typography sx={{ fontSize: 12 }}>Highlight</Typography>}
+                sx={{ mx: 0 }}
+              />
               <Button
                 variant="outlined"
                 size="small"
                 onClick={() => { setSettingsOpen(false); setNotesDraft(notes); setNotesOpen(true); }}
-                startIcon={<TextFieldsIcon sx={{ fontSize: 16 }} />}
-                sx={{ fontSize: 12, py: 1, width: '50%', alignSelf: 'center', color: notes.trim() ? 'primary.main' : undefined, borderColor: notes.trim() ? 'primary.main' : undefined }}
+                startIcon={<TextFieldsIcon sx={{ fontSize: 14 }} />}
+                sx={{ fontSize: 11, py: 0.5, color: notes.trim() ? 'primary.main' : undefined, borderColor: notes.trim() ? 'primary.main' : undefined }}
               >
-                Game Notes
+                Notes
               </Button>
+            </Stack>
 
-              <Stack direction="row" justifyContent="center" spacing={2}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={turnTimerSeconds > 0}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          onTimerChange(lastTimerRef.current);
-                        } else {
-                          lastTimerRef.current = turnTimerSeconds;
-                          onTimerChange(0);
-                        }
-                      }}
-                    />
-                  }
-                  label={<Typography sx={{ fontSize: 13 }}>Turn Timer</Typography>}
-                  sx={{ mx: 0 }}
-                />
-                <FormControlLabel
-                  control={<Switch checked={highlightMode} onChange={onToggleHighlightMode} />}
-                  label={<Typography sx={{ fontSize: 13 }}>Header Highlight</Typography>}
-                  sx={{ mx: 0 }}
-                />
-              </Stack>
-
-              <Stack direction="row" spacing={1}>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => { setSettingsOpen(false); setConfirmRestart(true); }}
-                  startIcon={<ReplayIcon sx={{ fontSize: 16 }} />}
-                  fullWidth
-                  sx={{ fontSize: 12, py: 1 }}
-                >
-                  Restart
-                </Button>
-                <Button
-                  variant="outlined"
-                  color="error"
-                  size="small"
-                  onClick={() => { setSettingsOpen(false); setConfirmEnd(true); }}
-                  startIcon={<FlagIcon sx={{ fontSize: 16 }} />}
-                  fullWidth
-                  sx={{ fontSize: 12, py: 1 }}
-                >
-                  End Game
-                </Button>
-              </Stack>
-
-              {sessionSeats && Object.keys(sessionSeats).length > 0 && (
-                <Box>
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 0.75 }}>
-                    Remote Players
-                  </Typography>
-                  <Stack spacing={0.5}>
-                    {players.map((p) => {
-                      const code = sessionSeats[p.position];
-                      if (!code) return null;
-                      return (
-                        <Stack key={p.position} direction="row" alignItems="center" justifyContent="space-between">
-                          <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.primary', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {p.playerName}
-                          </Typography>
-                          <Stack direction="row" alignItems="center" spacing={0.75}>
-                            <Typography sx={{ fontSize: 11, fontFamily: 'monospace', color: 'text.secondary', letterSpacing: 1 }}>
-                              {code}
-                            </Typography>
-                            <IconButton size="small" sx={{ p: 0.25 }} onClick={() => setQrDialogSeat({ playerName: p.playerName, code })}>
-                              <QrCodeIcon sx={{ fontSize: 16 }} />
-                            </IconButton>
-                          </Stack>
-                        </Stack>
-                      );
-                    })}
-                  </Stack>
-                </Box>
-              )}
+            <Stack direction="row" spacing={1} sx={{ width: '100%' }}>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => { setSettingsOpen(false); setConfirmRestart(true); }}
+                startIcon={<ReplayIcon sx={{ fontSize: 14 }} />}
+                fullWidth
+                sx={{ fontSize: 11, py: 0.5 }}
+              >
+                Restart
+              </Button>
+              <Button
+                variant="outlined"
+                color="error"
+                size="small"
+                onClick={() => { setSettingsOpen(false); setConfirmEnd(true); }}
+                startIcon={<FlagIcon sx={{ fontSize: 14 }} />}
+                fullWidth
+                sx={{ fontSize: 11, py: 0.5 }}
+              >
+                End Game
+              </Button>
             </Stack>
           </Box>
         )}
@@ -486,13 +464,12 @@ export function CenterZone({
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'flex-start',
+            justifyContent: 'center',
             gap: 1,
-            p: 1.5,
-            overflowY: 'auto',
+            p: 1,
           }}>
             {/* Header */}
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '100%', flexShrink: 0 }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '100%' }}>
               <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                 Dice / Flips
               </Typography>
@@ -501,61 +478,50 @@ export function CenterZone({
               </IconButton>
             </Stack>
 
-            {/* Latest result — big display */}
-            <Box sx={{ minHeight: 80, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {/* Latest result */}
+            <Box sx={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {lastEntry ? (
                 <Box key={resultKey} sx={{
-                  position: 'relative', width: '100%', textAlign: 'center',
+                  width: '100%', textAlign: 'center',
                   animation: 'diceResultPop 0.35s cubic-bezier(0.34,1.56,0.64,1)',
                   '@keyframes diceResultPop': {
-                    '0%':   { opacity: 0, transform: 'scale(0.4) translateY(12px)' },
-                    '100%': { opacity: 1, transform: 'scale(1)   translateY(0)'    },
+                    '0%':   { opacity: 0, transform: 'scale(0.4) translateY(8px)' },
+                    '100%': { opacity: 1, transform: 'scale(1)   translateY(0)'   },
                   },
                 }}>
                   {lastEntry.rolls.length === 1 ? (
-                    <Typography sx={{ fontWeight: 900, fontSize: 48, lineHeight: 1, color: lastEntry.color }}>
+                    <Typography sx={{ fontWeight: 900, fontSize: 40, lineHeight: 1, color: lastEntry.color }}>
                       {lastEntry.rolls[0]}
                     </Typography>
                   ) : (
-                    <>
-                      <Stack direction="row" flexWrap="wrap" justifyContent="center" gap={1}>
-                        {lastEntry.rolls.map((r, i) => (
-                          <Box key={i} sx={{ textAlign: 'center' }}>
-                            <Typography sx={{ fontSize: 9, color: 'text.disabled' }}>{i + 1}</Typography>
-                            <Typography sx={{ fontWeight: 900, fontSize: 32, lineHeight: 1, color: lastEntry.color }}>{r}</Typography>
-                          </Box>
-                        ))}
-                      </Stack>
-                      {lastEntry.total !== null && (
-                        <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.5 }}>
-                          total: {lastEntry.total}
-                        </Typography>
-                      )}
-                    </>
+                    <Stack direction="row" flexWrap="wrap" justifyContent="center" gap={0.5}>
+                      {lastEntry.rolls.map((r, i) => (
+                        <Box key={i} sx={{ textAlign: 'center' }}>
+                          <Typography sx={{ fontSize: 9, color: 'text.disabled' }}>{i + 1}</Typography>
+                          <Typography sx={{ fontWeight: 900, fontSize: 26, lineHeight: 1, color: lastEntry.color }}>{r}</Typography>
+                        </Box>
+                      ))}
+                    </Stack>
                   )}
-                  <Typography sx={{ fontSize: 10, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1, mt: 1.5 }}>
-                    {lastEntry.label}
-                  </Typography>
                 </Box>
               ) : (
                 <Typography sx={{ fontSize: 11, color: 'text.disabled' }}>—</Typography>
               )}
             </Box>
 
-
             {/* Buttons */}
-            <Stack spacing={1.5} sx={{ width: '100%' }}>
+            <Stack spacing={0.75} sx={{ width: '100%' }}>
               <Stack direction="row" spacing={1}>
-                <Button variant="outlined" fullWidth onClick={() => addRoll('d6', 6)} startIcon={<CasinoIcon sx={{ fontSize: 16 }} />} sx={{ fontSize: 12, py: 1 }}>d6</Button>
-                <Button variant="outlined" fullWidth onClick={() => addRoll('d20', 20)} startIcon={<D20Icon size={16} />} sx={{ fontSize: 12, py: 1 }}>d20</Button>
-                <Button variant="outlined" fullWidth onClick={() => addRoll('coin', null)} startIcon={<TollIcon sx={{ fontSize: 16 }} />} sx={{ fontSize: 12, py: 1 }}>Flip Coin</Button>
+                <Button variant="outlined" fullWidth onClick={() => addRoll('d6', 6)} startIcon={lastRolledType === 'd6' ? null : <CasinoIcon sx={{ fontSize: 14 }} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'd6' ? 900 : 400, py: 0.5, ...(lastRolledType === 'd6' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'd6' && lastRolledDisplay ? `total ${lastRolledDisplay}` : 'd6'}</Button>
+                <Button variant="outlined" fullWidth onClick={() => addRoll('d20', 20)} startIcon={lastRolledType === 'd20' ? null : <D20Icon size={14} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'd20' ? 900 : 400, py: 0.5, ...(lastRolledType === 'd20' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'd20' && lastRolledDisplay ? `total ${lastRolledDisplay}` : 'd20'}</Button>
+                <Button variant="outlined" fullWidth onClick={() => addRoll('coin', null)} startIcon={lastRolledType === 'coin' ? null : <TollIcon sx={{ fontSize: 14 }} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'coin' ? 900 : 400, py: 0.5, ...(lastRolledType === 'coin' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'coin' && lastRolledDisplay ? lastRolledDisplay : 'Flip'}</Button>
               </Stack>
               <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Stack direction="row" alignItems="center" spacing={0.75}>
-                  <Button variant="outlined" onClick={() => setDiceCount((c) => Math.max(1, c - 1))} sx={{ minWidth: 36, px: 0, fontSize: 18, py: 0.75 }}>−</Button>
-                  <Typography sx={{ fontWeight: 700, fontSize: 15, minWidth: 24, textAlign: 'center' }}>{diceCount}</Typography>
-                  <Button variant="outlined" onClick={() => setDiceCount((c) => Math.min(20, c + 1))} sx={{ minWidth: 36, px: 0, fontSize: 18, py: 0.75 }}>+</Button>
-                  <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>dice</Typography>
+                <Stack direction="row" alignItems="center" spacing={0.5}>
+                  <Button variant="outlined" onClick={() => setDiceCount((c) => Math.max(1, c - 1))} sx={{ minWidth: 32, px: 0, fontSize: 16, py: 0.5 }}>−</Button>
+                  <Typography sx={{ fontWeight: 700, fontSize: 14, minWidth: 20, textAlign: 'center' }}>{diceCount}</Typography>
+                  <Button variant="outlined" onClick={() => setDiceCount((c) => Math.min(20, c + 1))} sx={{ minWidth: 32, px: 0, fontSize: 16, py: 0.5 }}>+</Button>
+                  <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>dice</Typography>
                 </Stack>
                 {history.length > 0 && (
                   <Button variant="text" size="small" onClick={() => setHistory([])} sx={{ fontSize: 10, px: 0.5, color: 'text.disabled' }}>Clear</Button>
@@ -619,30 +585,6 @@ export function CenterZone({
         </DialogActions>
       </Dialog>
 
-      <Dialog open={!!qrDialogSeat} onClose={() => setQrDialogSeat(null)} maxWidth="xs">
-        <DialogTitle sx={{ pb: 1 }}>{qrDialogSeat?.playerName}</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, pb: 3 }}>
-          {qrDialogSeat && (
-            <>
-              <Box sx={{ p: 1.5, bgcolor: '#fff', borderRadius: 1 }}>
-                <QRCodeSVG
-                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}${ASSET_BASE}/game-manager/remote/?code=${qrDialogSeat.code}`}
-                  size={200}
-                />
-              </Box>
-              <Typography sx={{ fontFamily: 'monospace', fontSize: 18, letterSpacing: 3, fontWeight: 700 }}>
-                {qrDialogSeat.code}
-              </Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary', textAlign: 'center' }}>
-                Scan to join as {qrDialogSeat.playerName}
-              </Typography>
-            </>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setQrDialogSeat(null)}>Close</Button>
-        </DialogActions>
-      </Dialog>
     </>
   );
 }

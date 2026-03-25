@@ -412,17 +412,20 @@ export type LiveGameEventType =
   | 'eliminate'
   | 'undo_eliminate'
   | 'pass_turn'
-  | 'checkin';
+  | 'checkin'
+  | 'life_kill_attr'
+  | 'poison_kill_attr';
 
 export interface LiveGameEvent {
   type: LiveGameEventType;
-  playerIdx?: number;   // target player index (most events)
-  targetIdx?: number;   // commander_damage_change: player receiving damage
-  sourceIdx?: number;   // commander_damage_change: player dealing damage
-  isPartner?: boolean;  // commander_damage_change: is partner commander
-  delta?: number;       // numeric change (life_change, poison_change, etc.)
-  seat: string;         // which seat sent this event
-  ts: number;           // client timestamp ms (for ordering / expiry)
+  playerIdx?: number;         // target player index (most events)
+  targetIdx?: number;         // commander_damage_change: player receiving damage
+  sourceIdx?: number;         // commander_damage_change: player dealing damage
+  isPartner?: boolean;        // commander_damage_change: is partner commander
+  delta?: number;             // numeric change (life_change, poison_change, etc.)
+  sourcePlayerIdx?: number | null; // life_kill_attr / poison_kill_attr: who caused the kill (null = skip)
+  seat: string;               // which seat sent this event
+  ts: number;                 // client timestamp ms (for ordering / expiry)
 }
 
 export interface LiveGameSeatResponse {
