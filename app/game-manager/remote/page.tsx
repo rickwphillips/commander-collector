@@ -4,10 +4,13 @@ import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Box, Typography, TextField, Button, Stack, CircularProgress, IconButton } from '@mui/material';
 import TextFieldsIcon from '@mui/icons-material/TextFields';
+import Brightness7Icon from '@mui/icons-material/Brightness7';
+import Brightness4Icon from '@mui/icons-material/Brightness4';
 import { PlayerPanel } from '../components/PlayerPanel';
 import { api } from '@/lib/api';
 import type { GameManagerState, PlayerState, LiveGameEvent } from '@/lib/types';
 import { applyEvent } from '../remoteTransforms';
+import { useThemeMode } from '@/components/ThemeProvider';
 
 const POLL_INTERVAL_MS = 1000;
 // After sending an event, suppress polls for this long to avoid flickering
@@ -32,6 +35,7 @@ function RemotePageInner() {
   const [state, setState] = useState<GameManagerState | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [textSizeMode, setTextSizeMode] = useState<0 | 1 | 2>(0);
+  const { mode, toggleTheme } = useThemeMode();
 
   const lastEventTimeRef = useRef<number>(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -333,6 +337,20 @@ function RemotePageInner() {
         }}
       >
         <TextFieldsIcon sx={{ fontSize: textSizeMode === 2 ? 24 : textSizeMode === 1 ? 22 : 20 }} />
+      </IconButton>
+
+      {/* Dark mode toggle */}
+      <IconButton
+        onClick={toggleTheme}
+        aria-label="toggle dark mode"
+        sx={{
+          position: 'absolute', bottom: 10, left: 58, zIndex: 10,
+          color: 'text.secondary',
+          bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.6)',
+          '&:hover': { bgcolor: 'action.hover' },
+        }}
+      >
+        {mode === 'light' ? <Brightness4Icon /> : <Brightness7Icon />}
       </IconButton>
     </Box>
   );

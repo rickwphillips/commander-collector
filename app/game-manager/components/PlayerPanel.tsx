@@ -1443,8 +1443,20 @@ export function PlayerPanel({
         </Box>
 
         {/* Life total + controls */}
-        <Box sx={{ width: '33%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5 }}>
-          <Box sx={{ position: 'relative', lineHeight: 1 }}>
+        <Box sx={{ width: '33%', flexShrink: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', px: 0.5 }}>
+          <Tooltip open={lpKey === 'life-dec'} title="-5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
+            <IconButton
+              onClick={guardClick(() => onLifeChange(playerIdx, -1))}
+              onPointerDown={() => startLongPress('life-dec', () => onLifeChange(playerIdx, -5))}
+              onPointerUp={cancelLongPress}
+              onPointerLeave={cancelLongPress}
+              onPointerCancel={cancelLongPress}
+              sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, transition: 'padding 0.2s ease' }}
+            >
+              <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 60 : ts === 1 ? 48 : 36 }}>−</Typography>
+            </IconButton>
+          </Tooltip>
+          <Box sx={{ position: 'relative', lineHeight: 1, overflow: 'visible' }}>
             {showCrown && (
               <CrownIcon sx={{
                 fontSize: ts === 2 ? 72 : ts === 1 ? 60 : 48,
@@ -1461,7 +1473,9 @@ export function PlayerPanel({
             <Box sx={{ position: 'relative', overflow: 'hidden', lineHeight: 1, display: 'inline-block' }}>
               <Typography sx={{
                 fontWeight: 900,
-                fontSize: ts === 2 ? 'clamp(50px, 14dvh, 128px)' : ts === 1 ? 'clamp(40px, 11dvh, 96px)' : 'clamp(34px, 9dvh, 80px)',
+                fontSize: highlightMode
+                  ? (ts === 2 ? 'clamp(70px, 18dvh, 160px)' : ts === 1 ? 'clamp(60px, 15dvh, 130px)' : 'clamp(50px, 12dvh, 110px)')
+                  : (ts === 2 ? 'clamp(50px, 14dvh, 128px)' : ts === 1 ? 'clamp(40px, 11dvh, 96px)' : 'clamp(34px, 9dvh, 80px)'),
                 lineHeight: 1,
                 color: computedLifeColor || ((theme: import('@mui/material').Theme) => theme.palette.primary.main),
                 transition: 'color 0.4s ease, font-size 0.2s ease',
@@ -1475,7 +1489,9 @@ export function PlayerPanel({
                 <Box sx={{
                   position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
                   fontWeight: 900,
-                  fontSize: ts === 2 ? 'clamp(50px, 14dvh, 128px)' : ts === 1 ? 'clamp(40px, 11dvh, 96px)' : 'clamp(34px, 9dvh, 80px)',
+                  fontSize: highlightMode
+                    ? (ts === 2 ? 'clamp(70px, 18dvh, 160px)' : ts === 1 ? 'clamp(60px, 15dvh, 130px)' : 'clamp(50px, 12dvh, 110px)')
+                    : (ts === 2 ? 'clamp(50px, 14dvh, 128px)' : ts === 1 ? 'clamp(40px, 11dvh, 96px)' : 'clamp(34px, 9dvh, 80px)'),
                   lineHeight: 1,
                   color: 'transparent',
                   WebkitTextFillColor: 'transparent',
@@ -1563,32 +1579,18 @@ export function PlayerPanel({
               )}
             </Box>
           </Box>
-          <Stack direction="row" alignItems="center" spacing={ts === 2 ? 3 : ts === 1 ? 1.5 : 0} sx={{ mt: ts === 2 ? -1.5 : ts === 1 ? -0.5 : 0.5, transition: 'gap 0.2s ease, margin-top 0.2s ease' }}>
-            <Tooltip open={lpKey === 'life-dec'} title="-5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-              <IconButton
-                onClick={guardClick(() => onLifeChange(playerIdx, -1))}
-                onPointerDown={() => startLongPress('life-dec', () => onLifeChange(playerIdx, -5))}
-                onPointerUp={cancelLongPress}
-                onPointerLeave={cancelLongPress}
-                onPointerCancel={cancelLongPress}
-                sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, transition: 'padding 0.2s ease' }}
-              >
-                <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 60 : ts === 1 ? 48 : 36 }}>−</Typography>
-              </IconButton>
-            </Tooltip>
-            <Tooltip open={lpKey === 'life-inc'} title="+5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-              <IconButton
-                onClick={guardClick(() => onLifeChange(playerIdx, 1))}
-                onPointerDown={() => startLongPress('life-inc', () => onLifeChange(playerIdx, 5))}
-                onPointerUp={cancelLongPress}
-                onPointerLeave={cancelLongPress}
-                onPointerCancel={cancelLongPress}
-                sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, transition: 'padding 0.2s ease' }}
-              >
-                <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 60 : ts === 1 ? 48 : 36 }}>+</Typography>
-              </IconButton>
-            </Tooltip>
-          </Stack>
+          <Tooltip open={lpKey === 'life-inc'} title="+5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
+            <IconButton
+              onClick={guardClick(() => onLifeChange(playerIdx, 1))}
+              onPointerDown={() => startLongPress('life-inc', () => onLifeChange(playerIdx, 5))}
+              onPointerUp={cancelLongPress}
+              onPointerLeave={cancelLongPress}
+              onPointerCancel={cancelLongPress}
+              sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, transition: 'padding 0.2s ease' }}
+            >
+              <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 60 : ts === 1 ? 48 : 36 }}>+</Typography>
+            </IconButton>
+          </Tooltip>
         </Box>
 
         {/* Counters — right column */}

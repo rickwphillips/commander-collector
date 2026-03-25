@@ -47,6 +47,8 @@ const releases: Release[] = [
       { type: 'improved', text: 'Multiple remote players can now make changes simultaneously without one stomping the other\'s update' },
       { type: 'improved', text: 'Host polls for remote events every 1 second (down from 3 seconds) for noticeably faster sync' },
       { type: 'added', text: 'Remote panel connection check-in now uses the event queue, keeping the connected indicator alive without full state writes' },
+      { type: 'improved', text: 'Life total on the remote panel is larger and displayed between the − and + buttons for easier one-handed play' },
+      { type: 'added', text: 'Dark mode toggle added to the bottom of the remote panel' },
     ],
   },
   {
