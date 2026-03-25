@@ -1237,6 +1237,41 @@ export function PlayerPanel({
               </Stack>
             </Box>
           )}
+          {/* Pass Turn — long press, remote panel only */}
+          {remoteMode && isCurrentPlayer && onPassTurn && !player.isEliminated && (
+            <Box
+              onPointerDown={startPassTurnHold}
+              onPointerUp={cancelPassTurnHold}
+              onPointerLeave={cancelPassTurnHold}
+              onPointerCancel={cancelPassTurnHold}
+              sx={{
+                position: 'relative', overflow: 'hidden',
+                px: 1.5, py: 0.5,
+                borderRadius: 1.5,
+                border: '2px solid',
+                borderColor: 'primary.main',
+                cursor: 'pointer',
+                userSelect: 'none',
+                ...(passTurnHolding && {
+                  '&::after': {
+                    content: '""',
+                    position: 'absolute', top: 0, left: 0, height: '100%', width: '100%',
+                    bgcolor: 'primary.main',
+                    transformOrigin: 'left center',
+                    animation: 'passFill 0.7s linear forwards',
+                    '@keyframes passFill': {
+                      '0%': { transform: 'scaleX(0)' },
+                      '100%': { transform: 'scaleX(1)' },
+                    },
+                  },
+                }),
+              }}
+            >
+              <Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 13 : 12, fontWeight: 700, position: 'relative', zIndex: 1, color: 'primary.main', whiteSpace: 'nowrap', lineHeight: 1.4 }}>
+                PASS
+              </Typography>
+            </Box>
+          )}
         </Stack>
 
         {/* Center: absolutely positioned so it's always centered relative to the full header */}
@@ -1255,41 +1290,6 @@ export function PlayerPanel({
           </Typography>
         </Box>
           <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: 'auto', zIndex: 1 }}>
-            {/* Pass Turn — long press, remote panel only */}
-            {remoteMode && isCurrentPlayer && onPassTurn && !player.isEliminated && (
-              <Box
-                onPointerDown={startPassTurnHold}
-                onPointerUp={cancelPassTurnHold}
-                onPointerLeave={cancelPassTurnHold}
-                onPointerCancel={cancelPassTurnHold}
-                sx={{
-                  position: 'relative', overflow: 'hidden',
-                  px: 0.75, py: 0.25,
-                  borderRadius: 1,
-                  border: '1.5px solid',
-                  borderColor: 'primary.main',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  ...(passTurnHolding && {
-                    '&::after': {
-                      content: '""',
-                      position: 'absolute', top: 0, left: 0, height: '100%', width: '100%',
-                      bgcolor: 'primary.main',
-                      transformOrigin: 'left center',
-                      animation: 'passFill 0.7s linear forwards',
-                      '@keyframes passFill': {
-                        '0%': { transform: 'scaleX(0)' },
-                        '100%': { transform: 'scaleX(1)' },
-                      },
-                    },
-                  }),
-                }}
-              >
-                <Typography sx={{ fontSize: ts === 2 ? 11 : 10, fontWeight: 700, position: 'relative', zIndex: 1, color: 'primary.main', whiteSpace: 'nowrap', lineHeight: 1.4 }}>
-                  PASS
-                </Typography>
-              </Box>
-            )}
             {/* Active game state indicators */}
             <>
               {player.isMonarch && (
