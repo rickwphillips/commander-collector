@@ -38,6 +38,20 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.23.0',
+    date: '2026-03-25',
+    title: 'Commander damage threat visuals & auto-elimination',
+    changes: [
+      { type: 'added', text: 'Commander damage panel shows the threatening commander\'s art as a vignette background that intensifies as damage approaches 21' },
+      { type: 'added', text: 'Threatening commander\'s name appears scattered as ghost text across the life total panel, growing more visible as damage climbs' },
+      { type: 'improved', text: 'Commander damage elimination now checks each commander individually — 21 from a single commander is lethal, not the combined total' },
+      { type: 'fixed', text: 'Players are automatically eliminated when commander damage or any source brings their life to 0 — no manual step needed' },
+      { type: 'fixed', text: 'Commander damage to 0 life auto-attributes to the dealing player\'s commander; manual life changes still show the attribution prompt' },
+      { type: 'fixed', text: 'Eliminated players on their turn can still pass the turn from the remote panel' },
+      { type: 'improved', text: 'Commander damage elimination logic consolidated into a single shared source used by both host and remote panel' },
+    ],
+  },
+  {
     version: '1.22.0',
     date: '2026-03-25',
     title: 'Remote panel sync & Game Setup random fill',
