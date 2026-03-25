@@ -316,6 +316,7 @@ function RemotePageInner() {
         elapsedSeconds={isMyTurn ? elapsedSeconds : 0}
         textSizeMode={textSizeMode}
         highlightMode={true}
+        remoteMode={true}
       />
       {/* Pass Turn button — only shown when it's this player's turn */}
       {isMyTurn && (

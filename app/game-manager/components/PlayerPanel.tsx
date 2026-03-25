@@ -200,6 +200,7 @@ interface PlayerPanelProps {
   textSizeMode?: 0 | 1 | 2;
   monarchTransfer?: { fromPos: string | null; toPos: string | null };
   highlightMode?: boolean;
+  remoteMode?: boolean;
   seatCode?: string;
   activePlayerIdx?: number;
   remoteConnected?: boolean;
@@ -231,6 +232,7 @@ export function PlayerPanel({
   textSizeMode = 0,
   monarchTransfer = { fromPos: null, toPos: null },
   highlightMode = false,
+  remoteMode = false,
   seatCode,
   activePlayerIdx,
   remoteConnected = false,
@@ -404,11 +406,26 @@ export function PlayerPanel({
     100% { transform: translate(-50%,-50%) rotate(45deg) scale(4);   opacity: 0; }
   `, []);
 
+  const energyStaticShadow = player.energy > 5
+    ? `0 0 18px rgba(30,100,210,0.55), 0 0 36px rgba(20,70,180,0.3)`
+    : undefined;
   const energyPulseAnim = useMemo(() => player.energy > 5 ? keyframes`
-    0%   { text-shadow: ${energyGlow}; }
-    35%  { text-shadow: ${energyGlowPeak}; }
-    65%  { text-shadow: ${energyGlowPeak}; }
-    100% { text-shadow: ${energyGlow}; }
+    0%   { text-shadow: ${energyStaticShadow}, 0 0 4px rgba(80,200,255,0.95), 0 0 8px rgba(80,200,255,0.8); }
+    100% { text-shadow: ${energyStaticShadow}, 0 0 ${30 + player.energy * 5}px rgba(80,200,255,0), 0 0 ${60 + player.energy * 10}px rgba(80,200,255,0); }
+  ` : null, [player.energy]);
+  const sizzleAmp = Math.min(player.energy - 5, 10) * 0.2;
+  const energySizzleAnim = useMemo(() => player.energy > 5 ? keyframes`
+    0%   { transform: translate(0, 0); }
+    10%  { transform: translate(${-sizzleAmp}px, ${sizzleAmp * 0.5}px); }
+    20%  { transform: translate(${sizzleAmp}px, ${-sizzleAmp}px); }
+    30%  { transform: translate(${-sizzleAmp * 0.5}px, ${sizzleAmp}px); }
+    40%  { transform: translate(${sizzleAmp}px, ${sizzleAmp * 0.5}px); }
+    50%  { transform: translate(${-sizzleAmp}px, ${-sizzleAmp * 0.5}px); }
+    60%  { transform: translate(${sizzleAmp * 0.5}px, ${sizzleAmp}px); }
+    70%  { transform: translate(${-sizzleAmp}px, ${sizzleAmp * 0.5}px); }
+    80%  { transform: translate(${sizzleAmp}px, ${-sizzleAmp * 0.5}px); }
+    90%  { transform: translate(${-sizzleAmp * 0.5}px, ${-sizzleAmp}px); }
+    100% { transform: translate(0, 0); }
   ` : null, [player.energy]);
 
   const damageFlashAnim = useMemo(() => keyframes`
@@ -1443,8 +1460,8 @@ export function PlayerPanel({
         </Box>
 
         {/* Life total + controls */}
-        <Box sx={{ width: '33%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5 }}>
-          <Box sx={{ position: 'relative', lineHeight: 1, overflow: 'visible' }}>
+        <Box sx={{ width: '33%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5, alignSelf: 'stretch' }}>
+          <Box sx={{ position: 'relative', lineHeight: 1, overflow: 'visible', width: '100%', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {showCrown && (
               <CrownIcon sx={{
                 fontSize: ts === 2 ? 72 : ts === 1 ? 60 : 48,
@@ -1458,17 +1475,17 @@ export function PlayerPanel({
               }} />
             )}
             {/* Overflow-hidden wrapper keeps the swipe clipped to the number */}
-            <Box sx={{ position: 'relative', overflow: 'hidden', lineHeight: 1, display: 'inline-block' }}>
+            <Box sx={{ position: 'relative', overflow: 'hidden', lineHeight: 1, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Typography sx={{
                 fontWeight: 900,
-                fontSize: highlightMode
+                fontSize: remoteMode
                   ? (ts === 2 ? 'clamp(100px, 26dvh, 220px)' : ts === 1 ? 'clamp(85px, 22dvh, 190px)' : 'clamp(72px, 18dvh, 160px)')
                   : (ts === 2 ? 'clamp(50px, 14dvh, 128px)' : ts === 1 ? 'clamp(40px, 11dvh, 96px)' : 'clamp(34px, 9dvh, 80px)'),
                 lineHeight: 1,
                 color: computedLifeColor || ((theme: import('@mui/material').Theme) => theme.palette.primary.main),
                 transition: 'color 0.4s ease, font-size 0.2s ease',
                 ...(damageFlash > 0 && { animation: `${damageFlashAnim} 0.6s ease-out forwards` }),
-                ...(damageFlash === 0 && energyPulseAnim && { animation: `${energyPulseAnim} ${energyPulseDuration.toFixed(2)}s ease-in-out infinite` }),
+                ...(damageFlash === 0 && energyPulseAnim && { animation: `${energyPulseAnim} ${energyPulseDuration.toFixed(2)}s ease-out infinite, ${energySizzleAnim} 0.12s linear infinite` }),
               }}>
                 {player.life}
               </Typography>
