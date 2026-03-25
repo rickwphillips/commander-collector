@@ -8,6 +8,7 @@ import { GameEndSummary } from './components/GameEndSummary';
 import type { GameManagerState, PlayerSetup, PlayerState, CommanderDamageMap } from './types';
 import type { GameResultInput } from '@/lib/types';
 import { api } from '@/lib/api';
+import { applyEvent } from './remoteTransforms';
 
 const POSITIONS_BY_COUNT: Record<number, Array<PlayerState['position']>> = {
   2: ['bottom', 'top'],
@@ -97,9 +98,8 @@ export default function GameManagerPage() {
   });
   const [setupPrefill, setSetupPrefill] = useState<PlayerSetup[] | null>(null);
 
-  // Refs for live session sync
+  // Ref for live session sync (write timestamp used by sessionVerifiedRef logic only)
   const lastWriteTimeRef = useRef<number>(0);
-  const lastSeenUpdatedAtRef = useRef<string | null>(null);
 
   // On reload from localStorage we must verify the saved sessionCode is still active before
   // writing — otherwise we replay stale local state into a live session that may have moved on.
@@ -155,31 +155,31 @@ export default function GameManagerPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Poll for incoming remote changes
+  // Poll for remote events. The host is the sole writer of full state; remotes
+  // append typed events to the queue instead. We consume (read + clear) the queue
+  // every second and apply any events to our local state. The existing write effect
+  // then persists the merged result to the DB.
   useEffect(() => {
     if (state.phase !== 'playing' || !state.sessionCode) return;
     const code = state.sessionCode;
 
     const poll = async () => {
-      // Skip if we just wrote (avoid reading back our own write)
-      if (Date.now() - lastWriteTimeRef.current < 500) return;
-      // Skip if tab is hidden
       if (document.visibilityState === 'hidden') return;
       try {
-        const res = await api.getLiveGame(code);
+        const res = await api.getLiveGame(code, true); // consume=true clears the queue
         if (!res.is_active) return;
-        if (res.updated_at === lastSeenUpdatedAtRef.current) return;
-        lastSeenUpdatedAtRef.current = res.updated_at;
-        // Only apply if the incoming state is different from ours
-        // (prevents stomping local state with stale data)
+        if (res.remote_events.length === 0) return; // nothing to apply
         setState((prev) => {
-          if (JSON.stringify(prev) === JSON.stringify(res.state)) return prev;
-          return { ...res.state, sessionCode: prev.sessionCode, sessionSeats: prev.sessionSeats };
+          if (!prev) return prev;
+          return res.remote_events.reduce(
+            (s, ev) => applyEvent(s, ev),
+            prev,
+          );
         });
       } catch {/* silent */}
     };
 
-    const id = setInterval(poll, POLL_INTERVAL_MS);
+    const id = setInterval(poll, 1000);
     return () => clearInterval(id);
   }, [state.phase, state.sessionCode]);
 

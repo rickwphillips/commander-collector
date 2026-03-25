@@ -7,7 +7,7 @@
  * never overwrite fields (like currentPlayerIdx / turnNumber) that the host
  * may have changed since the remote panel last polled.
  */
-import type { GameManagerState, CommanderDamageMap } from '@/lib/types';
+import type { GameManagerState, CommanderDamageMap, LiveGameEvent } from '@/lib/types';
 
 export const CLOCKWISE: ReadonlyArray<'bottom' | 'left' | 'top' | 'right'> = [
   'bottom',
@@ -188,6 +188,13 @@ export function applyUndoEliminate(state: GameManagerState, idx: number): GameMa
   return { ...state, players: newPlayers };
 }
 
+export function applyCheckin(state: GameManagerState, seat: string, ts: number): GameManagerState {
+  return {
+    ...state,
+    remoteCheckins: { ...(state.remoteCheckins ?? {}), [seat]: ts },
+  };
+}
+
 export function applyPassTurn(state: GameManagerState): GameManagerState {
   const { players, currentPlayerIdx, turnNumber } = state;
   const firstIdx = state.firstPlayerIdx ?? 0;
@@ -215,4 +222,44 @@ export function applyPassTurn(state: GameManagerState): GameManagerState {
     turnNumber: newTurnNumber,
     turnStartTime: Date.now(),
   };
+}
+
+/**
+ * Dispatch a LiveGameEvent to the correct state-transform function.
+ * The host calls this for each event it dequeues from remote_events.
+ * Unknown event types are ignored (returns state unchanged).
+ */
+export function applyEvent(state: GameManagerState, event: LiveGameEvent): GameManagerState {
+  switch (event.type) {
+    case 'life_change':
+      return applyLifeChange(state, event.playerIdx!, event.delta!);
+    case 'poison_change':
+      return applyPoisonChange(state, event.playerIdx!, event.delta!);
+    case 'commander_tax_change':
+      return applyCommanderTaxChange(state, event.playerIdx!, event.delta!);
+    case 'energy_change':
+      return applyEnergyChange(state, event.playerIdx!, event.delta!);
+    case 'experience_change':
+      return applyExperienceChange(state, event.playerIdx!, event.delta!);
+    case 'toggle_monarch':
+      return applyToggleMonarch(state, event.playerIdx!);
+    case 'toggle_initiative':
+      return applyToggleInitiative(state, event.playerIdx!);
+    case 'toggle_citys_blessing':
+      return applyToggleCitysBlessing(state, event.playerIdx!);
+    case 'commander_damage_change':
+      return applyCommanderDamageChange(
+        state, event.targetIdx!, event.sourceIdx!, event.isPartner!, event.delta!
+      );
+    case 'eliminate':
+      return applyEliminate(state, event.playerIdx!);
+    case 'undo_eliminate':
+      return applyUndoEliminate(state, event.playerIdx!);
+    case 'pass_turn':
+      return applyPassTurn(state);
+    case 'checkin':
+      return applyCheckin(state, event.seat, event.ts);
+    default:
+      return state;
+  }
 }

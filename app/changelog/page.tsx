@@ -38,6 +38,18 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.19.0',
+    date: '2026-03-25T00:00:00',
+    title: 'Delta event queue for live sync',
+    changes: [
+      { type: 'improved', text: 'Remote players now send lightweight actions (life change, pass turn, etc.) instead of full game state — eliminating the race condition where a remote write could revert the host\'s turn advance' },
+      { type: 'fixed', text: 'Turn number can no longer be accidentally overwritten by a remote player\'s action — the host is the sole authority on turn state' },
+      { type: 'improved', text: 'Multiple remote players can now make changes simultaneously without one stomping the other\'s update' },
+      { type: 'improved', text: 'Host polls for remote events every 1 second (down from 3 seconds) for noticeably faster sync' },
+      { type: 'added', text: 'Remote panel connection check-in now uses the event queue, keeping the connected indicator alive without full state writes' },
+    ],
+  },
+  {
     version: '1.18.0',
     date: '2026-03-25T00:00:00',
     title: 'Live game session stability',

@@ -118,6 +118,7 @@ describe('session verification on reload', () => {
     (api.getLiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
       is_active: false,
       state: mockPlayingState,
+      remote_events: [],
       updated_at: '2026-01-01T00:00:00Z',
       seat: 'bottom',
     });
@@ -136,6 +137,7 @@ describe('session verification on reload', () => {
     (api.getLiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
       is_active: true,
       state: freshDBState,
+      remote_events: [],
       updated_at: '2026-01-01T00:00:00Z',
       seat: 'bottom',
     });
@@ -180,6 +182,7 @@ describe('handleStart — session cleanup ordering', () => {
     (api.getLiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
       is_active: true,
       state: mockPlayingState,
+      remote_events: [],
       updated_at: '2026-01-01T00:00:00Z',
       seat: 'bottom',
     });

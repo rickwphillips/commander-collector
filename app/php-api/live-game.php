@@ -6,16 +6,19 @@ $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
 $code = isset($_GET['code']) ? trim($_GET['code']) : null;
 
-// Resolve session + seat from a seat code
-function resolveSession($pdo, $code) {
-    $stmt = $pdo->prepare('
-        SELECT s.id as session_id, s.state, s.updated_at, s.is_active,
+// Resolve session + seat from a seat code.
+// Pass $forUpdate = true inside an open transaction to lock the row.
+function resolveSession($pdo, $code, $forUpdate = false) {
+    $lock = $forUpdate ? 'FOR UPDATE' : '';
+    $stmt = $pdo->prepare("
+        SELECT s.id as session_id, s.state, s.remote_events, s.updated_at, s.is_active,
                seat.seat
         FROM live_game_seats seat
         JOIN live_game_sessions s ON seat.session_id = s.id
         WHERE seat.code = ?
           AND s.expires_at > NOW()
-    ');
+        {$lock}
+    ");
     $stmt->execute([$code]);
     return $stmt->fetch();
 }
@@ -36,12 +39,55 @@ function generateSeatCode($pdo) {
 switch ($method) {
 
     // -----------------------------------------------------------------------
-    // POST — create a new session with per-seat codes
-    // Body: { state: GameManagerState, seats: string[] }
-    // seats = array of position strings that are active, e.g. ['bottom','top','left','right']
-    // Returns: { session_id, seats: { bottom: 'a3f9c12b', top: '...' }, expires_at }
+    // POST — two actions:
+    //   (default) create a new session with per-seat codes
+    //   ?action=event — append a remote event to the queue (atomic)
     // -----------------------------------------------------------------------
     case 'POST':
+        $action = isset($_GET['action']) ? $_GET['action'] : null;
+
+        // ── Append remote event ───────────────────────────────────────────
+        if ($action === 'event') {
+            if (!$code) {
+                sendError('code is required');
+            }
+
+            $data = getJSONInput();
+            if (empty($data['event']) || !is_array($data['event'])) {
+                sendError('event is required');
+            }
+
+            // Lock the row so concurrent appends don't overwrite each other
+            $pdo->beginTransaction();
+            try {
+                $row = resolveSession($pdo, $code, true);
+                if (!$row) {
+                    $pdo->rollBack();
+                    sendError('Session not found or expired', 404);
+                }
+                if (!$row['is_active']) {
+                    $pdo->rollBack();
+                    sendError('Session is no longer active', 410);
+                }
+
+                $events = json_decode($row['remote_events'] ?? '[]', true);
+                if (!is_array($events)) $events = [];
+                $events[] = $data['event'];
+
+                $stmt = $pdo->prepare(
+                    'UPDATE live_game_sessions SET remote_events = ? WHERE id = ?'
+                );
+                $stmt->execute([json_encode($events), $row['session_id']]);
+                $pdo->commit();
+
+                sendJSON(['ok' => true], 201);
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                sendError('Failed to append event: ' . $e->getMessage(), 500);
+            }
+        }
+
+        // ── Create session ────────────────────────────────────────────────
         $data = getJSONInput();
 
         if (empty($data['state']) || !is_array($data['state'])) {
@@ -102,30 +148,62 @@ switch ($method) {
     // -----------------------------------------------------------------------
     // GET — fetch session state by seat code
     // ?code=a3f9c12b
-    // Returns: { seat, state, updated_at, is_active }
+    // ?code=a3f9c12b&consume=1  (host only — atomically returns and clears remote_events)
+    // Returns: { seat, state, remote_events, updated_at, is_active }
     // -----------------------------------------------------------------------
     case 'GET':
         if (!$code) {
             sendError('code is required');
         }
 
-        $row = resolveSession($pdo, $code);
-        if (!$row) {
-            sendError('Session not found or expired', 404);
+        $consume = !empty($_GET['consume']);
+
+        if ($consume) {
+            // Atomically read the event queue and clear it so no events are
+            // processed twice. Uses FOR UPDATE to prevent a concurrent append
+            // from being lost between our read and our clear.
+            $pdo->beginTransaction();
+            try {
+                $row = resolveSession($pdo, $code, true);
+                if (!$row) {
+                    $pdo->rollBack();
+                    sendError('Session not found or expired', 404);
+                }
+
+                $events = json_decode($row['remote_events'] ?? '[]', true);
+                if (!is_array($events)) $events = [];
+
+                $clearStmt = $pdo->prepare(
+                    'UPDATE live_game_sessions SET remote_events = NULL WHERE id = ?'
+                );
+                $clearStmt->execute([$row['session_id']]);
+                $pdo->commit();
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                sendError('Failed to consume events: ' . $e->getMessage(), 500);
+            }
+        } else {
+            $row = resolveSession($pdo, $code);
+            if (!$row) {
+                sendError('Session not found or expired', 404);
+            }
+            $events = json_decode($row['remote_events'] ?? '[]', true);
+            if (!is_array($events)) $events = [];
         }
 
         $state = is_string($row['state']) ? json_decode($row['state'], true) : $row['state'];
 
         sendJSON([
-            'seat'       => $row['seat'],
-            'state'      => $state,
-            'updated_at' => $row['updated_at'],
-            'is_active'  => (bool)$row['is_active'],
+            'seat'          => $row['seat'],
+            'state'         => $state,
+            'remote_events' => $events,
+            'updated_at'    => $row['updated_at'],
+            'is_active'     => (bool)$row['is_active'],
         ]);
         break;
 
     // -----------------------------------------------------------------------
-    // PUT — update session state
+    // PUT — update session state (host only)
     // ?code=a3f9c12b
     // Body: { state: GameManagerState }
     // Returns: { updated_at }

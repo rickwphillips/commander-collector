@@ -396,9 +396,39 @@ export interface LiveGameSession {
   expires_at: string;
 }
 
+// Typed events sent by remote panels instead of full state writes.
+// The host consumes these from the event queue, applies them to its own
+// authoritative state, and writes the merged result back to the DB.
+export type LiveGameEventType =
+  | 'life_change'
+  | 'poison_change'
+  | 'commander_tax_change'
+  | 'energy_change'
+  | 'experience_change'
+  | 'toggle_monarch'
+  | 'toggle_initiative'
+  | 'toggle_citys_blessing'
+  | 'commander_damage_change'
+  | 'eliminate'
+  | 'undo_eliminate'
+  | 'pass_turn'
+  | 'checkin';
+
+export interface LiveGameEvent {
+  type: LiveGameEventType;
+  playerIdx?: number;   // target player index (most events)
+  targetIdx?: number;   // commander_damage_change: player receiving damage
+  sourceIdx?: number;   // commander_damage_change: player dealing damage
+  isPartner?: boolean;  // commander_damage_change: is partner commander
+  delta?: number;       // numeric change (life_change, poison_change, etc.)
+  seat: string;         // which seat sent this event
+  ts: number;           // client timestamp ms (for ordering / expiry)
+}
+
 export interface LiveGameSeatResponse {
-  seat: string;              // 'bottom' | 'top' | 'left' | 'right'
+  seat: string;                  // 'bottom' | 'top' | 'left' | 'right'
   state: GameManagerState;
+  remote_events: LiveGameEvent[]; // pending events for the host to apply
   updated_at: string;
   is_active: boolean;
 }

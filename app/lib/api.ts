@@ -156,12 +156,22 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ state, seats }),
     }),
-  getLiveGame: (code: string) =>
-    apiFetch<import('./types').LiveGameSeatResponse>(`/live-game?code=${code}`),
+  // consume=true: host only — atomically returns AND clears the remote_events queue
+  getLiveGame: (code: string, consume?: boolean) =>
+    apiFetch<import('./types').LiveGameSeatResponse>(
+      `/live-game?code=${code}${consume ? '&consume=1' : ''}`
+    ),
   updateLiveGame: (code: string, state: import('./types').GameManagerState) =>
     apiFetch<{ updated_at: string }>(`/live-game?code=${code}`, {
       method: 'PUT',
       body: JSON.stringify({ state }),
+    }),
+  // Remote panels call this instead of writing full state — appends a typed event
+  // to the queue; the host picks it up on next poll and applies it atomically.
+  sendLiveGameEvent: (code: string, event: import('./types').LiveGameEvent) =>
+    apiFetch<{ ok: boolean }>(`/live-game?code=${code}&action=event`, {
+      method: 'POST',
+      body: JSON.stringify({ event }),
     }),
   deleteLiveGame: (code: string) =>
     apiFetch<{ success: boolean }>(`/live-game?code=${code}`, { method: 'DELETE' }),

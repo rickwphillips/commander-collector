@@ -12,8 +12,10 @@ import {
   applyEliminate,
   applyUndoEliminate,
   applyPassTurn,
+  applyCheckin,
+  applyEvent,
 } from '@/game-manager/remoteTransforms';
-import type { GameManagerState, PlayerState } from '@/lib/types';
+import type { GameManagerState, PlayerState, LiveGameEvent } from '@/lib/types';
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 
@@ -426,5 +428,161 @@ describe('applyPassTurn', () => {
     expect(result.players[0].life).toBe(38);
     expect(result.players[1].life).toBe(35);
     expect(result.players[3].life).toBe(32);
+  });
+});
+
+// ─── applyCheckin ─────────────────────────────────────────────────────────────
+
+describe('applyCheckin', () => {
+  it('adds a seat timestamp to remoteCheckins', () => {
+    const state = makeState();
+    const result = applyCheckin(state, 'top', 12345);
+    expect(result.remoteCheckins?.top).toBe(12345);
+  });
+
+  it('preserves existing checkins when adding a new one', () => {
+    const state = makeState({ remoteCheckins: { bottom: 99 } });
+    const result = applyCheckin(state, 'top', 12345);
+    expect(result.remoteCheckins?.bottom).toBe(99);
+    expect(result.remoteCheckins?.top).toBe(12345);
+  });
+
+  it('overwrites the timestamp for a seat that re-checks in', () => {
+    const state = makeState({ remoteCheckins: { bottom: 100 } });
+    const result = applyCheckin(state, 'bottom', 200);
+    expect(result.remoteCheckins?.bottom).toBe(200);
+  });
+});
+
+// ─── applyEvent ───────────────────────────────────────────────────────────────
+
+describe('applyEvent', () => {
+  const baseEvent: Omit<LiveGameEvent, 'type'> = { seat: 'top', ts: 0 };
+
+  it('routes life_change to applyLifeChange', () => {
+    const state = makeState();
+    const result = applyEvent(state, { ...baseEvent, type: 'life_change', playerIdx: 0, delta: -3 });
+    expect(result.players[0].life).toBe(37);
+  });
+
+  it('routes poison_change to applyPoisonChange', () => {
+    const state = makeState();
+    const result = applyEvent(state, { ...baseEvent, type: 'poison_change', playerIdx: 0, delta: 2 });
+    expect(result.players[0].poison).toBe(2);
+  });
+
+  it('routes commander_tax_change to applyCommanderTaxChange', () => {
+    const state = makeState();
+    const result = applyEvent(state, { ...baseEvent, type: 'commander_tax_change', playerIdx: 0, delta: 2 });
+    expect(result.players[0].commanderTax).toBe(2);
+  });
+
+  it('routes energy_change to applyEnergyChange', () => {
+    const state = makeState();
+    const result = applyEvent(state, { ...baseEvent, type: 'energy_change', playerIdx: 0, delta: 3 });
+    expect(result.players[0].energy).toBe(3);
+  });
+
+  it('routes experience_change to applyExperienceChange', () => {
+    const state = makeState();
+    const result = applyEvent(state, { ...baseEvent, type: 'experience_change', playerIdx: 0, delta: 1 });
+    expect(result.players[0].experience).toBe(1);
+  });
+
+  it('routes toggle_monarch to applyToggleMonarch', () => {
+    const state = makeState();
+    const result = applyEvent(state, { ...baseEvent, type: 'toggle_monarch', playerIdx: 0 });
+    expect(result.players[0].isMonarch).toBe(true);
+  });
+
+  it('routes toggle_initiative to applyToggleInitiative', () => {
+    const state = makeState();
+    const result = applyEvent(state, { ...baseEvent, type: 'toggle_initiative', playerIdx: 0 });
+    expect(result.players[0].hasInitiative).toBe(true);
+  });
+
+  it('routes toggle_citys_blessing to applyToggleCitysBlessing', () => {
+    const state = makeState();
+    const result = applyEvent(state, { ...baseEvent, type: 'toggle_citys_blessing', playerIdx: 0 });
+    expect(result.players[0].hasCitysBlessing).toBe(true);
+  });
+
+  it('routes eliminate to applyEliminate', () => {
+    const state = makeState();
+    const result = applyEvent(state, { ...baseEvent, type: 'eliminate', playerIdx: 0 });
+    expect(result.players[0].isEliminated).toBe(true);
+  });
+
+  it('routes undo_eliminate to applyUndoEliminate', () => {
+    const state = makeState({ players: [makePlayer({ isEliminated: true, isConceded: true, eliminatedTurn: 1 })] });
+    const result = applyEvent(state, { ...baseEvent, type: 'undo_eliminate', playerIdx: 0 });
+    expect(result.players[0].isEliminated).toBe(false);
+  });
+
+  it('routes pass_turn to applyPassTurn', () => {
+    const state = makeState({
+      currentPlayerIdx: 0,
+      turnNumber: 1,
+      firstPlayerIdx: 0,
+      players: [
+        makePlayer({ position: 'bottom' }),
+        makePlayer({ position: 'left' }),
+      ],
+    });
+    const result = applyEvent(state, { ...baseEvent, type: 'pass_turn' });
+    expect(result.currentPlayerIdx).toBe(1);
+  });
+
+  it('routes checkin to applyCheckin', () => {
+    const state = makeState();
+    const result = applyEvent(state, { type: 'checkin', seat: 'top', ts: 9999 });
+    expect(result.remoteCheckins?.top).toBe(9999);
+  });
+
+  it('returns state unchanged for unknown event type', () => {
+    const state = makeState();
+    // Cast to bypass TypeScript — simulates a future/unknown event type arriving
+    const result = applyEvent(state, { type: 'unknown_future_event' as LiveGameEvent['type'], seat: 'top', ts: 0 });
+    expect(result).toBe(state);
+  });
+
+  // ── The core correctness guarantee ────────────────────────────────────────
+  // Remote events must NEVER affect turn-control fields (currentPlayerIdx,
+  // turnNumber, turnStartTime). These are host-owned. If a remote's event were
+  // applied to a state with a stale turn number, the correct host turn number
+  // must be preserved after the event is applied.
+
+  it('life_change event preserves host turn fields', () => {
+    const state = makeState({ currentPlayerIdx: 2, turnNumber: 7 });
+    const result = applyEvent(state, { ...baseEvent, type: 'life_change', playerIdx: 0, delta: -1 });
+    expect(result.currentPlayerIdx).toBe(2);
+    expect(result.turnNumber).toBe(7);
+  });
+
+  it('multiple events applied in sequence stack correctly', () => {
+    const state = makeState();
+    const events: LiveGameEvent[] = [
+      { ...baseEvent, type: 'life_change', playerIdx: 0, delta: -1 },
+      { ...baseEvent, type: 'life_change', playerIdx: 0, delta: -1 },
+      { ...baseEvent, type: 'life_change', playerIdx: 0, delta: -1 },
+    ];
+    const result = events.reduce(applyEvent, state);
+    expect(result.players[0].life).toBe(37);
+  });
+
+  it('events from two different remotes do not conflict', () => {
+    const state = makeState({
+      players: [
+        makePlayer({ position: 'bottom', life: 40 }),
+        makePlayer({ position: 'top',    life: 40 }),
+      ],
+    });
+    const events: LiveGameEvent[] = [
+      { seat: 'bottom', ts: 1, type: 'life_change', playerIdx: 0, delta: -2 },
+      { seat: 'top',    ts: 2, type: 'life_change', playerIdx: 1, delta: -3 },
+    ];
+    const result = events.reduce(applyEvent, state);
+    expect(result.players[0].life).toBe(38); // bottom player's change
+    expect(result.players[1].life).toBe(37); // top player's change
   });
 });

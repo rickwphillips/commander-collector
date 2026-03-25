@@ -6,23 +6,16 @@ import { Box, Typography, TextField, Button, Stack, CircularProgress, IconButton
 import TextFieldsIcon from '@mui/icons-material/TextFields';
 import { PlayerPanel } from '../components/PlayerPanel';
 import { api } from '@/lib/api';
-import type { GameManagerState, PlayerState } from '@/lib/types';
-import {
-  applyLifeChange,
-  applyPoisonChange,
-  applyCommanderTaxChange,
-  applyEnergyChange,
-  applyExperienceChange,
-  applyToggleMonarch,
-  applyToggleInitiative,
-  applyToggleCitysBlessing,
-  applyCommanderDamageChange,
-  applyEliminate,
-  applyUndoEliminate,
-  applyPassTurn,
-} from '../remoteTransforms';
+import type { GameManagerState, PlayerState, LiveGameEvent } from '@/lib/types';
+import { applyEvent } from '../remoteTransforms';
 
-const POLL_INTERVAL_MS = 3000;
+const POLL_INTERVAL_MS = 1000;
+// After sending an event, suppress polls for this long to avoid flickering
+// back to a DB state that hasn't reflected the event yet. By 2s the host
+// will have processed and written the merged state.
+const POST_EVENT_GRACE_MS = 2000;
+// Heartbeat interval — sends a checkin event so the host knows we're still here
+const CHECKIN_INTERVAL_MS = 9000;
 
 type RemotePhase = 'enter-code' | 'loading' | 'connected' | 'not-found' | 'ended';
 
@@ -40,7 +33,7 @@ function RemotePageInner() {
   const [errorMsg, setErrorMsg] = useState('');
   const [textSizeMode, setTextSizeMode] = useState<0 | 1 | 2>(0);
 
-  const lastWriteTimeRef = useRef<number>(0);
+  const lastEventTimeRef = useRef<number>(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const tickTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -79,11 +72,9 @@ function RemotePageInner() {
       }
       setCode(trimmed);
       setSeat(res.seat);
-      // Write checkin so host sees us immediately
-      const checkinState = { ...res.state, remoteCheckins: { ...(res.state.remoteCheckins ?? {}), [res.seat]: Date.now() } };
-      setState(checkinState);
-      api.updateLiveGame(trimmed, checkinState).catch(() => {});
-      lastWriteTimeRef.current = Date.now();
+      setState(res.state);
+      // Send checkin event so host sees us immediately
+      api.sendLiveGameEvent(trimmed, { type: 'checkin', seat: res.seat, ts: Date.now() }).catch(() => {});
       setPhase('connected');
     } catch {
       setPhase('enter-code');
@@ -101,10 +92,12 @@ function RemotePageInner() {
     if (phase !== 'connected' || !code) return;
 
     const poll = async () => {
-      if (Date.now() - lastWriteTimeRef.current < POLL_INTERVAL_MS) return;
+      // Grace period after sending an event — wait for host to process it
+      // before updating local state from DB, to avoid flickering
+      if (Date.now() - lastEventTimeRef.current < POST_EVENT_GRACE_MS) return;
       if (document.visibilityState === 'hidden') return;
       try {
-        const res = await api.getLiveGame(code);
+        const res = await api.getLiveGame(code); // remote never passes consume=true
         if (!res.is_active) {
           setPhase('ended');
           return;
@@ -117,77 +110,63 @@ function RemotePageInner() {
       } catch {/* silent */}
     };
 
-    const id = setInterval(poll, POLL_INTERVAL_MS);
-
-    // Heartbeat every 9s — keeps the "remote connected" indicator alive on the host.
-    // Reads current DB state first so we never overwrite a stale local copy into the DB.
-    const heartbeat = setInterval(async () => {
+    // Periodic checkin so host's "connected" indicator stays alive
+    const checkin = setInterval(() => {
       if (!seat) return;
-      try {
-        const res = await api.getLiveGame(code);
-        if (!res.is_active) return;
-        const now = Date.now();
-        const next = { ...res.state, remoteCheckins: { ...(res.state.remoteCheckins ?? {}), [seat]: now } };
-        api.updateLiveGame(code, next).catch(() => {});
-        // Sync local state with latest DB state + updated checkin
-        setState((prev) => {
-          if (!prev) return prev;
-          return { ...res.state, remoteCheckins: { ...(res.state.remoteCheckins ?? {}), [seat]: now } };
-        });
-      } catch {/* silent */}
-    }, 9000);
+      api.sendLiveGameEvent(code, { type: 'checkin', seat, ts: Date.now() }).catch(() => {});
+    }, CHECKIN_INTERVAL_MS);
 
-    return () => { clearInterval(id); clearInterval(heartbeat); };
+    const id = setInterval(poll, POLL_INTERVAL_MS);
+    return () => { clearInterval(id); clearInterval(checkin); };
   }, [phase, code, seat]);
 
-  // ── Write helper — optimistic local update + read-modify-write to DB ────────
-  // All action handlers go through here so the DB write always uses the freshest
-  // server state as its base.  This prevents the remote from overwriting fields
-  // (currentPlayerIdx, turnNumber, etc.) that the host may have changed since
-  // the remote panel last polled.
-  const remoteWrite = useCallback(async (applyFn: (s: GameManagerState) => GameManagerState) => {
-    // 1. Optimistic local update for instant UX
-    setState((prev) => (prev ? applyFn(prev) : prev));
-    lastWriteTimeRef.current = Date.now();
-    // 2. Read-modify-write — apply the same delta on top of the current DB state
-    try {
-      const res = await api.getLiveGame(code);
-      if (!res.is_active) { setPhase('ended'); return; }
-      api.updateLiveGame(code, applyFn(res.state)).catch(() => {/* silent */});
-    } catch {/* silent */}
-  }, [code]);
+  // ── Send event helper ─────────────────────────────────────────────────────
+  // Applies the event optimistically to local state for instant UX, then
+  // posts it to the DB event queue. The host picks it up on its next 1s poll,
+  // applies it to the authoritative state, and writes the merged result.
+  const sendEvent = useCallback((eventData: Omit<LiveGameEvent, 'seat' | 'ts'>) => {
+    const event: LiveGameEvent = { ...eventData, seat, ts: Date.now() };
+    // Optimistic local update
+    setState((prev) => (prev ? applyEvent(prev, event) : prev));
+    lastEventTimeRef.current = Date.now();
+    // Fire and forget — failures are silent; host will still have the correct
+    // state from its own actions, and remote re-syncs on next poll
+    api.sendLiveGameEvent(code, event).catch(() => {});
+  }, [code, seat]);
+
+  // ── Action handlers ───────────────────────────────────────────────────────
 
   const handleLifeChange = useCallback((idx: number, delta: number) => {
-    remoteWrite((s) => applyLifeChange(s, idx, delta));
-  }, [remoteWrite]);
+    sendEvent({ type: 'life_change', playerIdx: idx, delta });
+  }, [sendEvent]);
 
   const handlePoisonChange = useCallback((idx: number, delta: number) => {
-    remoteWrite((s) => applyPoisonChange(s, idx, delta));
-  }, [remoteWrite]);
+    sendEvent({ type: 'poison_change', playerIdx: idx, delta });
+  }, [sendEvent]);
 
   const handleCommanderTaxChange = useCallback((idx: number, delta: number) => {
-    remoteWrite((s) => applyCommanderTaxChange(s, idx, delta));
-  }, [remoteWrite]);
+    sendEvent({ type: 'commander_tax_change', playerIdx: idx, delta });
+  }, [sendEvent]);
 
   const handleEnergyChange = useCallback((idx: number, delta: number) => {
-    remoteWrite((s) => applyEnergyChange(s, idx, delta));
-  }, [remoteWrite]);
+    sendEvent({ type: 'energy_change', playerIdx: idx, delta });
+  }, [sendEvent]);
 
   const handleExperienceChange = useCallback((idx: number, delta: number) => {
-    remoteWrite((s) => applyExperienceChange(s, idx, delta));
-  }, [remoteWrite]);
+    sendEvent({ type: 'experience_change', playerIdx: idx, delta });
+  }, [sendEvent]);
 
   const handleToggleMonarch = useCallback((idx: number) => {
-    remoteWrite((s) => applyToggleMonarch(s, idx));
-  }, [remoteWrite]);
+    sendEvent({ type: 'toggle_monarch', playerIdx: idx });
+  }, [sendEvent]);
 
   const handleToggleInitiative = useCallback((idx: number) => {
-    remoteWrite((s) => applyToggleInitiative(s, idx));
-  }, [remoteWrite]);
+    sendEvent({ type: 'toggle_initiative', playerIdx: idx });
+  }, [sendEvent]);
 
   const handleToggleCitysBlessing = useCallback((idx: number) => {
-    remoteWrite((s) => applyToggleCitysBlessing(s, idx));
-  }, [remoteWrite]);
+    sendEvent({ type: 'toggle_citys_blessing', playerIdx: idx });
+  }, [sendEvent]);
 
   const handleCommanderDamageChange = useCallback((
     targetIdx: number,
@@ -195,20 +174,20 @@ function RemotePageInner() {
     isPartner: boolean,
     delta: number,
   ) => {
-    remoteWrite((s) => applyCommanderDamageChange(s, targetIdx, sourceIdx, isPartner, delta));
-  }, [remoteWrite]);
+    sendEvent({ type: 'commander_damage_change', targetIdx, sourceIdx, isPartner, delta });
+  }, [sendEvent]);
 
   const handleEliminate = useCallback((idx: number) => {
-    remoteWrite((s) => applyEliminate(s, idx));
-  }, [remoteWrite]);
+    sendEvent({ type: 'eliminate', playerIdx: idx });
+  }, [sendEvent]);
 
   const handleUndoEliminate = useCallback((idx: number) => {
-    remoteWrite((s) => applyUndoEliminate(s, idx));
-  }, [remoteWrite]);
+    sendEvent({ type: 'undo_eliminate', playerIdx: idx });
+  }, [sendEvent]);
 
   const handlePassTurn = useCallback(() => {
-    remoteWrite(applyPassTurn);
-  }, [remoteWrite]);
+    sendEvent({ type: 'pass_turn' });
+  }, [sendEvent]);
 
   // ── Derived values ────────────────────────────────────────────────────────
   const playerIdx = state?.players.findIndex((p) => p.position === seat) ?? -1;
