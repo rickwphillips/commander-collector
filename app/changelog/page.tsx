@@ -38,6 +38,14 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.17.3',
+    date: '2026-03-25T00:00:00',
+    title: 'Fix remote panel overwriting host state on any action',
+    changes: [
+      { type: 'fixed', text: 'All remote panel actions (life changes, poison, commander damage, Pass Turn, and more) now fetch the current game state from the database before writing — preventing any remote tap from overwriting the host\'s most recent turn or state changes' },
+    ],
+  },
+  {
     version: '1.17.2',
     date: '2026-03-24T00:00:00',
     title: 'Fix remote heartbeat overwriting host turn in DB',

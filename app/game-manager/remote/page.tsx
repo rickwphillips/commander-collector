@@ -6,7 +6,21 @@ import { Box, Typography, TextField, Button, Stack, CircularProgress, IconButton
 import TextFieldsIcon from '@mui/icons-material/TextFields';
 import { PlayerPanel } from '../components/PlayerPanel';
 import { api } from '@/lib/api';
-import type { GameManagerState, PlayerState, CommanderDamageMap } from '@/lib/types';
+import type { GameManagerState, PlayerState } from '@/lib/types';
+import {
+  applyLifeChange,
+  applyPoisonChange,
+  applyCommanderTaxChange,
+  applyEnergyChange,
+  applyExperienceChange,
+  applyToggleMonarch,
+  applyToggleInitiative,
+  applyToggleCitysBlessing,
+  applyCommanderDamageChange,
+  applyEliminate,
+  applyUndoEliminate,
+  applyPassTurn,
+} from '../remoteTransforms';
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -126,261 +140,75 @@ function RemotePageInner() {
     return () => { clearInterval(id); clearInterval(heartbeat); };
   }, [phase, code, seat]);
 
-  // ── Write helper — optimistic update + fire-and-forget DB write ───────────
-  const write = useCallback((newState: GameManagerState) => {
-    setState(newState);
+  // ── Write helper — optimistic local update + read-modify-write to DB ────────
+  // All action handlers go through here so the DB write always uses the freshest
+  // server state as its base.  This prevents the remote from overwriting fields
+  // (currentPlayerIdx, turnNumber, etc.) that the host may have changed since
+  // the remote panel last polled.
+  const remoteWrite = useCallback(async (applyFn: (s: GameManagerState) => GameManagerState) => {
+    // 1. Optimistic local update for instant UX
+    setState((prev) => (prev ? applyFn(prev) : prev));
     lastWriteTimeRef.current = Date.now();
-    api.updateLiveGame(code, newState).catch(() => {/* silent */});
-  }, [code]);
-
-  // ── Handler logic (mirrors GameBoard exactly) ─────────────────────────────
-  const updateState = useCallback((patch: Partial<GameManagerState>) => {
-    setState((prev) => {
-      if (!prev) return prev;
-      const next = { ...prev, ...patch };
-      lastWriteTimeRef.current = Date.now();
-      api.updateLiveGame(code, next).catch(() => {/* silent */});
-      return next;
-    });
+    // 2. Read-modify-write — apply the same delta on top of the current DB state
+    try {
+      const res = await api.getLiveGame(code);
+      if (!res.is_active) { setPhase('ended'); return; }
+      api.updateLiveGame(code, applyFn(res.state)).catch(() => {/* silent */});
+    } catch {/* silent */}
   }, [code]);
 
   const handleLifeChange = useCallback((idx: number, delta: number) => {
-    setState((prev) => {
-      if (!prev) return prev;
-      const { players, turnNumber, notes } = prev;
-      const target = players[idx];
-      const newLife = target.life + delta;
-      const isNewLifeKill = target.life > 0 && newLife <= 0;
-      const isUndoLifeKill = target.life <= 0 && newLife > 0;
-      const wasEliminatedByLife = target.isEliminated && target.life <= 0 && target.poison < 10;
-      const lifeNoteTag = `[lifekill:${idx}]`;
-      let newNotes = notes;
-      if (isUndoLifeKill) {
-        newNotes = notes.split('\n').filter((l) => !l.includes(lifeNoteTag)).join('\n');
-      }
-      const newPlayers = players.map((p, i) => {
-        if (i !== idx) return p;
-        return {
-          ...p,
-          life: newLife,
-          ...(isNewLifeKill && !p.isEliminated ? { isEliminated: true, eliminatedTurn: turnNumber } : {}),
-          ...(isUndoLifeKill && wasEliminatedByLife ? { isEliminated: false, eliminatedTurn: null } : {}),
-        };
-      });
-      const next = { ...prev, players: newPlayers, notes: newNotes };
-      lastWriteTimeRef.current = Date.now();
-      api.updateLiveGame(code, next).catch(() => {/* silent */});
-      return next;
-    });
-  }, [code]);
+    remoteWrite((s) => applyLifeChange(s, idx, delta));
+  }, [remoteWrite]);
 
   const handlePoisonChange = useCallback((idx: number, delta: number) => {
-    setState((prev) => {
-      if (!prev) return prev;
-      const { players, turnNumber, notes } = prev;
-      const target = players[idx];
-      const newPlayers = players.map((p, i) => {
-        if (i !== idx) return p;
-        const poison = Math.max(0, p.poison + delta);
-        const wasEliminatedByPoison = p.isEliminated && p.poison >= 10;
-        const isEliminated = poison >= 10 ? true : wasEliminatedByPoison ? false : p.isEliminated;
-        const eliminatedTurn = poison >= 10 && !p.isEliminated ? turnNumber : isEliminated ? p.eliminatedTurn : null;
-        return { ...p, poison, isEliminated, eliminatedTurn };
-      });
-      const isUndoPoisonKill = target.isEliminated && target.poison >= 10 && Math.max(0, target.poison + delta) < 10;
-      const poisonNoteTag = `[poisonkill:${idx}]`;
-      let newNotes = notes;
-      if (isUndoPoisonKill) {
-        newNotes = notes.split('\n').filter((l) => !l.includes(poisonNoteTag)).join('\n');
-      }
-      const next = { ...prev, players: newPlayers, notes: newNotes };
-      lastWriteTimeRef.current = Date.now();
-      api.updateLiveGame(code, next).catch(() => {/* silent */});
-      return next;
-    });
-  }, [code]);
+    remoteWrite((s) => applyPoisonChange(s, idx, delta));
+  }, [remoteWrite]);
 
   const handleCommanderTaxChange = useCallback((idx: number, delta: number) => {
-    setState((prev) => {
-      if (!prev) return prev;
-      const newPlayers = prev.players.map((p, i) =>
-        i === idx ? { ...p, commanderTax: Math.max(0, p.commanderTax + delta) } : p
-      );
-      const next = { ...prev, players: newPlayers };
-      lastWriteTimeRef.current = Date.now();
-      api.updateLiveGame(code, next).catch(() => {/* silent */});
-      return next;
-    });
-  }, [code]);
+    remoteWrite((s) => applyCommanderTaxChange(s, idx, delta));
+  }, [remoteWrite]);
 
   const handleEnergyChange = useCallback((idx: number, delta: number) => {
-    setState((prev) => {
-      if (!prev) return prev;
-      const newPlayers = prev.players.map((p, i) =>
-        i === idx ? { ...p, energy: Math.max(0, p.energy + delta) } : p
-      );
-      const next = { ...prev, players: newPlayers };
-      lastWriteTimeRef.current = Date.now();
-      api.updateLiveGame(code, next).catch(() => {/* silent */});
-      return next;
-    });
-  }, [code]);
+    remoteWrite((s) => applyEnergyChange(s, idx, delta));
+  }, [remoteWrite]);
 
   const handleExperienceChange = useCallback((idx: number, delta: number) => {
-    setState((prev) => {
-      if (!prev) return prev;
-      const newPlayers = prev.players.map((p, i) =>
-        i === idx ? { ...p, experience: Math.max(0, p.experience + delta) } : p
-      );
-      const next = { ...prev, players: newPlayers };
-      lastWriteTimeRef.current = Date.now();
-      api.updateLiveGame(code, next).catch(() => {/* silent */});
-      return next;
-    });
-  }, [code]);
+    remoteWrite((s) => applyExperienceChange(s, idx, delta));
+  }, [remoteWrite]);
 
   const handleToggleMonarch = useCallback((idx: number) => {
-    setState((prev) => {
-      if (!prev) return prev;
-      const newPlayers = prev.players.map((p, i) => ({
-        ...p,
-        isMonarch: i === idx ? !p.isMonarch : false,
-      }));
-      const next = { ...prev, players: newPlayers };
-      lastWriteTimeRef.current = Date.now();
-      api.updateLiveGame(code, next).catch(() => {/* silent */});
-      return next;
-    });
-  }, [code]);
+    remoteWrite((s) => applyToggleMonarch(s, idx));
+  }, [remoteWrite]);
 
   const handleToggleInitiative = useCallback((idx: number) => {
-    setState((prev) => {
-      if (!prev) return prev;
-      const newPlayers = prev.players.map((p, i) => ({
-        ...p,
-        hasInitiative: i === idx ? !p.hasInitiative : false,
-      }));
-      const next = { ...prev, players: newPlayers };
-      lastWriteTimeRef.current = Date.now();
-      api.updateLiveGame(code, next).catch(() => {/* silent */});
-      return next;
-    });
-  }, [code]);
+    remoteWrite((s) => applyToggleInitiative(s, idx));
+  }, [remoteWrite]);
 
   const handleToggleCitysBlessing = useCallback((idx: number) => {
-    setState((prev) => {
-      if (!prev) return prev;
-      const newPlayers = prev.players.map((p, i) =>
-        i === idx ? { ...p, hasCitysBlessing: !p.hasCitysBlessing } : p
-      );
-      const next = { ...prev, players: newPlayers };
-      lastWriteTimeRef.current = Date.now();
-      api.updateLiveGame(code, next).catch(() => {/* silent */});
-      return next;
-    });
-  }, [code]);
+    remoteWrite((s) => applyToggleCitysBlessing(s, idx));
+  }, [remoteWrite]);
 
   const handleCommanderDamageChange = useCallback((
     targetIdx: number,
     sourceIdx: number,
     isPartner: boolean,
-    delta: number
+    delta: number,
   ) => {
-    setState((prev) => {
-      if (!prev) return prev;
-      const { players, commanderDamage, turnNumber, notes } = prev;
-      const current = commanderDamage[targetIdx]?.[sourceIdx] ?? [0, 0];
-      const newDmg: [number, number] = [
-        isPartner ? current[0] : Math.max(0, current[0] + delta),
-        isPartner ? Math.max(0, current[1] + delta) : current[1],
-      ];
-      const newCommanderDamage: CommanderDamageMap = {
-        ...commanderDamage,
-        [targetIdx]: { ...(commanderDamage[targetIdx] ?? {}), [sourceIdx]: newDmg },
-      };
-      const prevTotal = current[0] + current[1];
-      const cmdDmgTotal = newDmg[0] + newDmg[1];
-      const actualDelta = cmdDmgTotal - prevTotal;
-      const isNewElimination = !players[targetIdx].isEliminated && cmdDmgTotal >= 21;
-      const isUndoElimination = players[targetIdx].isEliminated && prevTotal >= 21 && cmdDmgTotal < 21;
-      const target = players[targetIdx];
-      const source = players[sourceIdx];
-      const cmdLabel = source.partner
-        ? `${source.commander.name} / ${source.partner.name}`
-        : source.commander.name;
-      const noteTag = `[cmdkill:${targetIdx}:${sourceIdx}]`;
-      const noteLine = `${noteTag} ${target.playerName} eliminated by ${cmdLabel} commander damage (turn ${turnNumber})`;
-      let newNotes = notes;
-      if (isNewElimination) newNotes = [notes, noteLine].filter(Boolean).join('\n');
-      else if (isUndoElimination) newNotes = notes.split('\n').filter((l) => !l.includes(noteTag)).join('\n');
-      const newPlayers = players.map((p, i) => {
-        if (i !== targetIdx) return p;
-        return {
-          ...p,
-          life: p.life - actualDelta,
-          ...(isNewElimination ? { isEliminated: true, eliminatedTurn: turnNumber } : {}),
-          ...(isUndoElimination ? { isEliminated: false, eliminatedTurn: null } : {}),
-        };
-      });
-      const next = { ...prev, commanderDamage: newCommanderDamage, players: newPlayers, notes: newNotes };
-      lastWriteTimeRef.current = Date.now();
-      api.updateLiveGame(code, next).catch(() => {/* silent */});
-      return next;
-    });
-  }, [code]);
+    remoteWrite((s) => applyCommanderDamageChange(s, targetIdx, sourceIdx, isPartner, delta));
+  }, [remoteWrite]);
 
   const handleEliminate = useCallback((idx: number) => {
-    setState((prev) => {
-      if (!prev) return prev;
-      const newPlayers = prev.players.map((p, i) =>
-        i === idx ? { ...p, isEliminated: true, isConceded: true, eliminatedTurn: prev.turnNumber } : p
-      );
-      const next = { ...prev, players: newPlayers };
-      lastWriteTimeRef.current = Date.now();
-      api.updateLiveGame(code, next).catch(() => {/* silent */});
-      return next;
-    });
-  }, [code]);
+    remoteWrite((s) => applyEliminate(s, idx));
+  }, [remoteWrite]);
 
   const handleUndoEliminate = useCallback((idx: number) => {
-    setState((prev) => {
-      if (!prev) return prev;
-      const newPlayers = prev.players.map((p, i) =>
-        i === idx ? { ...p, isEliminated: false, isConceded: false, eliminatedTurn: null } : p
-      );
-      const next = { ...prev, players: newPlayers };
-      lastWriteTimeRef.current = Date.now();
-      api.updateLiveGame(code, next).catch(() => {/* silent */});
-      return next;
-    });
-  }, [code]);
-
-  const CLOCKWISE: PlayerState['position'][] = ['bottom', 'left', 'top', 'right'];
+    remoteWrite((s) => applyUndoEliminate(s, idx));
+  }, [remoteWrite]);
 
   const handlePassTurn = useCallback(() => {
-    setState((prev) => {
-      if (!prev) return prev;
-      const { players, currentPlayerIdx, turnNumber } = prev;
-      const firstIdx = prev.firstPlayerIdx ?? 0;
-      const currentPos = players[currentPlayerIdx].position;
-      const curCW = CLOCKWISE.indexOf(currentPos);
-      const firstCW = CLOCKWISE.indexOf(players[firstIdx].position);
-      let nextPlayerIdx = -1;
-      let stepsToNext = 0;
-      for (let step = 1; step <= 4; step++) {
-        const nextPos = CLOCKWISE[(curCW + step) % 4];
-        const idx = players.findIndex((p) => p.position === nextPos && !p.isEliminated);
-        if (idx !== -1) { nextPlayerIdx = idx; stepsToNext = step; break; }
-      }
-      if (nextPlayerIdx === -1) return prev;
-      const distToFirst = (firstCW - curCW + 4) % 4;
-      const newTurnNumber = distToFirst >= 1 && distToFirst <= stepsToNext ? turnNumber + 1 : turnNumber;
-      const next = { ...prev, currentPlayerIdx: nextPlayerIdx, turnNumber: newTurnNumber, turnStartTime: Date.now() };
-      lastWriteTimeRef.current = Date.now();
-      api.updateLiveGame(code, next).catch(() => {/* silent */});
-      return next;
-    });
-  }, [code]);
+    remoteWrite(applyPassTurn);
+  }, [remoteWrite]);
 
   // ── Derived values ────────────────────────────────────────────────────────
   const playerIdx = state?.players.findIndex((p) => p.position === seat) ?? -1;
