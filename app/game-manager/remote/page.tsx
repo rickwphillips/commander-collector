@@ -88,6 +88,12 @@ function RemotePageInner() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmed = codeInput.trim().toLowerCase();
+    if (trimmed) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('code', trimmed);
+      window.history.replaceState(null, '', url.toString());
+    }
     connect(codeInput);
   };
 
