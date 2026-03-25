@@ -502,126 +502,71 @@ export function PlayerPanel({
   const crackAlpha = (from: number) => Math.min(Math.max((lostRatio - from) / 0.15, 0), 1);
 
   function buildCrackSvg(): string {
+    // Impact point slightly off-center, varied by life value for subtle variety
+    const ox = 38 + (player.life % 7);
+    const oy = 32 + (player.life % 5);
     const p = (d: string, w: number, op: number) =>
-      `<path d="${d}" stroke="rgba(15,0,0,${op})" stroke-width="${w}" fill="none" stroke-linecap="round"/>`;
+      `<path d="${d}" stroke="rgba(10,0,0,${op})" stroke-width="${w}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
     const grp = (from: number, paths: string) => {
       const o = crackAlpha(from).toFixed(2);
       return o === '0.00' ? '' : `<g opacity="${o}">${paths}</g>`;
     };
 
-    // "1" is a narrow vertical stroke — horizontal branches just look like hash marks.
-    // Use diagonal/vertical-dominant cracks instead.
-    if (player.life === 1) {
-      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-        ${grp(0.2,
-          p('M50,0 L47,14 L52,28 L48,44 L53,60 L49,76 L51,100', 1.4, 0.95) +
-          p('M47,14 L38,24 L34,38 L40,50',  0.9, 0.88) +
-          p('M52,28 L61,38 L64,52 L58,64',  0.9, 0.88) +
-          p('M48,44 L38,52 L34,64 L40,76',  0.8, 0.82) +
-          p('M53,60 L62,68 L66,80 L60,92',  0.8, 0.82)
-        )}
-        ${grp(0.35,
-          p('M34,38 L26,46 L30,58 L24,70',  0.75, 0.85) +
-          p('M64,52 L72,60 L68,72 L76,84',  0.75, 0.85) +
-          p('M40,50 L32,58 L36,70 L28,80',  0.7, 0.8)  +
-          p('M58,64 L66,72 L62,84 L70,94',  0.7, 0.8)  +
-          p('M38,24 L30,14 L34,4',          0.65, 0.78) +
-          p('M61,38 L70,28 L66,16 L72,6',   0.65, 0.78)
-        )}
-        ${grp(0.5,
-          p('M26,46 L18,54 L22,66 L16,78',  0.65, 0.82) +
-          p('M72,60 L80,68 L76,80 L82,90',  0.65, 0.82) +
-          p('M30,58 L22,66 L26,78 L20,88',  0.6, 0.78)  +
-          p('M68,72 L76,80 L72,90 L78,100', 0.6, 0.78)  +
-          p('M34,4 L28,14 L32,24',          0.55, 0.75) +
-          p('M72,6 L78,16 L74,28',          0.55, 0.75)
-        )}
-        ${grp(0.7,
-          p('M18,54 L10,62 L14,74 L8,86',   0.55, 0.85) +
-          p('M80,68 L88,76 L84,88 L90,98',  0.55, 0.85) +
-          p('M22,66 L14,76 L18,88 L12,98',  0.5, 0.8)   +
-          p('M76,80 L84,88 L80,98',         0.5, 0.8)   +
-          p('M28,14 L20,24 L24,36',         0.48, 0.75) +
-          p('M78,16 L86,26 L82,38',         0.48, 0.75)
-        )}
-        ${grp(0.85,
-          p('M10,62 L4,70 L8,82',           0.45, 0.8)  +
-          p('M88,76 L94,84 L90,94',         0.45, 0.8)  +
-          p('M14,74 L6,82 L10,94',          0.42, 0.75) +
-          p('M84,88 L90,96 L96,90',         0.42, 0.75) +
-          p('M20,24 L12,34 L16,44',         0.4, 0.72)  +
-          p('M86,26 L92,36 L88,48',         0.4, 0.72)
-        )}
-      </svg>`;
-    }
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
       ${grp(0.2,
-        // main spine top→bottom
-        p('M51,0 L48,10 L53,22 L49,34 L54,46 L47,58 L52,70 L49,82 L51,100', 1.4, 0.95) +
-        // branches reaching all four corners
-        p('M48,10 L36,6 L22,10 L8,4',   0.9, 0.88) +   // top-left
-        p('M53,22 L66,16 L80,20 L94,12', 0.9, 0.88) +   // top-right
-        p('M49,34 L34,28 L18,34 L4,26',  0.85, 0.85) +  // mid-left upper
-        p('M54,46 L68,40 L84,44 L98,36', 0.85, 0.85) +  // mid-right upper
-        p('M47,58 L32,52 L16,56 L2,48',  0.8, 0.82) +   // mid-left lower
-        p('M52,70 L66,64 L82,68 L96,60', 0.8, 0.82) +   // mid-right lower
-        p('M49,82 L34,78 L18,82 L4,76',  0.75, 0.78) +  // bottom-left
-        p('M51,100 L62,94 L76,98',        0.7, 0.75)    // bottom-right
+        // primary cracks radiating from impact point at irregular angles
+        p(`M${ox},${oy} L${ox-14},${oy-18} L${ox-22},${oy-32}`, 1.6, 0.95) +           // upper-left
+        p(`M${ox},${oy} L${ox+8},${oy-22} L${ox+5},0`, 1.5, 0.92) +                    // up (lean left)
+        p(`M${ox},${oy} L${ox+28},${oy-14} L${ox+48},${oy-26} L100,${oy-18}`, 1.4, 0.9) + // right
+        p(`M${ox},${oy} L${ox+22},${oy+18} L${ox+38},${oy+42} L100,${oy+60}`, 1.3, 0.88) + // lower-right
+        p(`M${ox},${oy} L${ox+4},${oy+28} L${ox-2},${oy+52} L${ox+6},100`, 1.3, 0.87) + // down
+        p(`M${ox},${oy} L${ox-18},${oy+22} L${ox-34},${oy+48} L0,${oy+62}`, 1.2, 0.85) + // lower-left
+        p(`M${ox},${oy} L${ox-28},${oy+6} L0,${oy+14}`, 1.2, 0.84)                    // left
       )}
       ${grp(0.35,
-        // sub-branches off the main spine arms
-        p('M22,10 L14,18 L6,14 L2,24',   0.8, 0.85) +
-        p('M80,20 L88,28 L96,22 L100,32', 0.8, 0.85) +
-        p('M18,34 L8,42 L2,36 L4,48',    0.75, 0.82) +
-        p('M84,44 L94,50 L100,44 L98,56', 0.75, 0.82) +
-        p('M16,56 L6,62 L2,72 L8,80',    0.72, 0.8)  +
-        p('M82,68 L92,74 L98,68 L100,80', 0.72, 0.8)  +
-        p('M18,82 L8,88 L4,96 L12,100',  0.68, 0.78) +
-        p('M76,98 L86,92 L96,96 L100,88', 0.68, 0.78) +
-        // cross-connects between branches
-        p('M8,4 L4,14 L10,24',            0.65, 0.75) +
-        p('M94,12 L100,22 L96,32',        0.65, 0.75) +
-        p('M4,26 L2,36',                  0.6,  0.72) +
-        p('M98,36 L100,44',               0.6,  0.72)
+        // secondary branches off the primaries
+        p(`M${ox-14},${oy-18} L${ox-30},${oy-12} L0,${oy-8}`, 1.0, 0.88) +
+        p(`M${ox-14},${oy-18} L${ox-8},${oy-34} L0,${oy-48}`, 0.9, 0.85) +
+        p(`M${ox+8},${oy-22} L${ox+22},${oy-14} L${ox+40},${oy-20} L100,${oy-30}`, 0.9, 0.85) +
+        p(`M${ox+28},${oy-14} L${ox+22},${oy+6} L${ox+36},${oy+18}`, 0.85, 0.82) +
+        p(`M${ox+22},${oy+18} L${ox+10},${oy+32} L${ox+16},${oy+50}`, 0.85, 0.82) +
+        p(`M${ox+4},${oy+28} L${ox+18},${oy+36} L${ox+28},${oy+58} L${ox+18},100`, 0.8, 0.8) +
+        p(`M${ox-18},${oy+22} L${ox-6},${oy+34} L${ox-12},${oy+52}`, 0.8, 0.8) +
+        p(`M${ox-28},${oy+6} L${ox-18},${oy-6} L${ox-10},${oy-20}`, 0.8, 0.8)
       )}
       ${grp(0.5,
-        // fill interior gaps
-        p('M36,6 L30,16 L38,26 L32,36',   0.7, 0.8) +
-        p('M66,16 L72,26 L64,36 L70,46',  0.7, 0.8) +
-        p('M34,28 L28,38 L22,46 L28,54',  0.65, 0.78) +
-        p('M68,40 L74,50 L78,60 L72,68',  0.65, 0.78) +
-        p('M32,52 L24,60 L30,70 L22,78',  0.62, 0.75) +
-        p('M66,64 L74,72 L68,80 L76,88',  0.62, 0.75) +
-        p('M34,78 L28,86 L36,94 L28,100', 0.58, 0.72) +
-        p('M62,94 L68,86 L74,92',         0.58, 0.72)
+        // tertiary splinters
+        p(`M${ox-30},${oy-12} L${ox-42},${oy-24} L${ox-36},${oy-40} L0,${oy-52}`, 0.75, 0.82) +
+        p(`M${ox-8},${oy-34} L${ox+4},${oy-48} L${ox-2},${oy-62} L${ox+10},${oy-80}`, 0.72, 0.8) +
+        p(`M${ox+40},${oy-20} L${ox+50},${oy-8} L${ox+62},${oy-16}`, 0.7, 0.78) +
+        p(`M${ox+36},${oy+18} L${ox+52},${oy+28} L${ox+68},${oy+20} L100,${oy+32}`, 0.7, 0.78) +
+        p(`M${ox+16},${oy+50} L${ox+30},${oy+62} L${ox+22},${oy+78} L${ox+36},100`, 0.68, 0.76) +
+        p(`M${ox-12},${oy+52} L${ox-24},${oy+64} L${ox-14},${oy+80} L0,${oy+90}`, 0.68, 0.76) +
+        p(`M${ox-42},${oy-24} L${ox-52},${oy-10} L0,${oy-4}`, 0.65, 0.74) +
+        p(`M${ox+10},${oy-80} L${ox+22},${oy-72} L${ox+36},${oy-82}`, 0.62, 0.72)
       )}
       ${grp(0.7,
-        // dense secondary network
-        p('M14,18 L20,28 L14,38 L20,48',  0.6, 0.85) +
-        p('M88,28 L82,38 L88,48 L82,58',  0.6, 0.85) +
-        p('M6,62 L14,68 L8,78 L16,86',    0.55, 0.8) +
-        p('M92,74 L84,80 L90,90 L82,96',  0.55, 0.8) +
-        p('M30,16 L24,26 L30,34',         0.52, 0.78) +
-        p('M72,26 L78,34 L72,44',         0.52, 0.78) +
-        p('M28,54 L20,62 L26,70',         0.5,  0.75) +
-        p('M74,50 L82,58 L76,66',         0.5,  0.75) +
-        p('M24,60 L16,66 L22,76',         0.48, 0.72) +
-        p('M78,60 L86,66 L80,76',         0.48, 0.72)
+        // fine hairline web connecting the main cracks
+        p(`M${ox-22},${oy-32} L${ox-6},${oy-22} L${ox+4},${oy-38}`, 0.6, 0.8) +
+        p(`M${ox+5},0 L${ox-10},${oy-44} L${ox-20},${oy-58}`, 0.55, 0.78) +
+        p(`M${ox+48},${oy-26} L${ox+58},${oy-14} L${ox+72},${oy-22}`, 0.55, 0.76) +
+        p(`M${ox+62},${oy-16} L${ox+76},${oy-6} L${ox+84},${oy+8}`, 0.52, 0.74) +
+        p(`M${ox+28},${oy+58} L${ox+44},${oy+68} L${ox+38},${oy+84}`, 0.52, 0.74) +
+        p(`M${ox-24},${oy+64} L${ox-38},${oy+72} L${ox-28},${oy+86}`, 0.5, 0.72) +
+        p(`M${ox-52},${oy-10} L${ox-62},${oy+4} L${ox-50},${oy+18}`, 0.5, 0.72) +
+        p(`M${ox+22},${oy+6} L${ox+14},${oy+18} L${ox+24},${oy+30}`, 0.48, 0.7)
       )}
       ${grp(0.85,
-        // hairline fill — everywhere
-        p('M10,24 L16,32 L10,40',         0.45, 0.8) +
-        p('M92,32 L86,40 L92,48',         0.45, 0.8) +
-        p('M20,48 L14,56 L20,64',         0.42, 0.78) +
-        p('M82,58 L88,64 L82,72',         0.42, 0.78) +
-        p('M4,48 L10,56 L4,64',           0.4,  0.75) +
-        p('M98,56 L92,62 L98,70',         0.4,  0.75) +
-        p('M16,86 L22,92 L16,100',        0.38, 0.72) +
-        p('M82,96 L76,100',               0.38, 0.72) +
-        p('M38,26 L44,34 L38,42',         0.38, 0.7)  +
-        p('M64,36 L58,44 L64,52',         0.38, 0.7)  +
-        p('M28,38 L34,46 L28,54',         0.36, 0.68) +
-        p('M74,72 L80,78 L74,86',         0.36, 0.68)
+        // micro-cracks near impact
+        p(`M${ox-6},${oy+8} L${ox+4},${oy+14} L${ox-2},${oy+22}`, 0.45, 0.8) +
+        p(`M${ox+10},${oy+4} L${ox+18},${oy+12} L${ox+12},${oy+22}`, 0.42, 0.78) +
+        p(`M${ox+6},${oy-10} L${ox+14},${oy-4} L${ox+8},${oy+6}`, 0.42, 0.76) +
+        p(`M${ox-10},${oy-6} L${ox-4},${oy+4} L${ox-12},${oy+12}`, 0.4, 0.74) +
+        p(`M${ox-36},${oy-40} L${ox-28},${oy-30} L${ox-38},${oy-22}`, 0.4, 0.72) +
+        p(`M${ox+36},${oy-82} L${ox+48},${oy-76} L${ox+42},${oy-64}`, 0.38, 0.7) +
+        p(`M${ox+84},${oy+8} L${ox+90},${oy+22} L${ox+80},${oy+34}`, 0.38, 0.7) +
+        p(`M${ox+44},${oy+68} L${ox+54},${oy+80} L${ox+44},${oy+92}`, 0.36, 0.68) +
+        p(`M${ox-62},${oy+4} L${ox-72},${oy+16} L${ox-62},${oy+28}`, 0.36, 0.68)
       )}
     </svg>`;
   }
@@ -1584,6 +1529,17 @@ export function PlayerPanel({
             )}
             {/* Overflow-hidden wrapper keeps the swipe clipped to the number */}
             <Box sx={{ position: 'relative', overflow: 'hidden', lineHeight: 1, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {/* Crack texture — full overlay behind the number */}
+              {lostRatio > 0.2 && (
+                <Box sx={{
+                  position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(buildCrackSvg())}")`,
+                  backgroundSize: '100% 100%',
+                  mixBlendMode: 'multiply',
+                  pointerEvents: 'none',
+                  userSelect: 'none',
+                }} />
+              )}
               <Typography sx={{
                 fontWeight: 900,
                 fontSize: remoteMode
@@ -1597,17 +1553,6 @@ export function PlayerPanel({
               }}>
                 {player.life}
               </Typography>
-              {/* Crack texture — full overlay, not clipped to text */}
-              {lostRatio > 0.2 && (
-                <Box sx={{
-                  position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                  backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(buildCrackSvg())}")`,
-                  backgroundSize: '100% 100%',
-                  mixBlendMode: 'multiply',
-                  pointerEvents: 'none',
-                  userSelect: 'none',
-                }} />
-              )}
               {/* Swipe 1 — left → right, angled down ~22deg */}
               {damageFlash > 0 && (
                 <Box sx={{
