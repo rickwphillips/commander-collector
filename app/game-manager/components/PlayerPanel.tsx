@@ -1541,6 +1541,7 @@ export function PlayerPanel({
                 }} />
               )}
               <Typography sx={{
+                position: 'relative', zIndex: 1,
                 fontWeight: 900,
                 fontSize: remoteMode
                   ? (ts === 2 ? 'clamp(100px, 26dvh, 220px)' : ts === 1 ? 'clamp(85px, 22dvh, 190px)' : 'clamp(72px, 18dvh, 160px)')
