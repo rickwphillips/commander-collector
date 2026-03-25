@@ -1597,27 +1597,16 @@ export function PlayerPanel({
               }}>
                 {player.life}
               </Typography>
-              {/* Crack texture — background-clip:text confines to exact glyph shapes */}
+              {/* Crack texture — full overlay, not clipped to text */}
               {lostRatio > 0.2 && (
                 <Box sx={{
                   position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                  fontWeight: 900,
-                  fontSize: highlightMode
-                    ? (ts === 2 ? 'clamp(100px, 26dvh, 220px)' : ts === 1 ? 'clamp(85px, 22dvh, 190px)' : 'clamp(72px, 18dvh, 160px)')
-                    : (ts === 2 ? 'clamp(50px, 14dvh, 128px)' : ts === 1 ? 'clamp(40px, 11dvh, 96px)' : 'clamp(34px, 9dvh, 80px)'),
-                  lineHeight: 1,
-                  color: 'transparent',
-                  WebkitTextFillColor: 'transparent',
                   backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(buildCrackSvg())}")`,
                   backgroundSize: '100% 100%',
-                  WebkitBackgroundClip: 'text',
-                  backgroundClip: 'text',
+                  mixBlendMode: 'multiply',
                   pointerEvents: 'none',
                   userSelect: 'none',
-                  fontFamily: 'inherit',
-                }}>
-                  {player.life}
-                </Box>
+                }} />
               )}
               {/* Swipe 1 — left → right, angled down ~22deg */}
               {damageFlash > 0 && (
