@@ -8,6 +8,7 @@ import { GameEndSummary } from './components/GameEndSummary';
 import type { GameManagerState, PlayerSetup, PlayerState, CommanderDamageMap } from './types';
 import type { GameResultInput } from '@/lib/types';
 import { api } from '@/lib/api';
+import { debugLog } from '@/lib/debugLog';
 import { applyEvent } from './remoteTransforms';
 
 const POSITIONS_BY_COUNT: Record<number, Array<PlayerState['position']>> = {
@@ -109,6 +110,13 @@ export default function GameManagerPage() {
     (() => { const s = loadSavedState(); return !s?.sessionCode || s.phase !== 'playing'; })(),
   );
 
+  // State mirror of sessionVerifiedRef — used to gate the event polling loop so it doesn't
+  // consume and discard remote events before session verification has loaded DB state.
+  const [sessionVerified, setSessionVerified] = useState<boolean>(
+    typeof window === 'undefined' ||
+    (() => { const s = loadSavedState(); return !s?.sessionCode || s.phase !== 'playing'; })(),
+  );
+
   // Persist to localStorage
   useEffect(() => {
     if (state.phase !== 'setup') {
@@ -123,20 +131,32 @@ export default function GameManagerPage() {
   // before we've confirmed the session is still active.
   useEffect(() => {
     if (state.phase !== 'playing' || !state.sessionCode) return;
-    if (!sessionVerifiedRef.current) return;
+    if (!sessionVerifiedRef.current) {
+      debugLog('HOST write', 'SKIPPED — not yet verified', { code: state.sessionCode, lives: state.players.map((p) => `${p.playerName}:${p.life}`) }, 'warn');
+      return;
+    }
+    const lives = state.players.map((p) => `${p.playerName}:${p.life}`);
+    debugLog('HOST write', 'sending to DB', { code: state.sessionCode, lives });
     lastWriteTimeRef.current = Date.now();
-    api.updateLiveGame(state.sessionCode, state).catch(() => {/* silent */});
+    api.updateLiveGame(state.sessionCode, state)
+      .then(() => debugLog('HOST write', 'OK', { lives }))
+      .catch((err) => debugLog('HOST write', 'FAILED', { err: String(err), lives }, 'error'));
   }, [state]);
 
   // On mount: if we resumed a playing session from localStorage, verify it's still active.
   // If yes  → sync to current DB state (don't replay potentially stale localStorage).
   // If no   → clear the sessionCode so we don't write to a dead session.
   useEffect(() => {
-    if (sessionVerifiedRef.current) return;
+    if (sessionVerifiedRef.current) {
+      debugLog('HOST verify', 'skipped — already verified (fresh game or no saved session)');
+      return;
+    }
     const saved = loadSavedState();
     if (!saved?.sessionCode) { sessionVerifiedRef.current = true; return; }
+    debugLog('HOST verify', 'checking session', { code: saved.sessionCode, localLives: saved.players?.map((p) => `${p.playerName}:${p.life}`) });
     api.getLiveGame(saved.sessionCode)
       .then((res) => {
+        debugLog('HOST verify', 'DB response', { is_active: res.is_active, dbLives: res.state?.players?.map((p: { playerName: string; life: number }) => `${p.playerName}:${p.life}`) });
         sessionVerifiedRef.current = true;
         if (res.is_active) {
           setState((prev) => ({
@@ -147,10 +167,15 @@ export default function GameManagerPage() {
         } else {
           setState((prev) => ({ ...prev, sessionCode: null, sessionSeats: null }));
         }
+        // Only open the event polling loop AFTER DB state is loaded — prevents consuming
+        // the remote event queue before the authoritative state is in place.
+        setSessionVerified(true);
       })
-      .catch(() => {
+      .catch((err) => {
+        debugLog('HOST verify', 'FAILED', { err: String(err) }, 'error');
         sessionVerifiedRef.current = true;
         setState((prev) => ({ ...prev, sessionCode: null, sessionSeats: null }));
+        setSessionVerified(true);
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -160,28 +185,38 @@ export default function GameManagerPage() {
   // every second and apply any events to our local state. The existing write effect
   // then persists the merged result to the DB.
   useEffect(() => {
-    if (state.phase !== 'playing' || !state.sessionCode) return;
+    if (state.phase !== 'playing' || !state.sessionCode || !sessionVerified) return;
     const code = state.sessionCode;
 
     const poll = async () => {
-      if (document.visibilityState === 'hidden') return;
       try {
         const res = await api.getLiveGame(code, true); // consume=true clears the queue
         if (!res.is_active) return;
         if (res.remote_events.length === 0) return; // nothing to apply
+        debugLog('HOST poll', 'applying remote events', { events: res.remote_events.map((e) => e.type) });
         setState((prev) => {
           if (!prev) return prev;
-          return res.remote_events.reduce(
-            (s, ev) => applyEvent(s, ev),
-            prev,
-          );
+          const next = res.remote_events.reduce((s, ev) => applyEvent(s, ev), prev);
+          debugLog('HOST poll', 'state after events', { lives: next.players.map((p) => `${p.playerName}:${p.life}`) });
+          return next;
         });
-      } catch {/* silent */}
+      } catch (err) { debugLog('HOST poll', 'error', { err: String(err) }, 'error'); }
     };
 
-    const id = setInterval(poll, 1000);
-    return () => clearInterval(id);
-  }, [state.phase, state.sessionCode]);
+    const id = setInterval(poll, 500);
+
+    // Immediately consume queue on visibility restore — prevents events sitting
+    // unconsumed while the host tab was backgrounded, causing remote to revert.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        debugLog('HOST poll', 'visibility restored — immediate poll');
+        poll();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisible); };
+  }, [state.phase, state.sessionCode, sessionVerified]);
 
   const handleStart = async (playerSetups: PlayerSetup[], startingLife: number, turnTimerSeconds: number) => {
     // Mark verified immediately — this is a fresh game, no localStorage session to worry about

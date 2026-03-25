@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Box, Typography, TextField, Button, Stack, CircularProgress, IconButton } from '@mui/material';
+import { Box, Typography, TextField, Button, Stack, CircularProgress, IconButton, Chip } from '@mui/material';
 import TextFieldsIcon from '@mui/icons-material/TextFields';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import { PlayerPanel } from '../components/PlayerPanel';
 import { api } from '@/lib/api';
+import { debugLog } from '@/lib/debugLog';
 import type { GameManagerState, PlayerState, LiveGameEvent } from '@/lib/types';
 import { applyEvent } from '../remoteTransforms';
 import { useThemeMode } from '@/components/ThemeProvider';
@@ -16,7 +17,6 @@ const POLL_INTERVAL_MS = 1000;
 // After sending an event, suppress polls for this long to avoid flickering
 // back to a DB state that hasn't reflected the event yet. By 2s the host
 // will have processed and written the merged state.
-const POST_EVENT_GRACE_MS = 2000;
 // Heartbeat interval — sends a checkin event so the host knows we're still here
 const CHECKIN_INTERVAL_MS = 9000;
 
@@ -39,7 +39,10 @@ function RemotePageInner() {
   const [poisonKillPending, setPoisonKillPending] = useState(false);
   const { mode, toggleTheme } = useThemeMode();
 
-  const lastEventTimeRef = useRef<number>(0);
+  const lastSuccessfulPollRef = useRef<number>(Date.now());
+  const pollFailCountRef = useRef(0);
+  const inactiveCountRef = useRef(0);
+  const [showReconnect, setShowReconnect] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const tickTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -106,20 +109,33 @@ function RemotePageInner() {
     const poll = async () => {
       // Grace period after sending an event — wait for host to process it
       // before updating local state from DB, to avoid flickering
-      if (Date.now() - lastEventTimeRef.current < POST_EVENT_GRACE_MS) return;
-      if (document.visibilityState === 'hidden') return;
       try {
         const res = await api.getLiveGame(code); // remote never passes consume=true
         if (!res.is_active) {
-          setPhase('ended');
+          // Require 3 consecutive inactive responses before ending — guards against
+          // transient bad responses during server deploys or PHP file uploads
+          inactiveCountRef.current++;
+          debugLog('REMOTE poll', 'is_active=false', { count: inactiveCountRef.current }, 'warn');
+          if (inactiveCountRef.current >= 3) setPhase('ended');
           return;
         }
+        inactiveCountRef.current = 0;
+        pollFailCountRef.current = 0;
+        lastSuccessfulPollRef.current = Date.now();
+        if (showReconnect) setShowReconnect(false);
         setState((prev) => {
-          if (!prev) return res.state;
+          const dbLives = res.state?.players?.map((p: { playerName: string; life: number }) => `${p.playerName}:${p.life}`);
+          if (!prev) { debugLog('REMOTE poll', 'initial state from DB', { dbLives }); return res.state; }
           if (JSON.stringify(prev) === JSON.stringify(res.state)) return prev;
+          const prevLives = prev.players.map((p) => `${p.playerName}:${p.life}`);
+          debugLog('REMOTE poll', 'state updated from DB', { prevLives, dbLives });
           return res.state;
         });
-      } catch {/* silent */}
+      } catch (err) {
+        pollFailCountRef.current++;
+        debugLog('REMOTE poll', 'error', { err: String(err), failCount: pollFailCountRef.current }, 'error');
+        if (pollFailCountRef.current >= 8) setShowReconnect(true);
+      }
     };
 
     // Periodic checkin so host's "connected" indicator stays alive
@@ -132,18 +148,32 @@ function RemotePageInner() {
     return () => { clearInterval(id); clearInterval(checkin); };
   }, [phase, code, seat]);
 
+  // ── Reconnect on phone visibility restore ────────────────────────────────
+  // Mobile browsers throttle/pause setInterval when backgrounded. On return,
+  // if it's been >10s since the last successful poll, do a full reconnect.
+  useEffect(() => {
+    if (phase !== 'connected' || !code) return;
+    const handler = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastSuccessfulPollRef.current > 10000) {
+        connect(code);
+      }
+    };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
+  }, [phase, code, connect]);
+
   // ── Send event helper ─────────────────────────────────────────────────────
   // Applies the event optimistically to local state for instant UX, then
   // posts it to the DB event queue. The host picks it up on its next 1s poll,
   // applies it to the authoritative state, and writes the merged result.
   const sendEvent = useCallback((eventData: Omit<LiveGameEvent, 'seat' | 'ts'>) => {
     const event: LiveGameEvent = { ...eventData, seat, ts: Date.now() };
-    // Optimistic local update
-    setState((prev) => (prev ? applyEvent(prev, event) : prev));
-    lastEventTimeRef.current = Date.now();
-    // Fire and forget — failures are silent; host will still have the correct
-    // state from its own actions, and remote re-syncs on next poll
-    api.sendLiveGameEvent(code, event).catch(() => {});
+    debugLog('REMOTE send', event.type, eventData);
+    // Fire and forget — DB is source of truth; remote re-syncs on next poll
+    api.sendLiveGameEvent(code, event)
+      .then(() => debugLog('REMOTE send', `OK: ${event.type}`))
+      .catch((err) => debugLog('REMOTE send', `FAILED: ${event.type}`, { err: String(err) }, 'error'));
   }, [code, seat]);
 
   // ── Action handlers ───────────────────────────────────────────────────────
@@ -293,6 +323,11 @@ function RemotePageInner() {
         <Stack spacing={2} alignItems="center">
           <Typography variant="h6">Game Over</Typography>
           <Typography variant="body2" color="text.secondary">The game has ended.</Typography>
+          {code && (
+            <Button variant="contained" onClick={() => connect(code)}>
+              Rejoin Game
+            </Button>
+          )}
           <Button variant="outlined" onClick={() => { setPhase('enter-code'); setCodeInput(''); }}>
             Join Another Game
           </Button>
@@ -313,6 +348,12 @@ function RemotePageInner() {
 
   return (
     <Box sx={{ width: '100dvw', height: '100dvh', overflow: 'hidden', position: 'relative' }}>
+      {showReconnect && (
+        <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30, bgcolor: 'warning.main', px: 2, py: 0.75, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'warning.contrastText' }}>Connection lost</Typography>
+          <Chip label="Reconnect" size="small" onClick={() => connect(code)} sx={{ fontWeight: 700, cursor: 'pointer' }} />
+        </Box>
+      )}
       <PlayerPanel
         player={displayPlayer}
         playerIdx={playerIdx}

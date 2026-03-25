@@ -38,6 +38,19 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.21.0',
+    date: '2026-03-25T00:00:00',
+    title: 'Remote sync fixes, life panel redesign',
+    changes: [
+      { type: 'fixed', text: 'Remote player panel now always uses the server as source of truth — eliminates the life total reverting after changes' },
+      { type: 'fixed', text: 'Host event polling no longer pauses when the game manager window is minimized or backgrounded' },
+      { type: 'fixed', text: 'Remote connection no longer drops on a single failed poll — requires 3 consecutive failures before ending, with a reconnect banner and rejoin option' },
+      { type: 'improved', text: 'Diagnostic server-side logging added to trace sync issues' },
+      { type: 'improved', text: 'Life +/− buttons moved to directly below the life total number on each player panel' },
+      { type: 'improved', text: 'Crack texture overlay now transitions smoothly as life drops, expanding outward from the centre with each layer fading in independently' },
+    ],
+  },
+  {
     version: '1.20.0',
     date: '2026-03-25T00:00:00',
     title: 'Kill attribution panels, compact menus, dice UX',

@@ -509,75 +509,73 @@ export function PlayerPanel({
 
   const crackAlpha = (from: number) => Math.min(Math.max((lostRatio - from) / 0.15, 0), 1);
 
-  function buildCrackSvg(): string {
-    // Impact point slightly off-center, varied by life value for subtle variety
-    const ox = 38 + (player.life % 7);
-    const oy = 32 + (player.life % 5);
-    const p = (d: string, w: number, op: number) =>
-      `<path d="${d}" stroke="rgba(10,0,0,${op})" stroke-width="${w}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
-    const grp = (from: number, paths: string) => {
-      const o = crackAlpha(from).toFixed(2);
-      return o === '0.00' ? '' : `<g opacity="${o}">${paths}</g>`;
-    };
+  // Fixed per player — does not depend on player.life so the pattern never shifts
+  const ox = 38 + (playerIdx % 7);
+  const oy = 32 + (playerIdx % 5);
+  const cp = (d: string, w: number, op: number) =>
+    `<path d="${d}" stroke="rgba(10,0,0,${op})" stroke-width="${w}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const crackSvg = (paths: string) =>
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${paths}</svg>`;
 
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-      ${grp(0.2,
-        // primary cracks radiating from impact point at irregular angles
-        p(`M${ox},${oy} L${ox-14},${oy-18} L${ox-22},${oy-32}`, 1.6, 0.95) +           // upper-left
-        p(`M${ox},${oy} L${ox+8},${oy-22} L${ox+5},0`, 1.5, 0.92) +                    // up (lean left)
-        p(`M${ox},${oy} L${ox+28},${oy-14} L${ox+48},${oy-26} L100,${oy-18}`, 1.4, 0.9) + // right
-        p(`M${ox},${oy} L${ox+22},${oy+18} L${ox+38},${oy+42} L100,${oy+60}`, 1.3, 0.88) + // lower-right
-        p(`M${ox},${oy} L${ox+4},${oy+28} L${ox-2},${oy+52} L${ox+6},100`, 1.3, 0.87) + // down
-        p(`M${ox},${oy} L${ox-18},${oy+22} L${ox-34},${oy+48} L0,${oy+62}`, 1.2, 0.85) + // lower-left
-        p(`M${ox},${oy} L${ox-28},${oy+6} L0,${oy+14}`, 1.2, 0.84)                    // left
-      )}
-      ${grp(0.35,
-        // secondary branches off the primaries
-        p(`M${ox-14},${oy-18} L${ox-30},${oy-12} L0,${oy-8}`, 1.0, 0.88) +
-        p(`M${ox-14},${oy-18} L${ox-8},${oy-34} L0,${oy-48}`, 0.9, 0.85) +
-        p(`M${ox+8},${oy-22} L${ox+22},${oy-14} L${ox+40},${oy-20} L100,${oy-30}`, 0.9, 0.85) +
-        p(`M${ox+28},${oy-14} L${ox+22},${oy+6} L${ox+36},${oy+18}`, 0.85, 0.82) +
-        p(`M${ox+22},${oy+18} L${ox+10},${oy+32} L${ox+16},${oy+50}`, 0.85, 0.82) +
-        p(`M${ox+4},${oy+28} L${ox+18},${oy+36} L${ox+28},${oy+58} L${ox+18},100`, 0.8, 0.8) +
-        p(`M${ox-18},${oy+22} L${ox-6},${oy+34} L${ox-12},${oy+52}`, 0.8, 0.8) +
-        p(`M${ox-28},${oy+6} L${ox-18},${oy-6} L${ox-10},${oy-20}`, 0.8, 0.8)
-      )}
-      ${grp(0.5,
-        // tertiary splinters
-        p(`M${ox-30},${oy-12} L${ox-42},${oy-24} L${ox-36},${oy-40} L0,${oy-52}`, 0.75, 0.82) +
-        p(`M${ox-8},${oy-34} L${ox+4},${oy-48} L${ox-2},${oy-62} L${ox+10},${oy-80}`, 0.72, 0.8) +
-        p(`M${ox+40},${oy-20} L${ox+50},${oy-8} L${ox+62},${oy-16}`, 0.7, 0.78) +
-        p(`M${ox+36},${oy+18} L${ox+52},${oy+28} L${ox+68},${oy+20} L100,${oy+32}`, 0.7, 0.78) +
-        p(`M${ox+16},${oy+50} L${ox+30},${oy+62} L${ox+22},${oy+78} L${ox+36},100`, 0.68, 0.76) +
-        p(`M${ox-12},${oy+52} L${ox-24},${oy+64} L${ox-14},${oy+80} L0,${oy+90}`, 0.68, 0.76) +
-        p(`M${ox-42},${oy-24} L${ox-52},${oy-10} L0,${oy-4}`, 0.65, 0.74) +
-        p(`M${ox+10},${oy-80} L${ox+22},${oy-72} L${ox+36},${oy-82}`, 0.62, 0.72)
-      )}
-      ${grp(0.7,
-        // fine hairline web connecting the main cracks
-        p(`M${ox-22},${oy-32} L${ox-6},${oy-22} L${ox+4},${oy-38}`, 0.6, 0.8) +
-        p(`M${ox+5},0 L${ox-10},${oy-44} L${ox-20},${oy-58}`, 0.55, 0.78) +
-        p(`M${ox+48},${oy-26} L${ox+58},${oy-14} L${ox+72},${oy-22}`, 0.55, 0.76) +
-        p(`M${ox+62},${oy-16} L${ox+76},${oy-6} L${ox+84},${oy+8}`, 0.52, 0.74) +
-        p(`M${ox+28},${oy+58} L${ox+44},${oy+68} L${ox+38},${oy+84}`, 0.52, 0.74) +
-        p(`M${ox-24},${oy+64} L${ox-38},${oy+72} L${ox-28},${oy+86}`, 0.5, 0.72) +
-        p(`M${ox-52},${oy-10} L${ox-62},${oy+4} L${ox-50},${oy+18}`, 0.5, 0.72) +
-        p(`M${ox+22},${oy+6} L${ox+14},${oy+18} L${ox+24},${oy+30}`, 0.48, 0.7)
-      )}
-      ${grp(0.85,
-        // micro-cracks near impact
-        p(`M${ox-6},${oy+8} L${ox+4},${oy+14} L${ox-2},${oy+22}`, 0.45, 0.8) +
-        p(`M${ox+10},${oy+4} L${ox+18},${oy+12} L${ox+12},${oy+22}`, 0.42, 0.78) +
-        p(`M${ox+6},${oy-10} L${ox+14},${oy-4} L${ox+8},${oy+6}`, 0.42, 0.76) +
-        p(`M${ox-10},${oy-6} L${ox-4},${oy+4} L${ox-12},${oy+12}`, 0.4, 0.74) +
-        p(`M${ox-36},${oy-40} L${ox-28},${oy-30} L${ox-38},${oy-22}`, 0.4, 0.72) +
-        p(`M${ox+36},${oy-82} L${ox+48},${oy-76} L${ox+42},${oy-64}`, 0.38, 0.7) +
-        p(`M${ox+84},${oy+8} L${ox+90},${oy+22} L${ox+80},${oy+34}`, 0.38, 0.7) +
-        p(`M${ox+44},${oy+68} L${ox+54},${oy+80} L${ox+44},${oy+92}`, 0.36, 0.68) +
-        p(`M${ox-62},${oy+4} L${ox-72},${oy+16} L${ox-62},${oy+28}`, 0.36, 0.68)
-      )}
-    </svg>`;
-  }
+  // Each layer is a separate absolutely-positioned Box with its own CSS opacity transition.
+  // Because backgroundImage never changes (ox/oy are fixed), only opacity animates — smooth.
+  const crackLayers: Array<{ from: number; svg: string }> = [
+    { from: 0.2, svg: crackSvg(
+      // primary cracks radiating from impact point
+      cp(`M${ox},${oy} L${ox-14},${oy-18} L${ox-22},${oy-32}`, 1.6, 0.95) +
+      cp(`M${ox},${oy} L${ox+8},${oy-22} L${ox+5},0`, 1.5, 0.92) +
+      cp(`M${ox},${oy} L${ox+28},${oy-14} L${ox+48},${oy-26} L100,${oy-18}`, 1.4, 0.9) +
+      cp(`M${ox},${oy} L${ox+22},${oy+18} L${ox+38},${oy+42} L100,${oy+60}`, 1.3, 0.88) +
+      cp(`M${ox},${oy} L${ox+4},${oy+28} L${ox-2},${oy+52} L${ox+6},100`, 1.3, 0.87) +
+      cp(`M${ox},${oy} L${ox-18},${oy+22} L${ox-34},${oy+48} L0,${oy+62}`, 1.2, 0.85) +
+      cp(`M${ox},${oy} L${ox-28},${oy+6} L0,${oy+14}`, 1.2, 0.84)
+    )},
+    { from: 0.35, svg: crackSvg(
+      // secondary branches off the primaries
+      cp(`M${ox-14},${oy-18} L${ox-30},${oy-12} L0,${oy-8}`, 1.0, 0.88) +
+      cp(`M${ox-14},${oy-18} L${ox-8},${oy-34} L0,${oy-48}`, 0.9, 0.85) +
+      cp(`M${ox+8},${oy-22} L${ox+22},${oy-14} L${ox+40},${oy-20} L100,${oy-30}`, 0.9, 0.85) +
+      cp(`M${ox+28},${oy-14} L${ox+22},${oy+6} L${ox+36},${oy+18}`, 0.85, 0.82) +
+      cp(`M${ox+22},${oy+18} L${ox+10},${oy+32} L${ox+16},${oy+50}`, 0.85, 0.82) +
+      cp(`M${ox+4},${oy+28} L${ox+18},${oy+36} L${ox+28},${oy+58} L${ox+18},100`, 0.8, 0.8) +
+      cp(`M${ox-18},${oy+22} L${ox-6},${oy+34} L${ox-12},${oy+52}`, 0.8, 0.8) +
+      cp(`M${ox-28},${oy+6} L${ox-18},${oy-6} L${ox-10},${oy-20}`, 0.8, 0.8)
+    )},
+    { from: 0.5, svg: crackSvg(
+      // tertiary splinters
+      cp(`M${ox-30},${oy-12} L${ox-42},${oy-24} L${ox-36},${oy-40} L0,${oy-52}`, 0.75, 0.82) +
+      cp(`M${ox-8},${oy-34} L${ox+4},${oy-48} L${ox-2},${oy-62} L${ox+10},${oy-80}`, 0.72, 0.8) +
+      cp(`M${ox+40},${oy-20} L${ox+50},${oy-8} L${ox+62},${oy-16}`, 0.7, 0.78) +
+      cp(`M${ox+36},${oy+18} L${ox+52},${oy+28} L${ox+68},${oy+20} L100,${oy+32}`, 0.7, 0.78) +
+      cp(`M${ox+16},${oy+50} L${ox+30},${oy+62} L${ox+22},${oy+78} L${ox+36},100`, 0.68, 0.76) +
+      cp(`M${ox-12},${oy+52} L${ox-24},${oy+64} L${ox-14},${oy+80} L0,${oy+90}`, 0.68, 0.76) +
+      cp(`M${ox-42},${oy-24} L${ox-52},${oy-10} L0,${oy-4}`, 0.65, 0.74) +
+      cp(`M${ox+10},${oy-80} L${ox+22},${oy-72} L${ox+36},${oy-82}`, 0.62, 0.72)
+    )},
+    { from: 0.7, svg: crackSvg(
+      // fine hairline web connecting the main cracks
+      cp(`M${ox-22},${oy-32} L${ox-6},${oy-22} L${ox+4},${oy-38}`, 0.6, 0.8) +
+      cp(`M${ox+5},0 L${ox-10},${oy-44} L${ox-20},${oy-58}`, 0.55, 0.78) +
+      cp(`M${ox+48},${oy-26} L${ox+58},${oy-14} L${ox+72},${oy-22}`, 0.55, 0.76) +
+      cp(`M${ox+62},${oy-16} L${ox+76},${oy-6} L${ox+84},${oy+8}`, 0.52, 0.74) +
+      cp(`M${ox+28},${oy+58} L${ox+44},${oy+68} L${ox+38},${oy+84}`, 0.52, 0.74) +
+      cp(`M${ox-24},${oy+64} L${ox-38},${oy+72} L${ox-28},${oy+86}`, 0.5, 0.72) +
+      cp(`M${ox-52},${oy-10} L${ox-62},${oy+4} L${ox-50},${oy+18}`, 0.5, 0.72) +
+      cp(`M${ox+22},${oy+6} L${ox+14},${oy+18} L${ox+24},${oy+30}`, 0.48, 0.7)
+    )},
+    { from: 0.85, svg: crackSvg(
+      // micro-cracks near impact
+      cp(`M${ox-6},${oy+8} L${ox+4},${oy+14} L${ox-2},${oy+22}`, 0.45, 0.8) +
+      cp(`M${ox+10},${oy+4} L${ox+18},${oy+12} L${ox+12},${oy+22}`, 0.42, 0.78) +
+      cp(`M${ox+6},${oy-10} L${ox+14},${oy-4} L${ox+8},${oy+6}`, 0.42, 0.76) +
+      cp(`M${ox-10},${oy-6} L${ox-4},${oy+4} L${ox-12},${oy+12}`, 0.4, 0.74) +
+      cp(`M${ox-36},${oy-40} L${ox-28},${oy-30} L${ox-38},${oy-22}`, 0.4, 0.72) +
+      cp(`M${ox+36},${oy-82} L${ox+48},${oy-76} L${ox+42},${oy-64}`, 0.38, 0.7) +
+      cp(`M${ox+84},${oy+8} L${ox+90},${oy+22} L${ox+80},${oy+34}`, 0.38, 0.7) +
+      cp(`M${ox+44},${oy+68} L${ox+54},${oy+80} L${ox+44},${oy+92}`, 0.36, 0.68) +
+      cp(`M${ox-62},${oy+4} L${ox-72},${oy+16} L${ox-62},${oy+28}`, 0.36, 0.68)
+    )},
+  ];
 
   const isLifeLow = player.life <= 0;
   const isPoisoned = player.poison >= 10;
@@ -1558,7 +1556,7 @@ export function PlayerPanel({
 
         {/* Life total + controls */}
         <Box sx={{ width: '33%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5, alignSelf: 'stretch' }}>
-          <Box sx={{ position: 'relative', lineHeight: 1, overflow: 'visible', width: '100%', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Box sx={{ position: 'relative', lineHeight: 1, overflow: 'visible', width: '100%', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             {showCrown && (
               <CrownIcon sx={{
                 fontSize: ts === 2 ? 72 : ts === 1 ? 60 : 48,
@@ -1572,18 +1570,20 @@ export function PlayerPanel({
               }} />
             )}
             {/* Overflow-hidden wrapper keeps the swipe clipped to the number */}
-            <Box sx={{ position: 'relative', overflow: 'hidden', lineHeight: 1, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {/* Crack texture — full overlay behind the number */}
-              {lostRatio > 0.2 && (
-                <Box sx={{
+            <Box sx={{ position: 'relative', overflow: 'hidden', lineHeight: 1, width: '100%', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              {/* Crack layers — each fades in independently as life drops, expanding from centre */}
+              {crackLayers.map(({ from, svg }) => (
+                <Box key={from} sx={{
                   position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                  backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(buildCrackSvg())}")`,
+                  backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(svg)}")`,
                   backgroundSize: '100% 100%',
                   mixBlendMode: 'multiply',
                   pointerEvents: 'none',
                   userSelect: 'none',
+                  opacity: crackAlpha(from),
+                  transition: 'opacity 0.5s ease',
                 }} />
-              )}
+              ))}
               <Typography sx={{
                 position: 'relative', zIndex: 1,
                 fontWeight: 900,
@@ -1669,34 +1669,34 @@ export function PlayerPanel({
                   },
                 }} />
               )}
+              <Stack direction="row" alignItems="center" spacing={ts === 2 ? 1 : 0.5} sx={{ mt: 0.5, zIndex: 1, transition: 'gap 0.2s ease' }}>
+                <Tooltip open={lpKey === 'life-dec'} title="-5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
+                  <IconButton
+                    onClick={guardClick(() => onLifeChange(playerIdx, -1))}
+                    onPointerDown={() => startLongPress('life-dec', () => onLifeChange(playerIdx, -5))}
+                    onPointerUp={cancelLongPress}
+                    onPointerLeave={cancelLongPress}
+                    onPointerCancel={cancelLongPress}
+                    sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, borderRadius: 2, '& .MuiTouchRipple-root': { borderRadius: 2 }, transition: 'padding 0.2s ease' }}
+                  >
+                    <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 60 : ts === 1 ? 48 : 36 }}>−</Typography>
+                  </IconButton>
+                </Tooltip>
+                <Tooltip open={lpKey === 'life-inc'} title="+5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
+                  <IconButton
+                    onClick={guardClick(() => onLifeChange(playerIdx, 1))}
+                    onPointerDown={() => startLongPress('life-inc', () => onLifeChange(playerIdx, 5))}
+                    onPointerUp={cancelLongPress}
+                    onPointerLeave={cancelLongPress}
+                    onPointerCancel={cancelLongPress}
+                    sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, borderRadius: 2, '& .MuiTouchRipple-root': { borderRadius: 2 }, transition: 'padding 0.2s ease' }}
+                  >
+                    <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 60 : ts === 1 ? 48 : 36 }}>+</Typography>
+                  </IconButton>
+                </Tooltip>
+              </Stack>
             </Box>
           </Box>
-          <Stack direction="row" alignItems="center" spacing={ts === 2 ? 1 : 0.5} sx={{ mt: 0, transition: 'gap 0.2s ease' }}>
-            <Tooltip open={lpKey === 'life-dec'} title="-5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-              <IconButton
-                onClick={guardClick(() => onLifeChange(playerIdx, -1))}
-                onPointerDown={() => startLongPress('life-dec', () => onLifeChange(playerIdx, -5))}
-                onPointerUp={cancelLongPress}
-                onPointerLeave={cancelLongPress}
-                onPointerCancel={cancelLongPress}
-                sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, borderRadius: 2, '& .MuiTouchRipple-root': { borderRadius: 2 }, transition: 'padding 0.2s ease' }}
-              >
-                <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 60 : ts === 1 ? 48 : 36 }}>−</Typography>
-              </IconButton>
-            </Tooltip>
-            <Tooltip open={lpKey === 'life-inc'} title="+5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-              <IconButton
-                onClick={guardClick(() => onLifeChange(playerIdx, 1))}
-                onPointerDown={() => startLongPress('life-inc', () => onLifeChange(playerIdx, 5))}
-                onPointerUp={cancelLongPress}
-                onPointerLeave={cancelLongPress}
-                onPointerCancel={cancelLongPress}
-                sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, borderRadius: 2, '& .MuiTouchRipple-root': { borderRadius: 2 }, transition: 'padding 0.2s ease' }}
-              >
-                <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 60 : ts === 1 ? 48 : 36 }}>+</Typography>
-              </IconButton>
-            </Tooltip>
-          </Stack>
         </Box>
 
         {/* Counters — right column */}
