@@ -1575,7 +1575,7 @@ export function PlayerPanel({
                 onPointerUp={cancelLongPress}
                 onPointerLeave={cancelLongPress}
                 onPointerCancel={cancelLongPress}
-                sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, borderRadius: 2, bgcolor: 'action.selected', transition: 'padding 0.2s ease' }}
+                sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, borderRadius: 2, border: (theme: import('@mui/material').Theme) => `1px solid ${theme.palette.divider}`, transition: 'padding 0.2s ease' }}
               >
                 <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 60 : ts === 1 ? 48 : 36 }}>−</Typography>
               </IconButton>
@@ -1587,7 +1587,7 @@ export function PlayerPanel({
                 onPointerUp={cancelLongPress}
                 onPointerLeave={cancelLongPress}
                 onPointerCancel={cancelLongPress}
-                sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, borderRadius: 2, bgcolor: 'action.selected', transition: 'padding 0.2s ease' }}
+                sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, borderRadius: 2, border: (theme: import('@mui/material').Theme) => `1px solid ${theme.palette.divider}`, transition: 'padding 0.2s ease' }}
               >
                 <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 60 : ts === 1 ? 48 : 36 }}>+</Typography>
               </IconButton>
