@@ -69,6 +69,16 @@ const emptySlot = (): PlayerSlot => ({
 
 const LIFE_PRESETS = [20, 30, 40];
 
+type SeatPosition = 'bottom' | 'left' | 'top' | 'right';
+const ALL_POSITIONS: SeatPosition[] = ['bottom', 'left', 'top', 'right'];
+const POSITIONS_BY_COUNT_DEFAULT: Record<number, SeatPosition[]> = {
+  2: ['bottom', 'top'],
+  3: ['bottom', 'left', 'top'],
+  4: ['bottom', 'left', 'top', 'right'],
+};
+// Sort order for reordering playerSetups on start (matches game manager's POSITIONS_BY_COUNT)
+const POSITION_ORDER: Record<SeatPosition, number> = { bottom: 0, left: 1, top: 2, right: 3 };
+
 export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
   const router = useRouter();
   const [players, setPlayers] = useState<Player[]>([]);
@@ -83,6 +93,7 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
 
   const [playerCount, setPlayerCount] = useState<number>(4);
   const [slots, setSlots] = useState<PlayerSlot[]>([emptySlot(), emptySlot(), emptySlot(), emptySlot()]);
+  const [seatPositions, setSeatPositions] = useState<SeatPosition[]>(['bottom', 'left', 'top', 'right']);
 
   // debounce refs per slot (main/partner)
   const debounceTimers = useState<Record<string, ReturnType<typeof setTimeout>>>({})[0];
@@ -238,6 +249,27 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
       while (next.length < val) next.push(emptySlot());
       return next.slice(0, val);
     });
+    setSeatPositions(POSITIONS_BY_COUNT_DEFAULT[val] ?? POSITIONS_BY_COUNT_DEFAULT[4]);
+  };
+
+  const cyclePosition = (idx: number) => {
+    setSeatPositions((prev) => {
+      const next = [...prev];
+      const takenBefore = next.slice(0, idx);
+      const available = ALL_POSITIONS.filter(p => !takenBefore.includes(p));
+      if (available.length <= 1) return prev;
+      const currentIdx = available.indexOf(next[idx]);
+      next[idx] = available[(currentIdx + 1) % available.length];
+      // Cascade: fix any conflict for later slots
+      for (let j = idx + 1; j < playerCount; j++) {
+        const takenBeforeJ = next.slice(0, j);
+        if (takenBeforeJ.includes(next[j])) {
+          const availableForJ = ALL_POSITIONS.filter(p => !takenBeforeJ.includes(p));
+          next[j] = availableForJ[0] ?? next[j];
+        }
+      }
+      return next;
+    });
   };
 
   const handleRandom = useCallback(() => {
@@ -290,14 +322,14 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
 
     setError(null);
 
-    const positions: Array<'bottom' | 'top' | 'left' | 'right'> =
-      playerCount === 2
-        ? ['bottom', 'top']
-        : playerCount === 3
-        ? ['bottom', 'left', 'top']
-        : ['bottom', 'left', 'top', 'right'];
+    // Sort slot indices by chosen seat position so page.tsx's POSITIONS_BY_COUNT[i]
+    // assignment matches each player's chosen seat (bottom=0, left=1, top=2, right=3).
+    const sortedIndices = activeSlots
+      .map((_, i) => i)
+      .sort((a, b) => POSITION_ORDER[seatPositions[a]] - POSITION_ORDER[seatPositions[b]]);
 
-    const playerSetups: PlayerSetup[] = activeSlots.map((s, i) => {
+    const playerSetups: PlayerSetup[] = sortedIndices.map((i) => {
+      const s = activeSlots[i];
       const deck = decks.find((d) => d.id === s.deckId);
       const player = players.find((p) => p.id === s.playerId);
       const setup: PlayerSetup = {
@@ -310,8 +342,6 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
       if (s.hasPartner && s.partner.name) {
         setup.partner = { name: s.partner.name, artCropUrl: s.partner.artCropUrl };
       }
-      // position is handled in page.tsx via onStart
-      void positions[i];
       return setup;
     });
 
@@ -354,12 +384,6 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
     );
   };
 
-  const POSITIONS_BY_COUNT: Record<number, string[]> = {
-    2: ['bottom', 'top'],
-    3: ['bottom', 'left', 'top'],
-    4: ['bottom', 'left', 'top', 'right'],
-  };
-
   const positionIcons: Record<string, React.ReactElement> = {
     bottom: <SouthIcon sx={{ fontSize: 40, color: 'primary.main', opacity: 0.85 }} />,
     top: <NorthIcon sx={{ fontSize: 40, color: 'primary.main', opacity: 0.85 }} />,
@@ -374,23 +398,30 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
       selectedPlayerId !== '' ? decks.filter((d) => d.player_id === selectedPlayerId) : [];
     const otherDecks =
       selectedPlayerId !== '' ? decks.filter((d) => d.player_id !== selectedPlayerId) : decks;
-    const position = (POSITIONS_BY_COUNT[playerCount] ?? [])[idx];
-    const posIcon = position ? positionIcons[position] : null;
+    const position = seatPositions[idx];
+    const takenBefore = seatPositions.slice(0, idx);
+    const canCycle = ALL_POSITIONS.filter(p => !takenBefore.includes(p)).length > 1;
 
     return (
       <Card variant="outlined" key={idx} sx={{ mb: 2 }}>
         <CardContent>
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-            {posIcon}
+            <IconButton
+              onClick={() => cyclePosition(idx)}
+              disabled={!canCycle}
+              size="small"
+              title={`${position} seat${canCycle ? ' — click to rotate' : ''}`}
+              sx={{ p: 0.5 }}
+            >
+              {positionIcons[position]}
+            </IconButton>
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.1 }}>
                 Player {idx + 1}
               </Typography>
-              {position && (
-                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
-                  {position} seat
-                </Typography>
-              )}
+              <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
+                {position} seat
+              </Typography>
             </Box>
           </Stack>
           <Stack spacing={2}>

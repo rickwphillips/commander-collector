@@ -38,6 +38,17 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.26.0',
+    date: '2026-03-26',
+    title: 'Seat Position Assignment in Game Setup',
+    changes: [
+      { type: 'added', text: 'Seat direction arrows in game setup are now clickable — click to rotate a player\'s seat position (bottom / left / top / right)' },
+      { type: 'added', text: 'Each player\'s available seats are constrained by choices above — player 1 picks freely, player 2 picks from the remaining 3, and so on' },
+      { type: 'improved', text: 'Changing an earlier player\'s seat automatically reassigns any conflicts in later slots' },
+      { type: 'improved', text: 'Player order passed to the game board now reflects chosen seat positions, so each player lands in their selected spot' },
+    ],
+  },
+  {
     version: '1.25.2',
     date: '2026-03-26',
     title: 'Dice Grid Code Cleanup',
