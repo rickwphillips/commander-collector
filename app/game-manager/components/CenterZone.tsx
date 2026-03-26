@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   Box,
   Stack,
@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Checkbox,
   FormControlLabel,
   Switch,
   TextField,
@@ -124,7 +125,8 @@ export function CenterZone({
   const [history, setHistory] = useState<RollEntry[]>([]);
   const [resultKey, setResultKey] = useState(0);
   const [diceCount, setDiceCount] = useState(1);
-  type RollingEntry = { label: string; color: string; finalRolls: (number|string)[]; revealed: boolean[]; total: number|null; sides: number|null };
+  type RollingEntry = { label: string; color: string; finalRolls: (number|string)[]; revealed: boolean[]; total: number|null; sides: number|null; labels?: string[] };
+  type RollOffState = { phase: 'idle' } | { phase: 'rolling'; activeIndices: number[]; originalIndices: number[] } | { phase: 'result'; winnerIdx: number; winnerName: string; originalIndices: number[] } | { phase: 'tie'; tiedIndices: number[]; originalIndices: number[] };
   const [rollingEntry, setRollingEntry] = useState<RollingEntry | null>(null);
   const animTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [confirmEnd, setConfirmEnd] = useState(false);
@@ -134,14 +136,35 @@ export function CenterZone({
   const [notesDraft, setNotesDraft] = useState('');
   const [prevTurnTooltip, setPrevTurnTooltip] = useState(false);
   const [choosingFirst, setChoosingFirst] = useState(false);
+  const [rollOffState, setRollOffState] = useState<RollOffState>({ phase: 'idle' });
+  const [acesHigh, setAcesHigh] = useState(true);
+  const [elevenBeatsAces, setElevenBeatsAces] = useState(true);
+  const [adamsRule, setAdamsRule] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const lastTimerRef = useRef(turnTimerSeconds > 0 ? turnTimerSeconds : 300);
   const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lpFired = useRef(false);
+  const diceAudio = useRef<{ d20: HTMLAudioElement | null; d6: HTMLAudioElement | null }>({ d20: null, d6: null });
+  useEffect(() => {
+    const basePath = process.env.NODE_ENV === 'production' ? '/app/projects/commander' : '';
+    const d20 = new Audio(`${basePath}/audio/d-20.mp3`);
+    const d6  = new Audio(`${basePath}/audio/d-6.mp3`);
+    d20.preload = 'auto';
+    d6.preload  = 'auto';
+    diceAudio.current = { d20, d6 };
+  }, []);
 
   const addRoll = (label: string, sides: number | null) => {
     animTimers.current.forEach(clearTimeout);
     animTimers.current = [];
+
+    if (soundEnabled) {
+      const audio = sides === 20 ? diceAudio.current.d20 : sides === 6 ? diceAudio.current.d6 : null;
+      if (audio) {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      }
+    }
 
     let finalRolls: (number | string)[];
     let total: number | null;
@@ -174,6 +197,63 @@ export function CenterZone({
       setResultKey(k => k + 1);
     }, revealDelay + (finalRolls.length - 1) * stagger + 350);
     animTimers.current.push(doneT);
+  };
+
+  const getRollScore = (roll: number, allRolls: number[]): number => {
+    if (acesHigh && elevenBeatsAces && allRolls.includes(1)) {
+      if (roll === 11) return 21;   // 11 beats the ace
+      if (roll === 1)  return 20.5; // ace still beats 20
+      return roll;
+    }
+    if (acesHigh) return roll === 1 ? 21 : roll;
+    return roll;
+  };
+
+  const startRollOff = (playerIndices: number[], originalIndices?: number[]) => {
+    const origIndices = originalIndices ?? playerIndices;
+    animTimers.current.forEach(clearTimeout);
+    animTimers.current = [];
+    if (soundEnabled && diceAudio.current.d20) {
+      diceAudio.current.d20.currentTime = 0;
+      diceAudio.current.d20.play().catch(() => {});
+    }
+    const finalRolls = playerIndices.map(() => rollDie(20));
+    const labels = playerIndices.map(idx => players[idx].playerName);
+    setRollOffState({ phase: 'rolling', activeIndices: playerIndices, originalIndices: origIndices });
+    setDiceOpen(true);
+    setRollingEntry({ label: 'Roll Off', color: 'primary.main', finalRolls, revealed: finalRolls.map(() => false), total: null, sides: 20, labels });
+    const revealDelay = 600;
+    const stagger = 230;
+    finalRolls.forEach((_, i) => {
+      const t = setTimeout(() => {
+        setRollingEntry(prev => prev ? { ...prev, revealed: prev.revealed.map((v, j) => j === i ? true : v) } : null);
+      }, revealDelay + i * stagger);
+      animTimers.current.push(t);
+    });
+    const doneT = setTimeout(() => {
+      setRollingEntry(null);
+      const rolls = finalRolls as number[];
+      const scores = rolls.map(r => getRollScore(r, rolls));
+      const maxScore = Math.max(...scores);
+      const tiedPositions = scores.map((s, pos) => ({ s, pos })).filter(({ s }) => s === maxScore).map(({ pos }) => pos);
+      if (tiedPositions.length === 1) {
+        const winnerIdx = playerIndices[tiedPositions[0]];
+        setRollOffState({ phase: 'result', winnerIdx, winnerName: players[winnerIdx].playerName, originalIndices: origIndices });
+      } else {
+        const tiedIndices = tiedPositions.map(pos => playerIndices[pos]);
+        setRollOffState({ phase: 'tie', tiedIndices, originalIndices: origIndices });
+        const tieT = setTimeout(() => startRollOff(tiedIndices, origIndices), 2500);
+        animTimers.current.push(tieT);
+      }
+    }, revealDelay + (finalRolls.length - 1) * stagger + 800);
+    animTimers.current.push(doneT);
+  };
+
+  const cancelRollOff = () => {
+    animTimers.current.forEach(clearTimeout);
+    animTimers.current = [];
+    setRollingEntry(null);
+    setRollOffState({ phase: 'idle' });
   };
 
   const lastEntry = history.length > 0 ? history[history.length - 1] : null;
@@ -288,82 +368,72 @@ export function CenterZone({
 
           {/* Roll for first player */}
           {!firstPlayerSet && <Box sx={{ textAlign: 'center', width: '100%' }}>
-            {(rollPhase === 'rolling') && rolledPlayerName && (
-              <Typography variant="caption" sx={{ fontWeight: 600, color: '#DAA520', display: 'block', mb: 0.75, fontSize: fsPlayerName }}>
-                <Box key={rolledPlayerName} component="span" sx={{ display: 'inline-block', fontSize: fsBigName, fontWeight: 900, fontStyle: 'italic', letterSpacing: 0.5, animation: 'nameFlash 0.18s cubic-bezier(0.34,1.56,0.64,1)', '@keyframes nameFlash': { '0%': { opacity: 0, transform: 'scale(0.7) translateY(-6px)' }, '100%': { opacity: 1, transform: 'scale(1) translateY(0)' } } }}>
-                  {rolledPlayerName}
-                </Box>
-                <Box component="span" sx={{ color: 'text.primary', fontStyle: 'normal', fontWeight: 300, fontSize: fsGoesFirst }}>{' goes first!'}</Box>
-              </Typography>
-            )}
-            {(rollPhase === 'idle' || rollPhase === 'rolling') && !choosingFirst && (
-              <Stack direction="row" spacing={1.5} justifyContent="center" alignItems="flex-end">
-                <Button
-                  variant="contained"
-                  onClick={onRollForFirst}
-                  disabled={rollPhase === 'rolling'}
-                  sx={{ width: btnRollSize, height: btnRollSize, flexDirection: 'column', gap: 0.75, fontSize: fsPlayerName, fontWeight: 700, borderRadius: 2, flexShrink: 0 }}
-                >
-                  <svg viewBox="0 0 24 24" width="40" height="40" fill="currentColor">
-                    <path d="M12 2L2 19h20L12 2zm0 4l7 13H5l7-13zm-1 5v4h2v-4h-2zm0 5v2h2v-2h-2z" />
-                  </svg>
-                  {rollPhase === 'rolling' ? 'Rolling…' : 'Roll'}
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() => setChoosingFirst(true)}
-                  disabled={rollPhase === 'rolling'}
-                  sx={{ width: btnChooseSize, height: btnChooseSize, flexDirection: 'column', fontSize: fsCmdName, fontWeight: 600, borderRadius: 2, flexShrink: 0 }}
-                >
-                  Choose
-                </Button>
-              </Stack>
-            )}
-            {(rollPhase === 'idle' || rollPhase === 'rolling') && choosingFirst && (
-              <Box>
-                <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', display: 'block', mb: 1 }}>
+            <Stack direction="row" spacing={1.5} justifyContent="center" alignItems="flex-end">
+              <Button
+                variant="contained"
+                onClick={() => {
+                  const activeIndices = players.map((_, i) => i).filter(i => !players[i].isEliminated);
+                  startRollOff(activeIndices);
+                }}
+                disabled={rollOffState.phase === 'rolling' || rollOffState.phase === 'tie'}
+                sx={{ width: btnRollSize, height: btnRollSize, flexDirection: 'column', gap: 0.75, fontSize: fsPlayerName, fontWeight: 700, borderRadius: 2, flexShrink: 0 }}
+              >
+                <Box sx={{ display: 'inline-flex' }}><D20Icon size={40} /></Box>
+                Roll Off
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => setChoosingFirst(true)}
+                disabled={rollOffState.phase === 'rolling' || rollOffState.phase === 'tie'}
+                sx={{ width: btnChooseSize, height: btnChooseSize, flexDirection: 'column', fontSize: fsCmdName, fontWeight: 600, borderRadius: 2, flexShrink: 0 }}
+              >
+                Pick
+              </Button>
+            </Stack>
+            <Stack direction="row" spacing={0.5} justifyContent="center" sx={{ mt: 1, flexWrap: 'wrap' }}>
+              <FormControlLabel
+                control={<Checkbox size="small" checked={acesHigh} onChange={e => { setAcesHigh(e.target.checked); setElevenBeatsAces(e.target.checked); if (e.target.checked) setAdamsRule(false); }} sx={{ p: 0.5 }} />}
+                label={<Typography sx={{ fontSize: 10 }}>Aces High</Typography>}
+                sx={{ mr: 0 }}
+              />
+              <FormControlLabel
+                control={<Checkbox size="small" checked={elevenBeatsAces} disabled={!acesHigh} onChange={e => { setElevenBeatsAces(e.target.checked); if (e.target.checked) setAdamsRule(false); }} sx={{ p: 0.5 }} />}
+                label={<Typography sx={{ fontSize: 10, color: acesHigh ? 'text.primary' : 'text.disabled' }}>Eleven Beats Aces</Typography>}
+                sx={{ mr: 0 }}
+              />
+              <FormControlLabel
+                control={<Checkbox size="small" checked={adamsRule} onChange={e => { setAdamsRule(e.target.checked); if (e.target.checked) { setAcesHigh(false); setElevenBeatsAces(false); } }} sx={{ p: 0.5 }} />}
+                label={<Typography sx={{ fontSize: 10 }}>{"Adam's House Rules"}</Typography>}
+                sx={{ mr: 0 }}
+              />
+            </Stack>
+          </Box>}
+
+          {/* Pick first player overlay */}
+          {choosingFirst && (
+            <Box sx={{
+              position: 'absolute', inset: 0, zIndex: 10,
+              bgcolor: (theme) => theme.palette.mode === 'dark' ? '#1A1410EE' : '#FFF8F0EE',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              gap: 1, p: 1,
+            }}>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '100%' }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                   Who goes first?
                 </Typography>
-                <Stack spacing={0.5}>
-                  {players.map((p, idx) => (
-                    <Button key={idx} variant="outlined" onClick={() => { onChooseFirstPlayer(idx); setChoosingFirst(false); }} sx={{ fontSize: fsCmdName, py: 0.75 }}>
-                      {p.playerName}
-                    </Button>
-                  ))}
-                </Stack>
-                <Button size="small" onClick={() => setChoosingFirst(false)} sx={{ mt: 1, fontSize: 10, color: 'text.disabled' }}>
-                  Cancel
-                </Button>
+                <IconButton size="small" onClick={() => setChoosingFirst(false)} sx={{ p: 0.25 }}>
+                  <CloseIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Stack>
+              <Box sx={{ flex: 1, width: '100%', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 0.5 }}>
+                {players.map((p, idx) => (
+                  <Button key={idx} variant="outlined" onClick={() => { onChooseFirstPlayer(idx); setChoosingFirst(false); }} sx={{ fontSize: fsCmdName, height: '100%', minHeight: 0 }}>
+                    {p.playerName}
+                  </Button>
+                ))}
               </Box>
-            )}
-            {rollPhase === 'done' && (
-              <Box>
-                <Typography variant="caption" sx={{ fontWeight: 600, color: '#DAA520', display: 'block', mb: 0.75, fontSize: fsPlayerName }}>
-                  <Box component="span" sx={{
-                    display: 'inline-block',
-                    fontSize: fsBigName, fontWeight: 900, fontStyle: 'italic', letterSpacing: 0.5,
-                    animation: 'nameSizzle 0.5s cubic-bezier(0.34,1.56,0.64,1), nameGlow 2s ease-in-out 0.5s infinite alternate',
-                    '@keyframes nameSizzle': {
-                      '0%':   { opacity: 0, transform: 'scale(1.5)', textShadow: '0 0 32px rgba(255,215,0,1)' },
-                      '70%':  { transform: 'scale(0.95)',             textShadow: '0 0 8px rgba(255,215,0,0.6)' },
-                      '100%': { opacity: 1, transform: 'scale(1)',    textShadow: '0 0 14px rgba(255,215,0,0.8)' },
-                    },
-                    '@keyframes nameGlow': {
-                      '0%':   { textShadow: '0 0 6px rgba(255,215,0,0.5)' },
-                      '100%': { textShadow: '0 0 18px rgba(255,215,0,1), 0 0 32px rgba(255,165,0,0.6)' },
-                    },
-                  }}>
-                    {rolledPlayerName}
-                  </Box>
-                  <Box component="span" sx={{ color: 'text.primary', fontStyle: 'normal', fontWeight: 300, fontSize: fsGoesFirst }}>{' goes first!'}</Box>
-                </Typography>
-                <Stack direction="row" spacing={1.5} justifyContent="center" alignItems="flex-end">
-                  <Button variant="contained" onClick={onAcceptFirstPlayer} sx={{ width: btnRollSize, height: btnRollSize, fontSize: fsPlayerName, fontWeight: 700, borderRadius: 2 }}>Accept</Button>
-                  <Button variant="outlined" onClick={onRollAgain} sx={{ width: btnChooseSize, height: btnChooseSize, fontSize: fsCmdName, fontWeight: 600, borderRadius: 2 }}>Roll Again</Button>
-                </Stack>
-              </Box>
-            )}
-          </Box>}
+            </Box>
+          )}
 
           {/* Fullscreen toggle */}
           <IconButton
@@ -512,9 +582,9 @@ export function CenterZone({
             {/* Header */}
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '100%' }}>
               <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Dice / Flips
+                {rollOffState.phase !== 'idle' ? 'Roll-Off' : 'Dice / Flips'}
               </Typography>
-              <IconButton size="small" onClick={() => setDiceOpen(false)} sx={{ p: 0.25 }}>
+              <IconButton size="small" onClick={() => { if (rollOffState.phase !== 'idle') cancelRollOff(); setDiceOpen(false); }} sx={{ p: 0.25 }}>
                 <CloseIcon sx={{ fontSize: 16 }} />
               </IconButton>
             </Stack>
@@ -563,7 +633,7 @@ export function CenterZone({
                           : <Box sx={{ alignSelf: 'flex-end', mb: '10px', display: 'inline-flex' }}><D20Icon size={10} /></Box>
                         )}
                         <Box sx={{ textAlign: 'center', height: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
-                          <Typography sx={{ fontSize: 9, color: 'text.disabled', lineHeight: 1, mb: 0.25 }}>{i + 1}</Typography>
+                          <Typography sx={{ fontSize: 9, color: 'text.disabled', lineHeight: 1, mb: 0.25 }}>{rollingEntry.labels ? rollingEntry.labels[i] : i + 1}</Typography>
                           {rollingEntry.revealed[i] ? (
                             <Typography key={`rv${i}`} sx={{ fontWeight: 900, fontSize: 32, lineHeight: 1, color: rollingEntry.color, ...popSx }}>{r}</Typography>
                           ) : (
@@ -574,7 +644,29 @@ export function CenterZone({
                     ))}
                   </Stack>
                 );
-              })() : lastEntry ? (
+              })() : rollOffState.phase === 'result' ? (
+                <Box sx={{ width: '100%', textAlign: 'center' }}>
+                  <Typography sx={{
+                    fontWeight: 900, fontSize: fsBigName, color: '#DAA520',
+                    animation: 'nameSizzle 0.5s cubic-bezier(0.34,1.56,0.64,1)',
+                    '@keyframes nameSizzle': {
+                      '0%':   { opacity: 0, transform: 'scale(1.5)', textShadow: '0 0 32px rgba(255,215,0,1)' },
+                      '70%':  { transform: 'scale(0.95)',             textShadow: '0 0 8px rgba(255,215,0,0.6)' },
+                      '100%': { opacity: 1, transform: 'scale(1)',    textShadow: '0 0 14px rgba(255,215,0,0.8)' },
+                    },
+                  }}>
+                    {rollOffState.winnerName}
+                  </Typography>
+                  <Typography sx={{ fontSize: fsGoesFirst, color: 'text.primary' }}>goes first!</Typography>
+                </Box>
+              ) : rollOffState.phase === 'tie' ? (
+                <Box sx={{ width: '100%', textAlign: 'center' }}>
+                  <Typography sx={{ fontWeight: 900, fontSize: fsBigName, color: 'error.main' }}>Tie!</Typography>
+                  <Typography sx={{ fontSize: 10, color: 'text.disabled', mt: 0.5 }}>
+                    Re-rolling: {rollOffState.tiedIndices.map(i => players[i].playerName).join(' vs ')}
+                  </Typography>
+                </Box>
+              ) : lastEntry ? (
                 <Box key={resultKey} sx={{
                   width: '100%', textAlign: 'center',
                   animation: 'diceResultPop 0.35s cubic-bezier(0.34,1.56,0.64,1)',
@@ -613,17 +705,50 @@ export function CenterZone({
             </Box>
 
             {/* Buttons */}
-            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ width: '100%' }}>
-              <Button variant="outlined" onClick={() => setDiceCount((c) => Math.max(1, c - 1))} sx={{ minWidth: 28, px: 0, fontSize: 16, py: 0.5, flexShrink: 0 }}>−</Button>
-              <Typography sx={{ fontWeight: 700, fontSize: 14, minWidth: 18, textAlign: 'center', flexShrink: 0 }}>{diceCount}</Typography>
-              <Button variant="outlined" onClick={() => setDiceCount((c) => Math.min(20, c + 1))} sx={{ minWidth: 28, px: 0, fontSize: 16, py: 0.5, flexShrink: 0 }}>+</Button>
-              <Button variant="outlined" fullWidth onClick={() => addRoll('d6', 6)} startIcon={lastRolledType === 'd6' ? null : <CasinoIcon sx={{ fontSize: 14 }} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'd6' ? 900 : 400, py: 0.5, minWidth: 0, ...(lastRolledType === 'd6' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'd6' && lastRolledDisplay ? `total ${lastRolledDisplay}` : 'd6'}</Button>
-              <Button variant="outlined" fullWidth onClick={() => addRoll('d20', 20)} startIcon={lastRolledType === 'd20' ? null : <D20Icon size={14} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'd20' ? 900 : 400, py: 0.5, minWidth: 0, ...(lastRolledType === 'd20' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'd20' && lastRolledDisplay ? `total ${lastRolledDisplay}` : 'd20'}</Button>
-              <Button variant="outlined" fullWidth onClick={() => addRoll('coin', null)} startIcon={lastRolledType === 'coin' ? null : <TollIcon sx={{ fontSize: 14 }} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'coin' ? 900 : 400, py: 0.5, minWidth: 0, ...(lastRolledType === 'coin' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'coin' && lastRolledDisplay ? lastRolledDisplay : 'Flip'}</Button>
-              {history.length > 0 && (
-                <Button variant="text" size="small" onClick={() => setHistory([])} sx={{ fontSize: 10, px: 0.5, color: 'text.disabled', flexShrink: 0 }}>Clear</Button>
-              )}
-            </Stack>
+            {rollOffState.phase !== 'idle' ? (
+              <Stack direction="row" spacing={0.5} sx={{ width: '100%' }}>
+                <Button
+                  variant="contained"
+                  fullWidth
+                  disabled={rollOffState.phase === 'rolling' || rollOffState.phase === 'tie'}
+                  onClick={() => {
+                    if (rollOffState.phase === 'result') {
+                      onChooseFirstPlayer(rollOffState.winnerIdx);
+                      setRollOffState({ phase: 'idle' });
+                      setDiceOpen(false);
+                    }
+                  }}
+                  sx={{ fontSize: 12, py: 0.75 }}
+                >
+                  Accept
+                </Button>
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  disabled={rollOffState.phase === 'rolling' || rollOffState.phase === 'tie'}
+                  onClick={() => {
+                    if (rollOffState.phase === 'result') {
+                      startRollOff(rollOffState.originalIndices);
+                    }
+                  }}
+                  sx={{ fontSize: 12, py: 0.75 }}
+                >
+                  Roll Again
+                </Button>
+              </Stack>
+            ) : (
+              <Stack direction="row" alignItems="center" spacing={0.5} sx={{ width: '100%' }}>
+                <Button variant="outlined" onClick={() => setDiceCount((c) => Math.max(1, c - 1))} sx={{ minWidth: 28, px: 0, fontSize: 16, py: 0.5, flexShrink: 0 }}>−</Button>
+                <Typography sx={{ fontWeight: 700, fontSize: 14, minWidth: 18, textAlign: 'center', flexShrink: 0 }}>{diceCount}</Typography>
+                <Button variant="outlined" onClick={() => setDiceCount((c) => Math.min(20, c + 1))} sx={{ minWidth: 28, px: 0, fontSize: 16, py: 0.5, flexShrink: 0 }}>+</Button>
+                <Button variant="outlined" fullWidth onClick={() => addRoll('d6', 6)} startIcon={lastRolledType === 'd6' ? null : <CasinoIcon sx={{ fontSize: 14 }} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'd6' ? 900 : 400, py: 0.5, minWidth: 0, ...(lastRolledType === 'd6' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'd6' && lastRolledDisplay ? `total ${lastRolledDisplay}` : 'd6'}</Button>
+                <Button variant="outlined" fullWidth onClick={() => addRoll('d20', 20)} startIcon={lastRolledType === 'd20' ? null : <D20Icon size={14} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'd20' ? 900 : 400, py: 0.5, minWidth: 0, ...(lastRolledType === 'd20' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'd20' && lastRolledDisplay ? `total ${lastRolledDisplay}` : 'd20'}</Button>
+                <Button variant="outlined" fullWidth onClick={() => addRoll('coin', null)} startIcon={lastRolledType === 'coin' ? null : <TollIcon sx={{ fontSize: 14 }} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'coin' ? 900 : 400, py: 0.5, minWidth: 0, ...(lastRolledType === 'coin' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'coin' && lastRolledDisplay ? lastRolledDisplay : 'Flip'}</Button>
+                {history.length > 0 && (
+                  <Button variant="text" size="small" onClick={() => setHistory([])} sx={{ fontSize: 10, px: 0.5, color: 'text.disabled', flexShrink: 0 }}>Clear</Button>
+                )}
+              </Stack>
+            )}
           </Box>
         )}
       </Card>

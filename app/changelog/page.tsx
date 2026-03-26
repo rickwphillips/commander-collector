@@ -38,6 +38,18 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.25.0',
+    date: '2026-03-26',
+    title: 'D20 Roll-Off & Real Sound Effects',
+    changes: [
+      { type: 'added', text: 'Real audio recordings replace synthesized sounds — City\'s Blessing fanfare, poison bubbles, d20 and d6 dice rolls now use recorded MP3s' },
+      { type: 'added', text: 'D20 roll-off to determine first player — each player rolls a d20 with staggered reveals showing their name; ties automatically re-roll only the tied players until a clear winner emerges' },
+      { type: 'added', text: '"Pick" overlay for manually selecting first player, displayed as a full-panel grid of player name buttons' },
+      { type: 'added', text: 'Roll rules: Aces High (1 beats 20), Eleven Beats Aces (11 beats 1 when aces are high), and Adam\'s House Rules preset — mutually exclusive with the other two' },
+      { type: 'changed', text: 'Aces High and Eleven Beats Aces default to on; selecting Adam\'s House Rules clears them' },
+    ],
+  },
+  {
     version: '1.24.0',
     date: '2026-03-26',
     title: "City's Blessing flag & fanfare",
