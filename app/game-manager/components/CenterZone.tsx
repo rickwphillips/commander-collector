@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   Box,
   Stack,
@@ -83,6 +83,10 @@ interface CenterZoneProps {
 
 function rollDie(sides: number): number {
   return Math.floor(Math.random() * sides) + 1;
+}
+
+function sizeByTs(ts: 0 | 1 | 2, sm: string, md: string, lg: string): string {
+  return ts === 2 ? lg : ts === 1 ? md : sm;
 }
 
 export function CenterZone({
@@ -169,33 +173,34 @@ export function CenterZone({
   };
 
   const lastEntry = history.length > 0 ? history[history.length - 1] : null;
-  const lastRolledType: 'd6' | 'd20' | 'coin' | null = lastEntry
-    ? lastEntry.label === 'd6' ? 'd6'
-      : lastEntry.label === 'd20' ? 'd20'
-      : lastEntry.label.includes('Coin') ? 'coin'
-      : null
-    : null;
+  const lastRolledType = useMemo<'d6' | 'd20' | 'coin' | null>(() => {
+    if (!lastEntry) return null;
+    if (lastEntry.label === 'd6') return 'd6';
+    if (lastEntry.label === 'd20') return 'd20';
+    if (lastEntry.label.includes('Coin')) return 'coin';
+    return null;
+  }, [lastEntry]);
   // Value to show inside the highlighted button: total for multi-dice, roll for single, H/T for coin
-  const lastRolledDisplay: string | null = lastEntry
-    ? lastEntry.total !== null
-      ? String(lastEntry.total)
-      : lastEntry.rolls.length === 1
-        ? lastEntry.label.includes('Coin')
-          ? (lastEntry.rolls[0] === 'Heads' ? 'H' : 'T')
-          : String(lastEntry.rolls[0])
-        : null
-    : null;
+  const lastRolledDisplay = useMemo<string | null>(() => {
+    if (!lastEntry) return null;
+    if (lastEntry.total !== null) return String(lastEntry.total);
+    if (lastEntry.rolls.length === 1)
+      return lastEntry.label.includes('Coin')
+        ? (lastEntry.rolls[0] === 'Heads' ? 'H' : 'T')
+        : String(lastEntry.rolls[0]);
+    return null;
+  }, [lastEntry]);
   const ts = textSizeMode;
 
   // dvh/dvw-based sizing so the center tile scales across phone, tablet, and desktop
-  const btnMainSize = ts === 2 ? 'clamp(90px, min(16dvh, 14dvw), 175px)' : ts === 1 ? 'clamp(84px, min(15dvh, 13dvw), 160px)' : 'clamp(80px, min(14dvh, 12dvw), 150px)';
-  const btnRollSize = ts === 2 ? 'clamp(68px, min(13dvh, 11dvw), 135px)' : ts === 1 ? 'clamp(62px, min(12dvh, 10dvw), 120px)' : 'clamp(58px, min(11dvh, 9dvw), 110px)';
-  const btnChooseSize = ts === 2 ? 'clamp(52px, min(9dvh, 8dvw), 100px)' : ts === 1 ? 'clamp(48px, min(8.5dvh, 7.5dvw), 90px)' : 'clamp(44px, min(8dvh, 7dvw), 80px)';
-  const fsTurnNum = ts === 2 ? 'clamp(22px, 5dvh, 46px)' : ts === 1 ? 'clamp(20px, 4.5dvh, 40px)' : 'clamp(18px, 4dvh, 36px)';
-  const fsCmdName = ts === 2 ? 'clamp(12px, 2dvh, 20px)' : ts === 1 ? 'clamp(11px, 1.8dvh, 18px)' : 'clamp(10px, 1.7dvh, 16px)';
-  const fsPlayerName = ts === 2 ? 'clamp(10px, 1.8dvh, 17px)' : ts === 1 ? 'clamp(9px, 1.6dvh, 15px)' : 'clamp(8px, 1.5dvh, 13px)';
-  const fsBigName = ts === 2 ? 'clamp(14px, 3dvh, 28px)' : ts === 1 ? 'clamp(13px, 2.7dvh, 25px)' : 'clamp(12px, 2.5dvh, 22px)';
-  const fsGoesFirst = ts === 2 ? 'clamp(12px, 2.5dvh, 22px)' : ts === 1 ? 'clamp(11px, 2.2dvh, 20px)' : 'clamp(10px, 2dvh, 18px)';
+  const btnMainSize   = sizeByTs(ts, 'clamp(80px, min(14dvh, 12dvw), 150px)', 'clamp(84px, min(15dvh, 13dvw), 160px)', 'clamp(90px, min(16dvh, 14dvw), 175px)');
+  const btnRollSize   = sizeByTs(ts, 'clamp(58px, min(11dvh, 9dvw), 110px)',  'clamp(62px, min(12dvh, 10dvw), 120px)', 'clamp(68px, min(13dvh, 11dvw), 135px)');
+  const btnChooseSize = sizeByTs(ts, 'clamp(44px, min(8dvh, 7dvw), 80px)',    'clamp(48px, min(8.5dvh, 7.5dvw), 90px)', 'clamp(52px, min(9dvh, 8dvw), 100px)');
+  const fsTurnNum     = sizeByTs(ts, 'clamp(18px, 4dvh, 36px)',    'clamp(20px, 4.5dvh, 40px)',  'clamp(22px, 5dvh, 46px)');
+  const fsCmdName     = sizeByTs(ts, 'clamp(10px, 1.7dvh, 16px)',  'clamp(11px, 1.8dvh, 18px)',  'clamp(12px, 2dvh, 20px)');
+  const fsPlayerName  = sizeByTs(ts, 'clamp(8px, 1.5dvh, 13px)',   'clamp(9px, 1.6dvh, 15px)',   'clamp(10px, 1.8dvh, 17px)');
+  const fsBigName     = sizeByTs(ts, 'clamp(12px, 2.5dvh, 22px)',  'clamp(13px, 2.7dvh, 25px)',  'clamp(14px, 3dvh, 28px)');
+  const fsGoesFirst   = sizeByTs(ts, 'clamp(10px, 2dvh, 18px)',    'clamp(11px, 2.2dvh, 20px)',  'clamp(12px, 2.5dvh, 22px)');
   const rotatedBoxMaxWidth = 'clamp(70px, 14dvh, 120px)';
 
   const remaining = turnTimerSeconds > 0 ? Math.max(0, turnTimerSeconds - elapsedSeconds) : null;

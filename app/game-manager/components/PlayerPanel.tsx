@@ -248,10 +248,13 @@ export function PlayerPanel({
   remoteConnected = false,
 }: PlayerPanelProps) {
   const ts = textSizeMode;
-  const ttRotate = player.position === 'top' ? '180deg' : player.position === 'left' ? '90deg' : player.position === 'right' ? '270deg' : '0deg';
+  const POSITION_ROTATION = { top: '180deg', left: '90deg', right: '270deg', bottom: '0deg' } as const;
+  const POSITION_HEADER_PLACEMENT = { top: 'top', left: 'left', right: 'left', bottom: 'bottom' } as const;
+  const POSITION_SNAPSHOT_PLACEMENT = { bottom: 'top', top: 'bottom', left: 'right', right: 'left' } as const;
+  const ttRotate = POSITION_ROTATION[player.position];
   const ttSlotProps = { tooltip: { sx: { rotate: ttRotate } } };
-  const ttHeaderPlacement = player.position === 'top' ? 'top' as const : player.position === 'left' ? 'left' as const : player.position === 'right' ? 'left' as const : 'bottom' as const;
-  const snapshotPlacement = player.position === 'bottom' ? 'top' as const : player.position === 'top' ? 'bottom' as const : player.position === 'left' ? 'right' as const : 'left' as const;
+  const ttHeaderPlacement = POSITION_HEADER_PLACEMENT[player.position];
+  const snapshotPlacement = POSITION_SNAPSHOT_PLACEMENT[player.position];
   const ttHeaderSlotProps = {
     tooltip: { sx: { rotate: ttRotate } },
     popper: { modifiers: [{ name: 'flip', enabled: false }] },

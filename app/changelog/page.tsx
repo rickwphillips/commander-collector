@@ -38,6 +38,18 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.23.4',
+    date: '2026-03-25',
+    title: 'Code quality cleanup',
+    changes: [
+      { type: 'improved', text: 'Life and poison change logic now delegates to the shared pure functions used by remote panels, eliminating duplicated state logic' },
+      { type: 'improved', text: 'Opponent list for kill attribution prompts extracted into a shared helper, used in both life and poison kill flows' },
+      { type: 'improved', text: 'Dice panel sizing now uses a compact helper function instead of repeated ternary chains' },
+      { type: 'improved', text: 'Last rolled type and display value are now memoized, avoiding redundant recomputation on every render' },
+      { type: 'improved', text: 'Player position lookups (tooltip rotation, placement) use lookup objects instead of chained ternaries' },
+    ],
+  },
+  {
     version: '1.23.3',
     date: '2026-03-25',
     title: 'CMD damage snapshot tooltip refinements',

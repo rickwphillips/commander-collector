@@ -5,7 +5,13 @@ import { Box, Button, Typography } from '@mui/material';
 import { PlayerPanel } from './PlayerPanel';
 import { CenterZone } from './CenterZone';
 import type { GameManagerState, PlayerState } from '../types';
-import { applyCommanderDamageChange } from '../remoteTransforms';
+import {
+  applyCommanderDamageChange,
+  applyLifeChange,
+  applyPoisonChange,
+  applyLifeKillAttr,
+  applyPoisonKillAttr,
+} from '../remoteTransforms';
 
 type RollPhase = 'idle' | 'rolling' | 'done';
 
@@ -13,6 +19,14 @@ interface RollState {
   phase: RollPhase;
   highlightIdx: number | null;
   finalIdx: number | null;
+}
+
+const IDLE_ROLL_STATE: RollState = { phase: 'idle', highlightIdx: null, finalIdx: null };
+
+function getActiveOpponents(players: PlayerState[], excludeIdx: number) {
+  return players
+    .map((p, i) => ({ name: p.playerName, idx: i }))
+    .filter((_, i) => i !== excludeIdx && !players[i].isEliminated);
 }
 
 interface GameBoardProps {
@@ -28,7 +42,7 @@ interface GameBoardProps {
 export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGame, isResumed = false }: GameBoardProps) {
   const { players, commanderDamage, currentPlayerIdx, turnNumber, turnTimerSeconds, turnStartTime, startingLife } = state;
 
-  const [rollState, setRollState] = useState<RollState>({ phase: 'idle', highlightIdx: null, finalIdx: null });
+  const [rollState, setRollState] = useState<RollState>(IDLE_ROLL_STATE);
   const [firstPlayerSet, setFirstPlayerSet] = useState(isResumed);
   const [firstPlayerIdx, setFirstPlayerIdx] = useState(isResumed ? state.currentPlayerIdx : 0);
   const [winner, setWinner] = useState<PlayerState | null>(null);
@@ -154,7 +168,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
     const note = `First player (rolled): ${player?.playerName ?? '?'}`;
     const newNotes = state.notes ? `${state.notes}\n${note}` : note;
     onUpdate({ ...state, currentPlayerIdx: rollState.finalIdx, firstPlayerIdx: rollState.finalIdx, turnStartTime: Date.now(), notes: newNotes });
-    setRollState({ phase: 'idle', highlightIdx: null, finalIdx: null });
+    setRollState(IDLE_ROLL_STATE);
     setFirstPlayerIdx(rollState.finalIdx);
     setFirstPlayerSet(true);
   };
@@ -164,7 +178,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
     const note = `First player (chosen): ${player?.playerName ?? '?'}`;
     const newNotes = state.notes ? `${state.notes}\n${note}` : note;
     onUpdate({ ...state, currentPlayerIdx: idx, firstPlayerIdx: idx, turnStartTime: Date.now(), notes: newNotes });
-    setRollState({ phase: 'idle', highlightIdx: null, finalIdx: null });
+    setRollState(IDLE_ROLL_STATE);
     setFirstPlayerIdx(idx);
     setFirstPlayerSet(true);
   };
@@ -176,7 +190,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   const handleRestartGame = () => {
     setFirstPlayerSet(false);
     setFirstPlayerIdx(0);
-    setRollState({ phase: 'idle', highlightIdx: null, finalIdx: null });
+    setRollState(IDLE_ROLL_STATE);
     setWinner(null);
     onRestartGame(players);
   };
@@ -189,28 +203,9 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
 
   const handleLifeChange = (idx: number, delta: number) => {
     const target = players[idx];
-    const newLife = target.life + delta;
-    const isNewLifeKill = target.life > 0 && newLife <= 0;
-    const isUndoLifeKill = target.life <= 0 && newLife > 0;
-    const lifeNoteTag = `[lifekill:${idx}]`;
-
-    let newNotes = state.notes;
-    if (isUndoLifeKill) {
-      newNotes = state.notes.split('\n').filter((l) => !l.includes(lifeNoteTag)).join('\n');
-    }
-
-    const wasEliminatedByLife = target.isEliminated && target.life <= 0 && target.poison < 10;
-    const newPlayers = players.map((p, i) => {
-      if (i !== idx) return p;
-      return {
-        ...p,
-        life: newLife,
-        ...(isNewLifeKill && !p.isEliminated ? { isEliminated: true, eliminatedTurn: state.turnNumber } : {}),
-        ...(isUndoLifeKill && wasEliminatedByLife ? { isEliminated: false, eliminatedTurn: null } : {}),
-      };
-    });
+    const isNewLifeKill = target.life > 0 && target.life + delta <= 0;
+    const { players: newPlayers, notes: newNotes } = applyLifeChange(state, idx, delta);
     updateState({ players: newPlayers, notes: newNotes });
-
     if (isNewLifeKill) {
       const remaining = newPlayers.filter((p) => !p.isEliminated);
       const pendingWinner = remaining.length === 1 ? remaining[0] : null;
@@ -220,26 +215,9 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
 
   const handlePoisonChange = (idx: number, delta: number) => {
     const target = players[idx];
-    const newPlayers = players.map((p, i) => {
-      if (i !== idx) return p;
-      const poison = Math.max(0, p.poison + delta);
-      const wasEliminatedByPoison = p.isEliminated && p.poison >= 10;
-      const isEliminated = poison >= 10 ? true : wasEliminatedByPoison ? false : p.isEliminated;
-      const eliminatedTurn = poison >= 10 && !p.isEliminated ? state.turnNumber : isEliminated ? p.eliminatedTurn : null;
-      return { ...p, poison, isEliminated, eliminatedTurn };
-    });
-
     const isNewPoisonKill = !target.isEliminated && Math.max(0, target.poison + delta) >= 10;
-    const isUndoPoisonKill = target.isEliminated && target.poison >= 10 && Math.max(0, target.poison + delta) < 10;
-    const poisonNoteTag = `[poisonkill:${idx}]`;
-
-    let newNotes = state.notes;
-    if (isUndoPoisonKill) {
-      newNotes = state.notes.split('\n').filter((l) => !l.includes(poisonNoteTag)).join('\n');
-    }
-
+    const { players: newPlayers, notes: newNotes } = applyPoisonChange(state, idx, delta);
     updateState({ players: newPlayers, notes: newNotes });
-
     if (isNewPoisonKill) {
       setPoisonKillPrompt({ targetIdx: idx, newPlayers });
     }
@@ -470,34 +448,20 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
                 onEliminate={handleEliminate}
                 onUndoEliminate={handleUndoEliminate}
                 {...(lifeKillPrompt?.targetIdx === idx && {
-                  lifeKillOpponents: players
-                    .map((p, i) => ({ name: p.playerName, idx: i }))
-                    .filter((_, i) => i !== idx && !players[i].isEliminated),
+                  lifeKillOpponents: getActiveOpponents(players, idx),
                   onLifeKillSelect: (sourceIdx) => {
-                    const target = players[lifeKillPrompt.targetIdx];
-                    const source = sourceIdx !== null ? players[sourceIdx] : null;
-                    const lifeNoteTag = `[lifekill:${lifeKillPrompt.targetIdx}]`;
-                    const noteLine = source
-                      ? `${lifeNoteTag} ${target.playerName} brought to 0 life by ${source.playerName} (turn ${state.turnNumber})`
-                      : `${lifeNoteTag} ${target.playerName} brought to 0 life (turn ${state.turnNumber})`;
-                    updateState({ notes: [state.notes, noteLine].filter(Boolean).join('\n') });
+                    const { notes: newNotes } = applyLifeKillAttr(state, lifeKillPrompt.targetIdx, sourceIdx);
+                    updateState({ notes: newNotes });
                     const pending = lifeKillPrompt.pendingWinner;
                     setLifeKillPrompt(null);
                     if (pending) setWinner(pending);
                   },
                 })}
                 {...(poisonKillPrompt?.targetIdx === idx && {
-                  poisonKillOpponents: players
-                    .map((p, i) => ({ name: p.playerName, idx: i }))
-                    .filter((_, i) => i !== idx && !players[i].isEliminated),
+                  poisonKillOpponents: getActiveOpponents(players, idx),
                   onPoisonKillSelect: (sourceIdx) => {
-                    const target = players[poisonKillPrompt.targetIdx];
-                    const source = sourceIdx !== null ? players[sourceIdx] : null;
-                    const poisonNoteTag = `[poisonkill:${poisonKillPrompt.targetIdx}]`;
-                    const noteLine = source
-                      ? `${poisonNoteTag} ${target.playerName} eliminated by ${source.playerName}'s poison (turn ${state.turnNumber})`
-                      : `${poisonNoteTag} ${target.playerName} eliminated by poison (turn ${state.turnNumber})`;
-                    updateState({ notes: [state.notes, noteLine].filter(Boolean).join('\n') });
+                    const { notes: newNotes } = applyPoisonKillAttr(state, poisonKillPrompt.targetIdx, sourceIdx);
+                    updateState({ notes: newNotes });
                     const remaining = poisonKillPrompt.newPlayers.filter((p) => !p.isEliminated);
                     const pending = remaining.length === 1 ? remaining[0] : null;
                     setPoisonKillPrompt(null);
