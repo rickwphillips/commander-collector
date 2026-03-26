@@ -38,6 +38,21 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.25.1',
+    date: '2026-03-26',
+    title: 'Roll-Off Polish & No Loners Rule',
+    changes: [
+      { type: 'improved', text: 'Roll-off results stay on screen until Accept or Roll Again is chosen' },
+      { type: 'improved', text: "Winner's die turns gold with a pop animation; losers go gray" },
+      { type: 'improved', text: 'Tiebreaker re-rolls happen in place — eliminated players stay visible in gray, tied players re-animate in their original slots' },
+      { type: 'improved', text: 'Locked unique-highest player shown in primary color during No Loners re-rolls' },
+      { type: 'added', text: 'No Loners rule — only duplicates re-roll; unique non-highest are eliminated; unique highest is locked until all dupes are resolved' },
+      { type: 'added', text: 'Accept button shows the winner\'s name' },
+      { type: 'added', text: '"NO LONERS" watermark replaces "TIE" when the No Loners rule is driving a re-roll' },
+      { type: 'changed', text: 'Roll rules moved to a vertical list beside the Roll Off / Pick buttons' },
+    ],
+  },
+  {
     version: '1.25.0',
     date: '2026-03-26',
     title: 'D20 Roll-Off & Real Sound Effects',

@@ -125,8 +125,8 @@ export function CenterZone({
   const [history, setHistory] = useState<RollEntry[]>([]);
   const [resultKey, setResultKey] = useState(0);
   const [diceCount, setDiceCount] = useState(1);
-  type RollingEntry = { label: string; color: string; finalRolls: (number|string)[]; revealed: boolean[]; total: number|null; sides: number|null; labels?: string[] };
-  type RollOffState = { phase: 'idle' } | { phase: 'rolling'; activeIndices: number[]; originalIndices: number[] } | { phase: 'result'; winnerIdx: number; winnerName: string; originalIndices: number[] } | { phase: 'tie'; tiedIndices: number[]; originalIndices: number[] };
+  type RollingEntry = { label: string; color: string; finalRolls: (number|string)[]; revealed: boolean[]; total: number|null; sides: number|null; labels?: string[]; done?: boolean; activeSlots?: boolean[]; lockedSlots?: boolean[] };
+  type RollOffState = { phase: 'idle' } | { phase: 'rolling'; activeIndices: number[]; originalIndices: number[] } | { phase: 'result'; winnerIdx: number; winnerName: string; originalIndices: number[] } | { phase: 'tie'; tiedIndices: number[]; originalIndices: number[]; noLonersRule?: boolean; lockedInTie?: number[] };
   const [rollingEntry, setRollingEntry] = useState<RollingEntry | null>(null);
   const animTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [confirmEnd, setConfirmEnd] = useState(false);
@@ -140,11 +140,13 @@ export function CenterZone({
   const [acesHigh, setAcesHigh] = useState(true);
   const [elevenBeatsAces, setElevenBeatsAces] = useState(true);
   const [adamsRule, setAdamsRule] = useState(false);
+  const [noLoners, setNoLoners] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const lastTimerRef = useRef(turnTimerSeconds > 0 ? turnTimerSeconds : 300);
   const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lpFired = useRef(false);
   const diceAudio = useRef<{ d20: HTMLAudioElement | null; d6: HTMLAudioElement | null }>({ d20: null, d6: null });
+  const lastRoundScores = useRef<Record<string, number>>({});
   useEffect(() => {
     const basePath = process.env.NODE_ENV === 'production' ? '/app/projects/commander' : '';
     const d20 = new Audio(`${basePath}/audio/d-20.mp3`);
@@ -209,43 +211,103 @@ export function CenterZone({
     return roll;
   };
 
-  const startRollOff = (playerIndices: number[], originalIndices?: number[]) => {
+  const startRollOff = (playerIndices: number[], originalIndices?: number[], lockedPlayers?: { playerIdx: number; roll: number }[]) => {
+    const locked = lockedPlayers ?? [];
+    const lockedIdxSet = new Set(locked.map(l => l.playerIdx));
     const origIndices = originalIndices ?? playerIndices;
+    const isTiebreak = originalIndices !== undefined && (originalIndices.length > playerIndices.length || locked.length > 0);
+
     animTimers.current.forEach(clearTimeout);
     animTimers.current = [];
     if (soundEnabled && diceAudio.current.d20) {
       diceAudio.current.d20.currentTime = 0;
       diceAudio.current.d20.play().catch(() => {});
     }
-    const finalRolls = playerIndices.map(() => rollDie(20));
-    const labels = playerIndices.map(idx => players[idx].playerName);
+
+    const displayIndices = isTiebreak ? origIndices : playerIndices;
+    const activeSlots = displayIndices.map(idx => playerIndices.includes(idx));
+    const lockedSlots = displayIndices.map(idx => lockedIdxSet.has(idx));
+    const newRolls = playerIndices.map(() => rollDie(20));
+    const lockedRollMap: Record<number, number> = {};
+    locked.forEach(l => { lockedRollMap[l.playerIdx] = l.roll; });
+    let activeRollIdx = 0;
+    const allFinalRolls: number[] = displayIndices.map((idx, i) => {
+      if (activeSlots[i]) return newRolls[activeRollIdx++];
+      if (lockedSlots[i]) return lockedRollMap[idx];
+      return lastRoundScores.current[players[idx].playerName] ?? 0;
+    });
+    const labels = displayIndices.map(idx => players[idx].playerName);
+    const initialRevealed = displayIndices.map((_, i) => !activeSlots[i]);
+
     setRollOffState({ phase: 'rolling', activeIndices: playerIndices, originalIndices: origIndices });
     setDiceOpen(true);
-    setRollingEntry({ label: 'Roll Off', color: 'primary.main', finalRolls, revealed: finalRolls.map(() => false), total: null, sides: 20, labels });
+    setRollingEntry({ label: 'Roll Off', color: 'primary.main', finalRolls: allFinalRolls, revealed: initialRevealed, total: null, sides: 20, labels, activeSlots, lockedSlots });
+
     const revealDelay = 600;
     const stagger = 230;
-    finalRolls.forEach((_, i) => {
+    let activeAnimIdx = 0;
+    displayIndices.forEach((_, i) => {
+      if (!activeSlots[i]) return;
+      const delay = revealDelay + activeAnimIdx * stagger;
       const t = setTimeout(() => {
         setRollingEntry(prev => prev ? { ...prev, revealed: prev.revealed.map((v, j) => j === i ? true : v) } : null);
-      }, revealDelay + i * stagger);
+      }, delay);
       animTimers.current.push(t);
+      activeAnimIdx++;
     });
+
+    const lastActiveCount = activeSlots.filter(Boolean).length;
     const doneT = setTimeout(() => {
-      setRollingEntry(null);
-      const rolls = finalRolls as number[];
-      const scores = rolls.map(r => getRollScore(r, rolls));
-      const maxScore = Math.max(...scores);
-      const tiedPositions = scores.map((s, pos) => ({ s, pos })).filter(({ s }) => s === maxScore).map(({ pos }) => pos);
-      if (tiedPositions.length === 1) {
-        const winnerIdx = playerIndices[tiedPositions[0]];
-        setRollOffState({ phase: 'result', winnerIdx, winnerName: players[winnerIdx].playerName, originalIndices: origIndices });
+      setRollingEntry(prev => prev ? { ...prev, revealed: prev.revealed.map(() => true), done: true } : null);
+      playerIndices.forEach((idx, i) => { lastRoundScores.current[players[idx].playerName] = newRolls[i]; });
+
+      // Combine locked scores with new rolls for full comparison
+      const allRolls = [...locked.map(l => l.roll), ...newRolls];
+      const allPlayerIdx = [...locked.map(l => l.playerIdx), ...playerIndices];
+      const allScores = allRolls.map(r => getRollScore(r, allRolls));
+      const maxScore = Math.max(...allScores);
+
+      if (noLoners) {
+        // No Loners: dupes re-roll, unique highest stays locked, unique non-highest eliminated
+        const rollCounts: Record<number, number> = {};
+        allRolls.forEach(r => { rollCounts[r] = (rollCounts[r] ?? 0) + 1; });
+        const anyDupes = allRolls.some(r => rollCounts[r] > 1);
+
+        if (!anyDupes) {
+          // No dupes → unique highest wins
+          const winnerPos = allScores.indexOf(maxScore);
+          const winnerIdx = allPlayerIdx[winnerPos];
+          setRollOffState({ phase: 'result', winnerIdx, winnerName: players[winnerIdx].playerName, originalIndices: origIndices });
+        } else {
+          const uniqueHighestCount = allScores.filter(s => s === maxScore).length;
+          const nextActive: number[] = [];
+          const nextLocked: { playerIdx: number; roll: number }[] = [];
+          allRolls.forEach((r, pos) => {
+            const isDupe = rollCounts[r] > 1;
+            const isUniqueHighest = allScores[pos] === maxScore && uniqueHighestCount === 1;
+            if (isUniqueHighest) nextLocked.push({ playerIdx: allPlayerIdx[pos], roll: r });
+            else if (isDupe) nextActive.push(allPlayerIdx[pos]);
+            // unique non-highest → eliminated (not added to either)
+          });
+          const lockedInTie = nextLocked.map(l => l.playerIdx);
+          const tiedIndices = [...nextActive, ...lockedInTie];
+          setRollOffState({ phase: 'tie', tiedIndices, originalIndices: origIndices, noLonersRule: true, lockedInTie });
+          const tieT = setTimeout(() => startRollOff(nextActive, origIndices, nextLocked), 2500);
+          animTimers.current.push(tieT);
+        }
       } else {
-        const tiedIndices = tiedPositions.map(pos => playerIndices[pos]);
-        setRollOffState({ phase: 'tie', tiedIndices, originalIndices: origIndices });
-        const tieT = setTimeout(() => startRollOff(tiedIndices, origIndices), 2500);
-        animTimers.current.push(tieT);
+        const highestPositions = allScores.map((s, pos) => ({ s, pos })).filter(({ s }) => s === maxScore).map(({ pos }) => pos);
+        if (highestPositions.length === 1) {
+          const winnerIdx = allPlayerIdx[highestPositions[0]];
+          setRollOffState({ phase: 'result', winnerIdx, winnerName: players[winnerIdx].playerName, originalIndices: origIndices });
+        } else {
+          const tiedIndices = highestPositions.map(pos => allPlayerIdx[pos]);
+          setRollOffState({ phase: 'tie', tiedIndices, originalIndices: origIndices, noLonersRule: false });
+          const tieT = setTimeout(() => startRollOff(tiedIndices, origIndices), 2500);
+          animTimers.current.push(tieT);
+        }
       }
-    }, revealDelay + (finalRolls.length - 1) * stagger + 800);
+    }, revealDelay + (lastActiveCount - 1) * stagger + 800);
     animTimers.current.push(doneT);
   };
 
@@ -367,7 +429,7 @@ export function CenterZone({
           )}
 
           {/* Roll for first player */}
-          {!firstPlayerSet && <Box sx={{ textAlign: 'center', width: '100%' }}>
+          {!firstPlayerSet && <Stack direction="row" spacing={1.5} justifyContent="center" alignItems="center" sx={{ width: '100%' }}>
             <Stack direction="row" spacing={1.5} justifyContent="center" alignItems="flex-end">
               <Button
                 variant="contained"
@@ -390,24 +452,29 @@ export function CenterZone({
                 Pick
               </Button>
             </Stack>
-            <Stack direction="row" spacing={0.5} justifyContent="center" sx={{ mt: 1, flexWrap: 'wrap' }}>
+            <Stack direction="column" spacing={0} sx={{ alignItems: 'flex-start' }}>
               <FormControlLabel
-                control={<Checkbox size="small" checked={acesHigh} onChange={e => { setAcesHigh(e.target.checked); setElevenBeatsAces(e.target.checked); if (e.target.checked) setAdamsRule(false); }} sx={{ p: 0.5 }} />}
+                control={<Checkbox size="small" checked={acesHigh} onChange={e => { setAcesHigh(e.target.checked); setElevenBeatsAces(e.target.checked); if (e.target.checked) setAdamsRule(false); }} sx={{ p: 0.25 }} />}
                 label={<Typography sx={{ fontSize: 10 }}>Aces High</Typography>}
                 sx={{ mr: 0 }}
               />
               <FormControlLabel
-                control={<Checkbox size="small" checked={elevenBeatsAces} disabled={!acesHigh} onChange={e => { setElevenBeatsAces(e.target.checked); if (e.target.checked) setAdamsRule(false); }} sx={{ p: 0.5 }} />}
+                control={<Checkbox size="small" checked={elevenBeatsAces} disabled={!acesHigh} onChange={e => { setElevenBeatsAces(e.target.checked); if (e.target.checked) setAdamsRule(false); }} sx={{ p: 0.25 }} />}
                 label={<Typography sx={{ fontSize: 10, color: acesHigh ? 'text.primary' : 'text.disabled' }}>Eleven Beats Aces</Typography>}
                 sx={{ mr: 0 }}
               />
               <FormControlLabel
-                control={<Checkbox size="small" checked={adamsRule} onChange={e => { setAdamsRule(e.target.checked); if (e.target.checked) { setAcesHigh(false); setElevenBeatsAces(false); } }} sx={{ p: 0.5 }} />}
+                control={<Checkbox size="small" checked={noLoners} onChange={e => { setNoLoners(e.target.checked); if (e.target.checked) setAdamsRule(false); }} sx={{ p: 0.25 }} />}
+                label={<Typography sx={{ fontSize: 10 }}>No Loners</Typography>}
+                sx={{ mr: 0 }}
+              />
+              <FormControlLabel
+                control={<Checkbox size="small" checked={adamsRule} onChange={e => { setAdamsRule(e.target.checked); if (e.target.checked) { setAcesHigh(false); setElevenBeatsAces(false); setNoLoners(false); } }} sx={{ p: 0.25 }} />}
                 label={<Typography sx={{ fontSize: 10 }}>{"Adam's House Rules"}</Typography>}
                 sx={{ mr: 0 }}
               />
             </Stack>
-          </Box>}
+          </Stack>}
 
           {/* Pick first player overlay */}
           {choosingFirst && (
@@ -591,7 +658,7 @@ export function CenterZone({
 
             {/* Latest result */}
             <Box sx={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {rollingEntry ? (() => {
+              {rollingEntry && !rollingEntry.done ? (() => {
                 const isCoin = rollingEntry.sides === null;
                 const isD6 = rollingEntry.sides === 6;
                 const spinSx = {
@@ -634,7 +701,9 @@ export function CenterZone({
                         )}
                         <Box sx={{ textAlign: 'center', height: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
                           <Typography sx={{ fontSize: 9, color: 'text.disabled', lineHeight: 1, mb: 0.25 }}>{rollingEntry.labels ? rollingEntry.labels[i] : i + 1}</Typography>
-                          {rollingEntry.revealed[i] ? (
+                          {rollingEntry.activeSlots && !rollingEntry.activeSlots[i] ? (
+                            <Typography sx={{ fontWeight: 900, fontSize: 32, lineHeight: 1, color: rollingEntry.lockedSlots?.[i] ? 'primary.main' : 'text.disabled' }}>{r}</Typography>
+                          ) : rollingEntry.revealed[i] ? (
                             <Typography key={`rv${i}`} sx={{ fontWeight: 900, fontSize: 32, lineHeight: 1, color: rollingEntry.color, ...popSx }}>{r}</Typography>
                           ) : (
                             <Box sx={{ ...spinSx, fontSize: 32, lineHeight: 1 }}><RollingIcon /></Box>
@@ -644,7 +713,42 @@ export function CenterZone({
                     ))}
                   </Stack>
                 );
-              })() : rollOffState.phase === 'result' ? (
+              })() : rollingEntry && rollingEntry.done ? (
+                <Box sx={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <Stack direction="row" flexWrap="wrap" justifyContent="center" alignItems="center" gap={0.5}>
+                    {rollingEntry.finalRolls.map((r, i) => {
+                      const isActive = !rollingEntry.activeSlots || rollingEntry.activeSlots[i];
+                      const isLocked = rollingEntry.lockedSlots?.[i] ?? false;
+                      const isWinner = rollOffState.phase === 'result' && rollingEntry.labels?.[i] === rollOffState.winnerName;
+                      const lockedInTieNames = rollOffState.phase === 'tie' ? (rollOffState.lockedInTie ?? []).map(j => players[j].playerName) : [];
+                      const isLockedHighest = isLocked && rollOffState.phase === 'tie' && lockedInTieNames.includes(rollingEntry.labels?.[i] ?? '');
+                      const tiedNames = rollOffState.phase === 'tie' ? rollOffState.tiedIndices.map(j => players[j].playerName) : [];
+                      const isTied = rollOffState.phase === 'tie' && (isActive || isLocked) && tiedNames.includes(rollingEntry.labels?.[i] ?? '') && !isLockedHighest;
+                      const nameColor = isWinner ? '#DAA520' : isLockedHighest ? 'primary.main' : isTied ? '#DAA520' : 'text.disabled';
+                      const scoreColor = isWinner ? rollingEntry.color : isLockedHighest ? 'primary.main' : isTied ? '#DAA520' : 'text.disabled';
+                      return (
+                        <React.Fragment key={i}>
+                          {i > 0 && <Box sx={{ alignSelf: 'flex-end', mb: '10px', display: 'inline-flex' }}><D20Icon size={10} /></Box>}
+                          <Box sx={{ textAlign: 'center', height: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
+                            <Typography sx={{ fontSize: 9, color: nameColor, lineHeight: 1, mb: 0.25 }}>{rollingEntry.labels ? rollingEntry.labels[i] : i + 1}</Typography>
+                            <Typography sx={{ fontWeight: 900, fontSize: 32, lineHeight: 1, color: scoreColor, ...(isWinner && { animation: 'rollPop 0.3s cubic-bezier(0.34,1.56,0.64,1)', '@keyframes rollPop': { '0%': { opacity: 0, transform: 'scale(0.3)' }, '100%': { opacity: 1, transform: 'scale(1)' } } }) }}>{r}</Typography>
+                          </Box>
+                        </React.Fragment>
+                      );
+                    })}
+                  </Stack>
+                  {rollOffState.phase === 'tie' && (
+                    <Typography sx={{
+                      position: 'absolute', pointerEvents: 'none',
+                      fontWeight: 900, fontSize: rollOffState.noLonersRule ? 28 : 52, color: '#DAA520', opacity: 0.65,
+                      transform: 'rotate(-18deg)', letterSpacing: 6,
+                      textShadow: '0 0 24px rgba(255,215,0,0.9)',
+                    }}>
+                      {rollOffState.noLonersRule ? 'NO LONERS' : 'TIE'}
+                    </Typography>
+                  )}
+                </Box>
+              ) : rollOffState.phase === 'result' ? (
                 <Box sx={{ width: '100%', textAlign: 'center' }}>
                   <Typography sx={{
                     fontWeight: 900, fontSize: fsBigName, color: '#DAA520',
@@ -714,13 +818,14 @@ export function CenterZone({
                   onClick={() => {
                     if (rollOffState.phase === 'result') {
                       onChooseFirstPlayer(rollOffState.winnerIdx);
+                      setRollingEntry(null);
                       setRollOffState({ phase: 'idle' });
                       setDiceOpen(false);
                     }
                   }}
                   sx={{ fontSize: 12, py: 0.75 }}
                 >
-                  Accept
+                  {rollOffState.phase === 'result' ? `${rollOffState.winnerName} goes first` : 'Accept'}
                 </Button>
                 <Button
                   variant="outlined"
