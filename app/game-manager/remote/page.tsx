@@ -6,6 +6,8 @@ import { Box, Typography, TextField, Button, Stack, CircularProgress, IconButton
 import TextFieldsIcon from '@mui/icons-material/TextFields';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import { PlayerPanel } from '../components/PlayerPanel';
 import { api } from '@/lib/api';
 import type { GameManagerState, PlayerState, LiveGameEvent } from '@/lib/types';
@@ -35,6 +37,7 @@ function RemotePageInner() {
   const [state, setState] = useState<GameManagerState | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [textSizeMode, setTextSizeMode] = useState<0 | 1 | 2>(0);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const [lifeKillPending, setLifeKillPending] = useState(false);
   const [poisonKillPending, setPoisonKillPending] = useState(false);
   const { mode, toggleTheme } = useThemeMode();
@@ -371,6 +374,7 @@ function RemotePageInner() {
         activePlayerIdx={isMyTurn ? undefined : state.currentPlayerIdx}
         elapsedSeconds={isMyTurn ? elapsedSeconds : 0}
         textSizeMode={textSizeMode}
+        soundEnabled={soundEnabled}
         highlightMode={true}
         remoteMode={true}
         onPassTurn={isMyTurn ? handlePassTurn : undefined}
@@ -419,6 +423,20 @@ function RemotePageInner() {
         }}
       >
         {mode === 'light' ? <Brightness4Icon /> : <Brightness7Icon />}
+      </IconButton>
+
+      {/* Sound toggle */}
+      <IconButton
+        onClick={() => setSoundEnabled(s => !s)}
+        aria-label="toggle sound"
+        sx={{
+          position: 'absolute', bottom: 10, left: 106, zIndex: 10,
+          color: soundEnabled ? 'primary.main' : 'text.disabled',
+          bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.6)',
+          '&:hover': { bgcolor: 'action.hover' },
+        }}
+      >
+        {soundEnabled ? <VolumeUpIcon /> : <VolumeOffIcon />}
       </IconButton>
     </Box>
   );

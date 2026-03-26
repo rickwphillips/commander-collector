@@ -38,6 +38,19 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.27.0',
+    date: '2026-03-26',
+    title: "City's Blessing Flag Crowd & Commander Takeover",
+    changes: [
+      { type: 'added', text: "City's Blessing now raises a crowd of 12 flags that march slowly across the panel, looping from left to right" },
+      { type: 'added', text: 'Flags drift apart and regroup as they march, giving the crowd a natural, organic feel' },
+      { type: 'added', text: 'Each commander dealing damage gradually steals flags from the crowd — one flag per damage point, with all 12 taken at 20 commander damage' },
+      { type: 'improved', text: 'Flag wiggle updated to a hand-held crowd-waving motion with per-flag timing variation' },
+      { type: 'improved', text: 'Sound toggle added to the remote player panel' },
+      { type: 'improved', text: 'Player name and commander name header shrinks to text width instead of spanning full panel width' },
+    ],
+  },
+  {
     version: '1.26.0',
     date: '2026-03-26',
     title: 'Seat Position Assignment in Game Setup',

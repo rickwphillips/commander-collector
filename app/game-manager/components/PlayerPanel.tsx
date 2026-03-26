@@ -157,6 +157,17 @@ const flagImageSkew = keyframes`
   94%  { transform: skewX( 5deg); } /* droop:  61-57 = +4px */
   100% { transform: skewX( 7deg); } /* full:   63-56 = +7px */
 `;
+// Pole wiggle — enthusiastic hand-held waving, ±7–12° from a ~17° base.
+// Runs fast (1–2s per cycle) with each flag on its own offset for a crowd feel.
+const poleWiggle = keyframes`
+  0%   { transform: rotate(13deg); }
+  18%  { transform: rotate(27deg); }
+  36%  { transform: rotate(9deg);  }
+  54%  { transform: rotate(25deg); }
+  72%  { transform: rotate(11deg); }
+  88%  { transform: rotate(24deg); }
+  100% { transform: rotate(13deg); }
+`;
 const flagRipple = keyframes`
   /* Gust 1: fade in, travel, slow and fade out as wind dies */
   0%   { background-position: 200% 0;   opacity: 0; }
@@ -173,6 +184,20 @@ const flagRipple = keyframes`
   81%  { background-position: -200% 0;  opacity: 0; }
   /* Reset invisibly during calm 2 */
   100% { background-position: 200% 0;   opacity: 0; }
+`;
+// Group marches left→right across the full panel width, looping.
+const flagMarch = keyframes`
+  from { transform: translateX(-80%); }
+  to   { transform: translateX(80%);  }
+`;
+// Per-flag horizontal drift — each flag wanders slightly so the crowd splits and regroups.
+const flagDrift = keyframes`
+  0%   { transform: translateX(0px);   }
+  22%  { transform: translateX(18px);  }
+  45%  { transform: translateX(-10px); }
+  68%  { transform: translateX(24px);  }
+  85%  { transform: translateX(-6px);  }
+  100% { transform: translateX(0px);   }
 `;
 const godRaysPulse = keyframes`
   0%   { opacity: 0.8; }
@@ -299,6 +324,98 @@ interface PlayerPanelProps {
   remoteConnected?: boolean;
   soundEnabled?: boolean;
 }
+
+// ── City Flag ─────────────────────────────────────────────────────────────────
+// Reusable single flag: position, staggered rise delay, and wave phase offset
+// are all injected so 12 instances look independent.
+
+interface CityFlagProps {
+  left: string;
+  bottom?: number;        // bottom offset in px (default -25)
+  riseDelay: number;      // seconds before the flag starts rising
+  wiggleDuration: number; // seconds per wiggle cycle
+  wiggleOffset: number;   // seconds phase offset so each flag is desynchronized
+  driftDuration: number;  // seconds per drift cycle (split/regroup)
+  driftOffset: number;    // seconds phase offset for drift
+  artCropUrl?: string;
+  commanderName: string;
+}
+
+function CityFlag({ left, bottom = -25, riseDelay, wiggleDuration, wiggleOffset, driftDuration, driftOffset, artCropUrl, commanderName }: CityFlagProps) {
+  const dur = `${wiggleDuration}s`;
+  const off = `${wiggleOffset}s`;
+  return (
+    <Box sx={{
+      position: 'absolute', left, bottom,
+      pointerEvents: 'none', zIndex: 3,
+      animation: `${flagRise} 1.4s ${riseDelay}s ease-out both`,
+    }}>
+      {/* Per-flag horizontal drift for split/regroup effect */}
+      <Box sx={{ animation: `${flagDrift} ${driftDuration}s ${driftOffset}s ease-in-out infinite` }}>
+      <Box sx={{
+        position: 'relative',
+        transformOrigin: 'bottom left',
+        animation: `${poleWiggle} ${dur} ${off} ease-in-out infinite`,
+      }}>
+        {/* Flag cloth */}
+        <Box sx={{
+          position: 'absolute', left: 3, top: 0,
+          filter: 'drop-shadow(2px 2px 8px rgba(0,0,0,0.65)) drop-shadow(0 0 2px rgba(218,165,32,0.55))',
+          pointerEvents: 'none',
+        }}>
+          <Box sx={{ width: 72, height: 50, overflow: 'visible', animation: `${flagShape} ${dur} ${off} ease-in-out infinite` }}>
+            <Box sx={{ position: 'relative', width: 72, height: 50, overflow: 'hidden' }}>
+              {artCropUrl ? (
+                <svg width="72" height="50" viewBox="0 0 72 50" style={{ display: 'block' }}>
+                  <Box component="g" sx={{ transformBox: 'fill-box', transformOrigin: 'left top', animation: `${flagImageSkew} ${dur} ${off} ease-in-out infinite` }}>
+                    <image href={artCropUrl} x="0" y="0" width="72" height="50" preserveAspectRatio="xMidYMin slice" />
+                  </Box>
+                </svg>
+              ) : (
+                <Box sx={{ width: '100%', height: '100%', bgcolor: 'rgba(20,12,4,0.90)', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 0.5, transformOrigin: 'left top', animation: `${flagImageSkew} ${dur} ${off} ease-in-out infinite` }}>
+                  <Typography sx={{ fontSize: 7, fontWeight: 800, color: '#DAA520', textAlign: 'center', lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
+                    {commanderName}
+                  </Typography>
+                </Box>
+              )}
+              {/* Ripple layers — second offset by half a cycle for counter-shimmer */}
+              <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'repeating-linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 18%, transparent 36%)', backgroundSize: '300% 100%', animation: `${flagRipple} ${dur} ${off} linear infinite` }} />
+              <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'repeating-linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.10) 18%, transparent 36%)', backgroundSize: '300% 100%', animation: `${flagRipple} ${dur} linear infinite`, animationDelay: `${wiggleOffset - wiggleDuration / 2}s` }} />
+            </Box>
+          </Box>
+        </Box>
+        {/* Finial */}
+        <Box sx={{ position: 'absolute', left: -2, top: -7, width: 7, height: 7, borderRadius: '50%', background: 'radial-gradient(circle at 35% 30%, #FFE066, #DAA520 55%, #8B6914)', boxShadow: '0 0 5px rgba(218,165,32,0.9)' }} />
+        {/* Pole */}
+        <Box sx={{ width: 3, height: 140, background: 'linear-gradient(to right, #DAA520, #8B6914)' }} />
+      </Box>
+      </Box>{/* end drift wrapper */}
+    </Box>
+  );
+}
+
+// Order in which threat commander flags steal positions — spread across the crowd
+// so the takeover feels like infiltration rather than a sweep from one side.
+const THREAT_STEAL_ORDER = [6, 1, 10, 3, 8, 0, 11, 4, 7, 2, 9, 5];
+
+// Flags clustered in the center like a crowd marching left→right.
+// Varied bottom creates front/back depth. driftDuration/driftOffset make individuals
+// wander so the group splits and regroups as it moves.
+const CITY_FLAG_CONFIGS = [
+  { left: '30%', bottom: -28, riseDelay: 4.00, wiggleDuration: 3.2, wiggleOffset:  0.0, driftDuration: 11.0, driftOffset:  0.0  },
+  { left: '35%', bottom: -24, riseDelay: 4.12, wiggleDuration: 2.7, wiggleOffset: -0.9, driftDuration:  8.5, driftOffset: -2.3  },
+  { left: '40%', bottom: -30, riseDelay: 4.25, wiggleDuration: 3.6, wiggleOffset: -1.8, driftDuration: 13.0, driftOffset: -5.1  },
+  { left: '45%', bottom: -22, riseDelay: 4.06, wiggleDuration: 3.0, wiggleOffset: -2.4, driftDuration:  9.5, driftOffset: -1.4  },
+  { left: '50%', bottom: -26, riseDelay: 4.38, wiggleDuration: 2.5, wiggleOffset: -0.6, driftDuration: 12.0, driftOffset: -3.8  },
+  { left: '55%', bottom: -20, riseDelay: 4.18, wiggleDuration: 3.9, wiggleOffset: -1.5, driftDuration:  8.0, driftOffset: -6.5  },
+  { left: '60%', bottom: -28, riseDelay: 4.44, wiggleDuration: 2.8, wiggleOffset: -2.1, driftDuration: 10.5, driftOffset: -0.7  },
+  { left: '65%', bottom: -24, riseDelay: 4.08, wiggleDuration: 3.4, wiggleOffset: -1.2, driftDuration: 14.0, driftOffset: -4.2  },
+  // back-row flags (higher bottom = further back)
+  { left: '37%', bottom: -18, riseDelay: 4.30, wiggleDuration: 2.6, wiggleOffset: -1.7, driftDuration:  9.0, driftOffset: -7.0  },
+  { left: '48%', bottom: -16, riseDelay: 4.52, wiggleDuration: 3.7, wiggleOffset: -2.7, driftDuration: 11.5, driftOffset: -2.9  },
+  { left: '57%', bottom: -18, riseDelay: 4.20, wiggleDuration: 3.1, wiggleOffset: -0.4, driftDuration:  7.5, driftOffset: -5.5  },
+  { left: '63%', bottom: -15, riseDelay: 4.40, wiggleDuration: 2.9, wiggleOffset: -2.0, driftDuration: 12.5, driftOffset: -1.8  },
+];
 
 const BTN = { p: 0, minWidth: 26, minHeight: 26 } as const;
 
@@ -964,94 +1081,37 @@ export function PlayerPanel({
         </Box>
       ))}
 
-      {/* ── City's Blessing commander flag ── */}
-      {/* Outer box: rise animation + anchor (bottom edge clipped by panel overflow:hidden).
-          Inner box: 38° tilt so the pole points upper-right. Flag cloth on the right side of the pole. */}
-      {cityBlessingVisible && !cityBlessingExiting && (
-        <Box sx={{
-          position: 'absolute', left: '54%', bottom: -28,
-          pointerEvents: 'none', zIndex: 3,
-          animation: `${flagRise} 1.4s 4s ease-out both`,
-        }}>
-          <Box sx={{
-            position: 'relative',
-            transform: 'rotate(15deg)',
-            transformOrigin: 'bottom left',
-          }}>
-            {/* Flag cloth — clip-path animation keeps both left corners fixed to the pole.
-                Only right-edge vertices move, producing a true fabric wave/droop. */}
-            <Box sx={{
-              position: 'absolute', left: 3, top: 0,
-              filter: 'drop-shadow(2px 2px 8px rgba(0,0,0,0.65)) drop-shadow(0 0 2px rgba(218,165,32,0.55))',
-              pointerEvents: 'none',
-            }}>
-              {/* Animated shape — clip-path polygon; overflow visible so vertices can go outside box */}
-              <Box sx={{
-                width: 72, height: 50,
-                overflow: 'visible',
-                animation: `${flagShape} 10s ease-in-out infinite`,
-              }}>
-                {/* Content — fills the animated container; clipped by parent clip-path */}
-                <Box sx={{
-                  position: 'relative', width: 72, height: 50, overflow: 'hidden',
-                }}>
-                  {player.commander.artCropUrl ? (
-                    // SVG wrapper — skewY animates the <g> with transformOrigin left-center,
-                    // keeping the left edge fixed while the right edge deforms with the wave.
-                    <svg width="72" height="50" viewBox="0 0 72 50" style={{ display: 'block' }}>
-                      <Box component="g" sx={{
-                        transformBox: 'fill-box',
-                        transformOrigin: 'left top',
-                        animation: `${flagImageSkew} 10s ease-in-out infinite`,
-                      }}>
-                        <image
-                          href={player.commander.artCropUrl}
-                          x="0" y="0" width="72" height="50"
-                          preserveAspectRatio="xMidYMin slice"
-                        />
-                      </Box>
-                    </svg>
-                  ) : (
-                    <Box sx={{
-                      width: '100%', height: '100%',
-                      bgcolor: 'rgba(20,12,4,0.90)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      p: 0.5,
-                      transformOrigin: 'left top',
-                      animation: `${flagImageSkew} 10s ease-in-out infinite`,
-                    }}>
-                      <Typography sx={{
-                        fontSize: 7, fontWeight: 800, color: '#DAA520',
-                        textAlign: 'center', lineHeight: 1.2,
-                        overflow: 'hidden', display: '-webkit-box',
-                        WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
-                      }}>
-                        {player.commander.name}
-                      </Typography>
-                    </Box>
-                  )}
-                  {/* Cloth ripple — two staggered light-band layers travelling across the fabric */}
-                  <Box sx={{
-                    position: 'absolute', inset: 0, pointerEvents: 'none',
-                    background: 'repeating-linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 18%, transparent 36%)',
-                    backgroundSize: '300% 100%',
-                    animation: `${flagRipple} 10s linear infinite`,
-                  }} />
-                  <Box sx={{
-                    position: 'absolute', inset: 0, pointerEvents: 'none',
-                    background: 'repeating-linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.10) 18%, transparent 36%)',
-                    backgroundSize: '300% 100%',
-                    animation: `${flagRipple} 10s linear infinite`,
-                    animationDelay: '-1.4s',
-                  }} />
-                </Box>
-              </Box>
-            </Box>
-            {/* Pole — base below panel edge, clipped by overflow:hidden */}
-            <Box sx={{ width: 3, height: 140, background: 'linear-gradient(to right, #DAA520, #8B6914)' }} />
-          </Box>
+      {/* ── City's Blessing — crowd of flags marching left→right ── */}
+      {cityBlessingVisible && !cityBlessingExiting && (() => {
+        // Threat commander steals flags one per damage point, reaching all 12 at 20 dmg.
+        // Only activates when the attacker has art (no text-only threat flags).
+        const threatArtUrl = (threatSource?.artUrl) ?? null;
+        const threatCount = !threatArtUrl
+          ? 0
+          : Math.min(Math.floor(threatSource!.dmg * 12 / 20), 12);
+        const stolenIndices: ReadonlySet<number> = new Set(THREAT_STEAL_ORDER.slice(0, threatCount));
+        return (
+        <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', animation: `${flagMarch} 38s linear infinite` }}>
+          {CITY_FLAG_CONFIGS.map((cfg, i) => {
+            const isThreat = stolenIndices.has(i);
+            return (
+            <CityFlag
+              key={i}
+              left={cfg.left}
+              bottom={cfg.bottom}
+              riseDelay={cfg.riseDelay}
+              wiggleDuration={cfg.wiggleDuration}
+              wiggleOffset={cfg.wiggleOffset}
+              driftDuration={cfg.driftDuration}
+              driftOffset={cfg.driftOffset}
+              artCropUrl={isThreat ? threatArtUrl! : player.commander.artCropUrl}
+              commanderName={player.commander.name}
+            />
+            );
+          })}
         </Box>
-      )}
+        );
+      })()}
 
       {/* ── Initiative torch flicker overlay ── */}
       {player.hasInitiative && (
@@ -1542,7 +1602,7 @@ export function PlayerPanel({
         </Stack>
 
         {/* Center: absolutely positioned so it's always centered relative to the full header */}
-        <Box sx={{ position: 'absolute', left: 0, right: 0, textAlign: 'center', px: 6, pointerEvents: 'none' }}>
+        <Box sx={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', width: 'max-content', maxWidth: 'calc(100% - 96px)', textAlign: 'center', pointerEvents: 'none' }}>
           <Typography
             noWrap
             onClick={seatCode ? () => setQrOpen(true) : undefined}
