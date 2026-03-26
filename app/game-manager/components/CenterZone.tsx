@@ -356,6 +356,28 @@ export function CenterZone({
 
   const currentPlayer = players[currentPlayerIdx];
 
+  const renderDiceGrid = (
+    rolls: (number | string)[],
+    labels: string[] | undefined,
+    separator: React.ReactNode,
+    getSlotContent: (r: number | string, i: number) => { nameColor: string; scoreNode: React.ReactNode }
+  ) => (
+    <Stack direction="row" flexWrap="wrap" justifyContent="center" alignItems="center" gap={0.5}>
+      {rolls.map((r, i) => {
+        const { nameColor, scoreNode } = getSlotContent(r, i);
+        return (
+          <React.Fragment key={i}>
+            {i > 0 && separator}
+            <Box sx={{ textAlign: 'center', height: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
+              <Typography sx={{ fontSize: 9, color: nameColor, lineHeight: 1, mb: 0.25 }}>{labels ? labels[i] : i + 1}</Typography>
+              {scoreNode}
+            </Box>
+          </React.Fragment>
+        );
+      })}
+    </Stack>
+  );
+
   return (
     <>
       <Card
@@ -689,34 +711,33 @@ export function CenterZone({
                     <Box sx={spinSx}><RollingIcon large /></Box>
                   );
                 }
-                return (
-                  <Stack direction="row" flexWrap="wrap" justifyContent="center" alignItems="center" gap={0.5}>
-                    {rollingEntry.finalRolls.map((r, i) => (
-                      <React.Fragment key={i}>
-                        {i > 0 && (isCoin
-                          ? <TollIcon sx={{ fontSize: 10, color: 'text.disabled', alignSelf: 'flex-end', mb: '10px' }} />
-                          : isD6
-                          ? <CasinoIcon sx={{ fontSize: 10, color: 'text.disabled', alignSelf: 'flex-end', mb: '10px' }} />
-                          : <Box sx={{ alignSelf: 'flex-end', mb: '10px', display: 'inline-flex' }}><D20Icon size={10} /></Box>
-                        )}
-                        <Box sx={{ textAlign: 'center', height: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
-                          <Typography sx={{ fontSize: 9, color: 'text.disabled', lineHeight: 1, mb: 0.25 }}>{rollingEntry.labels ? rollingEntry.labels[i] : i + 1}</Typography>
-                          {rollingEntry.activeSlots && !rollingEntry.activeSlots[i] ? (
-                            <Typography sx={{ fontWeight: 900, fontSize: 32, lineHeight: 1, color: rollingEntry.lockedSlots?.[i] ? 'primary.main' : 'text.disabled' }}>{r}</Typography>
-                          ) : rollingEntry.revealed[i] ? (
-                            <Typography key={`rv${i}`} sx={{ fontWeight: 900, fontSize: 32, lineHeight: 1, color: rollingEntry.color, ...popSx }}>{r}</Typography>
-                          ) : (
-                            <Box sx={{ ...spinSx, fontSize: 32, lineHeight: 1 }}><RollingIcon /></Box>
-                          )}
-                        </Box>
-                      </React.Fragment>
-                    ))}
-                  </Stack>
+                const animSeparator = isCoin
+                  ? <TollIcon sx={{ fontSize: 10, color: 'text.disabled', alignSelf: 'flex-end', mb: '10px' }} />
+                  : isD6
+                  ? <CasinoIcon sx={{ fontSize: 10, color: 'text.disabled', alignSelf: 'flex-end', mb: '10px' }} />
+                  : <Box sx={{ alignSelf: 'flex-end', mb: '10px', display: 'inline-flex' }}><D20Icon size={10} /></Box>;
+                return renderDiceGrid(
+                  rollingEntry.finalRolls,
+                  rollingEntry.labels,
+                  animSeparator,
+                  (r, i) => ({
+                    nameColor: 'text.disabled' as const,
+                    scoreNode: rollingEntry.activeSlots && !rollingEntry.activeSlots[i] ? (
+                      <Typography sx={{ fontWeight: 900, fontSize: 32, lineHeight: 1, color: rollingEntry.lockedSlots?.[i] ? 'primary.main' : 'text.disabled' }}>{r}</Typography>
+                    ) : rollingEntry.revealed[i] ? (
+                      <Typography key={`rv${i}`} sx={{ fontWeight: 900, fontSize: 32, lineHeight: 1, color: rollingEntry.color, ...popSx }}>{r}</Typography>
+                    ) : (
+                      <Box sx={{ ...spinSx, fontSize: 32, lineHeight: 1 }}><RollingIcon /></Box>
+                    ),
+                  })
                 );
               })() : rollingEntry && rollingEntry.done ? (
                 <Box sx={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                  <Stack direction="row" flexWrap="wrap" justifyContent="center" alignItems="center" gap={0.5}>
-                    {rollingEntry.finalRolls.map((r, i) => {
+                  {renderDiceGrid(
+                    rollingEntry.finalRolls,
+                    rollingEntry.labels,
+                    <Box sx={{ alignSelf: 'flex-end', mb: '10px', display: 'inline-flex' }}><D20Icon size={10} /></Box>,
+                    (r, i) => {
                       const isActive = !rollingEntry.activeSlots || rollingEntry.activeSlots[i];
                       const isLocked = rollingEntry.lockedSlots?.[i] ?? false;
                       const isWinner = rollOffState.phase === 'result' && rollingEntry.labels?.[i] === rollOffState.winnerName;
@@ -726,17 +747,12 @@ export function CenterZone({
                       const isTied = rollOffState.phase === 'tie' && (isActive || isLocked) && tiedNames.includes(rollingEntry.labels?.[i] ?? '') && !isLockedHighest;
                       const nameColor = isWinner ? '#DAA520' : isLockedHighest ? 'primary.main' : isTied ? '#DAA520' : 'text.disabled';
                       const scoreColor = isWinner ? rollingEntry.color : isLockedHighest ? 'primary.main' : isTied ? '#DAA520' : 'text.disabled';
-                      return (
-                        <React.Fragment key={i}>
-                          {i > 0 && <Box sx={{ alignSelf: 'flex-end', mb: '10px', display: 'inline-flex' }}><D20Icon size={10} /></Box>}
-                          <Box sx={{ textAlign: 'center', height: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
-                            <Typography sx={{ fontSize: 9, color: nameColor, lineHeight: 1, mb: 0.25 }}>{rollingEntry.labels ? rollingEntry.labels[i] : i + 1}</Typography>
-                            <Typography sx={{ fontWeight: 900, fontSize: 32, lineHeight: 1, color: scoreColor, ...(isWinner && { animation: 'rollPop 0.3s cubic-bezier(0.34,1.56,0.64,1)', '@keyframes rollPop': { '0%': { opacity: 0, transform: 'scale(0.3)' }, '100%': { opacity: 1, transform: 'scale(1)' } } }) }}>{r}</Typography>
-                          </Box>
-                        </React.Fragment>
-                      );
-                    })}
-                  </Stack>
+                      return {
+                        nameColor,
+                        scoreNode: <Typography sx={{ fontWeight: 900, fontSize: 32, lineHeight: 1, color: scoreColor, ...(isWinner && { animation: 'rollPop 0.3s cubic-bezier(0.34,1.56,0.64,1)', '@keyframes rollPop': { '0%': { opacity: 0, transform: 'scale(0.3)' }, '100%': { opacity: 1, transform: 'scale(1)' } } }) }}>{r}</Typography>,
+                      };
+                    }
+                  )}
                   {rollOffState.phase === 'tie' && (
                     <Typography sx={{
                       position: 'absolute', pointerEvents: 'none',

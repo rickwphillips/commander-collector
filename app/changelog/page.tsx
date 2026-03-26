@@ -38,6 +38,14 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.25.2',
+    date: '2026-03-26',
+    title: 'Dice Grid Code Cleanup',
+    changes: [
+      { type: 'improved', text: 'Dice grid rendering unified into a single shared helper — animated and done states now use the same layout code' },
+    ],
+  },
+  {
     version: '1.25.1',
     date: '2026-03-26',
     title: 'Roll-Off Polish & No Loners Rule',
