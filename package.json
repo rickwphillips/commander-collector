@@ -1,6 +1,6 @@
 {
   "name": "commander-collector",
-  "version": "1.23.5",
+  "version": "1.24.0",
   "private": true,
   "scripts": {
     "dev": "next dev",

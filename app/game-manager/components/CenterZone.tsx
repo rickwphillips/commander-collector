@@ -79,6 +79,8 @@ interface CenterZoneProps {
   onCycleTextSizeMode: () => void;
   highlightMode: boolean;
   onToggleHighlightMode: () => void;
+  soundEnabled: boolean;
+  onToggleSound: () => void;
 }
 
 function rollDie(sides: number): number {
@@ -115,6 +117,8 @@ export function CenterZone({
   onCycleTextSizeMode,
   highlightMode,
   onToggleHighlightMode,
+  soundEnabled,
+  onToggleSound,
 }: CenterZoneProps) {
   type RollEntry = { label: string; rolls: (number | string)[]; total: number | null; color: string };
   const [history, setHistory] = useState<RollEntry[]>([]);
@@ -447,6 +451,11 @@ export function CenterZone({
               <FormControlLabel
                 control={<Switch size="small" checked={highlightMode} onChange={onToggleHighlightMode} />}
                 label={<Typography sx={{ fontSize: 12 }}>Highlight</Typography>}
+                sx={{ mx: 0 }}
+              />
+              <FormControlLabel
+                control={<Switch size="small" checked={soundEnabled} onChange={onToggleSound} />}
+                label={<Typography sx={{ fontSize: 12 }}>Sound</Typography>}
                 sx={{ mx: 0 }}
               />
               <Button

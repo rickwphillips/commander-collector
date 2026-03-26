@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { usePoisonSound } from '@/game-manager/hooks/usePoisonSound';
+import { useSounds } from '@/game-manager/hooks/useSounds';
 import { keyframes } from '@emotion/react';
 import { Box, Stack, Typography, IconButton, Button, TextField, Tooltip, SvgIcon } from '@mui/material';
 import { QRCodeSVG } from 'qrcode.react';
@@ -86,6 +88,91 @@ const godRaysFadeOut = keyframes`
 const fwFadeOut = keyframes`
   from { opacity: 1; }
   to   { opacity: 0; }
+`;
+const flagRise = keyframes`
+  0%   { transform: translateY(220px); opacity: 0; }
+  60%  { opacity: 1; }
+  100% { transform: translateY(0);     opacity: 1; }
+`;
+// Clip-path polygon animation — left corners (0 0) and (0 42px) are always fixed to the pole.
+// Only the right 3 vertices move: top-right, mid-right, bottom-right.
+// Gust = S-wave oscillation (4 diminishing cycles); calm = gravity droop.
+// 4-point polygon — no mid-right vertex, so the right edge is always a straight line.
+// The free edge tilts (top and bottom shift together) rather than bending.
+const flagShape = keyframes`
+  /* ── Gust 1 ── */
+  0%   { clip-path: polygon(0px 0px, 58px  0px, 58px 42px, 0px 42px); } /* flat */
+  4%   { clip-path: polygon(0px 0px, 59px  0px, 59px 42px, 0px 42px); } /* first flutter */
+  8%   { clip-path: polygon(0px 0px, 62px -2px, 60px 45px, 0px 42px); } /* peak 1 */
+  12%  { clip-path: polygon(0px 0px, 56px  2px, 56px 39px, 0px 42px); } /* reversal 1 */
+  16%  { clip-path: polygon(0px 0px, 61px -1px, 59px 44px, 0px 42px); } /* peak 2 */
+  20%  { clip-path: polygon(0px 0px, 56px  2px, 57px 40px, 0px 42px); } /* reversal 2 */
+  24%  { clip-path: polygon(0px 0px, 60px -1px, 58px 43px, 0px 42px); } /* small peak */
+  27%  { clip-path: polygon(0px 0px, 57px  1px, 57px 41px, 0px 42px); } /* small reversal */
+  30%  { clip-path: polygon(0px 0px, 59px  0px, 58px 43px, 0px 42px); } /* dying */
+  32%  { clip-path: polygon(0px 0px, 58px  0px, 58px 42px, 0px 42px); } /* flat */
+  /* ── Calm 1 ── */
+  40%  { clip-path: polygon(0px 0px, 57px  3px, 61px 46px, 0px 42px); } /* droop start */
+  50%  { clip-path: polygon(0px 0px, 56px  5px, 63px 48px, 0px 42px); } /* full droop */
+  56%  { clip-path: polygon(0px 0px, 57px  2px, 60px 45px, 0px 42px); } /* un-drooping */
+  58%  { clip-path: polygon(0px 0px, 58px  0px, 58px 42px, 0px 42px); } /* flat */
+  /* ── Gust 2 ── */
+  63%  { clip-path: polygon(0px 0px, 61px -2px, 60px 44px, 0px 42px); } /* peak 1 */
+  67%  { clip-path: polygon(0px 0px, 56px  2px, 56px 40px, 0px 42px); } /* reversal */
+  71%  { clip-path: polygon(0px 0px, 60px -1px, 59px 43px, 0px 42px); } /* peak 2 */
+  75%  { clip-path: polygon(0px 0px, 57px  1px, 57px 41px, 0px 42px); } /* reversal */
+  79%  { clip-path: polygon(0px 0px, 59px -1px, 58px 43px, 0px 42px); } /* small */
+  83%  { clip-path: polygon(0px 0px, 59px  0px, 58px 42px, 0px 42px); } /* dying */
+  86%  { clip-path: polygon(0px 0px, 58px  0px, 58px 42px, 0px 42px); } /* flat */
+  /* ── Calm 2 ── */
+  94%  { clip-path: polygon(0px 0px, 57px  3px, 61px 46px, 0px 42px); } /* droop */
+  100% { clip-path: polygon(0px 0px, 56px  5px, 63px 48px, 0px 42px); } /* full droop */
+`;
+// skewX from top-left pivot — matches the horizontal offset between the clip-path's
+// top-right and bottom-right vertices (BR_x - TR_x):
+//   negative = bottom leans left  (wave peak: BR_x < TR_x)
+//   positive = bottom leans right (droop:     BR_x > TR_x)
+const flagImageSkew = keyframes`
+  0%   { transform: skewX( 0deg); }
+  4%   { transform: skewX( 0deg); }
+  8%   { transform: skewX(-3deg); } /* peak1:  60-62 = -2px → -3° */
+  12%  { transform: skewX( 0deg); } /* rev1:   56-56 =  0px */
+  16%  { transform: skewX(-3deg); } /* peak2:  59-61 = -2px */
+  20%  { transform: skewX( 1deg); } /* rev2:   57-56 = +1px */
+  24%  { transform: skewX(-2deg); } /* small:  58-60 = -2px */
+  27%  { transform: skewX( 0deg); } /* rev:    57-57 =  0px */
+  30%  { transform: skewX(-1deg); } /* dying */
+  32%  { transform: skewX( 0deg); }
+  40%  { transform: skewX( 5deg); } /* droop start: 61-57 = +4px → +5° */
+  50%  { transform: skewX( 7deg); } /* full droop:  63-56 = +7px → +7° */
+  56%  { transform: skewX( 4deg); } /* un-droop:    60-57 = +3px */
+  58%  { transform: skewX( 0deg); }
+  63%  { transform: skewX(-2deg); } /* peak1:  60-61 = -1px */
+  67%  { transform: skewX( 0deg); } /* rev:    56-56 =  0px */
+  71%  { transform: skewX(-2deg); } /* peak2:  59-60 = -1px */
+  75%  { transform: skewX( 0deg); } /* rev:    57-57 =  0px */
+  79%  { transform: skewX(-1deg); } /* small */
+  83%  { transform: skewX(-1deg); }
+  86%  { transform: skewX( 0deg); }
+  94%  { transform: skewX( 5deg); } /* droop:  61-57 = +4px */
+  100% { transform: skewX( 7deg); } /* full:   63-56 = +7px */
+`;
+const flagRipple = keyframes`
+  /* Gust 1: fade in, travel, slow and fade out as wind dies */
+  0%   { background-position: 200% 0;   opacity: 0; }
+  2%   { background-position: 170% 0;   opacity: 1; }
+  18%  { background-position: -80% 0;   opacity: 1; }
+  26%  { background-position: -170% 0;  opacity: 0.3; }
+  28%  { background-position: -200% 0;  opacity: 0; }
+  /* Reset invisibly during calm 1 */
+  53%  { background-position: 200% 0;   opacity: 0; }
+  /* Gust 2: same pattern */
+  55%  { background-position: 170% 0;   opacity: 1; }
+  71%  { background-position: -80% 0;   opacity: 1; }
+  79%  { background-position: -170% 0;  opacity: 0.3; }
+  81%  { background-position: -200% 0;  opacity: 0; }
+  /* Reset invisibly during calm 2 */
+  100% { background-position: 200% 0;   opacity: 0; }
 `;
 const godRaysPulse = keyframes`
   0%   { opacity: 0.8; }
@@ -176,6 +263,7 @@ import ElimIcon from '@mui/icons-material/PersonOff';
 const XP_ICON_SRC = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRPxc2Yz21vbnc5VP3Muxnx5VtQGAynItuNWg&s';
 import type { PlayerState, CommanderDamageMap } from '../types';
 
+
 interface PlayerPanelProps {
   player: PlayerState;
   playerIdx: number;
@@ -209,6 +297,7 @@ interface PlayerPanelProps {
   seatCode?: string;
   activePlayerIdx?: number;
   remoteConnected?: boolean;
+  soundEnabled?: boolean;
 }
 
 const BTN = { p: 0, minWidth: 26, minHeight: 26 } as const;
@@ -246,7 +335,11 @@ export function PlayerPanel({
   seatCode,
   activePlayerIdx,
   remoteConnected = false,
+  soundEnabled = true,
 }: PlayerPanelProps) {
+  usePoisonSound(player.poison, player.isEliminated, soundEnabled);
+  const { playCitysBlessing } = useSounds(soundEnabled, player.hasCitysBlessing);
+
   const ts = textSizeMode;
   const POSITION_ROTATION = { top: '180deg', left: '90deg', right: '270deg', bottom: '0deg' } as const;
   const POSITION_HEADER_PLACEMENT = { top: 'top', left: 'left', right: 'left', bottom: 'bottom' } as const;
@@ -273,16 +366,22 @@ export function PlayerPanel({
   const [cmdDmgShowPlayer, setCmdDmgShowPlayer] = useState(false);
   const [cityBlessingVisible, setCityBlessingVisible] = useState(player.hasCitysBlessing);
   const [cityBlessingExiting, setCityBlessingExiting] = useState(false);
+  const prevHasCitysBlessing = useRef(player.hasCitysBlessing);
   useEffect(() => {
     if (player.hasCitysBlessing) {
+      if (!prevHasCitysBlessing.current) playCitysBlessing();
+      prevHasCitysBlessing.current = true;
       setCityBlessingVisible(true);
       setCityBlessingExiting(false);
-    } else if (cityBlessingVisible) {
-      setCityBlessingExiting(true);
-      const t = setTimeout(() => { setCityBlessingVisible(false); setCityBlessingExiting(false); }, 3800);
-      return () => clearTimeout(t);
+    } else {
+      prevHasCitysBlessing.current = false;
+      if (cityBlessingVisible) {
+        setCityBlessingExiting(true);
+        const t = setTimeout(() => { setCityBlessingVisible(false); setCityBlessingExiting(false); }, 3800);
+        return () => clearTimeout(t);
+      }
     }
-  }, [player.hasCitysBlessing]);
+  }, [player.hasCitysBlessing, playCitysBlessing]);
   const [xpFlashing, setXpFlashing] = useState(false);
   const [xpRippleKey, setXpRippleKey] = useState(0);
   const prevExperience = useRef(player.experience);
@@ -343,8 +442,6 @@ export function PlayerPanel({
   const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lpFired = useRef(false);
   const [qrOpen, setQrOpen] = useState(false);
-  const headerLpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const headerLpFired = useRef(false);
   const [passTurnHolding, setPassTurnHolding] = useState(false);
   const passTurnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startPassTurnHold = () => {
@@ -826,11 +923,11 @@ export function PlayerPanel({
           ...(cityBlessingExiting && { animation: `${fwFadeOut} 0.5s ease-out forwards` }),
         }}>
           {([
-            { left: '28%', top: '38%', delay: '4.5s',  dur: '6s',   color: '#81C784', angle:  -12, scale: 0.7 },
-            { left: '68%', top: '25%', delay: '6.7s',  dur: '7s',   color: '#4FC3F7', angle:   18, scale: 1.4 },
-            { left: '50%', top: '58%', delay: '9.0s',  dur: '6.5s', color: '#FFD700', angle:   -5, scale: 1.0 },
-            { left: '18%', top: '62%', delay: '5.6s',  dur: '8s',   color: '#FF8A65', angle:   25, scale: 1.7 },
-            { left: '80%', top: '48%', delay: '7.8s',  dur: '7.5s', color: '#CE93D8', angle:  -20, scale: 0.5 },
+            { left: '28%', top: '38%', delay: '5.5s',  dur: '6s',   color: '#81C784', angle:  -12, scale: 0.7 },
+            { left: '68%', top: '25%', delay: '7.7s',  dur: '7s',   color: '#4FC3F7', angle:   18, scale: 1.4 },
+            { left: '50%', top: '58%', delay: '10.0s', dur: '6.5s', color: '#FFD700', angle:   -5, scale: 1.0 },
+            { left: '18%', top: '62%', delay: '6.6s',  dur: '8s',   color: '#FF8A65', angle:   25, scale: 1.7 },
+            { left: '80%', top: '48%', delay: '8.8s',  dur: '7.5s', color: '#CE93D8', angle:  -20, scale: 0.5 },
           ] as { left: string; top: string; delay: string; dur: string; color: string; angle: number; scale: number }[]).map((fw, fi) => (
             <Box key={fi} sx={{ position: 'absolute', left: fw.left, top: fw.top }}>
               <Box sx={{ position: 'absolute', left: '50%', transform: `rotate(${fw.angle}deg)`, transformOrigin: 'bottom center' }}>
@@ -866,6 +963,95 @@ export function PlayerPanel({
           <rect x="6" y="28" width="86" height="12"/>
         </Box>
       ))}
+
+      {/* ── City's Blessing commander flag ── */}
+      {/* Outer box: rise animation + anchor (bottom edge clipped by panel overflow:hidden).
+          Inner box: 38° tilt so the pole points upper-right. Flag cloth on the right side of the pole. */}
+      {cityBlessingVisible && !cityBlessingExiting && (
+        <Box sx={{
+          position: 'absolute', left: '54%', bottom: -28,
+          pointerEvents: 'none', zIndex: 3,
+          animation: `${flagRise} 1.4s 4s ease-out both`,
+        }}>
+          <Box sx={{
+            position: 'relative',
+            transform: 'rotate(15deg)',
+            transformOrigin: 'bottom left',
+          }}>
+            {/* Flag cloth — clip-path animation keeps both left corners fixed to the pole.
+                Only right-edge vertices move, producing a true fabric wave/droop. */}
+            <Box sx={{
+              position: 'absolute', left: 3, top: 0,
+              filter: 'drop-shadow(2px 2px 8px rgba(0,0,0,0.65)) drop-shadow(0 0 2px rgba(218,165,32,0.55))',
+              pointerEvents: 'none',
+            }}>
+              {/* Animated shape — clip-path polygon; overflow visible so vertices can go outside box */}
+              <Box sx={{
+                width: 72, height: 50,
+                overflow: 'visible',
+                animation: `${flagShape} 10s ease-in-out infinite`,
+              }}>
+                {/* Content — fills the animated container; clipped by parent clip-path */}
+                <Box sx={{
+                  position: 'relative', width: 72, height: 50, overflow: 'hidden',
+                }}>
+                  {player.commander.artCropUrl ? (
+                    // SVG wrapper — skewY animates the <g> with transformOrigin left-center,
+                    // keeping the left edge fixed while the right edge deforms with the wave.
+                    <svg width="72" height="50" viewBox="0 0 72 50" style={{ display: 'block' }}>
+                      <Box component="g" sx={{
+                        transformBox: 'fill-box',
+                        transformOrigin: 'left top',
+                        animation: `${flagImageSkew} 10s ease-in-out infinite`,
+                      }}>
+                        <image
+                          href={player.commander.artCropUrl}
+                          x="0" y="0" width="72" height="50"
+                          preserveAspectRatio="xMidYMin slice"
+                        />
+                      </Box>
+                    </svg>
+                  ) : (
+                    <Box sx={{
+                      width: '100%', height: '100%',
+                      bgcolor: 'rgba(20,12,4,0.90)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      p: 0.5,
+                      transformOrigin: 'left top',
+                      animation: `${flagImageSkew} 10s ease-in-out infinite`,
+                    }}>
+                      <Typography sx={{
+                        fontSize: 7, fontWeight: 800, color: '#DAA520',
+                        textAlign: 'center', lineHeight: 1.2,
+                        overflow: 'hidden', display: '-webkit-box',
+                        WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
+                      }}>
+                        {player.commander.name}
+                      </Typography>
+                    </Box>
+                  )}
+                  {/* Cloth ripple — two staggered light-band layers travelling across the fabric */}
+                  <Box sx={{
+                    position: 'absolute', inset: 0, pointerEvents: 'none',
+                    background: 'repeating-linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 18%, transparent 36%)',
+                    backgroundSize: '300% 100%',
+                    animation: `${flagRipple} 10s linear infinite`,
+                  }} />
+                  <Box sx={{
+                    position: 'absolute', inset: 0, pointerEvents: 'none',
+                    background: 'repeating-linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.10) 18%, transparent 36%)',
+                    backgroundSize: '300% 100%',
+                    animation: `${flagRipple} 10s linear infinite`,
+                    animationDelay: '-1.4s',
+                  }} />
+                </Box>
+              </Box>
+            </Box>
+            {/* Pole — base below panel edge, clipped by overflow:hidden */}
+            <Box sx={{ width: 3, height: 140, background: 'linear-gradient(to right, #DAA520, #8B6914)' }} />
+          </Box>
+        </Box>
+      )}
 
       {/* ── Initiative torch flicker overlay ── */}
       {player.hasInitiative && (
@@ -1224,16 +1410,6 @@ export function PlayerPanel({
 
       {/* ── Header ── */}
       <Box
-        onPointerDown={seatCode ? () => {
-          headerLpFired.current = false;
-          headerLpTimer.current = setTimeout(() => {
-            headerLpFired.current = true;
-            setQrOpen(true);
-          }, 600);
-        } : undefined}
-        onPointerUp={seatCode ? () => { if (headerLpTimer.current) { clearTimeout(headerLpTimer.current); headerLpTimer.current = null; } } : undefined}
-        onPointerLeave={seatCode ? () => { if (headerLpTimer.current) { clearTimeout(headerLpTimer.current); headerLpTimer.current = null; } } : undefined}
-        onPointerCancel={seatCode ? () => { if (headerLpTimer.current) { clearTimeout(headerLpTimer.current); headerLpTimer.current = null; } } : undefined}
         sx={{
         px: 1, py: 0.5, flexShrink: 0, filter: 'none', position: 'relative', zIndex: 3, display: 'flex', alignItems: 'center',
         background: isCurrentPlayer && highlightMode
@@ -1328,8 +1504,8 @@ export function PlayerPanel({
               </Stack>
             </Box>
           )}
-          {/* Pass Turn — long press, remote panel only */}
-          {remoteMode && isCurrentPlayer && onPassTurn && (
+          {/* Pass Turn — long press */}
+          {isCurrentPlayer && onPassTurn && (
             <Box
               onPointerDown={startPassTurnHold}
               onPointerUp={cancelPassTurnHold}
@@ -1366,17 +1542,15 @@ export function PlayerPanel({
         </Stack>
 
         {/* Center: absolutely positioned so it's always centered relative to the full header */}
-        <Box
-          onPointerDown={seatCode ? () => { headerLpFired.current = false; headerLpTimer.current = setTimeout(() => { headerLpFired.current = true; setQrOpen(true); }, 600); } : undefined}
-          onPointerUp={seatCode ? () => { if (headerLpTimer.current) { clearTimeout(headerLpTimer.current); headerLpTimer.current = null; } } : undefined}
-          onPointerLeave={seatCode ? () => { if (headerLpTimer.current) { clearTimeout(headerLpTimer.current); headerLpTimer.current = null; } } : undefined}
-          onPointerCancel={seatCode ? () => { if (headerLpTimer.current) { clearTimeout(headerLpTimer.current); headerLpTimer.current = null; } } : undefined}
-          sx={{ position: 'absolute', left: 0, right: 0, textAlign: 'center', px: 6, cursor: seatCode ? 'pointer' : 'default' }}
-        >
-          <Typography noWrap sx={{ fontWeight: 700, fontSize: ts === 2 ? 16 : ts === 1 ? 14 : 12, lineHeight: 1.2 }}>
+        <Box sx={{ position: 'absolute', left: 0, right: 0, textAlign: 'center', px: 6, pointerEvents: 'none' }}>
+          <Typography
+            noWrap
+            onClick={seatCode ? () => setQrOpen(true) : undefined}
+            sx={{ fontWeight: 700, fontSize: ts === 2 ? 16 : ts === 1 ? 14 : 12, lineHeight: 1.2, pointerEvents: seatCode ? 'auto' : 'none', cursor: seatCode ? 'pointer' : 'default' }}
+          >
             {player.playerName}
           </Typography>
-          <Typography noWrap sx={{ fontSize: ts === 2 ? 13 : ts === 1 ? 11 : 9, lineHeight: 1.2, color: 'text.secondary' }}>
+          <Typography noWrap sx={{ fontSize: ts === 2 ? 13 : ts === 1 ? 11 : 9, lineHeight: 1.2, color: 'text.secondary', pointerEvents: 'none' }}>
             {player.deckName} · {player.commander.name}{player.partner ? ` / ${player.partner.name}` : ''}
           </Typography>
         </Box>

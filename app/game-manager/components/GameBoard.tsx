@@ -54,6 +54,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   const [poisonKillPrompt, setPoisonKillPrompt] = useState<{ targetIdx: number; newPlayers: PlayerState[] } | null>(null);
   const [monarchTransfer, setMonarchTransfer] = useState<{ fromPos: string | null; toPos: string | null }>({ fromPos: null, toPos: null });
   const [highlightMode, setHighlightMode] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
   // Start a 15s countdown when a winner is detected; auto-save when it hits 0
   useEffect(() => {
@@ -447,6 +448,8 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
                 onCommanderDamageChange={handleCommanderDamageChange}
                 onEliminate={handleEliminate}
                 onUndoEliminate={handleUndoEliminate}
+                onPassTurn={firstPlayerSet ? handleNextTurn : undefined}
+                soundEnabled={soundEnabled}
                 {...(lifeKillPrompt?.targetIdx === idx && {
                   lifeKillOpponents: getActiveOpponents(players, idx),
                   onLifeKillSelect: (sourceIdx) => {
@@ -501,6 +504,8 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
           onCycleTextSizeMode={() => setTextSizeMode((m) => ((m + 1) % 3) as 0 | 1 | 2)}
           highlightMode={highlightMode}
           onToggleHighlightMode={() => setHighlightMode(m => !m)}
+          soundEnabled={soundEnabled}
+          onToggleSound={() => setSoundEnabled(s => !s)}
         />
       </Box>
 

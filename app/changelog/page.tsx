@@ -38,6 +38,17 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.24.0',
+    date: '2026-03-26',
+    title: "City's Blessing flag & fanfare",
+    changes: [
+      { type: 'added', text: "Commander flag rises into the player panel when City's Blessing is gained, displaying the commander's art (or name if no art is available)" },
+      { type: 'added', text: "Royal fanfare plays on City's Blessing activation; fireworks boom continues looping for as long as the blessing is active" },
+      { type: 'added', text: 'Sound on/off toggle added to the center zone settings panel' },
+      { type: 'improved', text: 'Flag cloth animation uses clip-path polygon deformation keeping both left corners anchored to the pole; synchronized skewX on the image matches the outline wave and droop' },
+    ],
+  },
+  {
     version: '1.23.5',
     date: '2026-03-25',
     title: 'Remove debug logging',
