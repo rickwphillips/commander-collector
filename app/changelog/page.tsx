@@ -38,6 +38,14 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.23.5',
+    date: '2026-03-25',
+    title: 'Remove debug logging',
+    changes: [
+      { type: 'changed', text: 'Removed temporary diagnostic logging added during sync bugfixing (console logs, server log posts, and the debug-log PHP endpoint)' },
+    ],
+  },
+  {
     version: '1.23.4',
     date: '2026-03-25',
     title: 'Code quality cleanup',

@@ -8,7 +8,6 @@ import { GameEndSummary } from './components/GameEndSummary';
 import type { GameManagerState, PlayerSetup, PlayerState, CommanderDamageMap } from './types';
 import type { GameResultInput } from '@/lib/types';
 import { api } from '@/lib/api';
-import { debugLog } from '@/lib/debugLog';
 import { applyEvent } from './remoteTransforms';
 
 const POSITIONS_BY_COUNT: Record<number, Array<PlayerState['position']>> = {
@@ -131,32 +130,20 @@ export default function GameManagerPage() {
   // before we've confirmed the session is still active.
   useEffect(() => {
     if (state.phase !== 'playing' || !state.sessionCode) return;
-    if (!sessionVerifiedRef.current) {
-      debugLog('HOST write', 'SKIPPED — not yet verified', { code: state.sessionCode, lives: state.players.map((p) => `${p.playerName}:${p.life}`) }, 'warn');
-      return;
-    }
-    const lives = state.players.map((p) => `${p.playerName}:${p.life}`);
-    debugLog('HOST write', 'sending to DB', { code: state.sessionCode, lives });
+    if (!sessionVerifiedRef.current) return;
     lastWriteTimeRef.current = Date.now();
-    api.updateLiveGame(state.sessionCode, state)
-      .then(() => debugLog('HOST write', 'OK', { lives }))
-      .catch((err) => debugLog('HOST write', 'FAILED', { err: String(err), lives }, 'error'));
+    api.updateLiveGame(state.sessionCode, state).catch(() => {});
   }, [state]);
 
   // On mount: if we resumed a playing session from localStorage, verify it's still active.
   // If yes  → sync to current DB state (don't replay potentially stale localStorage).
   // If no   → clear the sessionCode so we don't write to a dead session.
   useEffect(() => {
-    if (sessionVerifiedRef.current) {
-      debugLog('HOST verify', 'skipped — already verified (fresh game or no saved session)');
-      return;
-    }
+    if (sessionVerifiedRef.current) return;
     const saved = loadSavedState();
     if (!saved?.sessionCode) { sessionVerifiedRef.current = true; return; }
-    debugLog('HOST verify', 'checking session', { code: saved.sessionCode, localLives: saved.players?.map((p) => `${p.playerName}:${p.life}`) });
     api.getLiveGame(saved.sessionCode)
       .then((res) => {
-        debugLog('HOST verify', 'DB response', { is_active: res.is_active, dbLives: res.state?.players?.map((p: { playerName: string; life: number }) => `${p.playerName}:${p.life}`) });
         sessionVerifiedRef.current = true;
         if (res.is_active) {
           setState((prev) => ({
@@ -171,8 +158,7 @@ export default function GameManagerPage() {
         // the remote event queue before the authoritative state is in place.
         setSessionVerified(true);
       })
-      .catch((err) => {
-        debugLog('HOST verify', 'FAILED', { err: String(err) }, 'error');
+      .catch(() => {
         sessionVerifiedRef.current = true;
         setState((prev) => ({ ...prev, sessionCode: null, sessionSeats: null }));
         setSessionVerified(true);
@@ -193,14 +179,11 @@ export default function GameManagerPage() {
         const res = await api.getLiveGame(code, true); // consume=true clears the queue
         if (!res.is_active) return;
         if (res.remote_events.length === 0) return; // nothing to apply
-        debugLog('HOST poll', 'applying remote events', { events: res.remote_events.map((e) => e.type) });
         setState((prev) => {
           if (!prev) return prev;
-          const next = res.remote_events.reduce((s, ev) => applyEvent(s, ev), prev);
-          debugLog('HOST poll', 'state after events', { lives: next.players.map((p) => `${p.playerName}:${p.life}`) });
-          return next;
+          return res.remote_events.reduce((s, ev) => applyEvent(s, ev), prev);
         });
-      } catch (err) { debugLog('HOST poll', 'error', { err: String(err) }, 'error'); }
+      } catch { /* ignore poll errors */ }
     };
 
     const id = setInterval(poll, 500);
@@ -208,10 +191,7 @@ export default function GameManagerPage() {
     // Immediately consume queue on visibility restore — prevents events sitting
     // unconsumed while the host tab was backgrounded, causing remote to revert.
     const onVisible = () => {
-      if (document.visibilityState === 'visible') {
-        debugLog('HOST poll', 'visibility restored — immediate poll');
-        poll();
-      }
+      if (document.visibilityState === 'visible') poll();
     };
     document.addEventListener('visibilitychange', onVisible);
 

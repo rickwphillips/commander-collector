@@ -8,7 +8,6 @@ import Brightness7Icon from '@mui/icons-material/Brightness7';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import { PlayerPanel } from '../components/PlayerPanel';
 import { api } from '@/lib/api';
-import { debugLog } from '@/lib/debugLog';
 import type { GameManagerState, PlayerState, LiveGameEvent } from '@/lib/types';
 import { applyEvent } from '../remoteTransforms';
 import { useThemeMode } from '@/components/ThemeProvider';
@@ -109,16 +108,12 @@ function RemotePageInner() {
     if (phase !== 'connected' || !code) return;
 
     const poll = async () => {
-      debugLog('REMOTE poll', 'tick', { code });
       try {
         const res = await api.getLiveGame(code); // remote never passes consume=true
-        const dbLives = res.state?.players?.map((p: { playerName: string; life: number }) => `${p.playerName}:${p.life}`);
-        debugLog('REMOTE poll', 'raw DB response', { is_active: res.is_active, dbLives });
         if (!res.is_active) {
           // Require 3 consecutive inactive responses before ending — guards against
           // transient bad responses during server deploys or PHP file uploads
           inactiveCountRef.current++;
-          debugLog('REMOTE poll', 'is_active=false', { count: inactiveCountRef.current }, 'warn');
           if (inactiveCountRef.current >= 3) setPhase('ended');
           return;
         }
@@ -129,15 +124,10 @@ function RemotePageInner() {
         // Skip applying DB state during the grace period — the optimistic
         // update is ahead of the DB until the host processes the event.
         const msSinceEvent = Date.now() - lastEventTimeRef.current;
-        if (msSinceEvent < POST_EVENT_GRACE_MS) {
-          debugLog('REMOTE poll', 'grace period — skipping DB state', { msSinceEvent });
-          return;
-        }
-        debugLog('REMOTE poll', 'applying DB state', { dbLives });
+        if (msSinceEvent < POST_EVENT_GRACE_MS) return;
         setState(res.state);
-      } catch (err) {
+      } catch {
         pollFailCountRef.current++;
-        debugLog('REMOTE poll', 'error', { err: String(err), failCount: pollFailCountRef.current }, 'error');
         if (pollFailCountRef.current >= 8) setShowReconnect(true);
       }
     };
@@ -173,15 +163,12 @@ function RemotePageInner() {
   // applies it to the authoritative state, and writes the merged result.
   const sendEvent = useCallback((eventData: Omit<LiveGameEvent, 'seat' | 'ts'>) => {
     const event: LiveGameEvent = { ...eventData, seat, ts: Date.now() };
-    debugLog('REMOTE send', event.type, eventData);
     // Optimistic update — apply instantly so the panel feels responsive.
     setState((prev) => prev ? applyEvent(prev, event) : prev);
     // Start grace period so the poll doesn't overwrite optimistic state
     // before the host has had time to process and write this event to DB.
     lastEventTimeRef.current = Date.now();
-    api.sendLiveGameEvent(code, event)
-      .then(() => debugLog('REMOTE send', `OK: ${event.type}`))
-      .catch((err) => debugLog('REMOTE send', `FAILED: ${event.type}`, { err: String(err) }, 'error'));
+    api.sendLiveGameEvent(code, event).catch(() => {});
   }, [code, seat]);
 
   // ── Action handlers ───────────────────────────────────────────────────────
