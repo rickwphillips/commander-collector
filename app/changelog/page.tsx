@@ -38,6 +38,21 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.28.0',
+    date: '2026-03-27',
+    title: 'Fluid Typography & Commander Snapshot Overlay',
+    changes: [
+      { type: 'improved', text: 'Text, buttons, and UI elements across the game manager, player panels, and remote panels now scale fluidly across all screen sizes and orientations' },
+      { type: 'changed', text: 'Removed the manual text size toggle — automatic fluid sizing makes it unnecessary' },
+      { type: 'added', text: 'Tapping a commander\'s name in the CMD Damage panel opens a full overlay showing their life total, counters, and all commander damage dealt to other players' },
+      { type: 'improved', text: 'Commander snapshot overlay includes a small art thumbnail for each player in the dealt damage list' },
+      { type: 'improved', text: 'Counter row in the commander snapshot has a translucent gradient background for readability in light and dark mode' },
+      { type: 'improved', text: 'Life total drifts and skews at poison 8+, growing more intense with each counter — 8 floats gently, 9 churns, 10+ boils' },
+      { type: 'improved', text: 'Tapping the commander art thumbnail in the snapshot header closes the overlay' },
+      { type: 'improved', text: 'Seat direction icons in game setup now scale fluidly with viewport size' },
+    ],
+  },
+  {
     version: '1.27.0',
     date: '2026-03-26',
     title: "City's Blessing Flag Crowd & Commander Takeover",

@@ -49,7 +49,6 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   const [winnerCountdown, setWinnerCountdown] = useState<number | null>(null);
   const winnerStateRef = useRef<GameManagerState | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [textSizeMode, setTextSizeMode] = useState<0 | 1 | 2>(0);
   const [lifeKillPrompt, setLifeKillPrompt] = useState<{ targetIdx: number; pendingWinner: PlayerState | null } | null>(null);
   const [poisonKillPrompt, setPoisonKillPrompt] = useState<{ targetIdx: number; newPlayers: PlayerState[] } | null>(null);
   const [monarchTransfer, setMonarchTransfer] = useState<{ fromPos: string | null; toPos: string | null }>({ fromPos: null, toPos: null });
@@ -432,7 +431,6 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
                 elapsedSeconds={firstPlayerSet && currentPlayerIdx === idx ? elapsedSeconds : 0}
                 turnTimerSeconds={turnTimerSeconds}
                 startingLife={startingLife}
-                textSizeMode={textSizeMode}
                 highlightMode={highlightMode}
                 seatCode={state.sessionSeats?.[player.position] ?? undefined}
                 remoteConnected={!!state.remoteCheckins?.[player.position] && Date.now() - (state.remoteCheckins[player.position] ?? 0) < 15000}
@@ -500,8 +498,6 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
           onToggleFullscreen={toggleFullscreen}
           notes={state.notes}
           onNotesChange={(n) => updateState({ notes: n })}
-          textSizeMode={textSizeMode}
-          onCycleTextSizeMode={() => setTextSizeMode((m) => ((m + 1) % 3) as 0 | 1 | 2)}
           highlightMode={highlightMode}
           onToggleHighlightMode={() => setHighlightMode(m => !m)}
           soundEnabled={soundEnabled}
@@ -519,7 +515,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
           px: 2, py: 1.5,
           display: 'flex', alignItems: 'center', gap: 1.5,
         }}>
-          <Typography sx={{ fontWeight: 900, fontSize: 18, flex: 1 }}>
+          <Typography sx={{ fontWeight: 900, fontSize: 'clamp(14px, 2.5dvh, 20px)', flex: 1 }}>
             🏆 {winner.playerName} wins — saving in {winnerCountdown}s
           </Typography>
           <Button size="small" variant="contained" onClick={() => {

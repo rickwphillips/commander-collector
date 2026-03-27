@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Box, Typography, TextField, Button, Stack, CircularProgress, IconButton, Chip } from '@mui/material';
-import TextFieldsIcon from '@mui/icons-material/TextFields';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
@@ -36,7 +35,6 @@ function RemotePageInner() {
   const [seat, setSeat] = useState('');
   const [state, setState] = useState<GameManagerState | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
-  const [textSizeMode, setTextSizeMode] = useState<0 | 1 | 2>(0);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [lifeKillPending, setLifeKillPending] = useState(false);
   const [poisonKillPending, setPoisonKillPending] = useState(false);
@@ -373,7 +371,6 @@ function RemotePageInner() {
         isCurrentPlayer={isMyTurn}
         activePlayerIdx={isMyTurn ? undefined : state.currentPlayerIdx}
         elapsedSeconds={isMyTurn ? elapsedSeconds : 0}
-        textSizeMode={textSizeMode}
         soundEnabled={soundEnabled}
         highlightMode={true}
         remoteMode={true}
@@ -397,19 +394,6 @@ function RemotePageInner() {
           },
         })}
       />
-
-      {/* Text size toggle */}
-      <IconButton
-        onClick={() => setTextSizeMode((m) => ((m + 1) % 3) as 0 | 1 | 2)}
-        sx={{
-          position: 'absolute', bottom: 10, left: 10, zIndex: 10,
-          color: textSizeMode === 2 ? 'warning.main' : textSizeMode === 1 ? 'primary.main' : 'text.secondary',
-          bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.6)',
-          '&:hover': { bgcolor: 'action.hover' },
-        }}
-      >
-        <TextFieldsIcon sx={{ fontSize: textSizeMode === 2 ? 24 : textSizeMode === 1 ? 22 : 20 }} />
-      </IconButton>
 
       {/* Dark mode toggle */}
       <IconButton

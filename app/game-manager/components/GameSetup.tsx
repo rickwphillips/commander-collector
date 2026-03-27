@@ -385,10 +385,10 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
   };
 
   const positionIcons: Record<string, React.ReactElement> = {
-    bottom: <SouthIcon sx={{ fontSize: 40, color: 'primary.main', opacity: 0.85 }} />,
-    top: <NorthIcon sx={{ fontSize: 40, color: 'primary.main', opacity: 0.85 }} />,
-    left: <WestIcon sx={{ fontSize: 40, color: 'primary.main', opacity: 0.85 }} />,
-    right: <EastIcon sx={{ fontSize: 40, color: 'primary.main', opacity: 0.85 }} />,
+    bottom: <SouthIcon sx={{ fontSize: 'clamp(28px, 5dvh, 44px)', color: 'primary.main', opacity: 0.85 }} />,
+    top: <NorthIcon sx={{ fontSize: 'clamp(28px, 5dvh, 44px)', color: 'primary.main', opacity: 0.85 }} />,
+    left: <WestIcon sx={{ fontSize: 'clamp(28px, 5dvh, 44px)', color: 'primary.main', opacity: 0.85 }} />,
+    right: <EastIcon sx={{ fontSize: 'clamp(28px, 5dvh, 44px)', color: 'primary.main', opacity: 0.85 }} />,
   };
 
   const renderSlot = (idx: number) => {

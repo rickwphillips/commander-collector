@@ -76,8 +76,6 @@ interface CenterZoneProps {
   onToggleFullscreen: () => void;
   notes: string;
   onNotesChange: (notes: string) => void;
-  textSizeMode: 0 | 1 | 2;
-  onCycleTextSizeMode: () => void;
   highlightMode: boolean;
   onToggleHighlightMode: () => void;
   soundEnabled: boolean;
@@ -88,9 +86,6 @@ function rollDie(sides: number): number {
   return Math.floor(Math.random() * sides) + 1;
 }
 
-function sizeByTs(ts: 0 | 1 | 2, sm: string, md: string, lg: string): string {
-  return ts === 2 ? lg : ts === 1 ? md : sm;
-}
 
 export function CenterZone({
   turnNumber,
@@ -114,8 +109,6 @@ export function CenterZone({
   onToggleFullscreen,
   notes,
   onNotesChange,
-  textSizeMode,
-  onCycleTextSizeMode,
   highlightMode,
   onToggleHighlightMode,
   soundEnabled,
@@ -336,17 +329,15 @@ export function CenterZone({
         : String(lastEntry.rolls[0]);
     return null;
   }, [lastEntry]);
-  const ts = textSizeMode;
-
-  // dvh/dvw-based sizing so the center tile scales across phone, tablet, and desktop
-  const btnMainSize   = sizeByTs(ts, 'clamp(80px, min(14dvh, 12dvw), 150px)', 'clamp(84px, min(15dvh, 13dvw), 160px)', 'clamp(90px, min(16dvh, 14dvw), 175px)');
-  const btnRollSize   = sizeByTs(ts, 'clamp(58px, min(11dvh, 9dvw), 110px)',  'clamp(62px, min(12dvh, 10dvw), 120px)', 'clamp(68px, min(13dvh, 11dvw), 135px)');
-  const btnChooseSize = sizeByTs(ts, 'clamp(44px, min(8dvh, 7dvw), 80px)',    'clamp(48px, min(8.5dvh, 7.5dvw), 90px)', 'clamp(52px, min(9dvh, 8dvw), 100px)');
-  const fsTurnNum     = sizeByTs(ts, 'clamp(18px, 4dvh, 36px)',    'clamp(20px, 4.5dvh, 40px)',  'clamp(22px, 5dvh, 46px)');
-  const fsCmdName     = sizeByTs(ts, 'clamp(10px, 1.7dvh, 16px)',  'clamp(11px, 1.8dvh, 18px)',  'clamp(12px, 2dvh, 20px)');
-  const fsPlayerName  = sizeByTs(ts, 'clamp(8px, 1.5dvh, 13px)',   'clamp(9px, 1.6dvh, 15px)',   'clamp(10px, 1.8dvh, 17px)');
-  const fsBigName     = sizeByTs(ts, 'clamp(12px, 2.5dvh, 22px)',  'clamp(13px, 2.7dvh, 25px)',  'clamp(14px, 3dvh, 28px)');
-  const fsGoesFirst   = sizeByTs(ts, 'clamp(10px, 2dvh, 18px)',    'clamp(11px, 2.2dvh, 20px)',  'clamp(12px, 2.5dvh, 22px)');
+  // dvh/dvw-based fluid sizing — scales smoothly across all layouts and DPIs
+  const btnMainSize   = 'clamp(80px, min(15dvh, 13dvw), 175px)';
+  const btnRollSize   = 'clamp(58px, min(12dvh, 10dvw), 135px)';
+  const btnChooseSize = 'clamp(44px, min(8.5dvh, 7.5dvw), 100px)';
+  const fsTurnNum     = 'clamp(18px, 4.5dvh, 46px)';
+  const fsCmdName     = 'clamp(10px, 1.85dvh, 20px)';
+  const fsPlayerName  = 'clamp(8px, 1.65dvh, 17px)';
+  const fsBigName     = 'clamp(12px, 2.75dvh, 28px)';
+  const fsGoesFirst   = 'clamp(10px, 2.25dvh, 22px)';
   const rotatedBoxMaxWidth = 'clamp(70px, 14dvh, 120px)';
 
   const remaining = turnTimerSeconds > 0 ? Math.max(0, turnTimerSeconds - elapsedSeconds) : null;
@@ -369,7 +360,7 @@ export function CenterZone({
           <React.Fragment key={i}>
             {i > 0 && separator}
             <Box sx={{ textAlign: 'center', height: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
-              <Typography sx={{ fontSize: 9, color: nameColor, lineHeight: 1, mb: 0.25 }}>{labels ? labels[i] : i + 1}</Typography>
+              <Typography sx={{ fontSize: 'clamp(7px, 1.3dvh, 11px)', color: nameColor, lineHeight: 1, mb: 0.25 }}>{labels ? labels[i] : i + 1}</Typography>
               {scoreNode}
             </Box>
           </React.Fragment>
@@ -430,7 +421,7 @@ export function CenterZone({
                   onPointerUp={() => { if (lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; } }}
                   onPointerLeave={() => { if (lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; } }}
                   onPointerCancel={() => { if (lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; } }}
-                  sx={{ width: btnMainSize, height: btnMainSize, fontSize: ts === 2 ? 'clamp(16px, 3.5dvh, 32px)' : ts === 1 ? 'clamp(14px, 3dvh, 28px)' : 'clamp(12px, 2.7dvh, 24px)', fontWeight: 700, borderRadius: 2, lineHeight: 1.2, flexShrink: 0, ...(pulseSpeed !== null && { animation: `nextTurnPulse ${pulseSpeed}s ease-in-out infinite`, '@keyframes nextTurnPulse': { '0%, 100%': { boxShadow: '0 0 0 0 rgba(255,100,50,0)', borderColor: 'primary.main' }, '50%': { boxShadow: `0 0 12px 4px rgba(255,80,30,${remaining! <= 10 ? 0.9 : 0.5})`, borderColor: 'error.main' } } }) }}
+                  sx={{ width: btnMainSize, height: btnMainSize, fontSize: 'clamp(12px, 3dvh, 32px)', fontWeight: 700, borderRadius: 2, lineHeight: 1.2, flexShrink: 0, ...(pulseSpeed !== null && { animation: `nextTurnPulse ${pulseSpeed}s ease-in-out infinite`, '@keyframes nextTurnPulse': { '0%, 100%': { boxShadow: '0 0 0 0 rgba(255,100,50,0)', borderColor: 'primary.main' }, '50%': { boxShadow: `0 0 12px 4px rgba(255,80,30,${remaining! <= 10 ? 0.9 : 0.5})`, borderColor: 'error.main' } } }) }}
                 >
                   Next<br />Turn
                 </Button>
@@ -532,19 +523,6 @@ export function CenterZone({
           >
             {isFullscreen ? <FullscreenExitIcon sx={{ fontSize: 20 }} /> : <FullscreenIcon sx={{ fontSize: 20 }} />}
           </IconButton>
-
-          {/* Text size cycle toggle (0=normal, 1=large, 2=xl) */}
-          <Tooltip title={textSizeMode === 0 ? 'Normal Text' : textSizeMode === 1 ? 'Large Text' : 'Extra-Large Text'} placement="top">
-            <IconButton
-              onClick={onCycleTextSizeMode}
-              sx={{
-                position: 'absolute', bottom: 6, left: 6,
-                color: textSizeMode === 2 ? 'warning.main' : textSizeMode === 1 ? 'primary.main' : 'text.secondary',
-              }}
-            >
-              <TextFieldsIcon sx={{ fontSize: textSizeMode === 2 ? 24 : textSizeMode === 1 ? 22 : 20 }} />
-            </IconButton>
-          </Tooltip>
 
           {/* Settings toggle */}
           <IconButton
@@ -839,7 +817,7 @@ export function CenterZone({
                       setDiceOpen(false);
                     }
                   }}
-                  sx={{ fontSize: 12, py: 0.75 }}
+                  sx={{ fontSize: 12, py: 'clamp(6px, 1.4dvh, 13px)' }}
                 >
                   {rollOffState.phase === 'result' ? `${rollOffState.winnerName} goes first` : 'Accept'}
                 </Button>
@@ -852,19 +830,19 @@ export function CenterZone({
                       startRollOff(rollOffState.originalIndices);
                     }
                   }}
-                  sx={{ fontSize: 12, py: 0.75 }}
+                  sx={{ fontSize: 12, py: 'clamp(6px, 1.4dvh, 13px)' }}
                 >
                   Roll Again
                 </Button>
               </Stack>
             ) : (
               <Stack direction="row" alignItems="center" spacing={0.5} sx={{ width: '100%' }}>
-                <Button variant="outlined" onClick={() => setDiceCount((c) => Math.max(1, c - 1))} sx={{ minWidth: 28, px: 0, fontSize: 16, py: 0.5, flexShrink: 0 }}>−</Button>
+                <Button variant="outlined" onClick={() => setDiceCount((c) => Math.max(1, c - 1))} sx={{ minWidth: 28, px: 0, fontSize: 16, py: 'clamp(5px, 1.2dvh, 11px)', flexShrink: 0 }}>−</Button>
                 <Typography sx={{ fontWeight: 700, fontSize: 14, minWidth: 18, textAlign: 'center', flexShrink: 0 }}>{diceCount}</Typography>
-                <Button variant="outlined" onClick={() => setDiceCount((c) => Math.min(20, c + 1))} sx={{ minWidth: 28, px: 0, fontSize: 16, py: 0.5, flexShrink: 0 }}>+</Button>
-                <Button variant="outlined" fullWidth onClick={() => addRoll('d6', 6)} startIcon={lastRolledType === 'd6' ? null : <CasinoIcon sx={{ fontSize: 14 }} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'd6' ? 900 : 400, py: 0.5, minWidth: 0, ...(lastRolledType === 'd6' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'd6' && lastRolledDisplay ? `total ${lastRolledDisplay}` : 'd6'}</Button>
-                <Button variant="outlined" fullWidth onClick={() => addRoll('d20', 20)} startIcon={lastRolledType === 'd20' ? null : <D20Icon size={14} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'd20' ? 900 : 400, py: 0.5, minWidth: 0, ...(lastRolledType === 'd20' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'd20' && lastRolledDisplay ? `total ${lastRolledDisplay}` : 'd20'}</Button>
-                <Button variant="outlined" fullWidth onClick={() => addRoll('coin', null)} startIcon={lastRolledType === 'coin' ? null : <TollIcon sx={{ fontSize: 14 }} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'coin' ? 900 : 400, py: 0.5, minWidth: 0, ...(lastRolledType === 'coin' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'coin' && lastRolledDisplay ? lastRolledDisplay : 'Flip'}</Button>
+                <Button variant="outlined" onClick={() => setDiceCount((c) => Math.min(20, c + 1))} sx={{ minWidth: 28, px: 0, fontSize: 16, py: 'clamp(5px, 1.2dvh, 11px)', flexShrink: 0 }}>+</Button>
+                <Button variant="outlined" fullWidth onClick={() => addRoll('d6', 6)} startIcon={lastRolledType === 'd6' ? null : <CasinoIcon sx={{ fontSize: 14 }} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'd6' ? 900 : 400, py: 'clamp(5px, 1.2dvh, 11px)', minWidth: 0, ...(lastRolledType === 'd6' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'd6' && lastRolledDisplay ? `total ${lastRolledDisplay}` : 'd6'}</Button>
+                <Button variant="outlined" fullWidth onClick={() => addRoll('d20', 20)} startIcon={lastRolledType === 'd20' ? null : <D20Icon size={14} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'd20' ? 900 : 400, py: 'clamp(5px, 1.2dvh, 11px)', minWidth: 0, ...(lastRolledType === 'd20' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'd20' && lastRolledDisplay ? `total ${lastRolledDisplay}` : 'd20'}</Button>
+                <Button variant="outlined" fullWidth onClick={() => addRoll('coin', null)} startIcon={lastRolledType === 'coin' ? null : <TollIcon sx={{ fontSize: 14 }} />} sx={{ fontSize: 11, fontWeight: lastRolledType === 'coin' ? 900 : 400, py: 'clamp(5px, 1.2dvh, 11px)', minWidth: 0, ...(lastRolledType === 'coin' && { color: 'warning.main', borderColor: 'warning.main' }) }}>{lastRolledType === 'coin' && lastRolledDisplay ? lastRolledDisplay : 'Flip'}</Button>
                 {history.length > 0 && (
                   <Button variant="text" size="small" onClick={() => setHistory([])} sx={{ fontSize: 10, px: 0.5, color: 'text.disabled', flexShrink: 0 }}>Clear</Button>
                 )}

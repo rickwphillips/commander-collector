@@ -17,6 +17,7 @@ import AddIcon from '@mui/icons-material/Add';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import QrCodeIcon from '@mui/icons-material/QrCode';
 import SmartphoneIcon from '@mui/icons-material/Smartphone';
+import CloseIcon from '@mui/icons-material/Close';
 
 const FW_DIRS: [number, number][] = [
   [0, -58], [41, -41], [58, 0], [41, 41], [0, 58], [-41, 41], [-58, 0], [-41, -41],
@@ -315,7 +316,6 @@ interface PlayerPanelProps {
   elapsedSeconds?: number;
   turnTimerSeconds?: number;
   startingLife?: number;
-  textSizeMode?: 0 | 1 | 2;
   monarchTransfer?: { fromPos: string | null; toPos: string | null };
   highlightMode?: boolean;
   remoteMode?: boolean;
@@ -445,7 +445,6 @@ export function PlayerPanel({
   elapsedSeconds = 0,
   turnTimerSeconds = 300,
   startingLife = 40,
-  textSizeMode = 0,
   monarchTransfer = { fromPos: null, toPos: null },
   highlightMode = false,
   remoteMode = false,
@@ -457,7 +456,30 @@ export function PlayerPanel({
   usePoisonSound(player.poison, player.isEliminated, soundEnabled);
   const { playCitysBlessing } = useSounds(soundEnabled, player.hasCitysBlessing);
 
-  const ts = textSizeMode;
+  // ── Fluid size tokens ─────────────────────────────────────────────────────
+  // All text and icon sizes scale with viewport height (dvh) so panels read
+  // correctly at 2-player (large panels), 4-player (small panels), and remote.
+  // Remote mode uses dvmax (longer viewport dimension) so landscape doesn't hit dvh minimums.
+  // Board mode uses dvh because panels are rotated 90° and share the viewport.
+  const fsPlayerName   = remoteMode ? 'clamp(13px, 2.0dvmax, 26px)'  : 'clamp(9px,  1.8dvh, 15px)';
+  const fsDeckName     = remoteMode ? 'clamp(10px, 1.5dvmax, 20px)'  : 'clamp(7px,  1.3dvh, 11px)';
+  const fsPassBtn      = remoteMode ? 'clamp(13px, 1.8dvmax, 22px)'  : 'clamp(9px,  1.6dvh, 13px)';
+  const fsHeaderIcon   = remoteMode ? 'clamp(24px, 3.8dvmax, 48px)'  : 'clamp(16px, 3.0dvh, 26px)';
+  const fsSmallIcon    = remoteMode ? 'clamp(16px, 2.4dvmax, 30px)'  : 'clamp(11px, 2.0dvh, 16px)';
+  const fsMenuTrigger  = remoteMode ? 'clamp(20px, 2.8dvmax, 36px)'  : 'clamp(14px, 2.2dvh, 20px)';
+  const fsSectionLabel = remoteMode ? 'clamp(12px, 1.8dvmax, 24px)'  : 'clamp(8px,  1.4dvh, 13px)';
+  const fsSourceName   = remoteMode ? 'clamp(13px, 2.0dvmax, 28px)'  : 'clamp(10px, 1.9dvh, 18px)';
+  const fsStatBadge    = remoteMode ? 'clamp(10px, 1.4dvmax, 18px)'  : 'clamp(8px,  1.4dvh, 12px)';
+  const fsCounterLabel = remoteMode ? 'clamp(14px, 2.4dvmax, 32px)'  : 'clamp(10px, 1.9dvh, 18px)';
+  const fsCounterValue = remoteMode ? 'clamp(20px, 3.5dvmax, 44px)'  : 'clamp(14px, 2.8dvh, 24px)';
+  const fsCounterBtn   = remoteMode ? 'clamp(26px, 4.2dvmax, 52px)'  : 'clamp(17px, 3.2dvh, 26px)';
+  const fsLifeBtn      = remoteMode ? 'clamp(40px, 8.5dvmax, 90px)'  : 'clamp(28px, 7.0dvh, 56px)';
+  const fsKillPrompt   = remoteMode ? 'clamp(15px, 2.4dvmax, 28px)'  : 'clamp(11px, 2.0dvh, 15px)';
+  const artHeight      = remoteMode ? 'clamp(40px, 7.5dvmax, 80px)'  : 'clamp(24px, 4.5dvh, 42px)';
+  const cmdBtnWidth    = remoteMode ? 'clamp(44px, 6.0dvmax, 70px)'  : 'clamp(28px, 5.0dvh, 38px)';
+  const cmdBtnHeight   = remoteMode ? 'clamp(40px, 5.5dvmax, 64px)'  : 'clamp(26px, 4.5dvh, 36px)';
+  const valColWidth    = remoteMode ? 'clamp(32px, 6.0dvmax, 58px)'  : 'clamp(24px, 4.5dvh, 36px)';
+  // ──────────────────────────────────────────────────────────────────────────
   const POSITION_ROTATION = { top: '180deg', left: '90deg', right: '270deg', bottom: '0deg' } as const;
   const POSITION_HEADER_PLACEMENT = { top: 'top', left: 'left', right: 'left', bottom: 'bottom' } as const;
   const POSITION_SNAPSHOT_PLACEMENT = { bottom: 'top', top: 'bottom', left: 'right', right: 'left' } as const;
@@ -705,6 +727,18 @@ export function PlayerPanel({
     20%  { text-shadow: 0 0 32px rgba(220,0,0,1), 0 0 64px rgba(180,0,0,0.7); filter: brightness(1.8); }
     100% { text-shadow: 0 0 0px rgba(180,0,0,0); filter: brightness(1); }
   `, []);
+
+  // Poison boil — life total drifts like it's floating in churning water (starts at 8 poison)
+  const poisonBoilAmp = player.poison >= 10 ? 5 : player.poison === 9 ? 3.8 : player.poison === 8 ? 1.5 : 0;
+  const poisonBoilSkew = Math.min(poisonBoilAmp * 0.6, 2.5);
+  const poisonBoilAnim = useMemo(() => player.poison >= 8 ? keyframes`
+    0%   { transform: translate(0, 0) skew(0deg, 0deg); }
+    20%  { transform: translate(${poisonBoilAmp * 0.5}px, ${-poisonBoilAmp}px) skew(${poisonBoilSkew}deg, ${-poisonBoilSkew * 0.4}deg); }
+    45%  { transform: translate(${-poisonBoilAmp}px, ${poisonBoilAmp * 0.6}px) skew(${-poisonBoilSkew * 0.7}deg, ${poisonBoilSkew * 0.5}deg); }
+    70%  { transform: translate(${poisonBoilAmp * 0.7}px, ${poisonBoilAmp * 0.4}px) skew(${poisonBoilSkew * 0.5}deg, ${-poisonBoilSkew * 0.3}deg); }
+    100% { transform: translate(0, 0) skew(0deg, 0deg); }
+  ` : null, [player.poison, poisonBoilAmp, poisonBoilSkew]);
+  const poisonBoilDuration = player.poison >= 10 ? 2.0 : player.poison >= 9 ? 2.5 : 5.0;
 
   const lostRatio = player.life <= 0 ? 1 : Math.max(0, Math.min((startingLife - player.life) / startingLife, 1));
 
@@ -1435,7 +1469,7 @@ export function PlayerPanel({
       {/* Life kill attribution overlay */}
       {lifeKillOpponents && onLifeKillSelect && (
         <Box sx={{ position: 'absolute', inset: 0, zIndex: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, bgcolor: 'rgba(0,0,0,0.72)', px: 2 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 15 : 13, color: '#fff', mb: 0.5, textAlign: 'center' }}>
+          <Typography sx={{ fontWeight: 700, fontSize: fsKillPrompt, color: '#fff', mb: 0.5, textAlign: 'center' }}>
             Who brought {player.playerName} to 0?
           </Typography>
           {lifeKillOpponents.map((opp) => (
@@ -1444,7 +1478,7 @@ export function PlayerPanel({
               {opp.name}
             </Button>
           ))}
-          <Button onClick={() => onLifeKillSelect(null)} sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, mt: 0.5 }}>
+          <Button onClick={() => onLifeKillSelect(null)} sx={{ color: 'rgba(255,255,255,0.5)', fontSize: fsKillPrompt, mt: 0.5 }}>
             Skip
           </Button>
         </Box>
@@ -1453,7 +1487,7 @@ export function PlayerPanel({
       {/* Poison kill attribution overlay */}
       {poisonKillOpponents && onPoisonKillSelect && (
         <Box sx={{ position: 'absolute', inset: 0, zIndex: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, bgcolor: 'rgba(0,40,0,0.78)', px: 2 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 15 : 13, color: '#7fff7f', mb: 0.5, textAlign: 'center' }}>
+          <Typography sx={{ fontWeight: 700, fontSize: fsKillPrompt, color: '#7fff7f', mb: 0.5, textAlign: 'center' }}>
             Who poisoned {player.playerName}?
           </Typography>
           {poisonKillOpponents.map((opp) => (
@@ -1462,7 +1496,7 @@ export function PlayerPanel({
               {opp.name}
             </Button>
           ))}
-          <Button onClick={() => onPoisonKillSelect(null)} sx={{ color: 'rgba(100,255,100,0.4)', fontSize: 12, mt: 0.5 }}>
+          <Button onClick={() => onPoisonKillSelect(null)} sx={{ color: 'rgba(100,255,100,0.4)', fontSize: fsKillPrompt, mt: 0.5 }}>
             Skip
           </Button>
         </Box>
@@ -1488,7 +1522,7 @@ export function PlayerPanel({
         <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0, zIndex: 1 }}>
           {player.commander.artCropUrl && (
             <Box component="img" src={player.commander.artCropUrl} alt={player.commander.name}
-              sx={{ height: ts === 2 ? 42 : ts === 1 ? 36 : 32, width: 'auto', borderRadius: 0.5, flexShrink: 0 }} />
+              sx={{ height: artHeight, width: 'auto', borderRadius: 0.5, flexShrink: 0 }} />
           )}
           {player.commanderTax > 0 && (
             <Tooltip title={`Commander Tax: cast ${player.commanderTax}× (+${player.commanderTax * 2} generic mana)`} placement="bottom" arrow>
@@ -1594,7 +1628,7 @@ export function PlayerPanel({
                 }),
               }}
             >
-              <Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 13 : 12, fontWeight: 700, position: 'relative', zIndex: 1, color: 'primary.main', whiteSpace: 'nowrap', lineHeight: 1.4 }}>
+              <Typography sx={{ fontSize: fsPassBtn, fontWeight: 700, position: 'relative', zIndex: 1, color: 'primary.main', whiteSpace: 'nowrap', lineHeight: 1.4 }}>
                 PASS
               </Typography>
             </Box>
@@ -1606,11 +1640,11 @@ export function PlayerPanel({
           <Typography
             noWrap
             onClick={seatCode ? () => setQrOpen(true) : undefined}
-            sx={{ fontWeight: 700, fontSize: ts === 2 ? 16 : ts === 1 ? 14 : 12, lineHeight: 1.2, pointerEvents: seatCode ? 'auto' : 'none', cursor: seatCode ? 'pointer' : 'default' }}
+            sx={{ fontWeight: 700, fontSize: fsPlayerName, lineHeight: 1.2, pointerEvents: seatCode ? 'auto' : 'none', cursor: seatCode ? 'pointer' : 'default' }}
           >
             {player.playerName}
           </Typography>
-          <Typography noWrap sx={{ fontSize: ts === 2 ? 13 : ts === 1 ? 11 : 9, lineHeight: 1.2, color: 'text.secondary', pointerEvents: 'none' }}>
+          <Typography noWrap sx={{ fontSize: fsDeckName, lineHeight: 1.2, color: 'text.secondary', pointerEvents: 'none' }}>
             {player.deckName} · {player.commander.name}{player.partner ? ` / ${player.partner.name}` : ''}
           </Typography>
         </Box>
@@ -1625,7 +1659,7 @@ export function PlayerPanel({
                     onPointerUp={cancelLongPress}
                     onPointerLeave={cancelLongPress}
                     onPointerCancel={cancelLongPress}
-                    sx={{ fontSize: ts === 2 ? 26 : ts === 1 ? 24 : 22, color: '#DAA520', cursor: 'pointer', animation: 'crownShimmer 2s ease-in-out infinite', '@keyframes crownShimmer': { '0%, 100%': { filter: 'drop-shadow(0 0 2px #DAA520) brightness(1)' }, '50%': { filter: 'drop-shadow(0 0 7px #FFD700) brightness(1.5)' } } }}
+                    sx={{ fontSize: fsHeaderIcon, color: '#DAA520', cursor: 'pointer', animation: 'crownShimmer 2s ease-in-out infinite', '@keyframes crownShimmer': { '0%, 100%': { filter: 'drop-shadow(0 0 2px #DAA520) brightness(1)' }, '50%': { filter: 'drop-shadow(0 0 7px #FFD700) brightness(1.5)' } } }}
                   />
                 </Tooltip>
               )}
@@ -1637,7 +1671,7 @@ export function PlayerPanel({
                     onPointerUp={cancelLongPress}
                     onPointerLeave={cancelLongPress}
                     onPointerCancel={cancelLongPress}
-                    sx={{ fontSize: ts === 2 ? 26 : ts === 1 ? 24 : 22, color: 'text.disabled', cursor: 'pointer', opacity: 0.4 }}
+                    sx={{ fontSize: fsHeaderIcon, color: 'text.disabled', cursor: 'pointer', opacity: 0.4 }}
                   />
                 </Tooltip>
               )}
@@ -1649,7 +1683,7 @@ export function PlayerPanel({
                     onPointerUp={cancelLongPress}
                     onPointerLeave={cancelLongPress}
                     onPointerCancel={cancelLongPress}
-                    sx={{ fontSize: ts === 2 ? 26 : ts === 1 ? 24 : 22, color: '#4FC3F7', cursor: 'pointer' }}
+                    sx={{ fontSize: fsHeaderIcon, color: '#4FC3F7', cursor: 'pointer' }}
                   />
                 </Tooltip>
               )}
@@ -1661,7 +1695,7 @@ export function PlayerPanel({
                     onPointerUp={cancelLongPress}
                     onPointerLeave={cancelLongPress}
                     onPointerCancel={cancelLongPress}
-                    sx={{ fontSize: ts === 2 ? 26 : ts === 1 ? 24 : 22, color: 'text.disabled', cursor: 'pointer', opacity: 0.4 }}
+                    sx={{ fontSize: fsHeaderIcon, color: 'text.disabled', cursor: 'pointer', opacity: 0.4 }}
                   />
                 </Tooltip>
               )}
@@ -1674,17 +1708,17 @@ export function PlayerPanel({
                     onPointerUp={cancelLongPress}
                     onPointerLeave={cancelLongPress}
                     onPointerCancel={cancelLongPress}
-                    sx={{ fontSize: ts === 2 ? 26 : ts === 1 ? 24 : 22, cursor: 'pointer' }}
+                    sx={{ fontSize: fsHeaderIcon, cursor: 'pointer' }}
                   />
                 </Tooltip>
               )}
               {/* Remote connected indicator */}
               {remoteConnected && (
-                <SmartphoneIcon sx={{ fontSize: ts === 2 ? 16 : 14, color: 'success.main', animation: 'remotePulse 2s ease-in-out infinite', '@keyframes remotePulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.4 } }, flexShrink: 0 }} />
+                <SmartphoneIcon sx={{ fontSize: fsSmallIcon, color: 'success.main', animation: 'remotePulse 2s ease-in-out infinite', '@keyframes remotePulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.4 } }, flexShrink: 0 }} />
               )}
               {/* Submenu trigger */}
               <IconButton size="small" onClick={() => setStateMenuOpen(o => !o)} onPointerDown={(e) => e.stopPropagation()} sx={{ p: 0.5, color: stateMenuOpen ? 'primary.main' : 'text.secondary' }}>
-                <AddIcon sx={{ fontSize: ts === 2 ? 20 : 18, transition: 'transform 0.2s ease', transform: stateMenuOpen ? 'rotate(45deg)' : 'none' }} />
+                <AddIcon sx={{ fontSize: fsMenuTrigger, transition: 'transform 0.2s ease', transform: stateMenuOpen ? 'rotate(45deg)' : 'none' }} />
               </IconButton>
             </>
           </Stack>
@@ -1803,13 +1837,13 @@ export function PlayerPanel({
           width: '33%',
           flexShrink: 0,
           borderRight: (theme) => `1px solid ${theme.palette.divider}`,
-          px: ts === 2 ? 0.1 : ts === 1 ? 0.25 : 0.5,
-          py: ts === 2 ? 0 : ts === 1 ? 0.1 : 0.25,
+          px: remoteMode ? 1 : 0.5,
+          py: remoteMode ? 1 : 0.25,
           display: 'grid',
-          gridTemplateColumns: `1fr ${ts === 2 ? 38 : 32}px ${ts === 2 ? 38 : 30}px ${ts === 2 ? 38 : 32}px`,
-          alignContent: 'center',
+          gridTemplateColumns: `1fr ${cmdBtnWidth} ${valColWidth} ${cmdBtnWidth}`,
+          alignContent: remoteMode ? 'start' : 'center',
           alignItems: 'center',
-          rowGap: ts > 0 ? 0 : 0.1,
+          rowGap: remoteMode ? 0.5 : 0.1,
           overflowY: 'auto',
           overflow: 'hidden',
           position: 'relative',
@@ -1836,11 +1870,11 @@ export function PlayerPanel({
             }} />
           )}
           {/* Title row — spans full width, same pattern as Counters */}
-          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ gridColumn: '1 / -1', mb: ts === 2 ? 0 : ts === 1 ? 0.1 : 0.25 }}>
-            <Typography sx={{ fontSize: ts === 2 ? 15 : ts === 1 ? 13 : 11, fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5, flex: 1 }}>
-              CMD Damage{isCmdDmgHigh && <Typography component="span" sx={{ fontSize: ts === 2 ? 15 : ts === 1 ? 13 : 11, color: 'error.main', ml: 0.5 }}>⚠</Typography>}
+          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ gridColumn: '1 / -1', mb: 0.25 }}>
+            <Typography sx={{ fontSize: fsSectionLabel, fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5, flex: 1 }}>
+              CMD Damage{isCmdDmgHigh && <Typography component="span" sx={{ fontSize: fsSectionLabel, color: 'error.main', ml: 0.5 }}>⚠</Typography>}
             </Typography>
-            <Button size="small" variant={cmdDmgShowPlayer ? 'contained' : 'outlined'} onClick={() => setCmdDmgShowPlayer(p => !p)} sx={{ minWidth: 0, px: 0.75, py: 0, fontSize: ts === 2 ? 11 : 9, lineHeight: 1.4, flexShrink: 0 }}>
+            <Button size="small" variant={cmdDmgShowPlayer ? 'contained' : 'outlined'} onClick={() => setCmdDmgShowPlayer(p => !p)} sx={{ minWidth: 0, px: remoteMode ? 1.25 : 0.75, py: remoteMode ? 0.5 : 0, fontSize: remoteMode ? fsSectionLabel : 'clamp(7px, 1.2dvh, 11px)', lineHeight: 1.4, flexShrink: 0 }}>
               {cmdDmgShowPlayer ? 'Player' : 'CMD'}
             </Button>
           </Stack>
@@ -1849,19 +1883,17 @@ export function PlayerPanel({
             const sourceEliminated = source.isEliminated;
             const rows = [
               <Box key={`${sourceIdx}-name`} sx={{ overflow: 'hidden', pt: 0 }}>
-                <Tooltip title={renderSourceSnapshot(source, sourceIdx)} placement={snapshotPlacement} componentsProps={{ tooltip: { sx: { bgcolor: 'background.paper', border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, p: 0, maxWidth: 220, boxShadow: 8, color: 'text.primary' } } }} open={openSnapshotKey === `${sourceIdx}-snap`} onClose={() => setOpenSnapshotKey(null)} disableHoverListener disableFocusListener disableTouchListener>
                 <Stack direction="row" alignItems="center" spacing={0.5} sx={{ overflow: 'hidden', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setOpenSnapshotKey(k => k === `${sourceIdx}-snap` ? null : `${sourceIdx}-snap`); }}>
                   {activePlayerIdx === sourceIdx && (
                     <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0, boxShadow: '0 0 4px 1px rgba(var(--mui-palette-primary-mainChannel) / 0.7)' }} />
                   )}
-                  <Typography sx={{ fontSize: ts === 2 ? 19 : ts === 1 ? 16 : 14, color: sourceEliminated ? 'text.disabled' : activePlayerIdx === sourceIdx ? 'primary.main' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', fontWeight: activePlayerIdx === sourceIdx ? 700 : 400 }}>
+                  <Typography sx={{ fontSize: fsSourceName, color: sourceEliminated ? 'text.disabled' : activePlayerIdx === sourceIdx ? 'primary.main' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', fontWeight: activePlayerIdx === sourceIdx ? 700 : 400 }}>
                     {cmdDmgShowPlayer ? source.playerName : source.commander.name}
                   </Typography>
                 </Stack>
-                </Tooltip>
-                <Stack direction="row" spacing={0.5} sx={{ mt: ts > 0 ? 0 : 0.15, flexWrap: 'wrap', alignItems: 'center' }}>
+                <Stack direction="row" spacing={0.5} sx={{ mt: 0.15, flexWrap: 'wrap', alignItems: 'center' }}>
                   {source.isMonarch && <Tooltip title="Monarch" placement="top" slotProps={ttSlotProps} arrow><CrownIcon sx={{
-                    fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10,
+                    fontSize: fsStatBadge,
                     color: '#DAA520',
                     animation: 'crownShimmer 2s ease-in-out infinite',
                     '@keyframes crownShimmer': {
@@ -1869,71 +1901,157 @@ export function PlayerPanel({
                       '50%': { filter: 'drop-shadow(0 0 7px #FFD700) brightness(1.5)' },
                     },
                   }} /></Tooltip>}
-                  {source.hasCitysBlessing && <Tooltip title="City's Blessing" placement="top" slotProps={ttSlotProps} arrow><span><CityIcon active sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10 }} /></span></Tooltip>}
-                  {source.hasInitiative && <Tooltip title="Initiative" placement="top" slotProps={ttSlotProps} arrow><InitiativeIcon sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, color: '#4FC3F7' }} /></Tooltip>}
-                  <Tooltip title={`Life: ${source.life}`} placement="top" slotProps={ttSlotProps} arrow><Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: lifeColor(source.life) || 'primary.main', lineHeight: 1 }}>♥{source.life}</Typography></Tooltip>
-                  {source.poison > 0 && <Tooltip title={`Poison: ${source.poison}`} placement="top" slotProps={ttSlotProps} arrow><Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: source.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1 }}>☠{source.poison}</Typography></Tooltip>}
-                  {source.energy > 0 && <Tooltip title={`Energy: ${source.energy}`} placement="top" slotProps={ttSlotProps} arrow><Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: '#4FC8FF', lineHeight: 1 }}>⚡{source.energy}</Typography></Tooltip>}
-                  {source.experience > 0 && <Tooltip title={`Experience: ${source.experience}`} placement="top" slotProps={ttSlotProps} arrow><Stack direction="row" alignItems="center" spacing={0.25}><Box sx={{ bgcolor: 'background.paper', display: 'inline-flex' }}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: ts === 2 ? 14 : ts === 1 ? 12 : 10, height: ts === 2 ? 14 : ts === 1 ? 12 : 10, objectFit: 'contain', mixBlendMode: 'multiply', transition: 'width 0.2s ease, height 0.2s ease' }} /></Box><Typography sx={{ fontSize: ts === 2 ? 14 : ts === 1 ? 12 : 10, fontWeight: 800, color: '#DAA520', lineHeight: 1 }}>{source.experience}</Typography></Stack></Tooltip>}
+                  {source.hasCitysBlessing && <Tooltip title="City's Blessing" placement="top" slotProps={ttSlotProps} arrow><span><CityIcon active sx={{ fontSize: fsStatBadge }} /></span></Tooltip>}
+                  {source.hasInitiative && <Tooltip title="Initiative" placement="top" slotProps={ttSlotProps} arrow><InitiativeIcon sx={{ fontSize: fsStatBadge, color: '#4FC3F7' }} /></Tooltip>}
+                  <Tooltip title={`Life: ${source.life}`} placement="top" slotProps={ttSlotProps} arrow><Typography sx={{ fontSize: fsStatBadge, fontWeight: 800, color: lifeColor(source.life) || 'primary.main', lineHeight: 1 }}>♥{source.life}</Typography></Tooltip>
+                  {source.poison > 0 && <Tooltip title={`Poison: ${source.poison}`} placement="top" slotProps={ttSlotProps} arrow><Typography sx={{ fontSize: fsStatBadge, fontWeight: 800, color: source.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1 }}>☠{source.poison}</Typography></Tooltip>}
+                  {source.energy > 0 && <Tooltip title={`Energy: ${source.energy}`} placement="top" slotProps={ttSlotProps} arrow><Typography sx={{ fontSize: fsStatBadge, fontWeight: 800, color: '#4FC8FF', lineHeight: 1 }}>⚡{source.energy}</Typography></Tooltip>}
+                  {source.experience > 0 && <Tooltip title={`Experience: ${source.experience}`} placement="top" slotProps={ttSlotProps} arrow><Stack direction="row" alignItems="center" spacing={0.25}><Box sx={{ bgcolor: 'background.paper', display: 'inline-flex' }}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: fsStatBadge, height: fsStatBadge, objectFit: 'contain', mixBlendMode: 'multiply', transition: 'width 0.2s ease, height 0.2s ease' }} /></Box><Typography sx={{ fontSize: fsStatBadge, fontWeight: 800, color: '#DAA520', lineHeight: 1 }}>{source.experience}</Typography></Stack></Tooltip>}
                 </Stack>
               </Box>,
               <Tooltip key={`${sourceIdx}-dec`} open={lpKey === `${sourceIdx}-dec`} title="-5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-                <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, false, -1))} onPointerDown={() => startLongPress(`${sourceIdx}-dec`, () => handleCmdDmgChange(playerIdx, sourceIdx, false, -5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: ts === 2 ? 38 : 32, minHeight: ts === 2 ? 24 : ts === 1 ? 28 : 32, transition: 'min-height 0.2s ease' }}>
-                  <Typography sx={{ fontSize: ts === 2 ? 28 : ts === 1 ? 24 : 22, fontWeight: 700, lineHeight: 1 }}>−</Typography>
+                <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, false, -1))} onPointerDown={() => startLongPress(`${sourceIdx}-dec`, () => handleCmdDmgChange(playerIdx, sourceIdx, false, -5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: cmdBtnWidth, minHeight: cmdBtnHeight }}>
+                  <Typography sx={{ fontSize: fsCounterBtn, fontWeight: 700, lineHeight: 1 }}>−</Typography>
                 </IconButton></span>
               </Tooltip>,
-              <Typography key={`${sourceIdx}-val`} sx={{ fontSize: ts === 2 ? 26 : ts === 1 ? 22 : 20, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', color: dmg[0] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary' }}>
+              <Typography key={`${sourceIdx}-val`} sx={{ fontSize: fsCounterValue, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', color: dmg[0] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary' }}>
                 {dmg[0]}
               </Typography>,
               <Tooltip key={`${sourceIdx}-inc`} open={lpKey === `${sourceIdx}-inc`} title="+5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-                <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, false, 1))} onPointerDown={() => startLongPress(`${sourceIdx}-inc`, () => handleCmdDmgChange(playerIdx, sourceIdx, false, 5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: ts === 2 ? 38 : 32, minHeight: ts === 2 ? 24 : ts === 1 ? 28 : 32, transition: 'min-height 0.2s ease' }}>
-                  <Typography sx={{ fontSize: ts === 2 ? 28 : ts === 1 ? 24 : 22, fontWeight: 700, lineHeight: 1 }}>+</Typography>
+                <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, false, 1))} onPointerDown={() => startLongPress(`${sourceIdx}-inc`, () => handleCmdDmgChange(playerIdx, sourceIdx, false, 5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: cmdBtnWidth, minHeight: cmdBtnHeight }}>
+                  <Typography sx={{ fontSize: fsCounterBtn, fontWeight: 700, lineHeight: 1 }}>+</Typography>
                 </IconButton></span>
               </Tooltip>,
             ];
             if (source.partner) {
               rows.push(
-                <Tooltip key={`${sourceIdx}-pname`} title={renderSourceSnapshot(source, sourceIdx)} placement={snapshotPlacement} componentsProps={{ tooltip: { sx: { bgcolor: 'background.paper', border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, p: 0, maxWidth: 220, boxShadow: 8, color: 'text.primary' } } }} open={openSnapshotKey === `${sourceIdx}-psnap`} onClose={() => setOpenSnapshotKey(null)} disableHoverListener disableFocusListener disableTouchListener>
-                <Typography onClick={(e) => { e.stopPropagation(); setOpenSnapshotKey(k => k === `${sourceIdx}-psnap` ? null : `${sourceIdx}-psnap`); }} sx={{ fontSize: ts === 2 ? 19 : ts === 1 ? 16 : 14, color: sourceEliminated ? 'text.disabled' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', cursor: 'pointer' }}>
+                <Typography key={`${sourceIdx}-pname`} onClick={(e) => { e.stopPropagation(); setOpenSnapshotKey(k => k === `${sourceIdx}-psnap` ? null : `${sourceIdx}-psnap`); }} sx={{ fontSize: fsSourceName, color: sourceEliminated ? 'text.disabled' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', cursor: 'pointer' }}>
                   {source.partner.name}
-                </Typography>
-                </Tooltip>,
+                </Typography>,
                 <Tooltip key={`${sourceIdx}-pdec`} open={lpKey === `${sourceIdx}-pdec`} title="-5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-                  <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, true, -1))} onPointerDown={() => startLongPress(`${sourceIdx}-pdec`, () => handleCmdDmgChange(playerIdx, sourceIdx, true, -5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: ts === 2 ? 38 : 32, minHeight: ts === 2 ? 24 : ts === 1 ? 28 : 32, transition: 'min-height 0.2s ease' }}>
-                    <Typography sx={{ fontSize: ts === 2 ? 28 : ts === 1 ? 24 : 22, fontWeight: 700, lineHeight: 1 }}>−</Typography>
+                  <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, true, -1))} onPointerDown={() => startLongPress(`${sourceIdx}-pdec`, () => handleCmdDmgChange(playerIdx, sourceIdx, true, -5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: cmdBtnWidth, minHeight: cmdBtnHeight }}>
+                    <Typography sx={{ fontSize: fsCounterBtn, fontWeight: 700, lineHeight: 1 }}>−</Typography>
                   </IconButton></span>
                 </Tooltip>,
-                <Typography key={`${sourceIdx}-pval`} sx={{ fontSize: ts === 2 ? 26 : ts === 1 ? 22 : 20, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', color: dmg[1] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary' }}>
+                <Typography key={`${sourceIdx}-pval`} sx={{ fontSize: fsCounterValue, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', color: dmg[1] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary' }}>
                   {dmg[1]}
                 </Typography>,
                 <Tooltip key={`${sourceIdx}-pinc`} open={lpKey === `${sourceIdx}-pinc`} title="+5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-                  <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, true, 1))} onPointerDown={() => startLongPress(`${sourceIdx}-pinc`, () => handleCmdDmgChange(playerIdx, sourceIdx, true, 5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: ts === 2 ? 38 : 32, minHeight: ts === 2 ? 24 : ts === 1 ? 28 : 32, transition: 'min-height 0.2s ease' }}>
-                    <Typography sx={{ fontSize: ts === 2 ? 28 : ts === 1 ? 24 : 22, fontWeight: 700, lineHeight: 1 }}>+</Typography>
+                  <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, true, 1))} onPointerDown={() => startLongPress(`${sourceIdx}-pinc`, () => handleCmdDmgChange(playerIdx, sourceIdx, true, 5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: cmdBtnWidth, minHeight: cmdBtnHeight }}>
+                    <Typography sx={{ fontSize: fsCounterBtn, fontWeight: 700, lineHeight: 1 }}>+</Typography>
                   </IconButton></span>
                 </Tooltip>,
               );
             }
             return rows;
           })}
+
+          {/* Commander snapshot overlay — covers full CMD DAMAGE panel */}
+          {openSnapshotKey !== null && (() => {
+            const match = openSnapshotKey.match(/^(\d+)-(p?snap)$/);
+            if (!match) return null;
+            const srcIdx = parseInt(match[1]);
+            const src = opponents.find(o => o.idx === srcIdx)?.player;
+            if (!src) return null;
+            const dealtRows = allPlayers.flatMap((tgt, tgtIdx) => {
+              if (tgtIdx === srcIdx) return [];
+              const d = commanderDamage[tgtIdx]?.[srcIdx] ?? [0, 0];
+              return [{ tgt, d, tgtIdx }];
+            });
+            const srcLifeColor = lifeColor(src.life);
+            return (
+              <Box
+                key="snapshot-overlay"
+                onClick={() => setOpenSnapshotKey(null)}
+                sx={{
+                  position: 'absolute', inset: 0, zIndex: 20,
+                  bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(20,12,4,0.96)' : 'rgba(255,248,240,0.97)',
+                  overflow: 'hidden',
+                  display: 'flex', flexDirection: 'column',
+                }}
+              >
+                {src.commander.artCropUrl && (
+                  <Box sx={{ position: 'absolute', inset: 0, backgroundImage: `url(${src.commander.artCropUrl})`, backgroundSize: 'cover', backgroundPosition: 'center top', opacity: 0.15, pointerEvents: 'none' }} />
+                )}
+                <Box onClick={(e) => e.stopPropagation()} sx={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', p: 1, gap: 0.5, overflowY: 'auto' }}>
+                  {/* Header row — name + life total + close */}
+                  <Stack direction="row" alignItems="center" spacing={0.75}>
+                    {src.commander.artCropUrl && (
+                      <Box component="img" src={src.commander.artCropUrl} alt="" onClick={() => setOpenSnapshotKey(null)} sx={{ height: artHeight, width: 'auto', borderRadius: 0.5, flexShrink: 0, cursor: 'pointer' }} />
+                    )}
+                    <Box sx={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                      <Stack direction="row" alignItems="center" spacing={0.5}>
+                        <Typography sx={{ fontSize: fsSourceName, fontWeight: 800, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{src.playerName}</Typography>
+                        {src.isMonarch && <CrownIcon sx={{ fontSize: fsStatBadge, color: '#DAA520', flexShrink: 0 }} />}
+                        {src.hasInitiative && <InitiativeIcon sx={{ fontSize: fsStatBadge, color: '#4FC3F7', flexShrink: 0 }} />}
+                      </Stack>
+                      <Typography sx={{ fontSize: fsSectionLabel, color: 'text.secondary', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.commander.name}</Typography>
+                      {src.partner && <Typography sx={{ fontSize: fsSectionLabel, color: 'text.secondary', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.partner.name}</Typography>}
+                    </Box>
+                    <Typography sx={{ fontSize: 'clamp(28px, 8dvmax, 56px)', fontWeight: 900, lineHeight: 1, color: srcLifeColor || 'text.primary', textDecoration: src.isEliminated ? 'line-through' : 'none', flexShrink: 0 }}>{src.life}</Typography>
+                    <IconButton size="small" onClick={() => setOpenSnapshotKey(null)} sx={{ p: 0.25, flexShrink: 0 }}>
+                      <CloseIcon sx={{ fontSize: fsSectionLabel }} />
+                    </IconButton>
+                  </Stack>
+
+                  <Box sx={{ borderTop: '1px solid', borderColor: 'divider' }} />
+
+                  {/* Counters row — horizontal */}
+                  <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="space-between" sx={{
+                    px: 1, py: 0.5, borderRadius: 1,
+                    background: (theme) => theme.palette.mode === 'dark'
+                      ? 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.03) 100%)'
+                      : 'linear-gradient(135deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.02) 100%)',
+                    border: '1px solid',
+                    borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                  }}>
+                    <Typography sx={{ fontSize: fsSourceName, fontWeight: 700, color: src.poison >= 10 ? 'error.main' : src.poison > 0 ? '#66BB6A' : 'text.disabled' }}>☠ {src.poison}</Typography>
+                    <Typography sx={{ fontSize: fsSourceName, fontWeight: 700, color: src.energy > 0 ? '#4FC8FF' : 'text.disabled' }}>⚡ {src.energy}</Typography>
+                    <Typography sx={{ fontSize: fsSourceName, fontWeight: 700, color: src.experience > 0 ? '#DAA520' : 'text.disabled' }}>XP {src.experience}</Typography>
+                    <Typography sx={{ fontSize: fsSourceName, fontWeight: 700, color: src.commanderTax > 0 ? 'text.secondary' : 'text.disabled' }}>Tax +{src.commanderTax * 2}</Typography>
+                  </Stack>
+
+                  {/* CMD damage dealt */}
+                  <Stack sx={{ flex: 1, minWidth: 0 }} spacing={0.25}>
+                    <Typography sx={{ fontSize: fsSectionLabel, fontWeight: 600, color: 'text.disabled', textTransform: 'uppercase', letterSpacing: 0.5 }}>CMD Dealt</Typography>
+                    {dealtRows.map(({ tgt, d, tgtIdx }) => {
+                      const isMe = tgtIdx === playerIdx;
+                      return (
+                        <Stack key={tgt.playerName} direction="row" alignItems="center" justifyContent="space-between" spacing={0.5}>
+                          {tgt.commander?.artCropUrl
+                            ? <Box component="img" src={tgt.commander.artCropUrl} alt="" sx={{ height: 'clamp(16px, 2.5dvmax, 28px)', width: 'auto', borderRadius: 0.25, flexShrink: 0, opacity: isMe ? 1 : 0.75 }} />
+                            : <Box sx={{ height: 'clamp(16px, 2.5dvmax, 28px)', width: 'clamp(11px, 1.8dvmax, 20px)', borderRadius: 0.25, flexShrink: 0, bgcolor: 'action.hover' }} />
+                          }
+                          <Typography sx={{ fontSize: fsSectionLabel, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, color: isMe ? 'primary.main' : 'text.secondary', fontWeight: isMe ? 700 : 400 }}>{tgt.playerName}</Typography>
+                          <Typography sx={{ fontSize: fsSourceName, fontWeight: 700, color: (d[0] >= 21 || d[1] >= 21) ? 'error.main' : isMe ? 'primary.main' : 'text.primary', flexShrink: 0 }}>
+                            {src.partner ? `${d[0]}/${d[1]}` : d[0]}
+                          </Typography>
+                        </Stack>
+                      );
+                    })}
+                  </Stack>
+                </Box>
+              </Box>
+            );
+          })()}
         </Box>
 
         {/* Life total + controls */}
-        <Box sx={{ width: '33%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5, alignSelf: 'stretch' }}>
-          <Box sx={{ position: 'relative', lineHeight: 1, overflow: 'visible', width: '100%', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <Box sx={{ width: '33%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5, alignSelf: 'stretch', pb: remoteMode ? 3 : 0 }}>
+          <Box sx={{ position: 'relative', lineHeight: 1, overflow: 'visible', width: '100%', flex: remoteMode ? undefined : 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             {showCrown && (
               <CrownIcon sx={{
-                fontSize: ts === 2 ? 72 : ts === 1 ? 60 : 48,
+                fontSize: 'clamp(40px, 9dvh, 72px)',
                 color: '#DAA520',
                 transform: 'rotate(-25deg)',
-                transition: 'font-size 0.25s ease',
                 position: 'absolute',
-                top: ts === 2 ? -36 : ts === 1 ? -30 : -24,
-                left: ts === 2 ? -44 : ts === 1 ? -36 : -28,
+                top: '-3dvh',
+                left: '-4dvh',
                 animation: monarchAnimStr,
               }} />
             )}
             {/* Overflow-hidden wrapper keeps the swipe clipped to the number */}
-            <Box sx={{ position: 'relative', overflow: 'hidden', lineHeight: 1, width: '100%', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <Box sx={{ position: 'relative', overflow: 'hidden', lineHeight: 1, width: '100%', flex: remoteMode ? undefined : 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               {/* Crack layers — each fades in independently as life drops, expanding from centre */}
               {crackLayers.map(({ from, svg }) => (
                 <Box key={from} sx={{
@@ -1985,14 +2103,13 @@ export function PlayerPanel({
               <Typography sx={{
                 position: 'relative', zIndex: 1,
                 fontWeight: 900,
-                fontSize: remoteMode
-                  ? (ts === 2 ? 'clamp(100px, 26dvh, 220px)' : ts === 1 ? 'clamp(85px, 22dvh, 190px)' : 'clamp(72px, 18dvh, 160px)')
-                  : (ts === 2 ? 'clamp(50px, 14dvh, 128px)' : ts === 1 ? 'clamp(40px, 11dvh, 96px)' : 'clamp(34px, 9dvh, 80px)'),
+                fontSize: remoteMode ? 'clamp(80px, 22dvmax, 260px)' : 'clamp(34px, 10dvh, 112px)',
                 lineHeight: 1,
                 color: computedLifeColor || ((theme: import('@mui/material').Theme) => theme.palette.primary.main),
                 transition: 'color 0.4s ease, font-size 0.2s ease',
                 ...(damageFlash > 0 && { animation: `${damageFlashAnim} 0.6s ease-out forwards` }),
                 ...(damageFlash === 0 && energyPulseAnim && { animation: `${energyPulseAnim} ${energyPulseDuration.toFixed(2)}s ease-out infinite, ${energySizzleAnim} 0.12s linear infinite` }),
+                ...(damageFlash === 0 && !energyPulseAnim && poisonBoilAnim && { animation: `${poisonBoilAnim} ${poisonBoilDuration}s ease-in-out infinite` }),
               }}>
                 {player.life}
               </Typography>
@@ -2067,7 +2184,7 @@ export function PlayerPanel({
                   },
                 }} />
               )}
-              <Stack direction="row" alignItems="center" spacing={ts === 2 ? 1 : 0.5} sx={{ mt: 0.5, zIndex: 1, transition: 'gap 0.2s ease' }}>
+              <Stack direction="row" alignItems="center" spacing={remoteMode ? 0 : 0.5} sx={{ mt: remoteMode ? 1 : 'clamp(0px, 0.6dvh, 4px)', flexShrink: 0, zIndex: 1, ...(remoteMode && { width: '100%', justifyContent: 'space-evenly' }) }}>
                 <Tooltip open={lpKey === 'life-dec'} title="-5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
                   <IconButton
                     onClick={guardClick(() => onLifeChange(playerIdx, -1))}
@@ -2075,9 +2192,9 @@ export function PlayerPanel({
                     onPointerUp={cancelLongPress}
                     onPointerLeave={cancelLongPress}
                     onPointerCancel={cancelLongPress}
-                    sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, borderRadius: 2, '& .MuiTouchRipple-root': { borderRadius: 2 }, transition: 'padding 0.2s ease' }}
+                    sx={{ px: remoteMode ? 4 : 0.5, py: 0.5, minWidth: remoteMode ? 100 : 52, minHeight: 52, borderRadius: 2, '& .MuiTouchRipple-root': { borderRadius: 2 } }}
                   >
-                    <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 60 : ts === 1 ? 48 : 36 }}>−</Typography>
+                    <Typography sx={{ fontWeight: 700, fontSize: fsLifeBtn }}>−</Typography>
                   </IconButton>
                 </Tooltip>
                 <Tooltip open={lpKey === 'life-inc'} title="+5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
@@ -2087,9 +2204,9 @@ export function PlayerPanel({
                     onPointerUp={cancelLongPress}
                     onPointerLeave={cancelLongPress}
                     onPointerCancel={cancelLongPress}
-                    sx={{ p: ts === 2 ? 0 : ts === 1 ? 0.25 : 0.5, minWidth: 52, minHeight: 52, borderRadius: 2, '& .MuiTouchRipple-root': { borderRadius: 2 }, transition: 'padding 0.2s ease' }}
+                    sx={{ px: remoteMode ? 4 : 0.5, py: 0.5, minWidth: remoteMode ? 100 : 52, minHeight: 52, borderRadius: 2, '& .MuiTouchRipple-root': { borderRadius: 2 } }}
                   >
-                    <Typography sx={{ fontWeight: 700, fontSize: ts === 2 ? 60 : ts === 1 ? 48 : 36 }}>+</Typography>
+                    <Typography sx={{ fontWeight: 700, fontSize: fsLifeBtn }}>+</Typography>
                   </IconButton>
                 </Tooltip>
               </Stack>
@@ -2102,17 +2219,17 @@ export function PlayerPanel({
           flex: 1,
           minWidth: 0,
           borderLeft: (theme) => `1px solid ${theme.palette.divider}`,
-          px: ts === 2 ? 0.1 : ts === 1 ? 0.25 : 0.5,
-          py: ts === 2 ? 0 : ts === 1 ? 0.1 : 0.25,
+          px: remoteMode ? 1 : 0.5,
+          py: remoteMode ? 1 : 0.25,
           overflowY: 'auto',
           display: 'grid',
-          gridTemplateColumns: `1fr ${ts === 2 ? 38 : 32}px ${ts === 2 ? 38 : 30}px ${ts === 2 ? 38 : 32}px`,
-          alignContent: 'safe center',
+          gridTemplateColumns: `1fr ${cmdBtnWidth} ${valColWidth} ${cmdBtnWidth}`,
+          alignContent: remoteMode ? 'start' : 'safe center',
           alignItems: 'center',
-          rowGap: ts > 0 ? 0 : 0.1,
+          rowGap: remoteMode ? 0.5 : 0.1,
           transition: 'padding 0.2s ease, row-gap 0.2s ease',
         }}>
-          <Typography sx={{ fontSize: ts === 2 ? 15 : ts === 1 ? 13 : 11, fontWeight: 600, color: 'text.secondary', mb: ts === 2 ? 0 : ts === 1 ? 0.1 : 0.25, textTransform: 'uppercase', letterSpacing: 0.5, gridColumn: '1 / -1' }}>
+          <Typography sx={{ fontSize: fsSectionLabel, fontWeight: 600, color: 'text.secondary', mb: 0.25, textTransform: 'uppercase', letterSpacing: 0.5, gridColumn: '1 / -1' }}>
             Counters
           </Typography>
           {([
@@ -2121,13 +2238,13 @@ export function PlayerPanel({
             ['Experience', player.experience, () => onExperienceChange(playerIdx, -1), () => onExperienceChange(playerIdx, 1), () => onExperienceChange(playerIdx, -5), () => onExperienceChange(playerIdx, 5), player.experience > 0 ? 'primary.main' : 'text.disabled'],
             ['Commander Tax', player.commanderTax, () => onCommanderTaxChange(playerIdx, -1), () => onCommanderTaxChange(playerIdx, 1), () => onCommanderTaxChange(playerIdx, -5), () => onCommanderTaxChange(playerIdx, 5), player.commanderTax > 0 ? 'warning.main' : 'text.disabled'],
           ] as [string, number, () => void, () => void, () => void, () => void, string][]).flatMap(([label, value, onDec, onInc, onDec5, onInc5, color]) => [
-            <Typography key={`${label}-lbl`} sx={{ fontSize: ts === 2 ? 19 : ts === 1 ? 16 : 14, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none' }}>{label}</Typography>,
+            <Typography key={`${label}-lbl`} sx={{ fontSize: fsSourceName, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none' }}>{label}</Typography>,
             <Tooltip key={`${label}-dec`} open={lpKey === `${label}-dec`} title="-5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-              <IconButton onClick={guardClick(onDec)} onPointerDown={() => startLongPress(`${label}-dec`, onDec5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: ts === 2 ? 38 : 32, minHeight: ts === 2 ? 24 : ts === 1 ? 28 : 32, transition: 'min-height 0.2s ease' }}><Typography sx={{ fontSize: ts === 2 ? 28 : ts === 1 ? 24 : 22, fontWeight: 700 }}>−</Typography></IconButton>
+              <IconButton onClick={guardClick(onDec)} onPointerDown={() => startLongPress(`${label}-dec`, onDec5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: cmdBtnWidth, minHeight: cmdBtnHeight }}><Typography sx={{ fontSize: fsCounterBtn, fontWeight: 700 }}>−</Typography></IconButton>
             </Tooltip>,
-            <Typography key={`${label}-val`} sx={{ fontSize: ts === 2 ? 26 : ts === 1 ? 22 : 20, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', color, filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none', ...(label === 'Poison' && value === 9 && { animation: 'poisonPulse 2.5s ease-in-out infinite', '@keyframes poisonPulse': { '0%, 100%': { opacity: 1, transform: 'scale(1)', textShadow: '0 0 8px rgba(0,200,60,0.9), 0 0 20px rgba(0,200,60,0.5)' }, '50%': { opacity: 0.3, transform: 'scale(0.85)', textShadow: '0 0 2px rgba(0,200,60,0.2)' } } }), ...(label === 'Experience' && xpGlow && { textShadow: xpGlow, ...(xpShimmerAnim && { animation: `${xpShimmerAnim} 3s ease-in-out infinite` }) }) }}>{value}</Typography>,
+            <Typography key={`${label}-val`} sx={{ fontSize: fsCounterValue, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', color, filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none', ...(label === 'Poison' && value === 9 && { animation: 'poisonPulse 2.5s ease-in-out infinite', '@keyframes poisonPulse': { '0%, 100%': { opacity: 1, transform: 'scale(1)', textShadow: '0 0 8px rgba(0,200,60,0.9), 0 0 20px rgba(0,200,60,0.5)' }, '50%': { opacity: 0.3, transform: 'scale(0.85)', textShadow: '0 0 2px rgba(0,200,60,0.2)' } } }), ...(label === 'Experience' && xpGlow && { textShadow: xpGlow, ...(xpShimmerAnim && { animation: `${xpShimmerAnim} 3s ease-in-out infinite` }) }) }}>{value}</Typography>,
             <Tooltip key={`${label}-inc`} open={lpKey === `${label}-inc`} title="+5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-              <IconButton onClick={guardClick(onInc)} onPointerDown={() => startLongPress(`${label}-inc`, onInc5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: ts === 2 ? 38 : 32, minHeight: ts === 2 ? 24 : ts === 1 ? 28 : 32, transition: 'min-height 0.2s ease' }}><Typography sx={{ fontSize: ts === 2 ? 28 : ts === 1 ? 24 : 22, fontWeight: 700 }}>+</Typography></IconButton>
+              <IconButton onClick={guardClick(onInc)} onPointerDown={() => startLongPress(`${label}-inc`, onInc5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: cmdBtnWidth, minHeight: cmdBtnHeight }}><Typography sx={{ fontSize: fsCounterBtn, fontWeight: 700 }}>+</Typography></IconButton>
             </Tooltip>,
           ])}
         </Box>
