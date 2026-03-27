@@ -18,6 +18,22 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import QrCodeIcon from '@mui/icons-material/QrCode';
 import SmartphoneIcon from '@mui/icons-material/Smartphone';
 import CloseIcon from '@mui/icons-material/Close';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import OpenInFullIcon from '@mui/icons-material/OpenInFull';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import VolumeOffIcon from '@mui/icons-material/VolumeOff';
+import Brightness4Icon from '@mui/icons-material/Brightness4';
+import Brightness7Icon from '@mui/icons-material/Brightness7';
+
+// Module-level art preload cache — prevents commander images from re-fetching
+// when PlayerPanel re-renders due to state changes (life totals, counters, etc.)
+const _artPreloadCache = new Map<string, HTMLImageElement>();
+function preloadArt(url: string | undefined) {
+  if (!url || _artPreloadCache.has(url)) return;
+  const img = new Image();
+  img.src = url;
+  _artPreloadCache.set(url, img);
+}
 
 const FW_DIRS: [number, number][] = [
   [0, -58], [41, -41], [58, 0], [41, 41], [0, 58], [-41, 41], [-58, 0], [-41, -41],
@@ -323,6 +339,12 @@ interface PlayerPanelProps {
   activePlayerIdx?: number;
   remoteConnected?: boolean;
   soundEnabled?: boolean;
+  onSwitchToPlayer?: (targetIdx: number) => void;
+  isBeingViewed?: boolean;
+  viewerPlayerNames?: string[];
+  onToggleTheme?: () => void;
+  themeMode?: 'light' | 'dark';
+  onToggleSound?: () => void;
 }
 
 // ── City Flag ─────────────────────────────────────────────────────────────────
@@ -452,6 +474,12 @@ export function PlayerPanel({
   activePlayerIdx,
   remoteConnected = false,
   soundEnabled = true,
+  onSwitchToPlayer,
+  isBeingViewed = false,
+  viewerPlayerNames = [],
+  onToggleTheme,
+  themeMode,
+  onToggleSound,
 }: PlayerPanelProps) {
   usePoisonSound(player.poison, player.isEliminated, soundEnabled);
   const { playCitysBlessing } = useSounds(soundEnabled, player.hasCitysBlessing);
@@ -502,7 +530,15 @@ export function PlayerPanel({
     const id = setTimeout(() => document.addEventListener('mousedown', close), 0);
     return () => { clearTimeout(id); document.removeEventListener('mousedown', close); };
   }, [rulesOpenLabel]);
-  const [cmdDmgShowPlayer, setCmdDmgShowPlayer] = useState(false);
+  const cmdDmgKey = `cmdDmgShowPlayer:${player.playerId}`;
+  const [cmdDmgShowPlayer, setCmdDmgShowPlayer] = useState(() => {
+    try { return localStorage.getItem(cmdDmgKey) === '1'; } catch { return false; }
+  });
+  const toggleCmdDmgShowPlayer = () => setCmdDmgShowPlayer(p => {
+    const next = !p;
+    try { localStorage.setItem(cmdDmgKey, next ? '1' : '0'); } catch {}
+    return next;
+  });
   const [cityBlessingVisible, setCityBlessingVisible] = useState(player.hasCitysBlessing);
   const [cityBlessingExiting, setCityBlessingExiting] = useState(false);
   const prevHasCitysBlessing = useRef(player.hasCitysBlessing);
@@ -576,6 +612,35 @@ export function PlayerPanel({
     monarchAnim === 'exiting'  ? `${crownExitToTop} 0.5s ease-in forwards` :
     monarchAnim === 'entering' ? `${crownEnterFromTop} ${monarchEnterIsTransfer ? '1s' : '0.5s'} ${monarchEnterIsTransfer ? '0.5s' : '0s'} ease-out both, ${crownShimmerBig} 2s ease-in-out infinite` :
     `${crownShimmerBig} 2s ease-in-out infinite`;
+
+  const isBeingViewedByAnyone = isBeingViewed || viewerPlayerNames.length > 0;
+  const viewerTooltipText = (() => {
+    if (viewerPlayerNames.length === 1) return `${viewerPlayerNames[0]} is viewing your panel`;
+    if (viewerPlayerNames.length === 2) return `${viewerPlayerNames[0]} and ${viewerPlayerNames[1]} are viewing your panel`;
+    if (viewerPlayerNames.length > 2) return `${viewerPlayerNames.slice(0, 2).join(', ')} and ${viewerPlayerNames.length - 2} other${viewerPlayerNames.length - 2 > 1 ? 's' : ''} are viewing your panel`;
+    return 'Someone is viewing your panel';
+  })();
+  const [viewerBannerVisible, setViewerBannerVisible] = useState(false);
+  const viewerBannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showViewerBanner = () => {
+    if (viewerBannerTimer.current) clearTimeout(viewerBannerTimer.current);
+    setViewerBannerVisible(true);
+    viewerBannerTimer.current = setTimeout(() => setViewerBannerVisible(false), 2500);
+  };
+  useEffect(() => {
+    if (!isBeingViewedByAnyone) return;
+    showViewerBanner();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBeingViewedByAnyone, viewerPlayerNames.length]);
+
+  // Preload all commander art on mount so images stay cached across state changes
+  useEffect(() => {
+    allPlayers.forEach(p => {
+      preloadArt(p.commander.artCropUrl);
+      preloadArt(p.partner?.artCropUrl);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [lpKey, setLpKey] = useState<string | null>(null);
   const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -830,7 +895,7 @@ export function PlayerPanel({
         </Stack>
         <Box sx={{ borderTop: '1px solid', borderColor: 'divider', mx: 1 }} />
         <Stack direction="row" alignItems="center" sx={{ position: 'relative', px: 1, py: 0.5 }}>
-          <Typography sx={{ fontSize: 40, fontWeight: 900, lineHeight: 1, flex: 1, textAlign: 'center', color: srcLifeColor || 'text.primary', textDecoration: src.isEliminated ? 'line-through' : 'none' }}>{src.life}</Typography>
+          <Typography sx={{ fontSize: 40, fontWeight: 900, lineHeight: 1, flex: 1, textAlign: 'center', color: srcLifeColor || 'primary.main', textDecoration: src.isEliminated ? 'line-through' : 'none' }}>{src.life}</Typography>
           <Stack spacing={0.25} sx={{ minWidth: 60 }}>
             <Typography sx={{ fontSize: 11, fontWeight: 700, color: src.poison >= 10 ? 'error.main' : src.poison > 0 ? '#66BB6A' : 'text.disabled' }}>☠ {src.poison}</Typography>
             <Typography sx={{ fontSize: 11, fontWeight: 700, color: src.energy > 0 ? '#4FC8FF' : 'text.disabled' }}>⚡ {src.energy}</Typography>
@@ -998,6 +1063,21 @@ export function PlayerPanel({
           }}
         />
       )}
+
+      {/* ── Viewer notification banner ── */}
+      <Box sx={{
+        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 12,
+        background: (theme) => `linear-gradient(90deg, ${theme.palette.primary.main}00 0%, ${theme.palette.primary.main}aa 44%, ${theme.palette.primary.main}ff 50%, ${theme.palette.primary.main}aa 56%, ${theme.palette.primary.main}00 100%)`,
+        color: '#fff',
+        px: 1, py: 0.4,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, textAlign: 'center',
+        pointerEvents: 'none',
+        opacity: viewerBannerVisible ? 1 : 0,
+        transition: viewerBannerVisible ? 'opacity 0.2s ease' : 'opacity 0.6s ease',
+      }}>
+        <VisibilityIcon sx={{ fontSize: 13 }} />
+        <Typography sx={{ fontSize: 19, fontWeight: 600, lineHeight: 1.3 }}>{viewerTooltipText}</Typography>
+      </Box>
 
       {/* ── City's Blessing god rays ── */}
       {cityBlessingVisible && (
@@ -1649,6 +1729,10 @@ export function PlayerPanel({
           </Typography>
         </Box>
           <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: 'auto', zIndex: 1 }}>
+            {/* Being viewed indicator */}
+            {isBeingViewedByAnyone && (
+              <VisibilityIcon onClick={(e) => { e.stopPropagation(); showViewerBanner(); }} sx={{ fontSize: fsHeaderIcon, color: 'primary.main', cursor: 'pointer', animation: 'eyePulse 1.5s ease-in-out infinite', '@keyframes eyePulse': { '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.4 } } }} />
+            )}
             {/* Active game state indicators */}
             <>
               {player.isMonarch && (
@@ -1824,6 +1908,21 @@ export function PlayerPanel({
                 <QrCodeIcon sx={{ fontSize: 16 }} />
               </Box>
             )}
+            {/* Remote-only: sound + theme toggles */}
+            {remoteMode && (
+              <Box sx={{ display: 'flex', borderTop: (theme) => `1px solid ${theme.palette.divider}` }}>
+                <Box onClick={(e) => { e.stopPropagation(); onToggleSound?.(); setStateMenuOpen(false); }} sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75, py: 1, cursor: 'pointer', color: soundEnabled ? 'primary.main' : 'text.disabled', '&:hover': { bgcolor: 'action.hover' }, transition: 'background-color 0.15s ease' }}>
+                  {soundEnabled ? <VolumeUpIcon sx={{ fontSize: 18 }} /> : <VolumeOffIcon sx={{ fontSize: 18 }} />}
+                  <Typography sx={{ fontSize: 13, lineHeight: 1 }}>Sound</Typography>
+                </Box>
+                {onToggleTheme && (
+                  <Box onClick={(e) => { e.stopPropagation(); onToggleTheme(); setStateMenuOpen(false); }} sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75, py: 1, cursor: 'pointer', color: 'text.secondary', borderLeft: (theme) => `1px solid ${theme.palette.divider}`, '&:hover': { bgcolor: 'action.hover' }, transition: 'background-color 0.15s ease' }}>
+                    {themeMode === 'light' ? <Brightness4Icon sx={{ fontSize: 18 }} /> : <Brightness7Icon sx={{ fontSize: 18 }} />}
+                    <Typography sx={{ fontSize: 13, lineHeight: 1 }}>{themeMode === 'light' ? 'Dark' : 'Light'}</Typography>
+                  </Box>
+                )}
+              </Box>
+            )}
           </Box>
           <Typography variant="caption" sx={{ color: 'text.disabled', mt: 1.5 }}>tap outside to close</Typography>
         </Box>
@@ -1834,7 +1933,7 @@ export function PlayerPanel({
 
         {/* Commander Damage box */}
         <Box sx={{
-          width: '33%',
+          width: remoteMode ? '33dvw' : '33%',
           flexShrink: 0,
           borderRight: (theme) => `1px solid ${theme.palette.divider}`,
           px: remoteMode ? 1 : 0.5,
@@ -1874,7 +1973,7 @@ export function PlayerPanel({
             <Typography sx={{ fontSize: fsSectionLabel, fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5, flex: 1 }}>
               CMD Damage{isCmdDmgHigh && <Typography component="span" sx={{ fontSize: fsSectionLabel, color: 'error.main', ml: 0.5 }}>⚠</Typography>}
             </Typography>
-            <Button size="small" variant={cmdDmgShowPlayer ? 'contained' : 'outlined'} onClick={() => setCmdDmgShowPlayer(p => !p)} sx={{ minWidth: 0, px: remoteMode ? 1.25 : 0.75, py: remoteMode ? 0.5 : 0, fontSize: remoteMode ? fsSectionLabel : 'clamp(7px, 1.2dvh, 11px)', lineHeight: 1.4, flexShrink: 0 }}>
+            <Button size="small" variant={cmdDmgShowPlayer ? 'contained' : 'outlined'} onClick={toggleCmdDmgShowPlayer} sx={{ minWidth: 0, px: remoteMode ? 1.25 : 0.75, py: remoteMode ? 0.5 : 0, fontSize: remoteMode ? fsSectionLabel : 'clamp(7px, 1.2dvh, 11px)', lineHeight: 1.4, flexShrink: 0 }}>
               {cmdDmgShowPlayer ? 'Player' : 'CMD'}
             </Button>
           </Stack>
@@ -1953,11 +2052,17 @@ export function PlayerPanel({
             const srcIdx = parseInt(match[1]);
             const src = opponents.find(o => o.idx === srcIdx)?.player;
             if (!src) return null;
-            const dealtRows = allPlayers.flatMap((tgt, tgtIdx) => {
-              if (tgtIdx === srcIdx) return [];
-              const d = commanderDamage[tgtIdx]?.[srcIdx] ?? [0, 0];
-              return [{ tgt, d, tgtIdx }];
-            });
+            const dealtRows = allPlayers
+              .flatMap((tgt, tgtIdx) => {
+                if (tgtIdx === srcIdx) return [];
+                const d = commanderDamage[tgtIdx]?.[srcIdx] ?? [0, 0];
+                return [{ tgt, d, tgtIdx }];
+              })
+              .sort((a, b) => {
+                if (a.tgtIdx === playerIdx) return -1;
+                if (b.tgtIdx === playerIdx) return 1;
+                return 0;
+              });
             const srcLifeColor = lifeColor(src.life);
             return (
               <Box
@@ -1988,10 +2093,19 @@ export function PlayerPanel({
                       <Typography sx={{ fontSize: fsSectionLabel, color: 'text.secondary', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.commander.name}</Typography>
                       {src.partner && <Typography sx={{ fontSize: fsSectionLabel, color: 'text.secondary', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.partner.name}</Typography>}
                     </Box>
-                    <Typography sx={{ fontSize: 'clamp(28px, 8dvmax, 56px)', fontWeight: 900, lineHeight: 1, color: srcLifeColor || 'text.primary', textDecoration: src.isEliminated ? 'line-through' : 'none', flexShrink: 0 }}>{src.life}</Typography>
-                    <IconButton size="small" onClick={() => setOpenSnapshotKey(null)} sx={{ p: 0.25, flexShrink: 0 }}>
-                      <CloseIcon sx={{ fontSize: fsSectionLabel }} />
-                    </IconButton>
+                    <Typography sx={{ fontSize: 'clamp(28px, 8dvmax, 56px)', fontWeight: 900, lineHeight: 1, color: srcLifeColor || 'primary.main', textDecoration: src.isEliminated ? 'line-through' : 'none', flexShrink: 0 }}>{src.life}</Typography>
+                    <Stack direction="column" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
+                      <IconButton size="small" onClick={() => setOpenSnapshotKey(null)} sx={{ p: 0.25 }}>
+                        <CloseIcon sx={{ fontSize: fsSectionLabel }} />
+                      </IconButton>
+                      {onSwitchToPlayer && !src.isEliminated && srcIdx !== playerIdx && (
+                        <Tooltip title="View panel" placement="left" slotProps={ttSlotProps} arrow>
+                          <IconButton size="small" onClick={(e) => { e.stopPropagation(); setOpenSnapshotKey(null); onSwitchToPlayer(srcIdx); }} sx={{ p: 0.25 }}>
+                            <OpenInFullIcon sx={{ fontSize: fsSectionLabel }} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Stack>
                   </Stack>
 
                   <Box sx={{ borderTop: '1px solid', borderColor: 'divider' }} />
@@ -2017,7 +2131,10 @@ export function PlayerPanel({
                     {dealtRows.map(({ tgt, d, tgtIdx }) => {
                       const isMe = tgtIdx === playerIdx;
                       return (
-                        <Stack key={tgt.playerName} direction="row" alignItems="center" justifyContent="space-between" spacing={0.5}>
+                        <Stack key={tgt.playerName} direction="row" alignItems="center" justifyContent="space-between" spacing={0.5}
+                          onClick={!isMe ? (e) => { e.stopPropagation(); setOpenSnapshotKey(`${tgtIdx}-snap`); } : undefined}
+                          sx={{ cursor: isMe ? 'default' : 'pointer', borderRadius: 0.5, '&:hover': !isMe ? { bgcolor: 'action.hover' } : undefined, px: 0.25 }}
+                        >
                           {tgt.commander?.artCropUrl
                             ? <Box component="img" src={tgt.commander.artCropUrl} alt="" sx={{ height: 'clamp(16px, 2.5dvmax, 28px)', width: 'auto', borderRadius: 0.25, flexShrink: 0, opacity: isMe ? 1 : 0.75 }} />
                             : <Box sx={{ height: 'clamp(16px, 2.5dvmax, 28px)', width: 'clamp(11px, 1.8dvmax, 20px)', borderRadius: 0.25, flexShrink: 0, bgcolor: 'action.hover' }} />
@@ -2037,7 +2154,7 @@ export function PlayerPanel({
         </Box>
 
         {/* Life total + controls */}
-        <Box sx={{ width: '33%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5, alignSelf: 'stretch', pt: remoteMode ? 6 : 0 }}>
+        <Box sx={{ width: remoteMode ? '33dvw' : '33%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5, alignSelf: 'stretch', pt: remoteMode ? 2 : 0 }}>
           <Box sx={{ position: 'relative', lineHeight: 1, overflow: 'visible', width: '100%', flex: remoteMode ? undefined : 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             {showCrown && (
               <CrownIcon sx={{

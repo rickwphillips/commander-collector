@@ -29,12 +29,14 @@ function redirectToLogin() {
 // Helper for API calls
 export async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
   // Handle query strings properly - insert .php before the query string
+  const isGet = !options?.method || options.method === 'GET';
+  const cb = isGet ? `_cb=${Date.now()}` : null;
   let url: string;
   if (endpoint.includes('?')) {
     const [path, query] = endpoint.split('?');
-    url = `${API_BASE}${path}.php?${query}`;
+    url = `${API_BASE}${path}.php?${query}${cb ? `&${cb}` : ''}`;
   } else {
-    url = `${API_BASE}${endpoint}.php`;
+    url = `${API_BASE}${endpoint}.php${cb ? `?${cb}` : ''}`;
   }
 
   const res = await fetch(url, {
@@ -43,6 +45,7 @@ export async function apiFetch<T>(endpoint: string, options?: RequestInit): Prom
       ...getAuthHeaders(),
       ...options?.headers,
     },
+    cache: 'no-store',
     ...options,
   });
 

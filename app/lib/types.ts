@@ -414,7 +414,10 @@ export type LiveGameEventType =
   | 'pass_turn'
   | 'checkin'
   | 'life_kill_attr'
-  | 'poison_kill_attr';
+  | 'poison_kill_attr'
+  | 'view_open'       // remote panel opened another player's panel overlay
+  | 'view_heartbeat'  // remote panel is still viewing (sent every ~5s); -1 = stopped
+  | 'view_close';     // remote panel closed the overlay
 
 export interface LiveGameEvent {
   type: LiveGameEventType;
@@ -484,6 +487,8 @@ export interface GameManagerState {
   sessionCode?: string | null;      // hex code for live session; null = no active session
   sessionSeats?: Record<string, string> | null; // { bottom: 'a3f9c12b', ... }
   remoteCheckins?: Record<string, number> | null; // { bottom: <timestamp ms> } — set by remote panel on connect/heartbeat
+  viewingPlayerIdx?: number | null;              // index of the player whose panel is being viewed (legacy, unused — see viewerMap)
+  viewerMap?: Record<string, { targetIdx: number; viewerName: string; ts: number; firstSeenTs: number }> | null; // seat → entry
 }
 
 // Form input types

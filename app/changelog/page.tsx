@@ -38,6 +38,21 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.30.0',
+    date: '2026-03-27',
+    title: 'Live Viewer Notifications & Remote Panel Enhancements',
+    changes: [
+      { type: 'added', text: 'When another player opens your remote panel, a translucent gradient banner fades in at the top showing their name' },
+      { type: 'improved', text: 'Banner re-shows automatically when a new viewer joins or when an additional viewer connects; tap the eye icon to re-trigger it manually' },
+      { type: 'improved', text: 'Read-only overlay banner now matches the viewer banner style and size' },
+      { type: 'added', text: 'Continuous view heartbeat lets the host reliably distinguish active viewers from reconnects' },
+      { type: 'improved', text: 'API requests are now cache-busted to prevent stale state on repeated polls' },
+      { type: 'improved', text: 'Commander art images are cached in memory to prevent reloading on every state change' },
+      { type: 'improved', text: 'Sound and theme toggles on the remote panel moved into the + submenu' },
+      { type: 'improved', text: 'CMD damage show-player toggle, sound, and theme preferences are now persisted in localStorage per player' },
+    ],
+  },
+  {
     version: '1.29.0',
     date: '2026-03-27',
     title: 'Remote Panel & Settings Polish',

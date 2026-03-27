@@ -1,7 +1,8 @@
 'use client';
 
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { Box, Button, Typography } from '@mui/material';
+import { Box, Button, Typography, IconButton } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import { PlayerPanel } from './PlayerPanel';
 import { CenterZone } from './CenterZone';
 import type { GameManagerState, PlayerState } from '../types';
@@ -54,6 +55,8 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   const [monarchTransfer, setMonarchTransfer] = useState<{ fromPos: string | null; toPos: string | null }>({ fromPos: null, toPos: null });
   const [highlightMode, setHighlightMode] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [posOverrides, setPosOverrides] = useState<Record<number, PlayerState['position']>>({});
+  const [viewingPlayerIdx, setViewingPlayerIdx] = useState<number | null>(null);
 
   // Start a 15s countdown when a winner is detected; auto-save when it hits 0
   useEffect(() => {
@@ -200,6 +203,12 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
     if (winner) winnerStateRef.current = next;
     onUpdate(next);
   };
+
+  // Sync read-only overlay visibility to game state so remote panels can show the eye indicator
+  useEffect(() => {
+    updateState({ viewingPlayerIdx: viewingPlayerIdx ?? null });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewingPlayerIdx]);
 
   const handleLifeChange = (idx: number, delta: number) => {
     const target = players[idx];
@@ -354,6 +363,14 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
     }
   };
 
+  const getEffectivePos = (idx: number): PlayerState['position'] => posOverrides[idx] ?? players[idx].position;
+
+  const handleSwitchToPlayer = (fromIdx: number, toIdx: number) => {
+    const fromPos = getEffectivePos(fromIdx);
+    const toPos = getEffectivePos(toIdx);
+    setPosOverrides(prev => ({ ...prev, [fromIdx]: toPos, [toIdx]: fromPos }));
+  };
+
   // Grid placement: col/row (1-indexed)
   const getGridPlacement = (position: PlayerState['position']) => {
     switch (position) {
@@ -387,12 +404,13 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
       }}
     >
       {players.map((player, idx) => {
-        const placement = getGridPlacement(player.position);
-        const rotation = getRotation(player.position);
-        const isVertical = player.position === 'left' || player.position === 'right';
+        const effectivePosition = getEffectivePos(idx);
+        const placement = getGridPlacement(effectivePosition);
+        const rotation = getRotation(effectivePosition);
+        const isVertical = effectivePosition === 'left' || effectivePosition === 'right';
 
-        if (player.position === 'right' && playerCount <= 3) return null;
-        if (player.position === 'left' && playerCount <= 2) return null;
+        if (effectivePosition === 'right' && playerCount <= 3) return null;
+        if (effectivePosition === 'left' && playerCount <= 2) return null;
 
         return (
           <Box
@@ -447,6 +465,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
                 onEliminate={handleEliminate}
                 onUndoEliminate={handleUndoEliminate}
                 onPassTurn={firstPlayerSet ? handleNextTurn : undefined}
+                isBeingViewed={viewingPlayerIdx === idx}
                 soundEnabled={soundEnabled}
                 {...(lifeKillPrompt?.targetIdx === idx && {
                   lifeKillOpponents: getActiveOpponents(players, idx),
@@ -505,6 +524,54 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
         />
       </Box>
 
+
+      {/* Read-only player panel overlay */}
+      {viewingPlayerIdx !== null && (() => {
+        const vPlayer = players[viewingPlayerIdx];
+        const noop = () => {};
+        return (
+          <Box
+            sx={{ position: 'fixed', inset: 0, zIndex: 60, bgcolor: 'rgba(0,0,0,0.7)' }}
+            onClick={() => setViewingPlayerIdx(null)}
+          >
+            <Box onClick={(e) => e.stopPropagation()} sx={{ position: 'absolute', inset: 0 }}>
+              <PlayerPanel
+                player={{ ...vPlayer, position: 'bottom' }}
+                playerIdx={viewingPlayerIdx}
+                allPlayers={players}
+                commanderDamage={commanderDamage}
+                startingLife={startingLife}
+                onLifeChange={noop}
+                onPoisonChange={noop}
+                onCommanderTaxChange={noop}
+                onEnergyChange={noop}
+                onExperienceChange={noop}
+                onToggleMonarch={noop}
+                onToggleInitiative={noop}
+                onToggleCitysBlessing={noop}
+                onCommanderDamageChange={noop}
+                onEliminate={noop}
+                onUndoEliminate={noop}
+                highlightMode={false}
+                soundEnabled={false}
+                activePlayerIdx={currentPlayerIdx}
+                turnTimerSeconds={turnTimerSeconds}
+              />
+              {/* Read-only blocker — prevents all interaction with the panel */}
+              <Box sx={{ position: 'absolute', inset: 0, zIndex: 5, cursor: 'pointer' }} onClick={() => setViewingPlayerIdx(null)} />
+              <IconButton
+                onClick={() => setViewingPlayerIdx(null)}
+                sx={{ position: 'absolute', top: 8, right: 8, zIndex: 10, bgcolor: 'rgba(0,0,0,0.5)', color: '#fff', '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' } }}
+              >
+                <CloseIcon />
+              </IconButton>
+              <Typography sx={{ position: 'absolute', top: 12, left: 12, zIndex: 10, fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: 1.5, pointerEvents: 'none' }}>
+                View Only
+              </Typography>
+            </Box>
+          </Box>
+        );
+      })()}
 
       {/* Winner countdown banner */}
       {winner && winnerCountdown !== null && (

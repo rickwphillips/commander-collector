@@ -264,6 +264,30 @@ export function applyPassTurn(state: GameManagerState): GameManagerState {
   };
 }
 
+function applyViewPlayer(state: GameManagerState, event: LiveGameEvent): GameManagerState {
+  const prevMap = state.viewerMap ?? {};
+  if (event.type === 'view_close') {
+    const { [event.seat]: _removed, ...rest } = prevMap;
+    return { ...state, viewerMap: Object.keys(rest).length > 0 ? rest : null };
+  }
+  const targetIdx = event.playerIdx ?? -1;
+  if (targetIdx < 0) {
+    const { [event.seat]: _removed, ...rest } = prevMap;
+    return { ...state, viewerMap: Object.keys(rest).length > 0 ? rest : null };
+  }
+  const viewer = state.players.find(p => p.position === event.seat);
+  const existing = prevMap[event.seat];
+  // Preserve firstSeenTs on heartbeat or if reconnecting quickly (within 20s)
+  const isReconnect = existing && (Date.now() - existing.ts < 20000);
+  const firstSeenTs = (event.type === 'view_heartbeat' || isReconnect)
+    ? (existing?.firstSeenTs ?? event.ts)
+    : event.ts;
+  return {
+    ...state,
+    viewerMap: { ...prevMap, [event.seat]: { targetIdx, viewerName: viewer?.playerName ?? event.seat, ts: event.ts, firstSeenTs } },
+  };
+}
+
 /**
  * Dispatch a LiveGameEvent to the correct state-transform function.
  * The host calls this for each event it dequeues from remote_events.
@@ -303,6 +327,10 @@ export function applyEvent(state: GameManagerState, event: LiveGameEvent): GameM
       return applyLifeKillAttr(state, event.playerIdx!, event.sourcePlayerIdx ?? null);
     case 'poison_kill_attr':
       return applyPoisonKillAttr(state, event.playerIdx!, event.sourcePlayerIdx ?? null);
+    case 'view_open':
+    case 'view_heartbeat':
+    case 'view_close':
+      return applyViewPlayer(state, event);
     default:
       return state;
   }

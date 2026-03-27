@@ -3,10 +3,7 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Box, Typography, TextField, Button, Stack, CircularProgress, IconButton, Chip } from '@mui/material';
-import Brightness7Icon from '@mui/icons-material/Brightness7';
-import Brightness4Icon from '@mui/icons-material/Brightness4';
-import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import VolumeOffIcon from '@mui/icons-material/VolumeOff';
+import CloseIcon from '@mui/icons-material/Close';
 import { PlayerPanel } from '../components/PlayerPanel';
 import { api } from '@/lib/api';
 import type { GameManagerState, PlayerState, LiveGameEvent } from '@/lib/types';
@@ -35,10 +32,24 @@ function RemotePageInner() {
   const [seat, setSeat] = useState('');
   const [state, setState] = useState<GameManagerState | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    try { return localStorage.getItem('remoteSoundEnabled') !== '0'; } catch { return true; }
+  });
   const [lifeKillPending, setLifeKillPending] = useState(false);
   const [poisonKillPending, setPoisonKillPending] = useState(false);
+  const [viewingPlayerIdx, setViewingPlayerIdx] = useState<number | null>(null);
   const { mode, toggleTheme } = useThemeMode();
+
+  // Lock body scroll and prevent pull-to-refresh while on the remote panel
+  useEffect(() => {
+    const prev = { overflow: document.body.style.overflow, overscrollBehavior: document.body.style.overscrollBehavior };
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+    return () => {
+      document.body.style.overflow = prev.overflow;
+      document.body.style.overscrollBehavior = prev.overscrollBehavior;
+    };
+  }, []);
 
   const lastSuccessfulPollRef = useRef<number>(Date.now());
   const lastEventTimeRef = useRef<number>(0);
@@ -239,6 +250,23 @@ function RemotePageInner() {
     sendEvent({ type: 'pass_turn' });
   }, [sendEvent]);
 
+  // Sync view overlay state to host so target player's remote panel gets eye notification.
+  // view_open/view_close sent on open/close; view_heartbeat sent every 5s while open.
+  useEffect(() => {
+    if (phase !== 'connected' || !code || !seat) return;
+    if (viewingPlayerIdx === null) {
+      api.sendLiveGameEvent(code, { type: 'view_close', seat, ts: Date.now() }).catch(() => {});
+      return;
+    }
+    // Send view_open immediately
+    api.sendLiveGameEvent(code, { type: 'view_open', playerIdx: viewingPlayerIdx, seat, ts: Date.now() }).catch(() => {});
+    // Send heartbeat every 5s while viewing
+    const id = setInterval(() => {
+      api.sendLiveGameEvent(code, { type: 'view_heartbeat', playerIdx: viewingPlayerIdx, seat, ts: Date.now() }).catch(() => {});
+    }, 5000);
+    return () => clearInterval(id);
+  }, [viewingPlayerIdx, phase, code, seat]);
+
   // ── Derived values ────────────────────────────────────────────────────────
   const playerIdx = state?.players.findIndex((p) => p.position === seat) ?? -1;
   const player = playerIdx >= 0 ? state?.players[playerIdx] : null;
@@ -343,7 +371,7 @@ function RemotePageInner() {
   const isMyTurn = state.players[state.currentPlayerIdx]?.position === seat;
 
   return (
-    <Box sx={{ width: '100dvw', height: '100dvh', overflow: 'hidden', position: 'relative', pt: 'env(safe-area-inset-top)', boxSizing: 'border-box' }}>
+    <Box sx={{ width: '100dvw', height: '100dvh', overflow: 'hidden', position: 'relative', pt: 'env(safe-area-inset-top)', boxSizing: 'border-box', touchAction: 'manipulation', overscrollBehavior: 'none' }}>
       {showReconnect && (
         <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30, bgcolor: 'warning.main', px: 2, py: 0.75, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'warning.contrastText' }}>Connection lost</Typography>
@@ -374,6 +402,11 @@ function RemotePageInner() {
         soundEnabled={soundEnabled}
         highlightMode={true}
         remoteMode={true}
+        viewerPlayerNames={Object.values(state.viewerMap ?? {}).filter(e => e.targetIdx === playerIdx && Date.now() - e.ts < 20000).map(e => e.viewerName)}
+        onSwitchToPlayer={(targetIdx) => setViewingPlayerIdx(targetIdx)}
+        onToggleTheme={toggleTheme}
+        themeMode={mode}
+        onToggleSound={() => setSoundEnabled(s => { const next = !s; try { localStorage.setItem('remoteSoundEnabled', next ? '1' : '0'); } catch {} return next; })}
         onPassTurn={isMyTurn ? handlePassTurn : undefined}
         {...(lifeKillPending && {
           lifeKillOpponents: state.players
@@ -395,33 +428,47 @@ function RemotePageInner() {
         })}
       />
 
-      {/* Dark mode toggle */}
-      <IconButton
-        onClick={toggleTheme}
-        aria-label="toggle dark mode"
-        sx={{
-          position: 'absolute', bottom: 10, left: 58, zIndex: 10,
-          color: 'text.secondary',
-          bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.6)',
-          '&:hover': { bgcolor: 'action.hover' },
-        }}
-      >
-        {mode === 'light' ? <Brightness4Icon /> : <Brightness7Icon />}
-      </IconButton>
+      {/* Read-only overlay — view another player's panel */}
+      {viewingPlayerIdx !== null && state && (() => {
+        const vPlayer = state.players[viewingPlayerIdx];
+        if (!vPlayer) return null;
+        const noop = () => {};
+        return (
+          <Box sx={{ position: 'absolute', inset: 0, zIndex: 60, bgcolor: 'rgba(0,0,0,0.7)' }}
+            onClick={() => setViewingPlayerIdx(null)}>
+            <Box onClick={(e) => e.stopPropagation()} sx={{ position: 'absolute', inset: 0 }}>
+              <PlayerPanel
+                player={{ ...vPlayer, position: 'bottom' }}
+                playerIdx={viewingPlayerIdx}
+                allPlayers={state.players}
+                commanderDamage={state.commanderDamage}
+                startingLife={state.startingLife}
+                onLifeChange={noop} onPoisonChange={noop} onCommanderTaxChange={noop}
+                onEnergyChange={noop} onExperienceChange={noop}
+                onToggleMonarch={noop} onToggleInitiative={noop} onToggleCitysBlessing={noop}
+                onCommanderDamageChange={noop} onEliminate={noop} onUndoEliminate={noop}
+                highlightMode={false} soundEnabled={false} remoteMode={true}
+                activePlayerIdx={state.currentPlayerIdx}
+                turnTimerSeconds={state.turnTimerSeconds}
+                onSwitchToPlayer={(targetIdx) => setViewingPlayerIdx(targetIdx)}
+              />
+              <Box sx={{ position: 'absolute', inset: 0, zIndex: 5, cursor: 'pointer' }}
+                onClick={() => setViewingPlayerIdx(null)} />
+              {/* Read-only banner */}
+              <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', px: 1, py: 0.4, background: 'linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.7) 44%, rgba(0,0,0,1) 50%, rgba(0,0,0,0.7) 56%, rgba(0,0,0,0) 100%)' }}>
+                <Typography sx={{ fontSize: 19, fontWeight: 600, color: '#fff', lineHeight: 1.3 }}>
+                  Read Only — {vPlayer.playerName}
+                </Typography>
+              </Box>
+              <IconButton onClick={() => setViewingPlayerIdx(null)}
+                sx={{ position: 'absolute', top: 4, right: 8, zIndex: 11, p: 0.5, color: 'rgba(255,255,255,0.7)' }}>
+                <CloseIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Box>
+          </Box>
+        );
+      })()}
 
-      {/* Sound toggle */}
-      <IconButton
-        onClick={() => setSoundEnabled(s => !s)}
-        aria-label="toggle sound"
-        sx={{
-          position: 'absolute', bottom: 10, left: 106, zIndex: 10,
-          color: soundEnabled ? 'primary.main' : 'text.disabled',
-          bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.6)',
-          '&:hover': { bgcolor: 'action.hover' },
-        }}
-      >
-        {soundEnabled ? <VolumeUpIcon /> : <VolumeOffIcon />}
-      </IconButton>
     </Box>
   );
 }
