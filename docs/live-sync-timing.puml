@@ -1,0 +1,161 @@
+@startuml Live Game Sync — Timing & Stale State Analysis
+
+title Commander Collector — Live Sync Timing\n(Host + Remote relative to DB, showing stale-state risk)
+
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+skinparam BoxPadding 10
+skinparam ParticipantPadding 20
+skinparam defaultFontSize 12
+skinparam noteFontSize 11
+
+actor Host as H
+participant "Host React\nState" as HS
+participant Database as DB
+participant "Remote React\nState" as RS
+actor Remote as R
+
+== Game Start ==
+
+H -> HS : handleStart(players, life)\nbuildInitialState()\n** sessionCode = null **
+note right of HS
+  useEffect([state]) fires:
+  sessionCode is null → **no DB write**
+end note
+
+HS -> DB : createLiveGame(freshState, seats)
+DB --> HS : { sessionCode, seats }
+HS -> HS : setState adds sessionCode + sessionSeats
+note right of HS
+  useEffect fires again:
+  sessionCode now set → **writes to DB**
+  lastWriteTimeRef = now
+end note
+HS -> DB : updateLiveGame(code, state)
+
+note over DB
+  DB now holds: turn=1, currentPlayer=0
+  from the **initial** state (no old-game bleed here)
+  BUT if deleteLiveGame failed for prior session →
+  old session may still be active in DB
+end note
+
+== Remote Connects ==
+
+R -> RS : connect(code)\nGET /live-game?code=X
+DB --> RS : { is_active:true, state, seat }
+RS -> RS : setState(dbState + checkin)\nlastWriteTimeRef = now
+RS -> DB : updateLiveGame(code, state+checkin)
+note right of RS
+  Immediately writes DB state back.
+  Write guard blocks poll for 3000ms.
+end note
+
+== Steady-State Polling Cycle ==
+
+note over H, R
+  POLL_INTERVAL = 3000ms
+  Host write guard: 500ms
+  Remote write guard: 3000ms
+  Heartbeat: 9000ms
+end note
+
+group t=0 — Host advances turn (Next Turn button)
+  H -> HS : handleNextTurn()
+  HS -> HS : currentPlayerIdx++\nturnNumber++\nturnStartTime=now
+  HS -> DB : updateLiveGame(code, newState)\n[useEffect on state change]
+  HS -> HS : lastWriteTimeRef = now
+  note right of HS
+    DB is now authoritative:
+    turn=2, player=1
+  end note
+end
+
+group t=200ms — Remote makes an action (e.g. life tap)
+  R -> RS : handleLifeChange(idx, -1)
+  RS -> RS : setState(prev => { ...prev, life-- })
+  note right of RS #ffaaaa
+    **STALE DATA WRITE:**
+    prev = last polled state (turn=1, player=0)
+    Remote has NOT yet seen the host's turn advance.
+    life change is correct BUT turnNumber/currentPlayerIdx
+    are the old values from last poll.
+  end note
+  RS -> DB : updateLiveGame(code, { turn=1, player=0, life-- })
+  RS -> RS : lastWriteTimeRef = now
+  note right of RS
+    Write guard now blocks remote poll for 3000ms
+  end note
+end
+
+group t=500ms — Host poll fires (500ms write guard passes)
+  HS -> DB : GET /live-game?code=X
+  DB --> HS : { updated_at: T2, state: { turn=1, player=0, life-- } }
+  note right of HS #ffaaaa
+    updated_at changed (remote wrote at t=200ms).
+    JSON differs → host APPLIES the remote state.
+    **HOST IS REVERTED** to turn=1, player=0.
+  end note
+  HS -> HS : setState(remoteStaleState)
+  HS -> DB : updateLiveGame(code, revertedState)
+end
+
+group t=3200ms — Remote poll finally fires (3000ms guard passes)
+  RS -> DB : GET /live-game?code=X
+  DB --> RS : { state: { turn=1, player=0, life-- } }
+  note right of RS
+    Gets the host-reverted state.
+    Looks consistent to remote — no visible change.
+  end note
+end
+
+== Heartbeat (every 9000ms) — FIXED ==
+
+group t=9000ms — Remote heartbeat
+  RS -> DB : GET /live-game?code=X\n[read-modify-write]
+  DB --> RS : { state: currentDBState }
+  note right of RS #aaffaa
+    Uses fresh DB state as base — not local prev.
+    Only adds remoteCheckins timestamp on top.
+    **Does NOT overwrite host turn.**
+  end note
+  RS -> DB : updateLiveGame(code,\n  { ...currentDBState, remoteCheckins: {..., seat: now} })
+end
+
+== Root Cause: Stale Local State on Remote Actions ==
+
+note over HS, RS #ffffaa
+  The heartbeat race is fixed.
+  But ALL other remote action handlers (life, poison,
+  commander damage, pass turn, etc.) still write
+  **local React state** to DB — not a fresh DB read.
+
+  If remote local state is behind the host by even one
+  poll cycle (up to 3000ms), any remote tap overwrites
+  the host's most recent changes in DB.
+
+  The host's 500ms write guard means it polls quickly
+  after its own writes, and when it sees the remote's
+  stale write (updated_at changed), it applies it,
+  reverting its own state.
+end note
+
+== Old Game State Scenario ==
+
+note over H, DB #ffd0d0
+  Risk: if deleteLiveGame() fails (fire-and-forget, silent catch)
+  when starting a new game, the old session remains active.
+
+  If the remote re-scans the same QR or navigates back to the
+  same URL code, it connects to the OLD session. Actions on the
+  old session do not affect the new game, but the remote player
+  sees stale game data (old players, old life totals, old turn).
+
+  Also: host localStorage can hold a game with sessionCode from
+  a prior session that was never properly deleted. On page reload,
+  loadSavedState() restores this state, and useEffect immediately
+  writes it to DB if sessionCode is still active — potentially
+  overwriting whatever state is currently in DB.
+end note
+
+@enduml
