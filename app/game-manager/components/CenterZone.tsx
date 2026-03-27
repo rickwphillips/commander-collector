@@ -451,10 +451,10 @@ export function CenterZone({
                   startRollOff(activeIndices);
                 }}
                 disabled={rollOffState.phase === 'rolling' || rollOffState.phase === 'tie'}
-                sx={{ width: btnRollSize, height: btnRollSize, flexDirection: 'column', gap: 0.75, fontSize: fsPlayerName, fontWeight: 700, borderRadius: 2, flexShrink: 0 }}
+                sx={{ width: btnRollSize, height: btnRollSize, flexDirection: 'column', gap: 0, fontSize: fsPlayerName, fontWeight: 700, borderRadius: 2, flexShrink: 0 }}
               >
                 <Box sx={{ display: 'inline-flex' }}><D20Icon size={40} /></Box>
-                Roll Off
+                Roll
               </Button>
               <Button
                 variant="outlined"
@@ -566,7 +566,7 @@ export function CenterZone({
               </IconButton>
             </Stack>
 
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '100%' }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '85%' }}>
               <FormControlLabel
                 control={
                   <Switch

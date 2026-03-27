@@ -343,7 +343,7 @@ function RemotePageInner() {
   const isMyTurn = state.players[state.currentPlayerIdx]?.position === seat;
 
   return (
-    <Box sx={{ width: '100dvw', height: '100dvh', overflow: 'hidden', position: 'relative' }}>
+    <Box sx={{ width: '100dvw', height: '100dvh', overflow: 'hidden', position: 'relative', pt: 'env(safe-area-inset-top)', boxSizing: 'border-box' }}>
       {showReconnect && (
         <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30, bgcolor: 'warning.main', px: 2, py: 0.75, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'warning.contrastText' }}>Connection lost</Typography>

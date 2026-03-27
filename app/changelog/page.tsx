@@ -38,6 +38,18 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '1.29.0',
+    date: '2026-03-27',
+    title: 'Remote Panel & Settings Polish',
+    changes: [
+      { type: 'fixed', text: 'Life total on the remote panel now sits lower, away from the player header bar' },
+      { type: 'fixed', text: 'Remote panel accounts for phone safe-area insets so content no longer renders behind the status bar or notch' },
+      { type: 'changed', text: 'Roll button renamed from "Roll Off" to "Roll"' },
+      { type: 'improved', text: 'Dice icon and Roll label are now flush with no gap between them' },
+      { type: 'improved', text: 'Notes button moved inline with the Timer/Highlight/Sound toggles in the settings panel' },
+    ],
+  },
+  {
     version: '1.28.0',
     date: '2026-03-27',
     title: 'Fluid Typography & Commander Snapshot Overlay',
