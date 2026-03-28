@@ -20,6 +20,8 @@ import PeopleIcon from '@mui/icons-material/People';
 import StyleIcon from '@mui/icons-material/Style';
 import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import AddCircleIcon from '@mui/icons-material/AddCircle';
 import AddIcon from '@mui/icons-material/Add';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import { DarkModeToggle } from './components/DarkModeToggle';
@@ -60,6 +62,22 @@ const navItems = [
     href: '/stats',
     icon: <BarChartIcon sx={{ fontSize: 40 }} />,
     color: '#CD853F',
+  },
+  {
+    title: 'Play Game',
+    description: 'Log a new Commander match',
+    href: '/game-manager',
+    icon: <AddCircleIcon sx={{ fontSize: 40 }} />,
+    color: '#A0522D',
+    centerRow: true,
+  },
+  {
+    title: 'Rules Guru',
+    description: 'Ask questions about MTG rules',
+    href: '/rules/chat',
+    icon: <MenuBookIcon sx={{ fontSize: 40 }} />,
+    color: '#6B8E6B',
+    external: true,
   },
 ];
 
@@ -180,10 +198,10 @@ export default function Dashboard() {
         {/* Navigation Cards */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
           {navItems.map((item, index) => (
-            <Grid key={item.title} size={{ xs: 6, md: 3 }}>
+            <Grid key={item.title} size={{ xs: 6, md: 3 }} offset={item.centerRow ? { md: 3, xs: 0 } : undefined}>
               <Grow in={mounted} timeout={800 + index * 150}>
                 <Card className={styles.navCard}>
-                  <CardActionArea component={Link} href={item.href} sx={{ height: '100%' }}>
+                  <CardActionArea component={item.external ? 'a' : Link} href={item.external && process.env.NODE_ENV === 'development' ? `http://localhost:3003${item.href.replace('/rules', '')}` : item.href} sx={{ height: '100%' }}>
                     <CardContent sx={{ textAlign: 'center', py: 3 }}>
                       <Box sx={{ color: item.color, mb: 2 }}>{item.icon}</Box>
                       <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>

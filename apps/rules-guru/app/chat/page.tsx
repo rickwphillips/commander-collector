@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
 import {
   Box,
   Typography,
@@ -31,6 +32,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
 import AutoStoriesIcon from '@mui/icons-material/AutoStories';
@@ -301,6 +303,11 @@ export default function ChatPage() {
           square
           sx={{ px: 2, py: 1.5, display: 'flex', alignItems: 'center', gap: 1, zIndex: 10 }}
         >
+          <Tooltip title="Commander Collector">
+            <IconButton component="a" href={process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '/app/projects/commander'} size="small">
+              <ArrowBackIcon />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="History">
             <IconButton onClick={() => setHistoryOpen(true)} size="small">
               <HistoryIcon />
@@ -362,12 +369,15 @@ export default function ChatPage() {
                   borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                 }}
               >
-                <Typography
-                  variant="body2"
-                  sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}
-                >
-                  {msg.content}
-                </Typography>
+                {msg.role === 'assistant' ? (
+                  <Box sx={{ '& p': { m: 0, mb: 1, lineHeight: 1.6, fontSize: '0.875rem' }, '& p:last-child': { mb: 0 }, '& ul, & ol': { mt: 0.5, mb: 1, pl: 2.5 }, '& li': { fontSize: '0.875rem', lineHeight: 1.6 }, '& strong': { fontWeight: 600 }, '& code': { fontFamily: 'monospace', fontSize: '0.8rem', bgcolor: 'action.hover', px: 0.5, borderRadius: 0.5 } }}>
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  </Box>
+                ) : (
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                    {msg.content}
+                  </Typography>
+                )}
 
                 {/* Pending pattern proposal */}
                 {msg.pending_pattern && (

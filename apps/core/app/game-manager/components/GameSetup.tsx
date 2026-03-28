@@ -92,6 +92,12 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
   const [turnTimerSeconds, setTurnTimerSeconds] = useState<number>(300);
 
   const [playerCount, setPlayerCount] = useState<number>(4);
+
+  useEffect(() => {
+    if (!isCustomLife) {
+      setStartingLife(playerCount === 2 ? 30 : 40);
+    }
+  }, [playerCount, isCustomLife]);
   const [slots, setSlots] = useState<PlayerSlot[]>([emptySlot(), emptySlot(), emptySlot(), emptySlot()]);
   const [seatPositions, setSeatPositions] = useState<SeatPosition[]>(['bottom', 'left', 'top', 'right']);
 
@@ -522,71 +528,68 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
           </Button>
         </Stack>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
-
         <Card sx={{ mb: 3 }}>
           <CardContent>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-              Starting Life Total
-            </Typography>
-            <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-              <ToggleButtonGroup
-                value={isCustomLife ? null : startingLife}
-                exclusive
-                onChange={handleLifePreset}
-                size="small"
-              >
-                {LIFE_PRESETS.map((v) => (
-                  <ToggleButton key={v} value={v}>
-                    {v}
-                  </ToggleButton>
-                ))}
-              </ToggleButtonGroup>
-              <TextField
-                label="Custom"
-                value={customLife}
-                onChange={(e) => handleCustomLife(e.target.value)}
-                size="small"
-                type="number"
-                inputProps={{ min: 1 }}
-                sx={{ width: 100 }}
-                placeholder="e.g. 30"
-              />
+            <Stack direction="row" spacing={4} flexWrap="wrap" gap={2}>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                  Players
+                </Typography>
+                <ToggleButtonGroup
+                  value={playerCount}
+                  exclusive
+                  onChange={handlePlayerCountChange}
+                  size="small"
+                >
+                  <ToggleButton value={2}>2</ToggleButton>
+                  <ToggleButton value={3}>3</ToggleButton>
+                  <ToggleButton value={4}>4</ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                  Starting Life
+                </Typography>
+                <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+                  <ToggleButtonGroup
+                    value={isCustomLife ? null : startingLife}
+                    exclusive
+                    onChange={handleLifePreset}
+                    size="small"
+                  >
+                    {LIFE_PRESETS.map((v) => (
+                      <ToggleButton key={v} value={v}>
+                        {v}
+                      </ToggleButton>
+                    ))}
+                  </ToggleButtonGroup>
+                  <TextField
+                    label="Custom"
+                    value={customLife}
+                    onChange={(e) => handleCustomLife(e.target.value)}
+                    size="small"
+                    type="number"
+                    inputProps={{ min: 1 }}
+                    sx={{ width: 100 }}
+                    placeholder="e.g. 30"
+                  />
+                </Stack>
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                  Turn Timer
+                </Typography>
+                <TextField
+                  label="Seconds"
+                  type="number"
+                  size="small"
+                  value={turnTimerSeconds}
+                  onChange={(e) => setTurnTimerSeconds(Math.max(0, Number(e.target.value)))}
+                  inputProps={{ min: 0 }}
+                  sx={{ width: 180 }}
+                />
+              </Box>
             </Stack>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Starting life: <strong>{startingLife}</strong>
-            </Typography>
-            <TextField
-              label="Turn Timer (seconds, 0 = no limit)"
-              type="number"
-              size="small"
-              value={turnTimerSeconds}
-              onChange={(e) => setTurnTimerSeconds(Math.max(0, Number(e.target.value)))}
-              inputProps={{ min: 0 }}
-              sx={{ mt: 2, width: 180 }}
-            />
-          </CardContent>
-        </Card>
-
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-              Number of Players
-            </Typography>
-            <ToggleButtonGroup
-              value={playerCount}
-              exclusive
-              onChange={handlePlayerCountChange}
-              size="small"
-            >
-              <ToggleButton value={2}>2</ToggleButton>
-              <ToggleButton value={3}>3</ToggleButton>
-              <ToggleButton value={4}>4</ToggleButton>
-            </ToggleButtonGroup>
           </CardContent>
         </Card>
 
@@ -594,6 +597,12 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
           Players
         </Typography>
         {Array.from({ length: playerCount }, (_, i) => renderSlot(i))}
+
+        {error && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {error}
+          </Alert>
+        )}
 
         <Button
           variant="contained"

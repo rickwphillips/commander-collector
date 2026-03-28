@@ -38,6 +38,20 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '3.0.0',
+    date: '2026-03-28',
+    title: 'Game Manager & Rules Guru Overhaul',
+    changes: [
+      { type: 'added', text: 'Rules Guru link card on the main dashboard — jump straight to the MTG rules chat' },
+      { type: 'added', text: 'Play Game nav card on the main dashboard — quick access to the Game Manager' },
+      { type: 'added', text: 'Back to Commander link in Rules Guru chat header' },
+      { type: 'added', text: 'Markdown rendering in Rules Guru chat — AI responses now render formatted text, lists, and code' },
+      { type: 'changed', text: 'Game Setup — players, starting life, and turn timer consolidated into a single panel' },
+      { type: 'changed', text: 'Starting life defaults to 30 for 2-player games, 40 for 3+ (reverts automatically)' },
+      { type: 'improved', text: 'Validation errors in Game Setup now appear directly above the Start Game button' },
+    ],
+  },
+  {
     version: '2.4.0',
     date: '2026-03-28',
     title: 'MTG Rules Guru & Turborepo Monorepo',
