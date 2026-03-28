@@ -293,7 +293,6 @@ function executeTool(string $name, array $input): string {
         ]);
         $body   = curl_exec($ch);
         $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
 
         if ($status !== 200 || !$body) {
             return json_encode(['error' => "Card not found: {$input['name']}"]);
@@ -311,7 +310,6 @@ function executeTool(string $name, array $input): string {
                 CURLOPT_USERAGENT      => 'CommanderCollector/2.4 (rules-guru)',
             ]);
             $rbody = curl_exec($rch);
-            curl_close($rch);
             if ($rbody) {
                 $rdata   = json_decode($rbody, true);
                 $rulings = array_map(fn($r) => $r['comment'], $rdata['data'] ?? []);
@@ -370,7 +368,6 @@ while ($iter < $maxIter) {
 
     $body   = curl_exec($ch);
     $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
 
     if ($status !== 200) {
         $err = json_decode($body, true);

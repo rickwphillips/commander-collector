@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
   },
   ...(isDev ? { experimental: { proxyTimeout: 120_000 } } : {}),
   ...(isDev ? {} : { output: 'export' }),
-  basePath: isDev ? '' : '/app/projects/rules-guru',
+  basePath: isDev ? '' : '/app/projects/commander/rules',
   images: {
     unoptimized: true,
     dangerouslyAllowSVG: true,

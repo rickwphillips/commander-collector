@@ -38,6 +38,21 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '2.4.0',
+    date: '2026-03-28',
+    title: 'MTG Rules Guru & Turborepo Monorepo',
+    changes: [
+      { type: 'added', text: 'MTG Rules Guru — new standalone app with AI-powered rules chat and conversation history' },
+      { type: 'added', text: 'Pattern library drawer — browse and review all filed interaction abstractions in-app' },
+      { type: 'added', text: 'Proposed pattern review dialog — review and confirm new patterns surfaced during chat' },
+      { type: 'added', text: 'PHP API: rules chat endpoint using Claude tool-use loop (lookup_card, propose_pattern)' },
+      { type: 'added', text: 'PHP API: pattern CRUD, conversation management, and pattern seeder (P001–P014)' },
+      { type: 'added', text: 'DB migration v2.4.0 — rules_patterns, rules_conversations, rules_messages tables' },
+      { type: 'changed', text: 'Restructured to Turborepo monorepo — apps/core, apps/decks, apps/rules-guru, packages/shared' },
+      { type: 'changed', text: 'Shared components and utilities extracted to packages/shared for cross-app reuse' },
+    ],
+  },
+  {
     version: '2.3.0',
     date: '2026-03-28',
     title: 'Decklist, Card Versions & Scan Overhaul',
