@@ -26,11 +26,21 @@ if (!$apiKey) {
 }
 
 $prompt = <<<PROMPT
-You are analyzing a photo of Magic: The Gathering cards laid out on a table. The cards may be in sleeves.
+You are performing OCR on a photo of Magic: The Gathering cards spread out on a table.
 
-For each card you can see, return its name and whether it appears to be a photocopy/proxy rather than a genuine printed card.
+The cards may be oriented in any direction — rotated 90°, upside down, or at an angle. Card names are printed along the top edge of each card, so in a spread they will often appear sideways or vertically in the photo. You must read the name text regardless of its orientation — mentally rotate each card to read it.
 
-Proxy indicators to look for (even through sleeves):
+Your task is to READ the printed name text on each visible card. Do not guess, infer, or use card artwork to identify cards. Do not use your knowledge of deck archetypes or themes. Only return a card if you can actually read its name text in the image.
+
+Important rules:
+- Read the NAME LINE printed on each card — that is the only source of truth
+- Cards may be rotated — tilt your reading of the text to match each card's orientation
+- If a card's name is obscured, cut off, or unreadable, skip it entirely
+- Do NOT infer names from artwork, colors, or card type
+- Do NOT generate a deck list based on the theme or archetype you recognize
+- It is better to return fewer correct names than many hallucinated ones
+
+For each card whose name you can read, also assess whether it appears to be a photocopy/proxy:
 - Noticeably lower print quality, pixelation, or blurriness compared to real cards
 - Matte/flat appearance where a real card would have gloss or texture
 - Slight color shifts, washed-out colors, or inkjet-style banding

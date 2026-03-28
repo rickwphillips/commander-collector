@@ -38,6 +38,18 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '2.1.0',
+    date: '2026-03-28',
+    title: 'Scan Accuracy & Image Editor',
+    changes: [
+      { type: 'added', text: 'Image editor dialog before submitting a scan — rotate 90° CW/CCW, adjust brightness and contrast with live preview' },
+      { type: 'improved', text: 'Scan prompt now explicitly instructs Claude to perform OCR on card name text rather than identifying cards by artwork or deck theme' },
+      { type: 'improved', text: 'Prompt instructs Claude to read card names regardless of orientation, since cards are often sideways in a spread photo' },
+      { type: 'improved', text: 'Max image resolution increased from 1600px to 3000px for better legibility of card names in large spreads' },
+      { type: 'fixed', text: 'Invalid config key removed that was causing production build failures' },
+    ],
+  },
+  {
     version: '2.0.0',
     date: '2026-03-28',
     title: 'Deck Scanner & Card List Management',

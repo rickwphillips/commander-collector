@@ -19,6 +19,7 @@ import {
   Grid,
   IconButton,
   MenuItem,
+  Slider,
   Stack,
   Step,
   StepLabel,
@@ -28,6 +29,8 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
+import RotateLeftIcon from '@mui/icons-material/RotateLeft';
+import RotateRightIcon from '@mui/icons-material/RotateRight';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -160,6 +163,12 @@ function ScanDeckPageInner() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [playersLoaded, setPlayersLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Pre-scan image editor
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [editRotation, setEditRotation] = useState(0);
+  const [editBrightness, setEditBrightness] = useState(100);
+  const [editContrast, setEditContrast] = useState(100);
 
   // Discard confirmation
   const [discardOpen, setDiscardOpen] = useState(false);
@@ -327,52 +336,62 @@ function ScanDeckPageInner() {
 
   // ── File / Camera input ────────────────────────────────────────────────────
 
-  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Open the pre-scan editor instead of scanning immediately
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setError(null);
     setPreviewUrl(URL.createObjectURL(file));
-    setScanning(true);
-
-    try {
-      const { base64, mimeType } = await fileToBase64(file);
-      const result = await api.scanDeck(base64, mimeType);
-      await lookupAllCards(result.cards);
-      setStep(1);
-    } catch (err) {
-      console.error('[Scan error]', err);
-      setError(err instanceof Error ? err.message : 'Scan failed');
-    } finally {
-      setScanning(false);
-      // Reset input so same file can be re-selected
-      if (cameraInputRef.current) cameraInputRef.current.value = '';
-      if (uploadInputRef.current) uploadInputRef.current.value = '';
-    }
+    setEditRotation(0);
+    setEditBrightness(100);
+    setEditContrast(100);
+    setPendingFile(file);
+    // Reset inputs so the same file can be re-selected
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (uploadInputRef.current) uploadInputRef.current.value = '';
   }, []);
 
-  async function fileToBase64(file: File): Promise<{ base64: string; mimeType: string }> {
-    const MAX_PX = 1600;
+  // Apply rotation + brightness/contrast to a canvas and return base64 JPEG
+  async function fileToBase64(
+    file: File,
+    rotation: number,
+    brightness: number,
+    contrast: number,
+  ): Promise<{ base64: string; mimeType: string }> {
+    const MAX_PX = 3000;
 
     const isHeic = file.type === 'image/heic' || file.type === 'image/heif' ||
       file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
 
-    // All images: decode via createImageBitmap (handles HEIC in Safari natively),
-    // scale down to MAX_PX on the longest side, export as JPEG.
     try {
       const bitmap = await createImageBitmap(file);
-      let w = bitmap.width;
-      let h = bitmap.height;
-      if (Math.max(w, h) > MAX_PX) {
-        const scale = MAX_PX / Math.max(w, h);
-        w = Math.round(w * scale);
-        h = Math.round(h * scale);
+      const origW = bitmap.width;
+      const origH = bitmap.height;
+
+      // Scale the source so the longest side fits MAX_PX
+      let sw = origW, sh = origH;
+      if (Math.max(sw, sh) > MAX_PX) {
+        const scale = MAX_PX / Math.max(sw, sh);
+        sw = Math.round(sw * scale);
+        sh = Math.round(sh * scale);
       }
+
+      // Output canvas dimensions swap when rotating 90° or 270°
+      const swapped = rotation === 90 || rotation === 270;
+      const outW = swapped ? sh : sw;
+      const outH = swapped ? sw : sh;
+
       const canvas = document.createElement('canvas');
-      canvas.width  = w;
-      canvas.height = h;
-      canvas.getContext('2d')!.drawImage(bitmap, 0, 0, w, h);
+      canvas.width  = outW;
+      canvas.height = outH;
+      const ctx = canvas.getContext('2d')!;
+
+      ctx.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
+      ctx.translate(outW / 2, outH / 2);
+      ctx.rotate((rotation * Math.PI) / 180);
+      ctx.drawImage(bitmap, -sw / 2, -sh / 2, sw, sh);
       bitmap.close();
+
       const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
       return { base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' };
     } catch (err) {
@@ -382,6 +401,26 @@ function ScanDeckPageInner() {
         );
       }
       throw new Error('Could not process image: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  }
+
+  // Called when user confirms the pre-scan editor and clicks Scan
+  async function processAndScan() {
+    if (!pendingFile) return;
+    setPendingFile(null);
+    setScanMoreOpen(false);
+    setScanning(true);
+
+    try {
+      const { base64, mimeType } = await fileToBase64(pendingFile, editRotation, editBrightness, editContrast);
+      const result = await api.scanDeck(base64, mimeType);
+      await lookupAllCards(result.cards);
+      setStep(1);
+    } catch (err) {
+      console.error('[Scan error]', err);
+      setError(err instanceof Error ? err.message : 'Scan failed');
+    } finally {
+      setScanning(false);
     }
   }
 
@@ -1104,6 +1143,86 @@ function ScanDeckPageInner() {
             </Button>
           </Stack>
         </DialogContent>
+      </Dialog>
+
+      {/* ── Pre-Scan Image Editor ── */}
+      <Dialog open={!!pendingFile} onClose={() => setPendingFile(null)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          Adjust Image Before Scanning
+          <IconButton onClick={() => setPendingFile(null)} sx={{ position: 'absolute', right: 8, top: 8 }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={3}>
+            {/* Preview */}
+            <Box sx={{ textAlign: 'center', overflow: 'hidden', borderRadius: 1, bgcolor: 'action.hover', p: 1 }}>
+              {previewUrl && (
+                <Box
+                  component="img"
+                  src={previewUrl}
+                  alt="Preview"
+                  sx={{
+                    maxWidth: '100%',
+                    maxHeight: 400,
+                    objectFit: 'contain',
+                    transform: `rotate(${editRotation}deg)`,
+                    filter: `brightness(${editBrightness}%) contrast(${editContrast}%)`,
+                    transition: 'transform 0.2s',
+                  }}
+                />
+              )}
+            </Box>
+
+            {/* Rotation */}
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Typography variant="body2" sx={{ minWidth: 80 }}>Rotation</Typography>
+              <IconButton onClick={() => setEditRotation((r) => (r - 90 + 360) % 360)}>
+                <RotateLeftIcon />
+              </IconButton>
+              <Typography variant="body2" sx={{ minWidth: 40, textAlign: 'center' }}>
+                {editRotation}°
+              </Typography>
+              <IconButton onClick={() => setEditRotation((r) => (r + 90) % 360)}>
+                <RotateRightIcon />
+              </IconButton>
+            </Stack>
+
+            {/* Brightness */}
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Typography variant="body2" sx={{ minWidth: 80 }}>Brightness</Typography>
+              <Slider
+                value={editBrightness}
+                onChange={(_, v) => setEditBrightness(v as number)}
+                min={50} max={200} step={5}
+                valueLabelDisplay="auto"
+                valueLabelFormat={(v) => `${v}%`}
+                sx={{ flex: 1 }}
+              />
+              <Button size="small" onClick={() => setEditBrightness(100)}>Reset</Button>
+            </Stack>
+
+            {/* Contrast */}
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Typography variant="body2" sx={{ minWidth: 80 }}>Contrast</Typography>
+              <Slider
+                value={editContrast}
+                onChange={(_, v) => setEditContrast(v as number)}
+                min={50} max={200} step={5}
+                valueLabelDisplay="auto"
+                valueLabelFormat={(v) => `${v}%`}
+                sx={{ flex: 1 }}
+              />
+              <Button size="small" onClick={() => setEditContrast(100)}>Reset</Button>
+            </Stack>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPendingFile(null)}>Cancel</Button>
+          <Button variant="contained" startIcon={<CameraAltIcon />} onClick={processAndScan}>
+            Scan
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* ── Discard Confirmation Dialog ── */}
