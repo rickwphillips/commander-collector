@@ -1,0 +1,12 @@
+{
+  "name": "@commander/shared",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./lib/*": "./src/lib/*.ts",
+    "./components/*": "./src/components/*.tsx",
+    "./theme/*": "./src/theme/*.ts"
+  }
+}

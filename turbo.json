@@ -1,0 +1,24 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["app/**", "src/**", "public/**", "package.json", "next.config.ts", "tsconfig.json"],
+      "outputs": ["out/**", ".next/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "dependsOn": ["^lint"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "inputs": ["app/**", "src/**", "tests/**"]
+    },
+    "test:run": {
+      "dependsOn": ["^build"]
+    }
+  }
+}

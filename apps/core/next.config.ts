@@ -3,6 +3,7 @@ import type { NextConfig } from 'next';
 const isDev = process.env.NODE_ENV === 'development';
 
 const nextConfig: NextConfig = {
+  transpilePackages: ['@commander/shared'],
   env: {
     NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),
   },

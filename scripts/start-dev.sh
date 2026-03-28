@@ -11,12 +11,12 @@ echo "Waiting for MySQL to start..."
 sleep 2
 
 echo "Starting PHP server on port 8080..."
-cd "$PROJECT_DIR/app"
+cd "$PROJECT_DIR/apps/core/app"
 php -S localhost:8080 > /tmp/php-server.log 2>&1 &
 echo "PHP server PID: $!"
 
 echo "Starting Next.js dev server..."
-cd "$PROJECT_DIR"
+cd "$PROJECT_DIR/apps/core"
 npm run dev > /tmp/nextjs-server.log 2>&1 &
 echo "Next.js PID: $!"
 

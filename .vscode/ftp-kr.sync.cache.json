@@ -1,0 +1,381 @@
+{
+  "ftp://ftpUser@rickwphillips.com@ftp.rickwphillips.com:21": {
+    ".bash_history": {
+      "type": "-",
+      "size": 4224,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".bash_logout": {
+      "type": "-",
+      "size": 18,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".bash_profile": {
+      "type": "-",
+      "size": 176,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".bashrc": {
+      "type": "-",
+      "size": 321,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".config": {},
+    ".contactemail": {
+      "type": "-",
+      "size": 23,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".cpan": {},
+    ".cpanel": {},
+    ".cphorde": {},
+    ".dns": {
+      "type": "-",
+      "size": 17,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".ecp_conf": {},
+    ".emacs": {
+      "type": "-",
+      "size": 500,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".ftpquota": {
+      "type": "-",
+      "size": 18,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".gemrc": {
+      "type": "-",
+      "size": 140,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".gnupg": {},
+    ".htaccess": {
+      "type": "-",
+      "size": 0,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".htaccess.phpupgrader.0913478a": {
+      "type": "-",
+      "size": 0,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".htaccess.phpupgrader.2dd8403b": {
+      "type": "-",
+      "size": 0,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".htaccess.phpupgrader.99086971": {
+      "type": "-",
+      "size": 0,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".htaccess.phpupgrader.initial": {
+      "type": "-",
+      "size": 0,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".htpasswds": {},
+    ".koality": {},
+    ".kshrc": {
+      "type": "-",
+      "size": 171,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".lastlogin": {
+      "type": "-",
+      "size": 590,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".npm": {},
+    ".nvm": {},
+    ".pearrc": {
+      "type": "-",
+      "size": 616,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".pki": {},
+    ".softaculous": {},
+    ".spamassassin": {},
+    ".spamassassinboxenable": {
+      "type": "-",
+      "size": 0,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".spamassassinenable": {
+      "type": "-",
+      "size": 0,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".spamboxenable": {
+      "type": "-",
+      "size": 0,
+      "lmtime": 0,
+      "modified": false
+    },
+    ".ssh": {},
+    ".subaccounts": {},
+    ".trash": {},
+    ".wp-cli": {},
+    ".zshrc": {
+      "type": "-",
+      "size": 658,
+      "lmtime": 0,
+      "modified": false
+    },
+    "access-logs": {
+      "type": "l",
+      "size": 34,
+      "lmtime": 0,
+      "modified": false
+    },
+    "bin": {},
+    "dvlmxtvw.php": {
+      "type": "-",
+      "size": 760,
+      "lmtime": 0,
+      "modified": false
+    },
+    "error_log": {
+      "type": "-",
+      "size": 2518,
+      "lmtime": 0,
+      "modified": false
+    },
+    "etc": {},
+    "home2": {
+      "rickwphi": {}
+    },
+    "logs": {},
+    "mail": {},
+    "mxhzxmao.php": {
+      "type": "-",
+      "size": 760,
+      "lmtime": 0,
+      "modified": false
+    },
+    "perl": {},
+    "perl5": {},
+    "php": {},
+    "public_ftp": {},
+    "public_html": {
+      ".htaccess": {
+        "type": "-",
+        "size": 322,
+        "lmtime": 0,
+        "modified": false
+      },
+      ".htaccess.backup": {
+        "type": "-",
+        "size": 4070,
+        "lmtime": 0,
+        "modified": false
+      },
+      ".htaccess.nfd-backup": {
+        "type": "-",
+        "size": 3032,
+        "lmtime": 0,
+        "modified": false
+      },
+      ".well-known": {},
+      "GrampysLetters": {},
+      "app": {
+        "projects": {
+          "commander": {
+            "404": {},
+            "404.html": {
+              "type": "-",
+              "size": 8306,
+              "lmtime": 0,
+              "modified": false
+            },
+            "__next.__PAGE__.txt": {
+              "type": "-",
+              "size": 1418,
+              "lmtime": 0,
+              "modified": false
+            },
+            "__next._full.txt": {
+              "type": "-",
+              "size": 5160,
+              "lmtime": 0,
+              "modified": false
+            },
+            "__next._head.txt": {
+              "type": "-",
+              "size": 1246,
+              "lmtime": 0,
+              "modified": false
+            },
+            "__next._index.txt": {
+              "type": "-",
+              "size": 2139,
+              "lmtime": 0,
+              "modified": false
+            },
+            "__next._tree.txt": {
+              "type": "-",
+              "size": 452,
+              "lmtime": 0,
+              "modified": false
+            },
+            "_next": {},
+            "_not-found": {},
+            "decks": {},
+            "favicon.ico": {
+              "type": "-",
+              "size": 25931,
+              "lmtime": 0,
+              "modified": false
+            },
+            "file.svg": {
+              "type": "-",
+              "size": 391,
+              "lmtime": 0,
+              "modified": false
+            },
+            "games": {},
+            "globe.svg": {
+              "type": "-",
+              "size": 1035,
+              "lmtime": 0,
+              "modified": false
+            },
+            "index.html": {
+              "type": "-",
+              "size": 7939,
+              "lmtime": 0,
+              "modified": false
+            },
+            "index.txt": {
+              "type": "-",
+              "size": 5160,
+              "lmtime": 0,
+              "modified": false
+            },
+            "next.svg": {
+              "type": "-",
+              "size": 1375,
+              "lmtime": 0,
+              "modified": false
+            },
+            "players": {},
+            "stats": {},
+            "vercel.svg": {
+              "type": "-",
+              "size": 128,
+              "lmtime": 0,
+              "modified": false
+            },
+            "window.svg": {
+              "type": "-",
+              "size": 385,
+              "lmtime": 0,
+              "modified": false
+            }
+          }
+        }
+      },
+      "app.bu": {},
+      "cgi-bin": {},
+      "commander": {},
+      "commander-config.php": {
+        "type": "-",
+        "size": 1641,
+        "lmtime": 0,
+        "modified": false
+      },
+      "commander-decks.php": {
+        "type": "-",
+        "size": 5646,
+        "lmtime": 0,
+        "modified": false
+      },
+      "commander-games.php": {
+        "type": "-",
+        "size": 5465,
+        "lmtime": 0,
+        "modified": false
+      },
+      "commander-head-to-head.php": {
+        "type": "-",
+        "size": 2346,
+        "lmtime": 0,
+        "modified": false
+      },
+      "commander-players.php": {
+        "type": "-",
+        "size": 2785,
+        "lmtime": 0,
+        "modified": false
+      },
+      "commander-stats.php": {
+        "type": "-",
+        "size": 5202,
+        "lmtime": 0,
+        "modified": false
+      },
+      "demo": {},
+      "error_log": {
+        "type": "-",
+        "size": 10866625,
+        "lmtime": 0,
+        "modified": false
+      },
+      "grandkid-api": {},
+      "images": {},
+      "php-api": {},
+      "robots.txt": {
+        "type": "-",
+        "size": 102,
+        "lmtime": 0,
+        "modified": false
+      },
+      "website_55a83c24": {},
+      "website_58ddc6be": {},
+      "website_a45f874b": {}
+    },
+    "rickwphi_WPWTY.1726965324.sql": {
+      "type": "-",
+      "size": 0,
+      "lmtime": 0,
+      "modified": false
+    },
+    "rickwphi_WPWTY.1726965324.sql.gz": {
+      "type": "-",
+      "size": 50,
+      "lmtime": 0,
+      "modified": false
+    },
+    "ssl": {},
+    "stage": {},
+    "tmp": {},
+    "www": {
+      "type": "l",
+      "size": 11,
+      "lmtime": 0,
+      "modified": false
+    }
+  },
+  "$version": 1
+}

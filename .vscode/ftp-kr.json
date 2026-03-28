@@ -1,0 +1,16 @@
+{
+    "host": "ftp.rickwphillips.com",
+    "username": "ftpUser@rickwphillips.com",
+    "password": "foh{^lG5~5*f",
+    "remotePath": "/public_html/",
+    "protocol": "ftp",
+    "port": 21,
+    "fileNameEncoding": "utf8",
+    "autoUpload": false,
+    "autoDelete": false,
+    "autoDownload": false,
+    "ignore": [
+        ".git",
+        "/.vscode"
+    ]
+}
