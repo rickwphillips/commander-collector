@@ -1,11 +1,14 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Card,
   CardContent,
   CardActionArea,
   Grid,
+  IconButton,
+  Tooltip,
   Typography,
   Stack,
   Chip,
@@ -23,9 +26,11 @@ import {
 } from '@mui/material';
 import Link from 'next/link';
 import AddIcon from '@mui/icons-material/Add';
+import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import StyleIcon from '@mui/icons-material/Style';
 import InputAdornment from '@mui/material/InputAdornment';
 import { PageContainer } from '@/components/PageContainer';
 import { ColorIdentityChips } from '@/components/ColorIdentityChips';
@@ -52,6 +57,7 @@ type SortOption =
   | 'games-asc';
 
 export default function DecksPage() {
+  const router = useRouter();
   const [decks, setDecks] = useState<DeckWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -190,9 +196,14 @@ export default function DecksPage() {
       title="Decks"
       subtitle="Track your commanders and decks"
       actions={
-        <Button variant="contained" startIcon={<AddIcon />} component={Link} href="/decks/new">
-          Add Deck
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <Button variant="outlined" startIcon={<CameraAltIcon />} component={Link} href="/decks/scan">
+            Scan Deck
+          </Button>
+          <Button variant="contained" startIcon={<AddIcon />} component={Link} href="/decks/new">
+            Add Deck
+          </Button>
+        </Stack>
       }
     >
       {error && (
@@ -345,9 +356,24 @@ export default function DecksPage() {
                             Piloted by {deck.player_name}
                           </Typography>
                         </Box>
-                        <Box sx={{ flexShrink: 0, ml:-30 }}>
+                        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0, ml: -30 }}>
+                          {deck.card_count > 0 && (
+                            <Tooltip title={`${deck.card_count} cards — edit list`}>
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  router.push(`/decks/scan?edit=${deck.id}`);
+                                }}
+                              >
+                                <StyleIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                           <ColorIdentityChips colors={deck.colors} size="medium" fixed />
-                        </Box>
+                        </Stack>
                       </Stack>
 
                       <Stack direction="row" spacing={1} sx={{ mt: 2 }}>

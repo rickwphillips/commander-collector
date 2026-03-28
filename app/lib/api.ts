@@ -179,6 +179,35 @@ export const api = {
   deleteLiveGame: (code: string) =>
     apiFetch<{ success: boolean }>(`/live-game?code=${code}`, { method: 'DELETE' }),
 
+  // Deck Cards (card list for a deck)
+  getDeckCards: (deckId: number) =>
+    apiFetch<import('./types').DeckCard[]>(`/deck-cards?deck_id=${deckId}`),
+  saveDeckCards: (deckId: number, cards: import('./types').CreateDeckCardInput[]) =>
+    apiFetch<{ success: boolean; deck_id: number }>('/deck-cards', {
+      method: 'POST',
+      body: JSON.stringify({ deck_id: deckId, cards }),
+    }),
+  deleteDeckCards: (deckId: number) =>
+    apiFetch<{ success: boolean }>(`/deck-cards?deck_id=${deckId}`, { method: 'DELETE' }),
+
+  // Scryfall card cache
+  lookupCard: (name: string) =>
+    apiFetch<import('./types').ScryfallCachedCard | null>(
+      `/scryfall-cache?name=${encodeURIComponent(name)}`
+    ),
+  bulkLookupCards: (names: string[]) =>
+    apiFetch<{ results: (import('./types').ScryfallCachedCard & { error?: string })[] }>(
+      '/scryfall-cache',
+      { method: 'POST', body: JSON.stringify({ names }) }
+    ),
+
+  // Deck Scanner (Claude Vision)
+  scanDeck: (imageBase64: string, mimeType: string) =>
+    apiFetch<{ cards: { name: string; proxy: boolean }[] }>('/scan', {
+      method: 'POST',
+      body: JSON.stringify({ image: imageBase64, mime_type: mimeType }),
+    }),
+
   // Users (admin)
   getUsers: () =>
     apiFetch<{ id: number; username: string; display_name: string; role: string }[]>('/auth/users'),

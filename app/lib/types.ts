@@ -1,6 +1,44 @@
 // Game type
 export type GameType = 'standard' | '2hg';
 
+// Scryfall card cache
+export interface ScryfallCachedCard {
+  id?: number;
+  scryfall_id: string;
+  name: string;
+  image_uri: string | null;
+  colors: string;
+  color_identity: string;
+  type_line: string | null;
+  mana_cost: string | null;
+  cached_at?: string;
+}
+
+// Deck card list entry
+export interface DeckCard {
+  id?: number;
+  deck_id: number;
+  scryfall_id: string | null;
+  card_name: string;
+  quantity: number;
+  is_commander: number; // 0 or 1
+  is_proxy: number;     // 0 or 1
+  // Joined from scryfall_card_cache
+  image_uri?: string | null;
+  colors?: string;
+  color_identity?: string;
+  type_line?: string | null;
+  mana_cost?: string | null;
+}
+
+export interface CreateDeckCardInput {
+  card_name: string;
+  scryfall_id?: string | null;
+  quantity?: number;
+  is_commander?: boolean;
+  is_proxy?: boolean;
+}
+
 // Database row types
 export interface Player {
   id: number;
@@ -45,6 +83,7 @@ export interface GameResult {
 // Extended types with joins
 export interface DeckWithPlayer extends Deck {
   player_name: string;
+  card_count: number;
 }
 
 // Deck detail from API (includes stats)

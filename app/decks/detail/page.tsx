@@ -24,6 +24,7 @@ import Link from 'next/link';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import DownloadIcon from '@mui/icons-material/Download';
 import { PageContainer } from '@/components/PageContainer';
 import { StatsCard } from '@/components/StatsCard';
 import { ColorIdentityChips } from '@/components/ColorIdentityChips';
@@ -32,7 +33,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { EmptyState } from '@/components/EmptyState';
 import { api } from '@/lib/api';
 import { getOrdinalSuffix, MTG_COLORS_WITH_C } from '@/lib/utils';
-import type { DeckDetail as DeckDetailType, GameWithResults } from '@/lib/types';
+import type { DeckDetail as DeckDetailType, GameWithResults, DeckCard } from '@/lib/types';
 
 
 
@@ -43,6 +44,7 @@ export default function DeckDetailPage() {
 
   const [deck, setDeck] = useState<DeckDetailType | null>(null);
   const [games, setGames] = useState<GameWithResults[]>([]);
+  const [deckCards, setDeckCards] = useState<DeckCard[]>([]);
   const [loading, setLoading] = useState(!!deckId);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,7 +61,12 @@ export default function DeckDetailPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [deckData, gamesData] = await Promise.all([api.getDeck(deckId), api.getGames()]);
+      const [deckData, gamesData, cardsData] = await Promise.all([
+        api.getDeck(deckId),
+        api.getGames(),
+        api.getDeckCards(deckId),
+      ]);
+      setDeckCards(cardsData);
       setDeck(deckData);
       setEditName(deckData.name);
       setEditCommander(deckData.commander);
@@ -137,6 +144,19 @@ export default function DeckDetailPage() {
     }
   };
 
+  const handleExportTCGPlayer = () => {
+    if (!deck || deckCards.length === 0) return;
+    const lines = deckCards.map((c) => `${c.quantity} ${c.card_name}`);
+    const content = lines.join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${deck.name.replace(/[^a-z0-9]/gi, '_')}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (!deckId) {
     return (
       <PageContainer title="Deck Not Found" backHref="/decks" backLabel="Back to Decks">
@@ -169,6 +189,13 @@ export default function DeckDetailPage() {
       backLabel="Back to Decks"
       actions={
         <Stack direction="row" spacing={1}>
+          <Button
+            startIcon={<DownloadIcon />}
+            onClick={handleExportTCGPlayer}
+            disabled={deckCards.length === 0}
+          >
+            Export
+          </Button>
           <Button startIcon={<EditIcon />} onClick={handleEdit}>
             Edit
           </Button>
@@ -339,15 +366,26 @@ export default function DeckDetailPage() {
             </Box>
           </Stack>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+        <DialogActions sx={{ justifyContent: 'space-between' }}>
           <Button
-            onClick={handleSave}
-            variant="contained"
-            disabled={!editName.trim() || !editCommander.trim() || saving}
+            variant="outlined"
+            onClick={() => {
+              setEditDialogOpen(false);
+              router.push(`/decks/scan?edit=${deckId}`);
+            }}
           >
-            {saving ? 'Saving...' : 'Save'}
+            Edit Cards
           </Button>
+          <Stack direction="row" spacing={1}>
+            <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={handleSave}
+              variant="contained"
+              disabled={!editName.trim() || !editCommander.trim() || saving}
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+          </Stack>
         </DialogActions>
       </Dialog>
 

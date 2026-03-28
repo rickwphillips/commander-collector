@@ -38,6 +38,23 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '2.0.0',
+    date: '2026-03-28',
+    title: 'Deck Scanner & Card List Management',
+    changes: [
+      { type: 'added', text: 'Scan a photo of your laid-out deck with Claude Vision to automatically identify all cards and create a decklist' },
+      { type: 'added', text: 'Proxy detection: Claude assesses print quality through sleeves and flags photocopies, with a per-card toggle to mark or clear proxy status' },
+      { type: 'added', text: 'Review screen to correct misread names, add missing cards, adjust quantities, and mark the commander before saving' },
+      { type: 'added', text: 'Scanned decks are saved with a full card list stored in the database, linked to the deck record' },
+      { type: 'added', text: 'Edit Cards workflow on any deck — scan more cards, add/remove/adjust, then save back to the existing deck' },
+      { type: 'added', text: 'Import a TCGPlayer-format .txt decklist into a deck — basic lands merge quantities, new cards are looked up on Scryfall, duplicates skipped' },
+      { type: 'added', text: 'Export any deck\'s card list as a .txt file in TCGPlayer import format' },
+      { type: 'added', text: 'Card list indicator icon on the Decks list — clicking it jumps directly to the edit-cards screen' },
+      { type: 'improved', text: 'Draft scan state is auto-saved to localStorage and restored if you navigate away mid-review' },
+      { type: 'added', text: 'Discard Deck button clears the in-progress scan with a confirmation prompt' },
+    ],
+  },
+  {
     version: '1.30.0',
     date: '2026-03-27',
     title: 'Live Viewer Notifications & Remote Panel Enhancements',

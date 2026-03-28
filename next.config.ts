@@ -3,6 +3,10 @@ import type { NextConfig } from 'next';
 const isDev = process.env.NODE_ENV === 'development';
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Increase body size limit for the scan endpoint (base64 image payloads)
+    serverBodySizeLimit: '10mb',
+  },
   // Only use static export for production builds
   ...(isDev ? {} : { output: 'export' }),
   basePath: isDev ? '' : '/app/projects/commander',

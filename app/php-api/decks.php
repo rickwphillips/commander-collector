@@ -85,7 +85,8 @@ switch ($method) {
                         COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 /
                         NULLIF(COUNT(DISTINCT gr.game_id), 0),
                         1
-                    ) as win_rate
+                    ) as win_rate,
+                    (SELECT COUNT(*) FROM deck_cards dc WHERE dc.deck_id = d.id) as card_count
                 FROM decks d
                 JOIN players p ON d.player_id = p.id
                 LEFT JOIN game_results gr ON gr.deck_id = d.id
