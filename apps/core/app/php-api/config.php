@@ -1,7 +1,7 @@
 <?php
 // Database configuration
 // Loads credentials from secrets file outside web root
-$isLocalDev = php_sapi_name() === 'cli-server';
+$isLocalDev = in_array(php_sapi_name(), ['cli-server', 'cli']);
 
 // Resolve home directory (HOME not always set under LiteSpeed/Apache)
 $homeDir = $_SERVER['HOME'] ?? getenv('HOME') ?: null;
@@ -61,7 +61,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate');
 header('Pragma: no-cache');
 
 // Handle preflight requests
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
     http_response_code(200);
     exit();
 }
