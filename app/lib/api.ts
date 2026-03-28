@@ -208,6 +208,18 @@ export const api = {
       body: JSON.stringify({ image: imageBase64, mime_type: mimeType }),
     }),
 
+  // Card image caching (on-demand fetch + store as base64)
+  getCardImage: (scryfallId: string, url?: string) =>
+    apiFetch<{ data_uri: string; cached: boolean }>(
+      `/card-image?scryfall_id=${encodeURIComponent(scryfallId)}${url ? `&url=${encodeURIComponent(url)}` : ''}`
+    ),
+
+  // All printings of a card from Scryfall
+  getCardPrints: (name: string) =>
+    apiFetch<{ prints: import('./types').CardPrint[] }>(
+      `/card-prints?name=${encodeURIComponent(name)}`
+    ),
+
   // Users (admin)
   getUsers: () =>
     apiFetch<{ id: number; username: string; display_name: string; role: string }[]>('/auth/users'),

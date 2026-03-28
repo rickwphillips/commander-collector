@@ -39,6 +39,17 @@ export interface CreateDeckCardInput {
   is_proxy?: boolean;
 }
 
+export interface CardPrint {
+  scryfall_id: string;
+  name: string;
+  set_name: string;
+  set_code: string;
+  collector_number: string;
+  image_uri: string | null;
+  released_at: string;
+  image_cached: boolean;
+}
+
 // Database row types
 export interface Player {
   id: number;

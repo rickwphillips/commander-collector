@@ -9,11 +9,11 @@ export async function scryfallAutocomplete(query: string): Promise<string[]> {
   if (query.length < 2) return [];
   try {
     const res = await fetch(
-      `https://api.scryfall.com/cards/autocomplete?q=${encodeURIComponent(query)}`
+      `https://api.scryfall.com/cards/search?q=name:${encodeURIComponent(query)}&unique=names&order=name&page=1`
     );
     if (!res.ok) return [];
     const data = await res.json();
-    return (data.data as string[]) ?? [];
+    return ((data.data as { name: string }[]) ?? []).map((c) => c.name);
   } catch {
     return [];
   }

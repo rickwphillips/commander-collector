@@ -25,6 +25,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import DownloadIcon from '@mui/icons-material/Download';
+import ListAltIcon from '@mui/icons-material/ListAlt';
 import { PageContainer } from '@/components/PageContainer';
 import { StatsCard } from '@/components/StatsCard';
 import { ColorIdentityChips } from '@/components/ColorIdentityChips';
@@ -195,6 +196,14 @@ export default function DeckDetailPage() {
             disabled={deckCards.length === 0}
           >
             Export
+          </Button>
+          <Button
+            component={Link}
+            href={`/decks/decklist?id=${deckId}`}
+            startIcon={<ListAltIcon />}
+            disabled={deckCards.length === 0}
+          >
+            Decklist
           </Button>
           <Button startIcon={<EditIcon />} onClick={handleEdit}>
             Edit

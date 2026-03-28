@@ -7,6 +7,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     sendError('Method not allowed', 405);
 }
 
+// Disable PHP's execution time limit — Anthropic API calls can take 30–60s
+set_time_limit(0);
+
 $input = getJSONInput();
 $imageData = $input['image'] ?? null;   // base64-encoded image data (no data URI prefix)
 $mimeType  = $input['mime_type'] ?? 'image/jpeg';
@@ -25,37 +28,54 @@ if (!$apiKey) {
     sendError('Anthropic API key not configured', 500);
 }
 
+// ── Imagick preprocessing — sharpen text, convert to grayscale ─────────────
+// Grayscale removes colorful card artwork that triggers Claude's recognition
+// mode; sharpening makes the name text more legible at small tile sizes.
+if (class_exists('Imagick')) {
+    try {
+        $img = new Imagick();
+        $img->readImageBlob(base64_decode($imageData));
+        $img->transformImageColorspace(Imagick::COLORSPACE_GRAY);
+        $img->unsharpMaskImage(0, 1, 2, 0.05);  // radius, sigma, amount, threshold
+        $img->setImageFormat('jpeg');
+        $img->setImageCompressionQuality(88);
+        $imageData = base64_encode($img->getImageBlob());
+        $mimeType  = 'image/jpeg';
+        $img->destroy();
+    } catch (Exception $e) {
+        // If Imagick fails, continue with original image
+    }
+}
+
 $prompt = <<<PROMPT
-You are performing OCR on a photo of Magic: The Gathering cards spread out on a table.
+You are an OCR system. Your only job is to read the name text printed on Magic: The Gathering cards visible in this photo.
 
-The cards may be oriented in any direction — rotated 90°, upside down, or at an angle. Card names are printed along the top edge of each card, so in a spread they will often appear sideways or vertically in the photo. You must read the name text regardless of its orientation — mentally rotate each card to read it.
+CRITICAL: These cards were gathered at random — they are NOT a curated deck. You cannot use deck themes, color combinations, or archetypes to guess what cards are present. Every single card name you return must come directly from reading the text characters visible in the image. If you cannot see the text, do not include the card.
 
-Your task is to READ the printed name text on each visible card. Do not guess, infer, or use card artwork to identify cards. Do not use your knowledge of deck archetypes or themes. Only return a card if you can actually read its name text in the image.
+How card names appear in the image:
+- The name is printed in a text bar along the top edge of the card
+- Cards may be oriented in any direction (upright, sideways, upside down)
+- For sideways cards, the name text runs along one of the long edges — you must tilt your reading to match
+- Sleeves, glare, or partial overlap may obscure some names — skip those
 
-Important rules:
-- Read the NAME LINE printed on each card — that is the only source of truth
-- Cards may be rotated — tilt your reading of the text to match each card's orientation
-- If a card's name is obscured, cut off, or unreadable, skip it entirely
-- Do NOT infer names from artwork, colors, or card type
-- Do NOT generate a deck list based on the theme or archetype you recognize
-- It is better to return fewer correct names than many hallucinated ones
+Your process for each card:
+1. Locate the name text bar (top edge of the card)
+2. Read the characters in that bar letter by letter
+3. Output exactly what you read — do not autocorrect to a card name you know
+4. If you cannot make out the characters clearly, skip the card entirely
 
-For each card whose name you can read, also assess whether it appears to be a photocopy/proxy:
-- Noticeably lower print quality, pixelation, or blurriness compared to real cards
-- Matte/flat appearance where a real card would have gloss or texture
-- Slight color shifts, washed-out colors, or inkjet-style banding
-- Card borders that look thin, uneven, or slightly off
-- Text or art that looks like it was printed on a home printer
+Also note whether each card looks like a photocopy or proxy: low print quality, pixelation, matte/flat finish, inkjet banding, or thin/uneven borders.
 
-Return ONLY a JSON array of objects with no additional text, explanation, or markdown.
+Return ONLY a raw JSON array — no explanation, no markdown, no other text.
+If you cannot read any names, return an empty array.
 
-Example output:
-[{"name":"Smothering Tithe","proxy":false},{"name":"Cultivate","proxy":true},{"name":"Command Tower","proxy":false}]
+Format: [{"name":"exact text you read","proxy":false},{"name":"another card","proxy":true}]
 PROMPT;
 
 $payload = [
-    'model'      => 'claude-opus-4-6',
-    'max_tokens' => 1024,
+    'model'      => 'claude-sonnet-4-6',
+    'max_tokens' => 2048,
+    'system'     => 'You are a pure OCR (optical character recognition) system. Your entire function is to read printed text from images exactly as the characters appear. You do not recognize objects, artwork, brands, or game content. You have no knowledge of Magic: The Gathering or any other game. You only see and output literal text characters. You never infer, guess, or fill in text you cannot directly see in the image.',
     'messages'   => [
         [
             'role'    => 'user',
@@ -87,7 +107,7 @@ curl_setopt_array($ch, [
         'x-api-key: ' . $apiKey,
         'anthropic-version: 2023-06-01',
     ],
-    CURLOPT_TIMEOUT        => 60,
+    CURLOPT_TIMEOUT        => 90,
 ]);
 
 $response = curl_exec($ch);
@@ -115,7 +135,8 @@ if (preg_match('/\[.*\]/s', $text, $matches)) {
 }
 
 if (!is_array($decoded)) {
-    sendError('Could not parse card names from vision response', 502);
+    $preview = substr($text, 0, 300);
+    sendError('Could not parse card names from vision response. Raw: ' . $preview, 502);
 }
 
 // Normalize: accept both [{name, proxy}] and ["name"] formats

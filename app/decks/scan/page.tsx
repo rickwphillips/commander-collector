@@ -11,6 +11,7 @@ import {
   CardMedia,
   Chip,
   CircularProgress,
+  LinearProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -40,12 +41,14 @@ import StarIcon from '@mui/icons-material/Star';
 import DownloadIcon from '@mui/icons-material/Download';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import StyleIcon from '@mui/icons-material/Style';
 import { PageContainer } from '@/components/PageContainer';
 import { ManaSymbol } from '@/components/ManaSymbol';
+import { DeckBreakdown } from '@/components/DeckBreakdown';
 import { api } from '@/lib/api';
 import { MTG_COLORS_WITH_C } from '@/lib/utils';
 import { scryfallAutocomplete } from '@/lib/scryfall';
-import type { ScryfallCachedCard, Player } from '@/lib/types';
+import type { ScryfallCachedCard, Player, DeckWithPlayer } from '@/lib/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -55,6 +58,8 @@ interface ScannedCard {
   scryfall_id: string | null;
   image_uri: string | null;
   color_identity: string;
+  type_line: string | null;
+  mana_cost: string | null;
   quantity: number;
   is_commander: boolean;
   is_proxy: boolean;
@@ -108,6 +113,8 @@ function cardFromScryfall(name: string, data: ScryfallCachedCard | null, proxy =
     scryfall_id: data?.scryfall_id ?? null,
     image_uri: data?.image_uri ?? null,
     color_identity: data?.color_identity ?? '',
+    type_line: data?.type_line ?? null,
+    mana_cost: data?.mana_cost ?? null,
     quantity: 1,
     is_commander: false,
     is_proxy: proxy,
@@ -143,6 +150,7 @@ function ScanDeckPageInner() {
   // Step 1
   const [scanning, setScanning] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [scanProgress, setScanProgress] = useState<{ current: number; total: number } | null>(null);
 
   // Step 2
   const [lookingUp, setLookingUp] = useState(false);
@@ -163,6 +171,9 @@ function ScanDeckPageInner() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [playersLoaded, setPlayersLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveMode, setSaveMode] = useState<'new' | 'existing'>('new');
+  const [allDecks, setAllDecks] = useState<DeckWithPlayer[]>([]);
+  const [existingDeckId, setExistingDeckId] = useState<number | ''>('');
 
   // Pre-scan image editor
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -175,6 +186,11 @@ function ScanDeckPageInner() {
 
   // Scan more dialog
   const [scanMoreOpen, setScanMoreOpen] = useState(false);
+
+  // Version picker dialog
+  const [versionCard, setVersionCard] = useState<ScannedCard | null>(null);
+  const [prints, setPrints] = useState<import('@/lib/types').CardPrint[]>([]);
+  const [loadingPrints, setLoadingPrints] = useState(false);
 
   // ── Load existing deck in edit mode ────────────────────────────────────────
 
@@ -196,6 +212,8 @@ function ScanDeckPageInner() {
             scryfall_id: c.scryfall_id,
             image_uri: c.image_uri ?? null,
             color_identity: c.color_identity ?? '',
+            type_line: c.type_line ?? null,
+            mana_cost: c.mana_cost ?? null,
             quantity: c.quantity,
             is_commander: !!c.is_commander,
             is_proxy: !!c.is_proxy,
@@ -310,6 +328,8 @@ function ScanDeckPageInner() {
               card.scryfall_id = hit.data.scryfall_id;
               card.image_uri = hit.data.image_uri ?? null;
               card.color_identity = hit.data.color_identity ?? '';
+              card.type_line = hit.data.type_line ?? null;
+              card.mana_cost = hit.data.mana_cost ?? null;
               card.notFound = false;
             }
           }
@@ -351,13 +371,44 @@ function ScanDeckPageInner() {
     if (uploadInputRef.current) uploadInputRef.current.value = '';
   }, []);
 
-  // Apply rotation + brightness/contrast to a canvas and return base64 JPEG
+  // Split a processed canvas into a cols×rows grid of overlapping tiles
+  function splitCanvasToTiles(
+    source: HTMLCanvasElement,
+    cols: number,
+    rows: number,
+  ): { base64: string; mimeType: string }[] {
+    const W = source.width;
+    const H = source.height;
+    const tileW = Math.ceil(W / cols);
+    const tileH = Math.ceil(H / rows);
+    // 8% overlap on each edge so cards near boundaries are fully visible in at least one tile
+    const overlapX = Math.round(tileW * 0.08);
+    const overlapY = Math.round(tileH * 0.08);
+    const tiles: { base64: string; mimeType: string }[] = [];
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const sx = Math.max(0, col * tileW - overlapX);
+        const sy = Math.max(0, row * tileH - overlapY);
+        const ex = Math.min(W, (col + 1) * tileW + overlapX);
+        const ey = Math.min(H, (row + 1) * tileH + overlapY);
+        const tileCanvas = document.createElement('canvas');
+        tileCanvas.width = ex - sx;
+        tileCanvas.height = ey - sy;
+        tileCanvas.getContext('2d')!.drawImage(source, sx, sy, ex - sx, ey - sy, 0, 0, ex - sx, ey - sy);
+        const dataUrl = tileCanvas.toDataURL('image/jpeg', 0.88);
+        tiles.push({ base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' });
+      }
+    }
+    return tiles;
+  }
+
+  // Apply rotation + brightness/contrast to a canvas and return base64 JPEG + the canvas
   async function fileToBase64(
     file: File,
     rotation: number,
     brightness: number,
     contrast: number,
-  ): Promise<{ base64: string; mimeType: string }> {
+  ): Promise<{ base64: string; mimeType: string; canvas: HTMLCanvasElement }> {
     const MAX_PX = 3000;
 
     const isHeic = file.type === 'image/heic' || file.type === 'image/heif' ||
@@ -393,7 +444,7 @@ function ScanDeckPageInner() {
       bitmap.close();
 
       const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
-      return { base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' };
+      return { base64: dataUrl.split(',')[1], mimeType: 'image/jpeg', canvas };
     } catch (err) {
       if (isHeic) {
         throw new Error(
@@ -407,22 +458,54 @@ function ScanDeckPageInner() {
   // Called when user confirms the pre-scan editor and clicks Submit
   async function processAndScan() {
     if (!pendingFile) return;
+    const fileToRestore = pendingFile;
+    const previewToRestore = previewUrl;
     setPendingFile(null);
     setScanMoreOpen(false);
     setScanning(true);
+    setScanProgress(null);
 
     try {
-      const { base64, mimeType } = await fileToBase64(pendingFile, editRotation, editBrightness, editContrast);
-      // Update preview to show the processed image (edits baked in)
+      const { base64, mimeType, canvas } = await fileToBase64(fileToRestore, editRotation, editBrightness, editContrast);
       setPreviewUrl(`data:${mimeType};base64,${base64}`);
-      const result = await api.scanDeck(base64, mimeType);
-      await lookupAllCards(result.cards);
+
+      // Split into 3×3 = 9 tiles so each tile covers ~11 cards at higher effective resolution
+      const COLS = 3, ROWS = 3;
+      const tiles = splitCanvasToTiles(canvas, COLS, ROWS);
+      setScanProgress({ current: 0, total: tiles.length });
+
+      // Scan all tiles in parallel
+      const tileResults = await Promise.allSettled(
+        tiles.map(async (tile) => {
+          const result = await api.scanDeck(tile.base64, tile.mimeType);
+          setScanProgress((prev) => prev ? { ...prev, current: prev.current + 1 } : prev);
+          return result.cards;
+        })
+      );
+
+      // Merge and deduplicate by name across all tiles
+      const seen = new Set<string>();
+      const allCards: { name: string; proxy: boolean }[] = [];
+      for (const result of tileResults) {
+        if (result.status !== 'fulfilled') continue;
+        for (const card of result.value) {
+          const key = card.name.toLowerCase().trim();
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
+          allCards.push(card);
+        }
+      }
+
+      await lookupAllCards(allCards);
       setStep(1);
     } catch (err) {
       console.error('[Scan error]', err);
       setError(err instanceof Error ? err.message : 'Scan failed');
+      setPreviewUrl(previewToRestore);
+      setPendingFile(fileToRestore);
     } finally {
       setScanning(false);
+      setScanProgress(null);
     }
   }
 
@@ -464,6 +547,8 @@ function ScanDeckPageInner() {
                 scryfall_id: hit.data.scryfall_id,
                 image_uri: hit.data.image_uri ?? null,
                 color_identity: hit.data.color_identity ?? '',
+                type_line: hit.data.type_line ?? null,
+                mana_cost: hit.data.mana_cost ?? null,
                 notFound: false,
               };
             })
@@ -569,8 +654,9 @@ function ScanDeckPageInner() {
 
   async function loadPlayers() {
     if (playersLoaded) return;
-    const data = await api.getPlayers();
-    setPlayers(data);
+    const [playerData, deckData] = await Promise.all([api.getPlayers(), api.getDecks()]);
+    setPlayers(playerData);
+    setAllDecks(deckData);
     setPlayersLoaded(true);
 
     // Auto-detect colors from commander's color_identity
@@ -618,6 +704,31 @@ function ScanDeckPageInner() {
       return;
     }
 
+    if (saveMode === 'existing') {
+      if (!existingDeckId) {
+        setError('Please select an existing deck');
+        return;
+      }
+      setSaving(true);
+      setError(null);
+      try {
+        await api.saveDeckCards(existingDeckId as number, cards.map((c) => ({
+          card_name: c.card_name,
+          scryfall_id: c.scryfall_id,
+          quantity: c.quantity,
+          is_commander: c.is_commander,
+          is_proxy: c.is_proxy,
+        })));
+        clearDraft();
+        router.push(`/decks/detail?id=${existingDeckId}`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to save cards');
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     if (!playerId || !deckName.trim()) {
       setError('Please fill in player and deck name');
       return;
@@ -653,6 +764,38 @@ function ScanDeckPageInner() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // ── Version picker ────────────────────────────────────────────────────────
+
+  async function openVersionPicker(card: ScannedCard) {
+    setVersionCard(card);
+    setPrints([]);
+    setLoadingPrints(true);
+    try {
+      const { prints: data } = await api.getCardPrints(card.card_name);
+      setPrints(data);
+    } catch {
+      // show empty state in dialog
+    } finally {
+      setLoadingPrints(false);
+    }
+  }
+
+  async function selectVersion(print: import('@/lib/types').CardPrint) {
+    if (!versionCard) return;
+    // Pre-fetch and cache the image in the background
+    if (print.image_uri) {
+      api.getCardImage(print.scryfall_id, print.image_uri).catch(() => {/* ignore */});
+    }
+    setCards((prev) =>
+      prev.map((c) =>
+        c.id === versionCard.id
+          ? { ...c, scryfall_id: print.scryfall_id, image_uri: print.image_uri }
+          : c
+      )
+    );
+    setVersionCard(null);
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -701,7 +844,19 @@ function ScanDeckPageInner() {
             {scanning ? (
               <Stack alignItems="center" spacing={2} py={4}>
                 <CircularProgress size={48} />
-                <Typography>Scanning photo with Claude Vision...</Typography>
+                <Typography>
+                  {scanProgress
+                    ? `Scanning tile ${scanProgress.current + 1} of ${scanProgress.total}...`
+                    : 'Preparing image...'}
+                  {' '}<Typography component="span" variant="caption" color="text.secondary">{process.env.NEXT_PUBLIC_BUILD_TIME}</Typography>
+                </Typography>
+                {scanProgress && (
+                  <LinearProgress
+                    variant="determinate"
+                    value={(scanProgress.current / scanProgress.total) * 100}
+                    sx={{ width: 280 }}
+                  />
+                )}
                 {previewUrl && (
                   <Box
                     component="img"
@@ -906,6 +1061,15 @@ function ScanDeckPageInner() {
                         >
                           <StarIcon fontSize="inherit" />
                         </IconButton>
+                        {card.scryfall_id && (
+                          <IconButton
+                            size="small"
+                            title="Change version/set"
+                            onClick={() => openVersionPicker(card)}
+                          >
+                            <StyleIcon fontSize="inherit" />
+                          </IconButton>
+                        )}
                         <IconButton size="small" title="Edit" onClick={() => openEdit(card)}>
                           <EditIcon fontSize="inherit" />
                         </IconButton>
@@ -924,6 +1088,16 @@ function ScanDeckPageInner() {
               </Grid>
             ))}
           </Grid>
+
+          {/* Deck breakdown summary */}
+          {cards.length > 0 && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="h6" sx={{ mb: 1.5 }}>
+                Deck Breakdown
+              </Typography>
+              <DeckBreakdown cards={cards} />
+            </Box>
+          )}
 
           <Divider sx={{ mb: 2 }} />
           <Stack direction="row" justifyContent="space-between">
@@ -961,111 +1135,178 @@ function ScanDeckPageInner() {
       )}
 
       {/* ── Step 2: Save ── */}
-      {step === 2 && (
-        <Card>
-          <CardContent sx={{ p: 4 }}>
-            <Stack spacing={3}>
-              <Typography variant="h6">Save as Deck</Typography>
+      {step === 2 && (() => {
+        const playerDecks = allDecks.filter((d) => d.player_id === playerId);
+        const selectedExistingDeck = allDecks.find((d) => d.id === existingDeckId);
+        const existingHasCards = (selectedExistingDeck?.card_count ?? 0) > 0;
+        const canSave = saveMode === 'existing'
+          ? !!existingDeckId
+          : !!playerId && !!deckName.trim();
 
-              <TextField
-                select
-                label="Player"
-                value={playerId}
-                onChange={(e) => setPlayerId(Number(e.target.value))}
-                required
-                fullWidth
-              >
-                <MenuItem value="">Select a player</MenuItem>
-                {players.map((p) => (
-                  <MenuItem key={p.id} value={p.id}>
-                    {p.name}
-                  </MenuItem>
-                ))}
-              </TextField>
+        return (
+          <Card>
+            <CardContent sx={{ p: 4 }}>
+              <Stack spacing={3}>
+                <Typography variant="h6">Save as Deck</Typography>
 
-              <TextField
-                label="Deck Name"
-                value={deckName}
-                onChange={(e) => setDeckName(e.target.value)}
-                required
-                fullWidth
-                placeholder="e.g., Landfall Aggro"
-              />
-
-              <TextField
-                label="Commander"
-                value={cards.find((c) => c.is_commander)?.card_name ?? ''}
-                InputProps={{ readOnly: true }}
-                fullWidth
-                helperText="Go back to Step 2 to change the commander"
-              />
-
-              <Box>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  Color Identity
-                </Typography>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  {MTG_COLORS_WITH_C.map((color) => (
-                    <ManaSymbol
-                      key={color}
-                      color={color}
-                      size={32}
-                      active={colors.includes(color)}
-                      dimmed
-                      onClick={() => handleColorClick(color)}
-                    />
-                  ))}
-                </Stack>
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                  Auto-filled from commander — adjust if needed
-                </Typography>
-              </Box>
-
-              <Box sx={{ bgcolor: 'action.hover', borderRadius: 1, p: 2 }}>
-                <Stack spacing={0.5}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <CheckCircleIcon color="success" fontSize="small" />
-                    <Typography variant="body2">
-                      {cards.length} cards will be saved with this deck
-                    </Typography>
-                  </Stack>
-                  {proxyCount > 0 && (
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <ContentCopyIcon color="error" fontSize="small" />
-                      <Typography variant="body2" color="error.main">
-                        {proxyCount} {proxyCount === 1 ? 'proxy' : 'proxies'} — need procurement
-                      </Typography>
-                    </Stack>
-                  )}
-                </Stack>
-              </Box>
-
-              <Stack direction="row" spacing={2} justifyContent="space-between">
-                <Button
-                  variant="outlined"
-                  color="error"
-                  onClick={() => setDiscardOpen(true)}
-                >
-                  Discard Deck
-                </Button>
-                <Stack direction="row" spacing={2}>
-                  <Button variant="outlined" onClick={() => setStep(1)}>
-                    Back
+                {/* New vs Existing toggle */}
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    variant={saveMode === 'new' ? 'contained' : 'outlined'}
+                    onClick={() => setSaveMode('new')}
+                  >
+                    New Deck
                   </Button>
                   <Button
-                    variant="contained"
-                    size="large"
-                    disabled={saving || !playerId || !deckName.trim()}
-                    onClick={handleSave}
+                    variant={saveMode === 'existing' ? 'contained' : 'outlined'}
+                    onClick={() => setSaveMode('existing')}
                   >
-                    {saving ? 'Saving...' : 'Save Deck'}
+                    Existing Deck
                   </Button>
                 </Stack>
+
+                {saveMode === 'new' ? (
+                  <>
+                    <TextField
+                      select
+                      label="Player"
+                      value={playerId}
+                      onChange={(e) => setPlayerId(Number(e.target.value))}
+                      required
+                      fullWidth
+                    >
+                      <MenuItem value="">Select a player</MenuItem>
+                      {players.map((p) => (
+                        <MenuItem key={p.id} value={p.id}>
+                          {p.name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+
+                    <TextField
+                      label="Deck Name"
+                      value={deckName}
+                      onChange={(e) => setDeckName(e.target.value)}
+                      required
+                      fullWidth
+                      placeholder="e.g., Landfall Aggro"
+                    />
+
+                    <TextField
+                      label="Commander"
+                      value={cards.find((c) => c.is_commander)?.card_name ?? ''}
+                      InputProps={{ readOnly: true }}
+                      fullWidth
+                      helperText="Go back to step 1 to change the commander"
+                    />
+
+                    <Box>
+                      <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                        Color Identity
+                      </Typography>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        {MTG_COLORS_WITH_C.map((color) => (
+                          <ManaSymbol
+                            key={color}
+                            color={color}
+                            size={32}
+                            active={colors.includes(color)}
+                            dimmed
+                            onClick={() => handleColorClick(color)}
+                          />
+                        ))}
+                      </Stack>
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                        Auto-filled from commander — adjust if needed
+                      </Typography>
+                    </Box>
+                  </>
+                ) : (
+                  <>
+                    <TextField
+                      select
+                      label="Player"
+                      value={playerId}
+                      onChange={(e) => { setPlayerId(Number(e.target.value)); setExistingDeckId(''); }}
+                      fullWidth
+                    >
+                      <MenuItem value="">Select a player</MenuItem>
+                      {players.map((p) => (
+                        <MenuItem key={p.id} value={p.id}>
+                          {p.name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+
+                    <TextField
+                      select
+                      label="Deck"
+                      value={existingDeckId}
+                      onChange={(e) => setExistingDeckId(Number(e.target.value))}
+                      fullWidth
+                      disabled={!playerId || playerDecks.length === 0}
+                      helperText={playerId && playerDecks.length === 0 ? 'This player has no decks' : undefined}
+                    >
+                      <MenuItem value="">Select a deck</MenuItem>
+                      {playerDecks.map((d) => (
+                        <MenuItem key={d.id} value={d.id}>
+                          {d.name} — {d.commander}
+                          {d.card_count > 0 ? ` (${d.card_count} cards)` : ''}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+
+                    {existingHasCards && (
+                      <Alert severity="warning">
+                        <strong>{selectedExistingDeck?.name}</strong> already has {selectedExistingDeck?.card_count} cards.
+                        Saving will replace that list entirely.
+                      </Alert>
+                    )}
+                  </>
+                )}
+
+                <Box sx={{ bgcolor: 'action.hover', borderRadius: 1, p: 2 }}>
+                  <Stack spacing={0.5}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <CheckCircleIcon color="success" fontSize="small" />
+                      <Typography variant="body2">
+                        {cards.length} cards will be saved
+                      </Typography>
+                    </Stack>
+                    {proxyCount > 0 && (
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <ContentCopyIcon color="error" fontSize="small" />
+                        <Typography variant="body2" color="error.main">
+                          {proxyCount} {proxyCount === 1 ? 'proxy' : 'proxies'} — need procurement
+                        </Typography>
+                      </Stack>
+                    )}
+                  </Stack>
+                </Box>
+
+                <Stack direction="row" spacing={2} justifyContent="space-between">
+                  <Button variant="outlined" color="error" onClick={() => setDiscardOpen(true)}>
+                    Discard Deck
+                  </Button>
+                  <Stack direction="row" spacing={2}>
+                    <Button variant="outlined" onClick={() => setStep(1)}>
+                      Back
+                    </Button>
+                    <Button
+                      variant="contained"
+                      size="large"
+                      disabled={saving || !canSave}
+                      onClick={handleSave}
+                    >
+                      {saving ? 'Saving...' : saveMode === 'existing' ? 'Replace Card List' : 'Save Deck'}
+                    </Button>
+                  </Stack>
+                </Stack>
               </Stack>
-            </Stack>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* ── Edit Card Dialog ── */}
       <Dialog open={!!editCard} onClose={() => setEditCard(null)} fullWidth maxWidth="xs">
@@ -1288,6 +1529,83 @@ function ScanDeckPageInner() {
           >
             {addLooking ? <CircularProgress size={18} /> : 'Add'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Version Picker Dialog ── */}
+      <Dialog open={!!versionCard} onClose={() => setVersionCard(null)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          Choose Version — {versionCard?.card_name}
+          <IconButton onClick={() => setVersionCard(null)} sx={{ position: 'absolute', right: 8, top: 8 }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          {loadingPrints ? (
+            <Stack alignItems="center" py={4}>
+              <CircularProgress size={40} />
+              <Typography variant="body2" color="text.secondary" mt={1}>
+                Loading printings...
+              </Typography>
+            </Stack>
+          ) : prints.length === 0 ? (
+            <Typography color="text.secondary" py={2}>
+              No printings found.
+            </Typography>
+          ) : (
+            <Grid container spacing={1.5} sx={{ mt: 0.5 }}>
+              {prints.map((print) => (
+                <Grid key={print.scryfall_id} size={{ xs: 6, sm: 4, md: 3 }}>
+                  <Card
+                    sx={{
+                      cursor: 'pointer',
+                      outline: versionCard?.scryfall_id === print.scryfall_id ? '2px solid' : undefined,
+                      outlineColor: 'primary.main',
+                      '&:hover': { outline: '2px solid', outlineColor: 'primary.light' },
+                    }}
+                    onClick={() => selectVersion(print)}
+                  >
+                    {print.image_uri ? (
+                      <CardMedia
+                        component="img"
+                        image={print.image_uri}
+                        alt={print.name}
+                        sx={{ aspectRatio: '488/680' }}
+                      />
+                    ) : (
+                      <Box
+                        sx={{
+                          aspectRatio: '488/680',
+                          bgcolor: 'action.hover',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary">
+                          No image
+                        </Typography>
+                      </Box>
+                    )}
+                    <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
+                      <Typography variant="caption" noWrap display="block">
+                        {print.set_name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        #{print.collector_number} · {print.released_at.slice(0, 4)}
+                        {print.image_cached && (
+                          <Chip label="cached" size="small" color="success" sx={{ ml: 0.5, height: 14, fontSize: '0.55rem' }} />
+                        )}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setVersionCard(null)}>Cancel</Button>
         </DialogActions>
       </Dialog>
     </PageContainer>

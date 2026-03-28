@@ -38,6 +38,23 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '2.3.0',
+    date: '2026-03-28',
+    title: 'Decklist, Card Versions & Scan Overhaul',
+    changes: [
+      { type: 'added', text: 'Decklist page with type/color breakdown and grouped card list' },
+      { type: 'added', text: 'Gallery tab on the decklist page showing all card images in a grid' },
+      { type: 'added', text: 'Image preview tooltip on card names in the decklist view' },
+      { type: 'added', text: 'Per-card version/set picker in the scan editor — browse all printings and swap to any set' },
+      { type: 'added', text: 'Card images cached as base64 in the database (fetched on demand, never re-requested)' },
+      { type: 'added', text: '"Existing Deck" option on the save screen — assign a scanned list to a current deck, with a warning if it already has cards' },
+      { type: 'added', text: 'Deck Breakdown panel on the scan review screen showing type counts and color distribution' },
+      { type: 'improved', text: 'Autocomplete now matches card names by substring (contains) instead of prefix only' },
+      { type: 'improved', text: 'Next.js dev proxy timeout extended to 2 minutes so slow Claude API calls complete without disconnecting' },
+      { type: 'fixed', text: 'PHP execution time limit removed on scan endpoint — edited/large images no longer time out mid-request' },
+    ],
+  },
+  {
     version: '2.2.0',
     date: '2026-03-28',
     title: 'Scan Editor Improvements',
