@@ -38,6 +38,15 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '2.2.0',
+    date: '2026-03-28',
+    title: 'Scan Editor Improvements',
+    changes: [
+      { type: 'improved', text: 'Pre-scan image editor now shows the final processed image (with rotation and adjustments applied) as the preview while scanning' },
+      { type: 'changed', text: 'Renamed "Scan" button in the image editor to "Submit"' },
+    ],
+  },
+  {
     version: '2.1.0',
     date: '2026-03-28',
     title: 'Scan Accuracy & Image Editor',

@@ -404,7 +404,7 @@ function ScanDeckPageInner() {
     }
   }
 
-  // Called when user confirms the pre-scan editor and clicks Scan
+  // Called when user confirms the pre-scan editor and clicks Submit
   async function processAndScan() {
     if (!pendingFile) return;
     setPendingFile(null);
@@ -413,6 +413,8 @@ function ScanDeckPageInner() {
 
     try {
       const { base64, mimeType } = await fileToBase64(pendingFile, editRotation, editBrightness, editContrast);
+      // Update preview to show the processed image (edits baked in)
+      setPreviewUrl(`data:${mimeType};base64,${base64}`);
       const result = await api.scanDeck(base64, mimeType);
       await lookupAllCards(result.cards);
       setStep(1);
@@ -1220,7 +1222,7 @@ function ScanDeckPageInner() {
         <DialogActions>
           <Button onClick={() => setPendingFile(null)}>Cancel</Button>
           <Button variant="contained" startIcon={<CameraAltIcon />} onClick={processAndScan}>
-            Scan
+            Submit
           </Button>
         </DialogActions>
       </Dialog>
