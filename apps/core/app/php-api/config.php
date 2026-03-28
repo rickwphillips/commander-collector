@@ -1,13 +1,15 @@
 <?php
 // Database configuration
 // Loads credentials from secrets file outside web root
-$isLocalDev = in_array(php_sapi_name(), ['cli-server', 'cli']);
-
 // Resolve home directory (HOME not always set under LiteSpeed/Apache)
 $homeDir = $_SERVER['HOME'] ?? getenv('HOME') ?: null;
 if (!$homeDir && isset($_SERVER['DOCUMENT_ROOT'])) {
     $homeDir = dirname($_SERVER['DOCUMENT_ROOT']);
 }
+
+// Local dev: cli-server (built-in PHP server) or cli with dev secrets present
+$isLocalDev = in_array(php_sapi_name(), ['cli-server', 'cli'])
+    && file_exists($homeDir . '/auth_secrets_dev.php');
 
 $secretsFile = $isLocalDev
     ? $homeDir . '/auth_secrets_dev.php'
