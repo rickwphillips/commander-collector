@@ -4,9 +4,10 @@
 # apps/core/app/php-api/rules/, then optionally re-seeds the local DB.
 #
 # Usage:
-#   ./scripts/sync-rules-patterns.sh           — dry run (shows what would change)
-#   ./scripts/sync-rules-patterns.sh --apply   — copy files
-#   ./scripts/sync-rules-patterns.sh --apply --seed  — copy + seed local DB
+#   ./scripts/sync-rules-patterns.sh                        — dry run (shows what would change)
+#   ./scripts/sync-rules-patterns.sh --apply                — copy files
+#   ./scripts/sync-rules-patterns.sh --apply --seed         — copy + seed local DB
+#   ./scripts/sync-rules-patterns.sh --apply --seed --prune — copy + seed + delete removed patterns
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
@@ -16,10 +17,12 @@ DEST="$PROJECT_DIR/apps/core/app/php-api/rules"
 
 APPLY=false
 SEED=false
+PRUNE=false
 for arg in "$@"; do
   case $arg in
     --apply) APPLY=true ;;
     --seed)  SEED=true ;;
+    --prune) PRUNE=true ;;
   esac
 done
 
@@ -64,7 +67,26 @@ else
   echo "Done: $COPIED file(s) copied, $SKIPPED unchanged."
 fi
 
-if [ "$APPLY" = true ] && [ "$SEED" = true ] && [ "$COPIED" -gt 0 ]; then
+PRUNED=0
+if [ "$PRUNE" = true ]; then
+  for dest_file in "$DEST"/p[0-9][0-9][0-9]*.md; do
+    [ -f "$dest_file" ] || continue
+    filename=$(basename "$dest_file")
+    src_file="$SRC/$filename"
+    if [ ! -f "$src_file" ]; then
+      echo "  - REMOVED: $filename"
+      if [ "$APPLY" = true ]; then
+        rm "$dest_file"
+      fi
+      PRUNED=$((PRUNED + 1))
+    fi
+  done
+  if [ "$PRUNED" -gt 0 ] && [ "$APPLY" = false ]; then
+    echo "Dry run: $PRUNED file(s) would be pruned."
+  fi
+fi
+
+if [ "$APPLY" = true ] && [ "$SEED" = true ] && [ "$COPIED" -gt 0 -o "$PRUNED" -gt 0 ]; then
   echo ""
   echo "Seeding local DB..."
   php "$DEST/seed.php"

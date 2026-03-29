@@ -1,4 +1,4 @@
-import type { ChatResponse, RulesConversation, RulesMessage, RulesPattern } from './types';
+import type { ActiveGameContext, ChatResponse, RulesConversation, RulesMessage, RulesPattern } from './types';
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ||
@@ -68,11 +68,16 @@ export const rulesApi = {
       method: 'DELETE',
     }),
 
+  // Active game context
+  getActiveGame: () =>
+    apiFetch<{ game: ActiveGameContext | null }>('/rules/active-game.php'),
+
   // Chat
   sendMessage: (payload: {
     message: string;
     conversation_id?: number;
     new_conversation_title?: string;
+    game_context?: ActiveGameContext | null;
   }) =>
     apiFetch<ChatResponse>('/rules/chat.php', {
       method: 'POST',

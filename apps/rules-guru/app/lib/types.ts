@@ -1,3 +1,16 @@
+export interface GameContextPlayer {
+  playerName: string;
+  deckName: string;
+  commander: string | null;
+  partner: string | null;
+  deckId: number | null;
+  cards: string[];
+}
+
+export interface ActiveGameContext {
+  players: GameContextPlayer[];
+}
+
 export interface RulesPattern {
   id?: number;
   pattern_id: string;

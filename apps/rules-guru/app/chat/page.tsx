@@ -23,7 +23,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Collapse,
+  Collapse, // used for pattern expand
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
@@ -36,9 +36,10 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
 import AutoStoriesIcon from '@mui/icons-material/AutoStories';
-import { DarkModeToggle } from '../components/DarkModeToggle';
+import AddCommentIcon from '@mui/icons-material/AddComment';
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import { rulesApi } from '../lib/api';
-import type { RulesConversation, RulesMessage, RulesPattern } from '../lib/types';
+import type { ActiveGameContext, RulesConversation, RulesMessage, RulesPattern } from '../lib/types';
 
 // ── Local message type (includes pending_pattern for new messages) ──────────
 interface LocalMessage {
@@ -49,6 +50,36 @@ interface LocalMessage {
 }
 
 const DRAWER_WIDTH = 300;
+
+// ── Resolve #P### references in a string to pattern names ──────────────────
+function resolvePatternRefs(text: string, patterns: RulesPattern[]): string {
+  return text.replace(/#(p\d+)/gi, (match, id) => {
+    const p = patterns.find(x => x.pattern_id.toLowerCase() === id.toLowerCase());
+    return p ? `#${p.pattern_id.toUpperCase()} (${p.name})` : match;
+  });
+}
+
+// ── Generate deck-aware suggestions from active game context ─────────────────
+function buildGameSuggestions(ctx: ActiveGameContext): string[] {
+  const result: string[] = [];
+  const commanders = ctx.players.map(p => p.commander).filter((c): c is string => !!c);
+
+  for (const cmd of commanders.slice(0, 2)) {
+    result.push(`What are the tricky rules interactions for ${cmd}?`);
+  }
+
+  if (commanders.length >= 2) {
+    result.push(`How does ${commanders[0]} interact with ${commanders[1]}?`);
+  }
+
+  const withPartner = ctx.players.find(p => p.partner);
+  if (withPartner?.commander && withPartner.partner) {
+    result.push(`How do ${withPartner.commander} and ${withPartner.partner} work as partners?`);
+  }
+
+  result.push('What rules questions commonly come up in Commander?');
+  return result.slice(0, 4);
+}
 
 export default function ChatPage() {
   const [input, setInput] = useState('');
@@ -67,6 +98,8 @@ export default function ChatPage() {
   const [savingPattern, setSavingPattern] = useState(false);
   const [patternsLoading, setPatternsLoading] = useState(true);
 
+  const [gameContext, setGameContext] = useState<ActiveGameContext | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -76,7 +109,7 @@ export default function ChatPage() {
 
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
 
-  // Load conversations list and patterns on mount
+  // Load conversations, patterns, and active game on mount
   useEffect(() => {
     rulesApi.getConversations().then(r => setConversations(r.conversations)).catch(() => {});
     rulesApi.getPatterns()
@@ -90,6 +123,9 @@ export default function ChatPage() {
       })
       .catch(() => {})
       .finally(() => setPatternsLoading(false));
+    rulesApi.getActiveGame()
+      .then(r => setGameContext(r.game))
+      .catch(() => {});
   }, []);
 
   const loadConversation = async (id: number) => {
@@ -128,22 +164,35 @@ export default function ChatPage() {
     }
   };
 
+  // Insert a #P### reference into the input at the end
+  const citePattern = (p: RulesPattern) => {
+    const ref = `#${p.pattern_id.toUpperCase()} `;
+    setInput(prev => (prev.endsWith(' ') || prev === '' ? prev + ref : prev + ' ' + ref));
+    setPatternsOpen(false);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  };
+
   const handleSend = async () => {
-    const text = input.trim();
-    if (!text || loading) return;
+    const raw = input.trim();
+    if (!raw || loading) return;
+
+    // Resolve #P### refs so Claude sees the pattern name inline
+    const resolved = resolvePatternRefs(raw, patterns);
 
     setInput('');
     setError(null);
 
-    const userMsg: LocalMessage = { role: 'user', content: text };
+    // Show the original (unresolved) text to the user
+    const userMsg: LocalMessage = { role: 'user', content: raw };
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
 
     try {
       const res = await rulesApi.sendMessage({
-        message: text,
+        message: resolved,
         conversation_id: conversationId ?? undefined,
-        new_conversation_title: !conversationId ? text.slice(0, 80) : undefined,
+        new_conversation_title: !conversationId ? raw.slice(0, 80) : undefined,
+        game_context: gameContext ?? undefined,
       });
 
       setConversationId(res.conversation_id);
@@ -156,11 +205,10 @@ export default function ChatPage() {
       };
       setMessages(prev => [...prev, assistantMsg]);
 
-      // Refresh conversation list
       rulesApi.getConversations().then(r => setConversations(r.conversations)).catch(() => {});
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message');
-      setMessages(prev => prev.slice(0, -1)); // remove optimistic user message
+      setMessages(prev => prev.slice(0, -1));
     } finally {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
@@ -207,6 +255,52 @@ export default function ChatPage() {
     const d = new Date(iso);
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   };
+
+  // Render user message with #P### highlighted as chips
+  const renderUserContent = (text: string) => {
+    const parts = text.split(/(#P\d+(?:\s+\([^)]+\))?)/gi);
+    if (parts.length === 1) {
+      return <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{text}</Typography>;
+    }
+    return (
+      <Box sx={{ lineHeight: 1.6, fontSize: '0.875rem', whiteSpace: 'pre-wrap' }}>
+        {parts.map((part, i) =>
+          /^#P\d+/i.test(part)
+            ? <Chip key={i} label={part} size="small" color="primary" variant="outlined" sx={{ mx: 0.25, height: 20, fontSize: '0.7rem', color: 'primary.contrastText', borderColor: 'primary.contrastText' }} />
+            : <span key={i}>{part}</span>
+        )}
+      </Box>
+    );
+  };
+
+  // Suggestions: game-aware if context available, otherwise pattern-based
+  const suggestions: string[] = (() => {
+    if (gameContext && gameContext.players.length > 0) {
+      return buildGameSuggestions(gameContext);
+    }
+    if (patterns.length > 0) {
+      return patterns.slice(0, 4).flatMap(p => {
+        if (p.suggested_questions) {
+          try {
+            const qs: string[] = JSON.parse(p.suggested_questions);
+            return qs.slice(0, 1);
+          } catch { /* fall through */ }
+        }
+        const firstTag = p.tags
+          ? p.tags.replace(/^\[|\]$/g, '').split(',')[0].trim().replace(/-/g, ' ')
+          : null;
+        if (!firstTag) return [`Explain ${p.name}`];
+        const verb = firstTag.endsWith('s') ? 'do' : 'does';
+        return [`How ${verb} ${firstTag} work?`];
+      });
+    }
+    return [
+      'Does deathtouch work with trample?',
+      'Can I respond to a mana ability?',
+      'How does the legend rule work?',
+      'What is the layer system?',
+    ];
+  })();
 
   return (
     <Box sx={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
@@ -287,6 +381,15 @@ export default function ChatPage() {
                   </Box>
                   <Typography variant="body2" fontWeight={500} noWrap>{p.name}</Typography>
                 </Box>
+                <Tooltip title={`Cite #${p.pattern_id.toUpperCase()} in your question`}>
+                  <IconButton
+                    size="small"
+                    onClick={e => { e.stopPropagation(); citePattern(p); }}
+                    sx={{ mr: 0.5, flexShrink: 0 }}
+                  >
+                    <AddCommentIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Tooltip>
                 {expandedPattern === p.pattern_id ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
               </ListItemButton>
               <Collapse in={expandedPattern === p.pattern_id}>
@@ -301,6 +404,14 @@ export default function ChatPage() {
                   <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'pre-wrap', display: 'block', maxHeight: 200, overflow: 'auto' }}>
                     {p.content.split('\n').slice(0, 8).join('\n')}
                   </Typography>
+                  <Button
+                    size="small"
+                    startIcon={<AddCommentIcon />}
+                    onClick={() => citePattern(p)}
+                    sx={{ mt: 1 }}
+                  >
+                    Cite in question
+                  </Button>
                 </Box>
               </Collapse>
               <Divider />
@@ -339,34 +450,49 @@ export default function ChatPage() {
           </Tooltip>
         </Paper>
 
+        {/* Active game banner */}
+        {gameContext && (
+          <Box
+            sx={{
+              borderBottom: 1,
+              borderColor: 'divider',
+              bgcolor: theme => theme.palette.mode === 'dark' ? 'success.dark' : 'success.light',
+              px: 2,
+              py: 0.75,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+            }}
+          >
+            <SportsEsportsIcon sx={{ fontSize: 15, color: 'success.contrastText', opacity: 0.9, flexShrink: 0 }} />
+            <Typography variant="caption" sx={{ color: 'success.contrastText', fontWeight: 600, flexShrink: 0 }}>
+              Live game
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+              {gameContext.players.map(p => (
+                <Chip
+                  key={p.playerName}
+                  label={p.partner ? `${p.playerName}: ${p.commander} + ${p.partner}` : `${p.playerName}: ${p.commander ?? p.deckName}`}
+                  size="small"
+                  sx={{ fontSize: '0.65rem', height: 18, bgcolor: 'rgba(255,255,255,0.2)', color: 'success.contrastText' }}
+                />
+              ))}
+            </Box>
+          </Box>
+        )}
+
         {/* Messages */}
         <Box sx={{ flex: 1, overflow: 'auto', px: 2, py: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           {messages.length === 0 && (
             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, opacity: 0.6 }}>
               <AutoStoriesIcon sx={{ fontSize: 64 }} color="primary" />
-              <Typography variant="h6" color="text.secondary">Ask an MTG rules question</Typography>
+              <Typography variant="h6" color="text.secondary">
+                {gameContext ? `Asking about your game? I know the decks.` : 'Ask an MTG rules question'}
+              </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center', maxWidth: 500 }}>
-                {patternsLoading ? (
+                {patternsLoading && !gameContext ? (
                   <CircularProgress size={20} />
-                ) : (patterns.length > 0 ? patterns.slice(0, 4).flatMap(p => {
-                  if (p.suggested_questions) {
-                    try {
-                      const qs: string[] = JSON.parse(p.suggested_questions);
-                      return qs.slice(0, 1);
-                    } catch { /* fall through */ }
-                  }
-                  const firstTag = p.tags
-                    ? p.tags.replace(/^\[|\]$/g, '').split(',')[0].trim().replace(/-/g, ' ')
-                    : null;
-                  if (!firstTag) return [`Explain ${p.name}`];
-                  const verb = firstTag.endsWith('s') ? 'do' : 'does';
-                  return [`How ${verb} ${firstTag} work?`];
-                }) : [
-                  'Does deathtouch work with trample?',
-                  'Can I respond to a mana ability?',
-                  'How does the legend rule work?',
-                  'What is the layer system?',
-                ]).map(q => (
+                ) : suggestions.map(q => (
                   <Chip
                     key={q}
                     label={q}
@@ -402,11 +528,7 @@ export default function ChatPage() {
                   <Box sx={{ '& p': { m: 0, mb: 1, lineHeight: 1.6, fontSize: '0.875rem' }, '& p:last-child': { mb: 0 }, '& ul, & ol': { mt: 0.5, mb: 1, pl: 2.5 }, '& li': { fontSize: '0.875rem', lineHeight: 1.6 }, '& strong': { fontWeight: 600 }, '& code': { fontFamily: 'monospace', fontSize: '0.8rem', bgcolor: 'action.hover', px: 0.5, borderRadius: 0.5 } }}>
                     <ReactMarkdown>{msg.content}</ReactMarkdown>
                   </Box>
-                ) : (
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                    {msg.content}
-                  </Typography>
-                )}
+                ) : renderUserContent(msg.content)}
 
                 {/* Pending pattern proposal */}
                 {msg.pending_pattern && (
@@ -478,7 +600,7 @@ export default function ChatPage() {
             fullWidth
             multiline
             maxRows={6}
-            placeholder="Ask a rules question…"
+            placeholder={gameContext ? 'Ask about your game…' : 'Ask a rules question…'}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}

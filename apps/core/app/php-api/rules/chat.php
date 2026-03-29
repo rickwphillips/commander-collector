@@ -16,6 +16,7 @@ $input          = getJSONInput();
 $userMessage    = trim($input['message'] ?? '');
 $conversationId = isset($input['conversation_id']) ? (int)$input['conversation_id'] : null;
 $newTitle       = trim($input['new_conversation_title'] ?? '');
+$gameContext    = $input['game_context'] ?? null;
 
 if (!$userMessage) sendError('message is required');
 
@@ -237,6 +238,36 @@ Key SBAs:
 PROMPT;
 
 $systemPrompt .= $patternsContext;
+
+// ── Active game context (personalization) ──────────────────────────────────
+if (!empty($gameContext['players'])) {
+    $systemPrompt .= "\n\n---\n\n## Active Game Context\n\n";
+    $systemPrompt .= "A Commander game is currently in progress. Use this to personalize your answers: ";
+    $systemPrompt .= "reference specific cards from these decks when relevant, point out tricky interactions ";
+    $systemPrompt .= "that may come up given these commanders and card combinations, and address rules questions ";
+    $systemPrompt .= "in the context of what the players are actually running.\n\n";
+
+    foreach ($gameContext['players'] as $player) {
+        $playerName  = htmlspecialchars($player['playerName'] ?? 'Unknown', ENT_QUOTES);
+        $deckName    = htmlspecialchars($player['deckName']   ?? 'Unknown Deck', ENT_QUOTES);
+        $commander   = htmlspecialchars($player['commander']  ?? 'Unknown Commander', ENT_QUOTES);
+        $partner     = !empty($player['partner']) ? htmlspecialchars($player['partner'], ENT_QUOTES) : null;
+        $cards       = is_array($player['cards']) ? $player['cards'] : [];
+
+        $commanderStr = $partner ? "{$commander} + {$partner} (Partner)" : $commander;
+        $systemPrompt .= "**{$playerName}** — \"{$deckName}\" — Commander: *{$commanderStr}*\n";
+
+        if (!empty($cards)) {
+            // Filter out lands to keep context focused on spells/threats
+            $nonLands = array_filter($cards, fn($c) => !preg_match('/\b(Plains|Island|Swamp|Mountain|Forest|Land)\b/i', $c));
+            $systemPrompt .= "Deck contents: " . implode(', ', array_values($nonLands)) . "\n";
+        } else {
+            $systemPrompt .= "(Deck list not available)\n";
+        }
+        $systemPrompt .= "\n";
+    }
+
+}
 
 // ── Tool definitions ───────────────────────────────────────────────────────
 $tools = [
