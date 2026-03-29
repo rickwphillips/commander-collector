@@ -38,6 +38,20 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '3.3.0',
+    date: '2026-03-29',
+    title: 'Rules Guru Game Awareness & Deck Icons',
+    changes: [
+      { type: 'added', text: 'Rules Guru now detects active game sessions and personalizes answers based on each player\'s commander and deck' },
+      { type: 'added', text: 'Cite a pattern inline using #P### syntax — resolves to the pattern name before sending' },
+      { type: 'added', text: 'Pattern Library drawer now has a cite button to insert #P### directly into your question' },
+      { type: 'added', text: 'Decks with cards show a card icon in all deck select dropdowns' },
+      { type: 'fixed', text: 'Rules Guru prompt token usage drastically reduced — no more API token limit errors' },
+      { type: 'fixed', text: 'Markdown tables in Rules Guru responses now render properly with borders and styling' },
+      { type: 'fixed', text: 'Conversation history capped to last 8 messages to prevent prompt bloat over long sessions' },
+    ],
+  },
+  {
     version: '3.2.1',
     date: '2026-03-28',
     title: 'Scan & Rules Guru Fixes',

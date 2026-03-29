@@ -34,20 +34,24 @@ if (!$conversationId) {
 $stmt = $db->prepare("INSERT INTO rules_messages (conversation_id, role, content) VALUES (?, 'user', ?)");
 $stmt->execute([$conversationId, $userMessage]);
 
-// Load full conversation history for context
-$stmt = $db->prepare("SELECT role, content FROM rules_messages WHERE conversation_id = ? ORDER BY id");
+// Load recent conversation history (last 8 messages to stay within token budget)
+$stmt = $db->prepare("
+    SELECT role, content FROM rules_messages
+    WHERE conversation_id = ?
+    ORDER BY id DESC
+    LIMIT 8
+");
 $stmt->execute([$conversationId]);
-$history = $stmt->fetchAll();
+$history = array_reverse($stmt->fetchAll());
 
-// ── Load patterns from DB for system prompt context ────────────────────────
-$patternRows = $db->query("SELECT pattern_id, name, category, cr_refs, tags, content, examples_count FROM rules_patterns ORDER BY pattern_id")->fetchAll();
+// ── Load pattern index (metadata only, compact) ───────────────────────────
+$patternRows = $db->query("SELECT pattern_id, name, category FROM rules_patterns ORDER BY pattern_id")->fetchAll();
 
 $patternsContext = '';
 if ($patternRows) {
-    $patternsContext = "\n\n---\n\n## Interaction Pattern Library\n\nThe following patterns are your trained abstractions. Match incoming questions to these before answering.\n\n";
+    $patternsContext = "\n\n---\n\n## Interaction Pattern Library\n\nUse `get_pattern` to fetch any pattern's full detail. Index:\n";
     foreach ($patternRows as $p) {
-        $patternsContext .= "### {$p['pattern_id']} — {$p['name']} (category: {$p['category']})\n";
-        $patternsContext .= $p['content'] . "\n\n---\n\n";
+        $patternsContext .= "{$p['pattern_id']} — {$p['name']} ({$p['category']})\n";
     }
 }
 
@@ -61,7 +65,7 @@ When card names are mentioned, use the `lookup_card` tool to fetch current Oracl
 
 ## Step 2: Pattern Match
 
-Before answering, review the Interaction Pattern Library below. Identify the underlying mechanic type of the question — not the card names. When a pattern matches, say: *"This looks like it falls under [Pattern Name] (P###) — applying that logic here..."* then state the definitive ruling.
+The most relevant patterns for this question are pre-loaded below with full detail. Check those first. For any other pattern in the index that looks applicable, use `get_pattern` to fetch its full content. When applying a pattern, say: *"This looks like it falls under [Pattern Name] (P###) — applying that logic here..."* then state the definitive ruling.
 
 If the user corrects a pattern application:
 1. Do NOT immediately accept the correction.
@@ -269,6 +273,23 @@ if (!empty($gameContext['players'])) {
 
 }
 
+// ── distillPattern: extract high-signal sections only (token-efficient) ───
+function distillPattern(array $p): string {
+    $content = $p['content'] ?? '';
+    $out = "**{$p['pattern_id']} — {$p['name']}** ({$p['category']})\n";
+
+    foreach (['Abstract', 'The Pattern', 'Definitive Conclusions'] as $section) {
+        if (preg_match('/##\s+' . preg_quote($section, '/') . '\s*\n+(.*?)(?=\n##\s|\z)/s', $content, $m)) {
+            $text = trim($m[1]);
+            // Trim "Additional Examples" sub-sections which can be verbose
+            $text = preg_replace('/###.*$/s', '', $text);
+            $out .= "\n**{$section}:**\n" . trim($text) . "\n";
+        }
+    }
+
+    return $out . "\n";
+}
+
 // ── Tool definitions ───────────────────────────────────────────────────────
 $tools = [
     [
@@ -283,6 +304,24 @@ $tools = [
                 ],
             ],
             'required' => ['name'],
+        ],
+    ],
+    [
+        'name'        => 'get_pattern',
+        'description' => 'Fetch a pattern by ID. Returns a distilled summary (Abstract, Pattern pseudocode, Definitive Conclusions) by default. Set full_content=true only if you need the complete examples and CR text.',
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => [
+                'pattern_id' => [
+                    'type'        => 'string',
+                    'description' => 'The pattern ID to fetch, e.g. "p001" or "P001"',
+                ],
+                'full_content' => [
+                    'type'        => 'boolean',
+                    'description' => 'Set true to receive the full markdown content instead of the distilled summary',
+                ],
+            ],
+            'required' => ['pattern_id'],
         ],
     ],
     [
@@ -312,6 +351,28 @@ foreach ($history as $msg) {
 
 // ── Tool execution helper ──────────────────────────────────────────────────
 function executeTool(string $name, array $input): string {
+    if ($name === 'get_pattern') {
+        global $db;
+        $pid  = strtolower(trim($input['pattern_id'] ?? ''));
+        $stmt = $db->prepare("SELECT pattern_id, name, category, cr_refs, tags, content, examples_count FROM rules_patterns WHERE LOWER(pattern_id) = ?");
+        $stmt->execute([$pid]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            return json_encode(['error' => "Pattern not found: {$input['pattern_id']}"]);
+        }
+        // Return distilled view by default; full content only if explicitly requested
+        $full = !empty($input['full_content']);
+        return json_encode([
+            'pattern_id'     => $row['pattern_id'],
+            'name'           => $row['name'],
+            'category'       => $row['category'],
+            'cr_refs'        => $row['cr_refs'],
+            'tags'           => $row['tags'],
+            'examples_count' => $row['examples_count'],
+            'content'        => $full ? $row['content'] : distillPattern($row),
+        ]);
+    }
+
     if ($name === 'lookup_card') {
         $cardName = urlencode($input['name'] ?? '');
         $cardUrl  = "https://api.scryfall.com/cards/named?fuzzy=$cardName";

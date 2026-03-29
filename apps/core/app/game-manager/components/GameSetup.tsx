@@ -25,6 +25,7 @@ import SouthIcon from '@mui/icons-material/South';
 import NorthIcon from '@mui/icons-material/North';
 import EastIcon from '@mui/icons-material/East';
 import WestIcon from '@mui/icons-material/West';
+import StyleIcon from '@mui/icons-material/Style';
 import ListSubheader from '@mui/material/ListSubheader';
 import { api } from '@/lib/api';
 import type { Player, DeckWithPlayer } from '@/lib/types';
@@ -445,7 +446,10 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
               {playerDecks.length > 0 && <ListSubheader>Your Decks</ListSubheader>}
               {playerDecks.map((d) => (
                 <MenuItem key={d.id} value={d.id}>
-                  {d.name} — {d.commander}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    {d.card_count > 0 && <StyleIcon sx={{ fontSize: 14, opacity: 0.6 }} />}
+                    {d.name} — {d.commander}
+                  </Box>
                 </MenuItem>
               ))}
               {playerDecks.length > 0 && otherDecks.length > 0 && (
@@ -453,7 +457,10 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
               )}
               {otherDecks.map((d) => (
                 <MenuItem key={d.id} value={d.id}>
-                  {d.name} ({d.player_name}) — {d.commander}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    {d.card_count > 0 && <StyleIcon sx={{ fontSize: 14, opacity: 0.6 }} />}
+                    {d.name} ({d.player_name}) — {d.commander}
+                  </Box>
                 </MenuItem>
               ))}
             </TextField>

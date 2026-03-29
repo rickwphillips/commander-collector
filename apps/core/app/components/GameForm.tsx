@@ -21,6 +21,7 @@ import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import GroupsIcon from '@mui/icons-material/Groups';
+import StyleIcon from '@mui/icons-material/Style';
 import ListSubheader from '@mui/material/ListSubheader';
 import { ColorIdentityChips } from './ColorIdentityChips';
 import { LoadingSpinner } from './LoadingSpinner';
@@ -429,7 +430,10 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
                 value={deck.id}
                 disabled={results.some((r, i) => i !== index && r.deck_id === deck.id)}
               >
-                {deck.name} - {deck.commander}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  {deck.card_count > 0 && <StyleIcon sx={{ fontSize: 14, opacity: 0.6 }} />}
+                  {deck.name} - {deck.commander}
+                </Box>
               </MenuItem>
             ))}
             {playerDecks.length > 0 && otherDecks.length > 0 && (
@@ -441,7 +445,10 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
                 value={deck.id}
                 disabled={results.some((r, i) => i !== index && r.deck_id === deck.id)}
               >
-                {deck.name} ({deck.player_name}) - {deck.commander}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  {deck.card_count > 0 && <StyleIcon sx={{ fontSize: 14, opacity: 0.6 }} />}
+                  {deck.name} ({deck.player_name}) - {deck.commander}
+                </Box>
               </MenuItem>
             ))}
           </TextField>

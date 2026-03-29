@@ -22,6 +22,7 @@ import type {
   ComparisonConditions,
   ComparisonEntityFilter,
 } from '@/lib/types';
+import StyleIcon from '@mui/icons-material/Style';
 import { QuerySentence } from './QuerySentence';
 import { ConditionColorPicker } from './ConditionColorPicker';
 
@@ -571,6 +572,14 @@ export function ComparisonBuilder({
               getOptionLabel={(d) => `${d.name} (${d.player_name})`}
               value={decks.filter((d) => entityFilter.deck_ids?.includes(d.id) ?? false)}
               onChange={(_, v) => setFilter('deck_ids', v.map((d) => d.id))}
+              renderOption={(props, d) => (
+                <li {...props} key={d.id}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    {d.card_count > 0 && <StyleIcon sx={{ fontSize: 14, opacity: 0.6 }} />}
+                    {d.name} ({d.player_name})
+                  </Box>
+                </li>
+              )}
               renderInput={(params) => (
                 <TextField {...params} label="Specific decks" placeholder="All decks" />
               )}

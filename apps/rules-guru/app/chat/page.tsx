@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   Box,
   Typography,
@@ -396,8 +397,8 @@ export default function ChatPage() {
                 <Box sx={{ px: 2, pb: 1.5, bgcolor: 'action.hover' }}>
                   {p.tags && (
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
-                      {p.tags.replace(/[\[\]]/g, '').split(',').map(t => (
-                        <Chip key={t.trim()} label={t.trim()} size="small" sx={{ fontSize: '0.65rem', height: 18 }} />
+                      {p.tags.replace(/[\[\]]/g, '').split(',').map((t, i) => (
+                        <Chip key={`${t.trim()}-${i}`} label={t.trim()} size="small" sx={{ fontSize: '0.65rem', height: 18 }} />
                       ))}
                     </Box>
                   )}
@@ -525,8 +526,19 @@ export default function ChatPage() {
                 }}
               >
                 {msg.role === 'assistant' ? (
-                  <Box sx={{ '& p': { m: 0, mb: 1, lineHeight: 1.6, fontSize: '0.875rem' }, '& p:last-child': { mb: 0 }, '& ul, & ol': { mt: 0.5, mb: 1, pl: 2.5 }, '& li': { fontSize: '0.875rem', lineHeight: 1.6 }, '& strong': { fontWeight: 600 }, '& code': { fontFamily: 'monospace', fontSize: '0.8rem', bgcolor: 'action.hover', px: 0.5, borderRadius: 0.5 } }}>
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  <Box sx={{
+                  '& p': { m: 0, mb: 1, lineHeight: 1.6, fontSize: '0.875rem' },
+                  '& p:last-child': { mb: 0 },
+                  '& ul, & ol': { mt: 0.5, mb: 1, pl: 2.5 },
+                  '& li': { fontSize: '0.875rem', lineHeight: 1.6 },
+                  '& strong': { fontWeight: 600 },
+                  '& code': { fontFamily: 'monospace', fontSize: '0.8rem', bgcolor: 'action.hover', px: 0.5, borderRadius: 0.5 },
+                  '& table': { borderCollapse: 'collapse', width: '100%', fontSize: '0.8rem', mb: 1 },
+                  '& th, & td': { border: '1px solid', borderColor: 'divider', px: 1, py: 0.5, textAlign: 'left' },
+                  '& th': { bgcolor: 'action.hover', fontWeight: 600 },
+                  '& tr:nth-of-type(even)': { bgcolor: 'action.hover' },
+                }}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                   </Box>
                 ) : renderUserContent(msg.content)}
 
@@ -645,8 +657,8 @@ export default function ChatPage() {
               <Typography variant="h6">{patternDialog.name}</Typography>
               {patternDialog.tags && (
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                  {patternDialog.tags.replace(/[\[\]]/g, '').split(',').map(t => (
-                    <Chip key={t.trim()} label={t.trim()} size="small" variant="outlined" />
+                  {patternDialog.tags.replace(/[\[\]]/g, '').split(',').map((t, i) => (
+                    <Chip key={`${t.trim()}-${i}`} label={t.trim()} size="small" variant="outlined" />
                   ))}
                 </Box>
               )}
