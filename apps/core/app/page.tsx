@@ -201,7 +201,7 @@ export default function Dashboard() {
             <Grid key={item.title} size={{ xs: 6, md: 3 }} offset={item.centerRow ? { md: 3, xs: 0 } : undefined}>
               <Grow in={mounted} timeout={800 + index * 150}>
                 <Card className={styles.navCard}>
-                  <CardActionArea component={item.external ? 'a' : Link} href={item.external && process.env.NODE_ENV === 'development' ? `http://localhost:3003${item.href.replace('/rules', '')}` : item.href} sx={{ height: '100%' }}>
+                  <CardActionArea component={item.external ? 'a' : Link} href={item.external ? (process.env.NODE_ENV === 'development' ? 'http://localhost:3003/chat' : '/app/projects/commander/rules/chat') : item.href} sx={{ height: '100%' }}>
                     <CardContent sx={{ textAlign: 'center', py: 3 }}>
                       <Box sx={{ color: item.color, mb: 2 }}>{item.icon}</Box>
                       <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>

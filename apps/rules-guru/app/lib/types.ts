@@ -8,6 +8,7 @@ export interface RulesPattern {
   content: string;
   examples_count: number;
   updated_at?: string;
+  suggested_questions?: string | null;
 }
 
 export interface RulesConversation {

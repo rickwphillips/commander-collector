@@ -332,12 +332,25 @@ export default function ChatPage() {
               <AutoStoriesIcon sx={{ fontSize: 64 }} color="primary" />
               <Typography variant="h6" color="text.secondary">Ask an MTG rules question</Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center', maxWidth: 500 }}>
-                {[
+                {(patterns.length > 0 ? patterns.slice(0, 4).flatMap(p => {
+                  if (p.suggested_questions) {
+                    try {
+                      const qs: string[] = JSON.parse(p.suggested_questions);
+                      return qs.slice(0, 1);
+                    } catch { /* fall through */ }
+                  }
+                  const firstTag = p.tags
+                    ? p.tags.replace(/^\[|\]$/g, '').split(',')[0].trim().replace(/-/g, ' ')
+                    : null;
+                  if (!firstTag) return [`Explain ${p.name}`];
+                  const verb = firstTag.endsWith('s') ? 'do' : 'does';
+                  return [`How ${verb} ${firstTag} work?`];
+                }) : [
                   'Does deathtouch work with trample?',
                   'Can I respond to a mana ability?',
                   'How does the legend rule work?',
                   'What is the layer system?',
-                ].map(q => (
+                ]).map(q => (
                   <Chip
                     key={q}
                     label={q}
