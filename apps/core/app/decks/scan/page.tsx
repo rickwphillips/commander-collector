@@ -11,6 +11,7 @@ import {
   CardMedia,
   Chip,
   CircularProgress,
+  FormControlLabel,
   LinearProgress,
   Dialog,
   DialogActions,
@@ -25,6 +26,7 @@ import {
   Step,
   StepLabel,
   Stepper,
+  Switch,
   TextField,
   Typography,
 } from '@mui/material';
@@ -48,45 +50,7 @@ import { DeckBreakdown } from '@/components/DeckBreakdown';
 import { api } from '@/lib/api';
 import { MTG_COLORS_WITH_C } from '@/lib/utils';
 import { scryfallAutocomplete } from '@/lib/scryfall';
-import type { ScryfallCachedCard, Player, DeckWithPlayer } from '@/lib/types';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface ScannedCard {
-  id: string;               // local temp id
-  card_name: string;
-  scryfall_id: string | null;
-  image_uri: string | null;
-  color_identity: string;
-  type_line: string | null;
-  mana_cost: string | null;
-  quantity: number;
-  is_commander: boolean;
-  is_proxy: boolean;
-  notFound: boolean;        // true if Scryfall returned no match
-}
-
-// ─── Draft persistence ─────────────────────────────────────────────────────────
-
-const DRAFT_KEY = 'cc:scan-draft';
-
-interface ScanDraft {
-  step: number;
-  cards: ScannedCard[];
-  deckName: string;
-  playerId: number | '';
-  colors: string[];
-}
-
-function readDraft(): Partial<ScanDraft> {
-  if (typeof window === 'undefined') return {};
-  try { return JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null') ?? {}; }
-  catch { return {}; }
-}
-
-function clearDraft() {
-  try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
-}
+import type { ScryfallCachedCard, Player, DeckWithPlayer, ScannedCard, ScanDraft } from '@/lib/types';
 
 // ─── Steps ────────────────────────────────────────────────────────────────────
 
@@ -104,6 +68,28 @@ const BASIC_LANDS = new Set([
 
 function tempId() {
   return Math.random().toString(36).slice(2);
+}
+
+function cropDataUrl(
+  dataUrl: string,
+  x: number, y: number, w: number, h: number
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const sw = Math.round(img.width * w);
+      const sh = Math.round(img.height * h);
+      canvas.width = sw;
+      canvas.height = sh;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject(new Error('No canvas context'));
+      ctx.drawImage(img, img.width * x, img.height * y, sw, sh, 0, 0, sw, sh);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
 }
 
 function cardFromScryfall(name: string, data: ScryfallCachedCard | null, proxy = false): ScannedCard {
@@ -131,19 +117,24 @@ function ScanDeckPageInner() {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const isMobile = typeof navigator !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
 
-  // In edit mode ignore any persisted draft; start fresh from the deck's saved cards
-  const draft = editDeckId ? {} : readDraft();
+  const [step, setStep]     = useState<number>(0);
+  const [cards, setCards]   = useState<ScannedCard[]>([]);
+  const [deckName, setDeckName] = useState('');
+  const [playerId, setPlayerId] = useState<number | ''>('');
+  const [colors, setColors] = useState<string[]>([]);
+  // draftReady gates the auto-save: don't write back until we've loaded the server draft
+  const [draftReady, setDraftReady] = useState(!!editDeckId);
+  const draftSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [step, setStep]     = useState<number>(draft.step ?? 0);
-  const [cards, setCards]   = useState<ScannedCard[]>(draft.cards ?? []);
-  const [deckName, setDeckName] = useState(draft.deckName ?? '');
-  const [playerId, setPlayerId] = useState<number | ''>(draft.playerId ?? '');
-  const [colors, setColors] = useState<string[]>(draft.colors ?? []);
+  const [scanResults, setScanResults] = useState<ScannedCard[] | null>(null);
+  const [cropMap, setCropMap] = useState<Record<string, string>>({}); // card id → cropped data URL
 
   // Edit-mode: loading existing deck cards
   const [editLoading, setEditLoading] = useState(!!editDeckId);
   const [importing, setImporting] = useState(false);
+  const [singletonImport, setSingletonImport] = useState(true);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -192,6 +183,22 @@ function ScanDeckPageInner() {
   const [prints, setPrints] = useState<import('@/lib/types').CardPrint[]>([]);
   const [loadingPrints, setLoadingPrints] = useState(false);
 
+  // ── Load server draft on mount (new deck mode only) ──────────────────────
+
+  useEffect(() => {
+    if (editDeckId) return;
+    api.getScanDraft().then(({ state }) => {
+      if (state) {
+        setStep(state.step);
+        setCards(state.cards);
+        setDeckName(state.deckName);
+        setPlayerId(state.playerId);
+        setColors(state.colors);
+      }
+    }).catch(() => {}).finally(() => setDraftReady(true));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Load existing deck in edit mode ────────────────────────────────────────
 
   useEffect(() => {
@@ -230,16 +237,18 @@ function ScanDeckPageInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editDeckId]);
 
-  // ── Persist draft to localStorage (new decks only) ─────────────────────────
+  // ── Persist draft to server (new decks only, debounced 1.5s) ──────────────
 
   useEffect(() => {
-    if (editDeckId) return; // don't clobber draft with edit-mode state
+    if (!draftReady || editDeckId) return;
     if (step === 0 && cards.length === 0) return;
-    try {
-      const draft: ScanDraft = { step, cards, deckName, playerId, colors };
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-    } catch { /* quota exceeded, ignore */ }
-  }, [editDeckId, step, cards, deckName, playerId, colors]);
+    if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current);
+    draftSaveTimer.current = setTimeout(() => {
+      api.saveScanDraft({ step, cards, deckName, playerId, colors }).catch(() => {});
+    }, 1500);
+    return () => { if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftReady, editDeckId, step, cards, deckName, playerId, colors]);
 
   // ── Discard ────────────────────────────────────────────────────────────────
 
@@ -287,9 +296,12 @@ function ScanDeckPageInner() {
 
         if (existingId) {
           if (isBasic) basicMerges.push({ id: existingId, qty });
-          // non-basic duplicate: skip
+          // non-basic already in deck: skip
+        } else if (toAdd.some((t) => t.name.toLowerCase() === key)) {
+          // duplicate within this import file: skip
         } else {
-          toAdd.push({ name, qty });
+          const effectiveQty = singletonImport && !isBasic ? 1 : qty;
+          toAdd.push({ name, qty: effectiveQty });
         }
       }
 
@@ -343,7 +355,7 @@ function ScanDeckPageInner() {
   }
 
   function discardDraft() {
-    clearDraft();
+    api.clearScanDraft().catch(() => {});
     setStep(0);
     setCards([]);
     setDeckName('');
@@ -469,16 +481,19 @@ function ScanDeckPageInner() {
       const { base64, mimeType, canvas } = await fileToBase64(fileToRestore, editRotation, editBrightness, editContrast);
       setPreviewUrl(`data:${mimeType};base64,${base64}`);
 
-      // Split into 3×3 = 9 tiles so each tile covers ~11 cards at higher effective resolution
+      // Split into 3×3 = 9 tiles + 1 full-image pass = 10 total scans
+      // Full image catches edge cards that span tile borders
       const COLS = 3, ROWS = 3;
       const tiles = splitCanvasToTiles(canvas, COLS, ROWS);
-      setScanProgress({ current: 0, total: tiles.length });
+      const allScans = [...tiles, { base64, mimeType }];
+      const totalScans = allScans.length;
+      setScanProgress({ current: 1, total: totalScans });
 
-      // Scan all tiles in parallel
+      // Scan all tiles (+ full image) in parallel
       const tileResults = await Promise.allSettled(
-        tiles.map(async (tile) => {
+        allScans.map(async (tile) => {
           const result = await api.scanDeck(tile.base64, tile.mimeType);
-          setScanProgress((prev) => prev ? { ...prev, current: prev.current + 1 } : prev);
+          setScanProgress((prev) => prev ? { ...prev, current: Math.min(prev.current + 1, prev.total) } : prev);
           return result.cards;
         })
       );
@@ -496,8 +511,30 @@ function ScanDeckPageInner() {
         }
       }
 
-      await lookupAllCards(allCards);
-      setStep(1);
+      const added = await lookupAllCards(allCards);
+
+      // Async: ask Claude to locate each not-found card and store a crop snippet
+      const notFoundCards = added.filter((c) => c.notFound);
+      const scanBase64 = base64;
+      const scanMime = mimeType;
+      notFoundCards.forEach((c) => {
+        api.findCardCrop(scanBase64, scanMime, c.card_name)
+          .then(async ({ crop }) => {
+            if (!crop) return;
+            const snippet = await cropDataUrl(
+              `data:${scanMime};base64,${scanBase64}`,
+              crop.x, crop.y, crop.w, crop.h
+            );
+            setCropMap((prev) => ({ ...prev, [c.id]: snippet }));
+          })
+          .catch(() => {/* silently ignore — crop is best-effort */});
+      });
+
+      if (editDeckId) {
+        setScanResults(added);
+      } else {
+        setStep(1);
+      }
     } catch (err) {
       console.error('[Scan error]', err);
       setError(err instanceof Error ? err.message : 'Scan failed');
@@ -511,7 +548,7 @@ function ScanDeckPageInner() {
 
   // ── Scryfall lookups ──────────────────────────────────────────────────────
 
-  async function lookupAllCards(items: { name: string; proxy: boolean }[]) {
+  async function lookupAllCards(items: { name: string; proxy: boolean }[]): Promise<ScannedCard[]> {
     setLookingUp(true);
     try {
       const names = items.map((i) => i.name);
@@ -537,24 +574,27 @@ function ScanDeckPageInner() {
         );
         const hits = retries.filter((r): r is { id: string; data: ScryfallCachedCard } => r !== null);
         if (hits.length > 0) {
+          hits.forEach((hit) => {
+            const card = scanned.find((c) => c.id === hit.id);
+            if (card) {
+              card.card_name = hit.data.name ?? card.card_name;
+              card.scryfall_id = hit.data.scryfall_id;
+              card.image_uri = hit.data.image_uri ?? null;
+              card.color_identity = hit.data.color_identity ?? '';
+              card.type_line = hit.data.type_line ?? null;
+              card.mana_cost = hit.data.mana_cost ?? null;
+              card.notFound = false;
+            }
+          });
           setCards((prev) =>
             prev.map((c) => {
-              const hit = hits.find((h) => h.id === c.id);
-              if (!hit) return c;
-              return {
-                ...c,
-                card_name: hit.data.name ?? c.card_name,
-                scryfall_id: hit.data.scryfall_id,
-                image_uri: hit.data.image_uri ?? null,
-                color_identity: hit.data.color_identity ?? '',
-                type_line: hit.data.type_line ?? null,
-                mana_cost: hit.data.mana_cost ?? null,
-                notFound: false,
-              };
+              const updated = scanned.find((s) => s.id === c.id);
+              return updated ?? c;
             })
           );
         }
       }
+      return scanned;
     } finally {
       setLookingUp(false);
     }
@@ -719,7 +759,7 @@ function ScanDeckPageInner() {
           is_commander: c.is_commander,
           is_proxy: c.is_proxy,
         })));
-        clearDraft();
+        api.clearScanDraft().catch(() => {});
         router.push(`/decks/detail?id=${existingDeckId}`);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to save cards');
@@ -757,7 +797,7 @@ function ScanDeckPageInner() {
         is_proxy: c.is_proxy,
       })));
 
-      clearDraft();
+      api.clearScanDraft().catch(() => {});
       router.push(`/decks/detail?id=${deck.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save deck');
@@ -837,44 +877,43 @@ function ScanDeckPageInner() {
         </Alert>
       )}
 
+      {/* Hidden file inputs — always mounted so refs work from any step */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        {...(isMobile ? { capture: 'environment' } : {})}
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
+      <input
+        ref={uploadInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".txt,text/plain"
+        style={{ display: 'none' }}
+        onChange={handleImportFile}
+      />
+
       {/* ── Step 0: Capture ── */}
       {step === 0 && (
         <Card>
           <CardContent sx={{ p: 4 }}>
-            {scanning ? (
-              <Stack alignItems="center" spacing={2} py={4}>
-                <CircularProgress size={48} />
-                <Typography>
-                  {scanProgress
-                    ? `Scanning tile ${scanProgress.current + 1} of ${scanProgress.total}...`
-                    : 'Preparing image...'}
-                  {' '}<Typography component="span" variant="caption" color="text.secondary">{process.env.NEXT_PUBLIC_BUILD_TIME}</Typography>
-                </Typography>
-                {scanProgress && (
-                  <LinearProgress
-                    variant="determinate"
-                    value={(scanProgress.current / scanProgress.total) * 100}
-                    sx={{ width: 280 }}
-                  />
-                )}
-                {previewUrl && (
-                  <Box
-                    component="img"
-                    src={previewUrl}
-                    alt="Deck photo"
-                    sx={{ maxWidth: 320, maxHeight: 240, borderRadius: 1, objectFit: 'contain' }}
-                  />
-                )}
-              </Stack>
-            ) : (
-              <Stack alignItems="center" spacing={3} py={4}>
-                <CameraAltIcon sx={{ fontSize: 64, color: 'text.secondary' }} />
-                <Typography variant="h6">Photograph your deck layout</Typography>
-                <Typography color="text.secondary" textAlign="center" maxWidth={480}>
-                  Lay your cards face-up in rows and take a clear photo. Claude will read the card
-                  names and look them up on Scryfall.
-                </Typography>
-                <Stack direction="row" spacing={2}>
+            <Stack alignItems="center" spacing={3} py={4}>
+              <CameraAltIcon sx={{ fontSize: 64, color: 'text.secondary' }} />
+              <Typography variant="h6">Photograph your deck layout</Typography>
+              <Typography color="text.secondary" textAlign="center" maxWidth={480}>
+                Lay your cards face-up in rows and take a clear photo. Claude will read the card
+                names and look them up on Scryfall.
+              </Typography>
+              <Stack direction="row" spacing={2}>
+                {isMobile && (
                   <Button
                     variant="contained"
                     size="large"
@@ -883,38 +922,17 @@ function ScanDeckPageInner() {
                   >
                     Take Photo
                   </Button>
-                  <Button
-                    variant="outlined"
-                    size="large"
-                    startIcon={<UploadFileIcon />}
-                    onClick={() => uploadInputRef.current?.click()}
-                  >
-                    Upload Image
-                  </Button>
-                </Stack>
-                <input
-                  ref={cameraInputRef}
-                  type="file"
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  onChange={handleFileChange}
-                />
-                <input
-                  ref={uploadInputRef}
-                  type="file"
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  onChange={handleFileChange}
-                />
-                <input
-                  ref={importInputRef}
-                  type="file"
-                  accept=".txt,text/plain"
-                  style={{ display: 'none' }}
-                  onChange={handleImportFile}
-                />
+                )}
+                <Button
+                  variant={isMobile ? 'outlined' : 'contained'}
+                  size="large"
+                  startIcon={<UploadFileIcon />}
+                  onClick={() => uploadInputRef.current?.click()}
+                >
+                  Upload Image
+                </Button>
               </Stack>
-            )}
+            </Stack>
           </CardContent>
         </Card>
       )}
@@ -946,6 +964,17 @@ function ScanDeckPageInner() {
             <Stack direction="row" spacing={1}>
               {editDeckId && (
                 <>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        size="small"
+                        checked={singletonImport}
+                        onChange={(e) => setSingletonImport(e.target.checked)}
+                      />
+                    }
+                    label={<Typography variant="caption">Singleton</Typography>}
+                    sx={{ mr: 0 }}
+                  />
                   <Button
                     variant="outlined"
                     size="small"
@@ -1011,6 +1040,13 @@ function ScanDeckPageInner() {
                       image={card.image_uri}
                       alt={card.card_name}
                       sx={{ aspectRatio: '488/680' }}
+                    />
+                  ) : card.notFound && cropMap[card.id] ? (
+                    <Box
+                      component="img"
+                      src={cropMap[card.id]}
+                      alt={card.card_name}
+                      sx={{ aspectRatio: '488/680', width: '100%', objectFit: 'contain', bgcolor: 'action.hover' }}
                     />
                   ) : (
                     <Box
@@ -1366,20 +1402,22 @@ function ScanDeckPageInner() {
         </DialogTitle>
         <DialogContent>
           <Stack spacing={2} py={1}>
+            {isMobile && (
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={<CameraAltIcon />}
+                onClick={() => { setScanMoreOpen(false); setTimeout(() => cameraInputRef.current?.click(), 50); }}
+                fullWidth
+              >
+                Take Photo
+              </Button>
+            )}
             <Button
-              variant="contained"
-              size="large"
-              startIcon={<CameraAltIcon />}
-              onClick={() => { setScanMoreOpen(false); cameraInputRef.current?.click(); }}
-              fullWidth
-            >
-              Take Photo
-            </Button>
-            <Button
-              variant="outlined"
+              variant={isMobile ? 'outlined' : 'contained'}
               size="large"
               startIcon={<UploadFileIcon />}
-              onClick={() => { setScanMoreOpen(false); uploadInputRef.current?.click(); }}
+              onClick={() => { setScanMoreOpen(false); setTimeout(() => uploadInputRef.current?.click(), 50); }}
               fullWidth
             >
               Upload Image
@@ -1606,6 +1644,85 @@ function ScanDeckPageInner() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setVersionCard(null)}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Scanning Progress Dialog ── */}
+      <Dialog open={scanning} maxWidth="xs" fullWidth>
+        <DialogContent>
+          <Stack alignItems="center" spacing={2} py={2}>
+            <CircularProgress size={48} />
+            <Typography>
+              {scanProgress
+                ? `Scanning tile ${scanProgress.current} of ${scanProgress.total}…`
+                : 'Preparing image…'}
+            </Typography>
+            {scanProgress && (
+              <LinearProgress
+                variant="determinate"
+                value={(scanProgress.current / scanProgress.total) * 100}
+                sx={{ width: '100%' }}
+              />
+            )}
+            {previewUrl && (
+              <Box
+                component="img"
+                src={previewUrl}
+                alt="Deck photo"
+                sx={{ maxWidth: '100%', maxHeight: 200, borderRadius: 1, objectFit: 'contain' }}
+              />
+            )}
+          </Stack>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Scan Results Dialog (edit mode) ── */}
+      <Dialog open={!!scanResults} onClose={() => { setScanResults(null); setCropMap({}); }} maxWidth="xs" fullWidth>
+        <DialogTitle>
+          Scan Results
+          <IconButton onClick={() => { setScanResults(null); setCropMap({}); }} sx={{ position: 'absolute', right: 8, top: 8 }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          {scanResults && scanResults.length === 0 ? (
+            <Typography color="text.secondary">No new cards were identified.</Typography>
+          ) : (
+            <Stack spacing={1}>
+              <Typography variant="body2" color="text.secondary" mb={1}>
+                {scanResults?.length} card{scanResults?.length !== 1 ? 's' : ''} added to your deck:
+              </Typography>
+              {scanResults?.map((c) => (
+                <Box key={c.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {c.notFound ? (
+                    cropMap[c.id] ? (
+                      <Box
+                        component="img"
+                        src={cropMap[c.id]}
+                        alt={c.card_name}
+                        sx={{ width: 36, height: 50, borderRadius: 0.5, objectFit: 'cover', flexShrink: 0, opacity: 0.85 }}
+                      />
+                    ) : (
+                      <Box sx={{ width: 36, height: 50, bgcolor: 'action.hover', borderRadius: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <CircularProgress size={16} />
+                      </Box>
+                    )
+                  ) : c.image_uri ? (
+                    <Box component="img" src={c.image_uri} alt={c.card_name} sx={{ width: 36, height: 50, borderRadius: 0.5, objectFit: 'cover', flexShrink: 0 }} />
+                  ) : (
+                    <Box sx={{ width: 36, height: 50, bgcolor: 'action.hover', borderRadius: 0.5, flexShrink: 0 }} />
+                  )}
+                  <Box>
+                    <Typography variant="body2">{c.card_name}</Typography>
+                    {c.notFound && <Typography variant="caption" color="error">Not found on Scryfall</Typography>}
+                  </Box>
+                </Box>
+              ))}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button variant="contained" onClick={() => { setScanResults(null); setCropMap({}); }}>Done</Button>
         </DialogActions>
       </Dialog>
     </PageContainer>

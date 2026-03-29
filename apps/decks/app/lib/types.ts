@@ -1,6 +1,29 @@
 // Game type
 export type GameType = 'standard' | '2hg';
 
+// Scan draft (cross-device persistence)
+export interface ScannedCard {
+  id: string;
+  card_name: string;
+  scryfall_id: string | null;
+  image_uri: string | null;
+  color_identity: string;
+  type_line: string | null;
+  mana_cost: string | null;
+  quantity: number;
+  is_commander: boolean;
+  is_proxy: boolean;
+  notFound: boolean;
+}
+
+export interface ScanDraft {
+  step: number;
+  cards: ScannedCard[];
+  deckName: string;
+  playerId: number | '';
+  colors: string[];
+}
+
 // Scryfall card cache
 export interface ScryfallCachedCard {
   id?: number;

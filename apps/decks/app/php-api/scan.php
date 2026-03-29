@@ -13,6 +13,7 @@ set_time_limit(0);
 $input = getJSONInput();
 $imageData = $input['image'] ?? null;   // base64-encoded image data (no data URI prefix)
 $mimeType  = $input['mime_type'] ?? 'image/jpeg';
+$findCard  = $input['find_card'] ?? null; // if set, locate this card name and return its bounding box
 
 if (!$imageData) {
     sendError('image is required');
@@ -28,7 +29,88 @@ if (!$apiKey) {
     sendError('Anthropic API key not configured', 500);
 }
 
-// ── Imagick preprocessing — sharpen text, convert to grayscale ─────────────
+// ── find_card mode: locate a specific card and return its bounding box ─────────
+// Skip grayscale preprocessing — color image helps with visual location.
+if ($findCard) {
+    $cardName = trim((string) $findCard);
+    $findPrompt = "You are looking at a photo of Magic: The Gathering cards spread out on a surface.\n"
+        . "Find the card named \"" . str_replace('"', '\\"', $cardName) . "\" in this image.\n"
+        . "Return ONLY a JSON object with the card's bounding box as fractions of the full image dimensions (values 0.0–1.0):\n"
+        . "{\"x\":0.1,\"y\":0.2,\"w\":0.15,\"h\":0.25}\n"
+        . "where x,y is the top-left corner and w,h is the width/height of the card.\n"
+        . "Add a small amount of padding around the card so the name bar is clearly visible.\n"
+        . "If you cannot find the card in the image, return {\"x\":null}";
+
+    $payload = [
+        'model'      => 'claude-sonnet-4-6',
+        'max_tokens' => 256,
+        'messages'   => [
+            [
+                'role'    => 'user',
+                'content' => [
+                    [
+                        'type'   => 'image',
+                        'source' => [
+                            'type'       => 'base64',
+                            'media_type' => $mimeType,
+                            'data'       => $imageData,
+                        ],
+                    ],
+                    [
+                        'type' => 'text',
+                        'text' => $findPrompt,
+                    ],
+                ],
+            ],
+        ],
+    ];
+
+    $ch = curl_init('https://api.anthropic.com/v1/messages');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode($payload),
+        CURLOPT_HTTPHEADER     => [
+            'Content-Type: application/json',
+            'x-api-key: ' . $apiKey,
+            'anthropic-version: 2023-06-01',
+        ],
+        CURLOPT_TIMEOUT        => 60,
+    ]);
+
+    $response  = curl_exec($ch);
+    $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+
+    if ($curlError) {
+        sendJSON(['crop' => null]);
+    }
+
+    $data = json_decode($response, true);
+    if ($httpCode !== 200) {
+        sendJSON(['crop' => null]);
+    }
+
+    $text = $data['content'][0]['text'] ?? '';
+    $crop = null;
+    if (preg_match('/\{[^}]+\}/s', $text, $matches)) {
+        $parsed = json_decode($matches[0], true);
+        if (is_array($parsed) && isset($parsed['x']) && $parsed['x'] !== null) {
+            $crop = [
+                'x' => (float) ($parsed['x'] ?? 0),
+                'y' => (float) ($parsed['y'] ?? 0),
+                'w' => (float) ($parsed['w'] ?? 0),
+                'h' => (float) ($parsed['h'] ?? 0),
+            ];
+        }
+    }
+
+    sendJSON(['crop' => $crop]);
+}
+
+// ── Standard card-list scan mode ──────────────────────────────────────────────
+
+// Imagick preprocessing — sharpen text, convert to grayscale
 // Grayscale removes colorful card artwork that triggers Claude's recognition
 // mode; sharpening makes the name text more legible at small tile sizes.
 if (class_exists('Imagick')) {

@@ -65,6 +65,7 @@ export default function ChatPage() {
 
   const [patternDialog, setPatternDialog] = useState<RulesPattern | null>(null);
   const [savingPattern, setSavingPattern] = useState(false);
+  const [patternsLoading, setPatternsLoading] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -78,7 +79,7 @@ export default function ChatPage() {
   // Load conversations list and patterns on mount
   useEffect(() => {
     rulesApi.getConversations().then(r => setConversations(r.conversations)).catch(() => {});
-    rulesApi.getPatterns().then(r => setPatterns(r.patterns)).catch(() => {});
+    rulesApi.getPatterns().then(r => setPatterns(r.patterns)).catch(() => {}).finally(() => setPatternsLoading(false));
   }, []);
 
   const loadConversation = async (id: number) => {
@@ -259,7 +260,11 @@ export default function ChatPage() {
         </Box>
         <Divider />
         <Box sx={{ overflow: 'auto', flex: 1 }}>
-          {patterns.map(p => (
+          {patternsLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 120 }}>
+              <CircularProgress size={32} />
+            </Box>
+          ) : patterns.map(p => (
             <Box key={p.pattern_id}>
               <ListItemButton
                 onClick={() => setExpandedPattern(expandedPattern === p.pattern_id ? null : p.pattern_id)}
@@ -331,7 +336,9 @@ export default function ChatPage() {
               <AutoStoriesIcon sx={{ fontSize: 64 }} color="primary" />
               <Typography variant="h6" color="text.secondary">Ask an MTG rules question</Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center', maxWidth: 500 }}>
-                {(patterns.length > 0 ? patterns.slice(0, 4).flatMap(p => {
+                {patternsLoading ? (
+                  <CircularProgress size={20} />
+                ) : (patterns.length > 0 ? patterns.slice(0, 4).flatMap(p => {
                   if (p.suggested_questions) {
                     try {
                       const qs: string[] = JSON.parse(p.suggested_questions);

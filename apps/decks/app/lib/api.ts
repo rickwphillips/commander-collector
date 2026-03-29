@@ -207,6 +207,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ image: imageBase64, mime_type: mimeType }),
     }),
+  findCardCrop: (imageBase64: string, mimeType: string, cardName: string) =>
+    apiFetch<{ crop: { x: number; y: number; w: number; h: number } | null }>('/scan', {
+      method: 'POST',
+      body: JSON.stringify({ image: imageBase64, mime_type: mimeType, find_card: cardName }),
+    }),
 
   // Card image caching (on-demand fetch + store as base64)
   getCardImage: (scryfallId: string, url?: string) =>
@@ -223,6 +228,14 @@ export const api = {
   // Users (admin)
   getUsers: () =>
     apiFetch<{ id: number; username: string; display_name: string; role: string }[]>('/auth/users'),
+
+  // Scan draft (cross-device persistence)
+  getScanDraft: () =>
+    apiFetch<{ state: import('./types').ScanDraft | null }>('scan-draft'),
+  saveScanDraft: (state: import('./types').ScanDraft) =>
+    apiFetch<{ success: boolean }>('scan-draft', { method: 'PUT', body: JSON.stringify({ state }) }),
+  clearScanDraft: () =>
+    apiFetch<{ success: boolean }>('scan-draft', { method: 'DELETE' }),
 
   // Comparison Builder
   getComparison: (config: import('./types').ComparisonConfig) => {

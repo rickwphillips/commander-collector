@@ -38,6 +38,25 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '3.2.0',
+    date: '2026-03-28',
+    title: 'Deck Scanner Improvements',
+    changes: [
+      { type: 'added', text: 'Scan progress dialog shows while scanning, with tile counter and live image preview' },
+      { type: 'added', text: 'Scan results dialog (edit mode) shows all cards added after a Scan More pass' },
+      { type: 'added', text: 'Take Photo on mobile uses the device camera directly; hidden on desktop where it duplicates Upload Image' },
+      { type: 'added', text: 'Singleton toggle on Import (default on) — enforces Commander deck rules, skipping duplicate non-basic cards' },
+      { type: 'added', text: 'Cross-device draft persistence — scan draft is saved per user on the server, so you can start on mobile and pick up on desktop' },
+      { type: 'added', text: 'Not-found cards show a cropped photo snippet (located by AI) as a visual placeholder in both the card grid and scan results dialog' },
+      { type: 'improved', text: 'Scan now runs 10 passes (3×3 tile grid plus a full-image pass) to improve recognition of cards near tile edges' },
+      { type: 'fixed', text: 'Import, Take Photo, and Add Image buttons now work correctly in deck edit mode' },
+      { type: 'fixed', text: 'Rules Guru pattern library and question suggestions show a loading indicator while fetching' },
+      { type: 'fixed', text: 'Removed duplicate dark mode toggle in Rules Guru chat header that overlapped the Pattern Library icon' },
+      { type: 'fixed', text: 'Rules Guru question generation now batches at 4 patterns at a time, preventing timeouts when many patterns have no cached questions' },
+      { type: 'fixed', text: 'Static export now bundles .htaccess files so DirectorySlash is reliably deployed' },
+    ],
+  },
+  {
     version: '3.0.1',
     date: '2026-03-28',
     title: 'AI-Generated Pattern Questions',
