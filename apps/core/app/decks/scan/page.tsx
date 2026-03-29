@@ -142,6 +142,7 @@ function ScanDeckPageInner() {
   const [scanning, setScanning] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [scanProgress, setScanProgress] = useState<{ current: number; total: number } | null>(null);
+  const scanStartCardCount = useRef(0); // cards.length when current scan began
 
   // Step 2
   const [lookingUp, setLookingUp] = useState(false);
@@ -476,6 +477,7 @@ function ScanDeckPageInner() {
     setScanMoreOpen(false);
     setScanning(true);
     setScanProgress(null);
+    scanStartCardCount.current = cards.length;
 
     try {
       const { base64, mimeType, canvas } = await fileToBase64(fileToRestore, editRotation, editBrightness, editContrast);
@@ -489,29 +491,41 @@ function ScanDeckPageInner() {
       const totalScans = allScans.length;
       setScanProgress({ current: 1, total: totalScans });
 
-      // Scan all tiles (+ full image) in parallel
-      const tileResults = await Promise.allSettled(
-        allScans.map(async (tile) => {
-          const result = await api.scanDeck(tile.base64, tile.mimeType);
-          setScanProgress((prev) => prev ? { ...prev, current: Math.min(prev.current + 1, prev.total) } : prev);
-          return result.cards;
-        })
-      );
-
-      // Merge and deduplicate by name across all tiles
+      // Scan in batches of 3 to stay within API rate limits (30k tokens/min).
+      // Each batch's new cards are deduped and looked up immediately — lookups
+      // run concurrently with the next batch scan so cards appear progressively.
+      const BATCH_SIZE = 3;
       const seen = new Set<string>();
-      const allCards: { name: string; proxy: boolean }[] = [];
-      for (const result of tileResults) {
-        if (result.status !== 'fulfilled') continue;
-        for (const card of result.value) {
-          const key = card.name.toLowerCase().trim();
-          if (!key || seen.has(key)) continue;
-          seen.add(key);
-          allCards.push(card);
+      const lookupPromises: Promise<ScannedCard[]>[] = [];
+
+      for (let i = 0; i < allScans.length; i += BATCH_SIZE) {
+        const batch = allScans.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.allSettled(
+          batch.map(async (tile) => {
+            const result = await api.scanDeck(tile.base64, tile.mimeType);
+            setScanProgress((prev) => prev ? { ...prev, current: Math.min(prev.current + 1, prev.total) } : prev);
+            return result.cards;
+          })
+        );
+
+        // Dedupe new names from this batch and kick off lookup immediately
+        const newCards: { name: string; proxy: boolean }[] = [];
+        for (const result of batchResults) {
+          if (result.status !== 'fulfilled') continue;
+          for (const card of result.value) {
+            const key = card.name.toLowerCase().trim();
+            if (!key || seen.has(key)) continue;
+            seen.add(key);
+            newCards.push(card);
+          }
+        }
+        if (newCards.length > 0) {
+          lookupPromises.push(lookupAllCards(newCards));
         }
       }
 
-      const added = await lookupAllCards(allCards);
+      // Wait for all in-flight lookups and flatten into a single result list
+      const added = (await Promise.all(lookupPromises)).flat();
 
       // Async: ask Claude to locate each not-found card and store a crop snippet
       const notFoundCards = added.filter((c) => c.notFound);
@@ -520,14 +534,19 @@ function ScanDeckPageInner() {
       notFoundCards.forEach((c) => {
         api.findCardCrop(scanBase64, scanMime, c.card_name)
           .then(async ({ crop }) => {
-            if (!crop) return;
+            if (!crop) {
+              // Claude couldn't locate this card in the image — likely a hallucination, discard it
+              setCards((prev) => prev.filter((card) => card.id !== c.id));
+              setScanResults((prev) => prev ? prev.filter((card) => card.id !== c.id) : null);
+              return;
+            }
             const snippet = await cropDataUrl(
               `data:${scanMime};base64,${scanBase64}`,
               crop.x, crop.y, crop.w, crop.h
             );
             setCropMap((prev) => ({ ...prev, [c.id]: snippet }));
           })
-          .catch(() => {/* silently ignore — crop is best-effort */});
+          .catch(() => {/* network error — leave card in place, treat as unknown */});
       });
 
       if (editDeckId) {
@@ -1648,33 +1667,76 @@ function ScanDeckPageInner() {
       </Dialog>
 
       {/* ── Scanning Progress Dialog ── */}
-      <Dialog open={scanning} maxWidth="xs" fullWidth>
-        <DialogContent>
-          <Stack alignItems="center" spacing={2} py={2}>
-            <CircularProgress size={48} />
-            <Typography>
-              {scanProgress
-                ? `Scanning tile ${scanProgress.current} of ${scanProgress.total}…`
-                : 'Preparing image…'}
-            </Typography>
-            {scanProgress && (
-              <LinearProgress
-                variant="determinate"
-                value={(scanProgress.current / scanProgress.total) * 100}
-                sx={{ width: '100%' }}
-              />
-            )}
-            {previewUrl && (
-              <Box
-                component="img"
-                src={previewUrl}
-                alt="Deck photo"
-                sx={{ maxWidth: '100%', maxHeight: 200, borderRadius: 1, objectFit: 'contain' }}
-              />
-            )}
-          </Stack>
-        </DialogContent>
-      </Dialog>
+      {(() => {
+        const SCAN_QUIPS = [
+          'Wibbling…',
+          'Concentrating…',
+          'Tapping out…',
+          'Consulting the oracle…',
+          'Shuffling through the library…',
+          'Reading the name bars…',
+          'Checking for proxies…',
+          'Cross-referencing Scryfall…',
+          'Identifying your commanders…',
+          'Counting the spells…',
+        ];
+        const quipIdx = scanProgress
+          ? Math.floor((scanProgress.current / scanProgress.total) * SCAN_QUIPS.length)
+          : 0;
+        const quip = SCAN_QUIPS[Math.min(quipIdx, SCAN_QUIPS.length - 1)];
+        const newCards = cards.slice(scanStartCardCount.current);
+        const hasResults = newCards.length > 0;
+        return (
+          <Dialog open={scanning} maxWidth="xs" fullWidth>
+            <DialogContent>
+              <Stack alignItems="center" spacing={1.5} py={1}>
+                <Stack direction="row" alignItems="center" spacing={1.5} width="100%">
+                  <CircularProgress size={hasResults ? 20 : 40} sx={{ flexShrink: 0, transition: 'all 0.3s' }} />
+                  <Box flex={1}>
+                    <Typography variant={hasResults ? 'body2' : 'body1'}>
+                      {scanProgress
+                        ? `Tile ${scanProgress.current} of ${scanProgress.total} — ${quip}`
+                        : 'Preparing image…'}
+                    </Typography>
+                    {scanProgress && (
+                      <LinearProgress
+                        variant="determinate"
+                        value={(scanProgress.current / scanProgress.total) * 100}
+                        sx={{ mt: 0.5 }}
+                      />
+                    )}
+                  </Box>
+                </Stack>
+                {hasResults ? (
+                  <Box sx={{ width: '100%', maxHeight: 220, overflowY: 'auto' }}>
+                    {newCards.map((c) => (
+                      <Box key={c.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.25 }}>
+                        {c.image_uri ? (
+                          <Box component="img" src={c.image_uri} alt={c.card_name}
+                            sx={{ width: 24, height: 34, borderRadius: 0.5, objectFit: 'cover', flexShrink: 0 }} />
+                        ) : (
+                          <Box sx={{ width: 24, height: 34, bgcolor: 'action.hover', borderRadius: 0.5, flexShrink: 0 }} />
+                        )}
+                        <Typography variant="caption" noWrap sx={{ flex: 1 }}>{c.card_name}</Typography>
+                        {c.notFound && (
+                          <Typography variant="caption" color="error" sx={{ flexShrink: 0 }}>?</Typography>
+                        )}
+                      </Box>
+                    ))}
+                  </Box>
+                ) : previewUrl && (
+                  <Box
+                    component="img"
+                    src={previewUrl}
+                    alt="Deck photo"
+                    sx={{ maxWidth: '100%', maxHeight: 180, borderRadius: 1, objectFit: 'contain' }}
+                  />
+                )}
+              </Stack>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
 
       {/* ── Scan Results Dialog (edit mode) ── */}
       <Dialog open={!!scanResults} onClose={() => { setScanResults(null); setCropMap({}); }} maxWidth="xs" fullWidth>

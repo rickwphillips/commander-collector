@@ -79,7 +79,17 @@ export default function ChatPage() {
   // Load conversations list and patterns on mount
   useEffect(() => {
     rulesApi.getConversations().then(r => setConversations(r.conversations)).catch(() => {});
-    rulesApi.getPatterns().then(r => setPatterns(r.patterns)).catch(() => {}).finally(() => setPatternsLoading(false));
+    rulesApi.getPatterns()
+      .then(r => {
+        const sorted = [...r.patterns].sort((a, b) => {
+          const numA = parseInt(a.pattern_id.replace(/\D/g, ''), 10);
+          const numB = parseInt(b.pattern_id.replace(/\D/g, ''), 10);
+          return numA - numB;
+        });
+        setPatterns(sorted);
+      })
+      .catch(() => {})
+      .finally(() => setPatternsLoading(false));
   }, []);
 
   const loadConversation = async (id: number) => {

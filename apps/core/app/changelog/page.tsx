@@ -38,6 +38,21 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '3.2.1',
+    date: '2026-03-28',
+    title: 'Scan & Rules Guru Fixes',
+    changes: [
+      { type: 'fixed', text: 'Rules Guru pattern library now displays all patterns (sort was using wrong field, causing 0 results)' },
+      { type: 'fixed', text: 'Rules Guru redirects to login when session expires instead of showing a generic error' },
+      { type: 'improved', text: 'Deck scanner now batches tile scans in groups of 3 to stay within API rate limits' },
+      { type: 'improved', text: 'Scan results appear progressively — cards show up as each batch completes, without waiting for all tiles' },
+      { type: 'improved', text: 'Scan progress dialog shrinks the spinner once cards start appearing and shows a live card list with MTG-flavored status quips' },
+      { type: 'improved', text: 'Not-found cards are now discarded when the AI cannot visually locate them in the image (hallucination detection)' },
+      { type: 'fixed', text: 'Scan tile counter now correctly shows "of 10" and never exceeds the total' },
+      { type: 'added', text: 'Rules Guru knowledge base expanded from 208 to 409 interaction patterns' },
+    ],
+  },
+  {
     version: '3.2.0',
     date: '2026-03-28',
     title: 'Deck Scanner Improvements',

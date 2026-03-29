@@ -6,10 +6,20 @@ const API_BASE =
     ? '/app/php-api'
     : '/php-api');
 
+const LOGIN_URL =
+  process.env.NODE_ENV === 'development' ? 'http://localhost:3000/app/login/' : '/app/login/';
+
 function getAuthHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return {};
   const token = localStorage.getItem('auth_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function redirectToLogin() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('auth_token');
+  const currentUrl = window.location.href;
+  window.location.href = `${LOGIN_URL}?redirect=${encodeURIComponent(currentUrl)}`;
 }
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
@@ -22,6 +32,10 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
       ...(options?.headers ?? {}),
     },
   });
+  if (res.status === 401) {
+    redirectToLogin();
+    throw new Error('Authentication required');
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error ?? `API error ${res.status}`);
