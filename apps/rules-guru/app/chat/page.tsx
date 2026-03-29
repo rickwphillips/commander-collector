@@ -322,7 +322,6 @@ export default function ChatPage() {
               <MenuBookIcon />
             </IconButton>
           </Tooltip>
-          <DarkModeToggle />
         </Paper>
 
         {/* Messages */}
