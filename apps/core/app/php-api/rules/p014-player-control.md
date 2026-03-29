@@ -5,7 +5,7 @@ category: multiplayer
 cr_refs: [722.1, 722.3, 722.4, 722.5, 722.5a, 722.5b, 722.6]
 tags: [mindslaver, player-control, decisions, choices, resources, concede, tournament, commander]
 created: 2026-03-28
-examples_count: 1
+examples_count: 3
 ---
 
 # P014 — Player Control
@@ -73,6 +73,16 @@ Opponent's turn begins. You control all their decisions:
 Result: their board is gone, their hand is gone, their library may be gone. They get their turn back technically — with nothing left to work with.
 
 **The Infinite Lock (Commander):** Mindslaver + Academy Ruins. Control their turn, then use Academy Ruins during their turn to return Mindslaver to top of your library. Draw it next turn. Repeat. Opponent never gets a free turn.
+
+## Additional Examples
+
+**Example 2 — Opposition Agent + Fetchland:**
+Opposition Agent has flash and a limited player-control effect during library searches. Opponent activates a fetchland. You control their search: you make them find the land they wanted, but the Agent exiles it instead of putting it onto the battlefield. You may play that land later. The Agent's control is limited to the library search window only (CR 722.5 context: "it's unlikely the player will be allowed to make any decisions other than what to find with the search").
+
+**Example 3 — Opposition Agent + Tutors:**
+Opponent casts Demonic Tutor. You control their library search. Quality restriction: "a card" (no qualifier) → they must find exactly one card. You choose which card they find (and exile it, granting you play permission). Their tutor found nothing useful for them.
+
+**Nuance — "May find nothing":** If the search instruction specifies a card *type or quality* ("search for a basic land card"), you may have them find nothing. This is because finding a card matching a quality is optional. If it's "search for a card" with no qualifier, you must find the specified number.
 
 ## Commonly Confused With
 - **Control-changing effects (Layer 2)** — Taking control of a *permanent* is a layer 2 continuous effect (P004). Taking control of a *player* is an entirely different mechanism (CR 722) and doesn't go through the layer system at all.

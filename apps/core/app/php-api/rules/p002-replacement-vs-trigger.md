@@ -5,7 +5,7 @@ category: replacement
 cr_refs: [603.1, 614.1, 614.1a, 614.1b, 614.1c, 614.6, 614.15]
 tags: [replacement, triggered, instead, enters-the-battlefield, death, draw, graveyard, lifelink]
 created: 2026-03-28
-examples_count: 5
+examples_count: 6
 ---
 
 # P002 — Replacement vs. Trigger
@@ -69,6 +69,12 @@ Teferi's Puzzle Box: "At the beginning of each player's draw step, that player d
 
 **Example 5 — Death replacement:**
 "If [this creature] would die, exile it instead" — replacement. The creature never reaches the graveyard. Any "when X dies" triggers referencing this creature DO NOT fire (614.6 — the replaced event never happened, so nothing to react to).
+
+**Example 6 — Abundance + Sylvan Library (draw replacement bypasses payment clause):**
+Sylvan Library: triggered ability — "draw 2 additional cards. If you do, choose two cards drawn this turn. For each, pay 4 life or put it on top of your library."
+Abundance: replacement effect — "If you would draw a card, you may instead choose land or nonland and reveal until you find one."
+If Abundance replaces both of Sylvan Library's extra draws, those draws never happen. Sylvan Library's clause says "if you do [draw 2]" — you didn't draw (Abundance replaced the draws). Sylvan Library's official ruling: "If you haven't actually drawn any cards that turn, the rest of the ability has no effect." Zero life paid, full Abundance filtering.
+Nuance: your normal draw-step draw is also replaceable. If you replace it too, you drew zero cards total → no payment at all. If you drew normally and replaced only the Sylvan draws, you drew 1 card → must pay 4 life or put that 1 card back.
 
 ## Commonly Confused With
 - **P007 (Priority Windows)** — Replacement effects have no priority window; triggers do.
