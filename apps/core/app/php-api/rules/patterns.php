@@ -55,18 +55,22 @@ if ($method === 'GET') {
     $stmt = $db->query("SELECT pattern_id, name, category, cr_refs, tags, content, examples_count, updated_at, suggested_questions FROM rules_patterns ORDER BY updated_at DESC");
     $patterns = $stmt->fetchAll();
 
-    // Lazily generate questions for any pattern missing them
-    $needsGeneration = array_filter($patterns, fn($p) => empty($p['suggested_questions']));
+    // Lazily generate questions — process at most 4 missing patterns per request
+    $needsGeneration = array_slice(
+        array_values(array_filter($patterns, fn($p) => empty($p['suggested_questions']))),
+        0, 4
+    );
     if (!empty($needsGeneration)) {
         $update = $db->prepare("UPDATE rules_patterns SET suggested_questions = :q WHERE pattern_id = :id");
-        foreach ($needsGeneration as &$p) {
+        $byId = array_column($patterns, null, 'pattern_id');
+        foreach ($needsGeneration as $p) {
             $questions = generateSuggestedQuestions($p['pattern_id'], $p['name'], $p['content']);
             if ($questions) {
                 $update->execute([':q' => $questions, ':id' => $p['pattern_id']]);
-                $p['suggested_questions'] = $questions;
+                $byId[$p['pattern_id']]['suggested_questions'] = $questions;
             }
         }
-        unset($p);
+        $patterns = array_values($byId);
     }
 
     sendJSON(['patterns' => array_values($patterns)]);
