@@ -47,6 +47,7 @@ WHAT DOES NOT TRANSFER:
 INFORMATION:
   ✓ Controller sees hand and face-down permanents of controlled player (722.4)
   ✗ Controller cannot see cards outside the game (sideboard, etc.) (722.4)
+  ✗ Controller cannot access controlled player's sideboard — can't instruct "choose a card from outside the game"
 ```
 
 ## Definitive Conclusions
@@ -57,6 +58,7 @@ INFORMATION:
 - **You can make them attack with all their creatures** into an unfavorable board to destroy their army.
 - **You can cast their combo pieces badly** — target the wrong things, pay Phyrexian mana costs in life, search up useless tutors, float mana into nothing.
 - **You can force them to discard** their best cards at end of turn cleanup if they're over hand size.
+- **You cannot access the controlled player's sideboard.** CR 722.4 and Gatherer ruling (4/12/2024): "Controlling a player doesn't allow you to look at that player's sideboard. If an effect instructs that player to choose a card from outside the game, you can't have that player choose any card." — This means Mindslaver cannot activate a controlled player's companion (companion activation is an "outside the game" effect).
 - **Multiple player-control effects overwrite each other** — last created wins (722.1a).
 - **A skipped turn delays the effect** — it waits for the next actual turn (722.1b).
 - **The controlled player is still "active player"** for all purposes — their triggers trigger, their SBAs apply, APNAP applies to their abilities.
@@ -83,6 +85,11 @@ Opposition Agent has flash and a limited player-control effect during library se
 Opponent casts Demonic Tutor. You control their library search. Quality restriction: "a card" (no qualifier) → they must find exactly one card. You choose which card they find (and exile it, granting you play permission). Their tutor found nothing useful for them.
 
 **Nuance — "May find nothing":** If the search instruction specifies a card *type or quality* ("search for a basic land card"), you may have them find nothing. This is because finding a card matching a quality is optional. If it's "search for a card" with no qualifier, you must find the specified number.
+
+**Example 4 — Mindslaver + Companion (Gatherer ruling 4/12/2024):**
+You control opponent's turn via Mindslaver. Opponent has a companion in their sideboard with a valid deck (e.g., Lurrus of the Dream-Den). Can you activate the companion's {3} ability to put Lurrus into their hand?
+
+No. CR 722.4 states you cannot see the controlled player's sideboard. The companion activation is an "outside the game" instruction. Ruling: "If an effect instructs that player to choose a card from outside the game, you can't have that player choose any card." — The companion ability cannot be activated during the controlled turn.
 
 ## Commonly Confused With
 - **Control-changing effects (Layer 2)** — Taking control of a *permanent* is a layer 2 continuous effect (P004). Taking control of a *player* is an entirely different mechanism (CR 722) and doesn't go through the layer system at all.

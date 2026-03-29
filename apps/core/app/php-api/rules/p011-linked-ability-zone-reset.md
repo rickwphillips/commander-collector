@@ -53,6 +53,9 @@ FOR a permanent with linked ETB (exiles) + LTB (returns):
 - **Destroying A only returns B.** A's LTB returns B to the battlefield. B is a new object, exiling nothing.
 - **B's new ETB fires.** B must exile a new target. Its linked LTB will return whatever the new ETB exiles.
 - **If B's new ETB has no legal targets**, it's countered at resolution. B stays on the battlefield. Its LTB will return nothing when it eventually leaves.
+- **Panharmonicon/Strionic Resonator doubling an O-Ring ETB: both triggers are linked to the same LTB.** If O-Ring's ETB triggers twice (via Panharmonicon), each instance exiles a separate card. Both exiled cards are linked to the same LTB. When O-Ring leaves the battlefield, the single LTB trigger returns BOTH exiled cards. This is significantly stronger than it looks. (Gatherer ruling 3/19/2021: "If a triggered ability is linked to a second ability, additional instances of that triggered ability are also linked to that second ability. If the second ability refers to 'the exiled card,' it refers to all cards exiled by all instances of that linked triggered ability.")
+- **Destroy O-Ring in response to its ETB = permanent exile.** If the O-Ring leaves the battlefield before its ETB resolves, the LTB fires immediately and does nothing (this instance exiled nothing yet). The ETB still resolves and exiles the target permanently with no return mechanism. This is an aggressive political response that permanently removes a threat.
+- **Aura returning via O-Ring LTB is not targeting.** When the LTB returns an exiled Aura, the owner chooses where to attach it as it enters — this bypasses hexproof (no target is chosen during resolution). If no legal enchant target exists, the Aura stays exiled permanently.
 - **Multiple Oblivion Rings pointing at each other** creates a chain of ETB triggers, not a nested "cage." Each departure immediately releases whatever that ring was holding.
 - **Zone-change identity (P003) is always in play.** Every time an Oblivion Ring-style permanent enters the battlefield — including via its own chain of effects — it is a new object starting fresh.
 
@@ -73,7 +76,23 @@ Commonly mistaken outcome: "Destroying A returns both B and X" — WRONG. X retu
 
 ## Additional Examples
 
-*(Add over time)*
+**Example 2 — Destroying O-Ring before its ETB resolves (permanent exile):**
+
+O-Ring enters → its ETB targets Threat X. In response, opponent destroys O-Ring.
+
+Two things happen:
+1. O-Ring's LTB fires (it just left the battlefield) → checks what THIS instance exiled → nothing → does nothing
+2. O-Ring's ETB is still on the stack → resolves → exiles Threat X permanently
+
+Threat X is now in exile with no way to return — the LTB already fired and found nothing. Threat X can never be returned by this O-Ring's LTB.
+
+Scryfall ruling (2007-10-01): "If Oblivion Ring leaves the battlefield before its first ability has resolved, its second ability will trigger and do nothing. Then its first ability will resolve and exile the targeted nonland permanent forever."
+
+**Example 3 — O-Ring returning an Aura:**
+
+O-Ring exiles an Aura. When O-Ring later leaves the battlefield, the Aura returns to the battlefield via O-Ring's LTB. The Aura's owner chooses what it will enchant as it enters — the return is not targeting (it's a replacement/ETB effect), so hexproof doesn't prevent it. If the Aura can't legally attach to anything, it remains exiled permanently.
+
+Scryfall ruling (2008-10-01): "If the exiled card is an Aura, that card's owner chooses what it will enchant as it comes back onto the battlefield. An Aura put onto the battlefield this way doesn't target anything, but the Aura's enchant ability restricts what it can be attached to. If the Aura can't legally be attached to anything, it remains exiled forever."
 
 ## Commonly Confused With
 - **P003 (Zone Change Identity)** — P011 extends P003. The zone-change-creates-new-object rule is what resets the linked ability pair. P003 is the foundation; P011 is the application to linked exile effects specifically.

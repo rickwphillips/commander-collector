@@ -185,35 +185,53 @@ export function DeckBreakdown({ cards, showList = false }: Props) {
                       alignItems="center"
                       spacing={1}
                     >
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ minWidth: 20, textAlign: 'right' }}
-                      >
-                        {card.quantity}
-                      </Typography>
                       <Tooltip
-                        disableInteractive
                         placement="right"
+                        enterDelay={200}
+                        enterNextDelay={100}
                         title={
                           card.image_uri ? (
                             <Box
                               component="img"
                               src={card.image_uri}
                               alt={card.card_name}
-                              sx={{ width: 160, borderRadius: 1, display: 'block' }}
+                              sx={{ width: 220, borderRadius: 1.5, display: 'block' }}
                             />
                           ) : ''
                         }
-                        slotProps={{ tooltip: { sx: { bgcolor: 'transparent', p: 0, boxShadow: 6 } } }}
+                        slotProps={{ tooltip: { sx: { bgcolor: 'transparent', p: 0, boxShadow: 10 } } }}
                       >
-                        <Typography
-                          variant="body2"
-                          sx={{ flex: 1, cursor: card.image_uri ? 'default' : undefined }}
+                        <Box
+                          sx={{
+                            width: 32,
+                            height: 44,
+                            flexShrink: 0,
+                            borderRadius: 0.5,
+                            overflow: 'hidden',
+                            bgcolor: 'action.hover',
+                            cursor: card.image_uri ? 'zoom-in' : 'default',
+                          }}
                         >
-                          {card.card_name}
-                        </Typography>
+                          {card.image_uri && (
+                            <Box
+                              component="img"
+                              src={card.image_uri}
+                              alt={card.card_name}
+                              sx={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }}
+                            />
+                          )}
+                        </Box>
                       </Tooltip>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ minWidth: 16, textAlign: 'right' }}
+                      >
+                        {card.quantity}
+                      </Typography>
+                      <Typography variant="body2" sx={{ flex: 1 }}>
+                        {card.card_name}
+                      </Typography>
                       {card.is_proxy ? (
                         <Chip label="proxy" size="small" color="warning" sx={{ height: 16, fontSize: '0.6rem' }} />
                       ) : null}

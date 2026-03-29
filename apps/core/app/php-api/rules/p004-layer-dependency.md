@@ -66,8 +66,16 @@ Conspiracy names "Sliver." Now all your Conspiracied creatures have all Sliver a
 **Example 2 — Double timestamp fight:**
 Two Auras each trying to set a creature's P/T (layer 7b). First Aura: "Enchanted creature is 4/4." Second Aura: "Enchanted creature is 3/3." Whichever was attached most recently has the later timestamp and wins. Result: creature is 3/3.
 
-**Example 3 — Humility + creature with abilities:**
-Humility on battlefield. A creature enters with an ETB ability. The ETB ability triggers before Humility's continuous effect removes it? No — continuous effects apply immediately. The creature is on the battlefield with no abilities (Humility layer 6 applies instantly). The ETB trigger was generated as part of the enters-the-battlefield event (603.6a) — even if the creature now has no abilities, the trigger was already put into the system during the ETB event. Result: ETB trigger fires even though Humility already removed the ability. (This is a subtle but important point confirmed by 603.6b.)
+**Example 3 — Humility + creature with abilities (CORRECTED):**
+Humility on battlefield. A creature enters with an ETB ability. CR 603.6b states: "There is no moment 'between' when a permanent enters the battlefield and when continuous effects apply." Therefore: the creature is on the battlefield with no abilities from the very moment it arrives (Humility layer 6 applies instantaneously). The ETB trigger ability does not exist when evaluated at entry time. **Result: ETB trigger does NOT fire.** (Prior version of this example incorrectly stated the trigger fires; this is contradicted by 603.6b and confirmed by the Magus of the Moon ruling — see Example 5.)
+
+**Example 5 — Magus of the Moon: ETB triggers lost before firing (Gatherer ruling 7/25/2025):**
+Magus of the Moon is on the battlefield: "Nonbasic lands are Mountains." A fetchland enters. Continuous effects apply immediately (603.6b): the fetchland is now a Mountain, which has no "when this enters" trigger. Result: the fetchland's ETB trigger never fires — it doesn't exist when evaluated.
+Key ruling: "If a nonbasic land has an ability that triggers 'when' it enters, it will lose that ability before it can trigger." This is the same logic as Example 3 under Humility. The ability is gone before the trigger can be generated.
+
+**Example 6 — Magus of the Moon losing its own abilities (Gatherer ruling 7/25/2025):**
+Magus of the Moon's type-changing effect is in layer 4. If a "creatures lose all abilities" effect (like Humility, layer 6) removes Magus of the Moon's abilities, that removal happens AFTER layer 4 has already been applied. The nonbasic-lands-become-Mountains effect has already been applied in layer 4, so it persists — the lands are still Mountains. Magus losing its abilities in layer 6 cannot retroactively undo layer 4.
+Official ruling: "If Magus of the Moon loses its abilities, it continues to turn nonbasic lands into Mountains. This is because effects that change subtypes are applied before considering effects that remove abilities, regardless of the order in which those effects were created." This is P010 (Multi-Layer Effect Continuity) in action alongside P004.
 
 **Example 4 — Layers and counters don't interact:**
 "This creature is 2/2" (layer 7b) applied to a creature with a +1/+1 counter. The counter applies in 7c, after the set. Result: 3/3. Someone thinks "the counter overwrites the set" — wrong direction. 7b sets to 2/2, 7c counter adds 1/1, result 3/3.

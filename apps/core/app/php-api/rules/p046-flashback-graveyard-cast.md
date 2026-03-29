@@ -69,6 +69,9 @@ COUNTERED FLASHBACK SPELL:
 - **Copies of flashback spells are not cast with flashback.** They don't get the exile replacement — they cease to exist per SBA when they leave the stack.
 - **Flashback timing matches the card type.** Sorceries can only be flashed back during main phase; instants anytime.
 - **The exile replacement is a static ability of the spell on the stack.** If the card is moved off the stack some other way (rare), the replacement should still fire.
+- **A card put in the graveyard without being cast can still be flashed back.** There is no requirement that the card was cast before arriving in the graveyard. (Gatherer ruling 6/6/2025: "You can cast a spell using flashback even if it was somehow put into your graveyard without having been cast.")
+- **A card with no mana cost that gains flashback has no flashback cost — it cannot be cast via flashback.** Flashback cost equals the original mana cost when granted via Snapcaster-style effects. If the card has no mana cost (like a land or a zero-cost card erroneously gaining flashback), there is no cost to pay and it cannot be cast this way. (Gatherer ruling 6/6/2025: "If a card with no mana cost gains flashback, it has no flashback cost. It can't be cast this way.")
+- **If a split card gains flashback, you pay only the cost of the half you're casting.** (Gatherer ruling 6/6/2025)
 
 ## Canonical Example
 **Faithless Looting flashback:**

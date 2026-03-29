@@ -70,7 +70,11 @@ Teferi's Puzzle Box: "At the beginning of each player's draw step, that player d
 **Example 5 — Death replacement:**
 "If [this creature] would die, exile it instead" — replacement. The creature never reaches the graveyard. Any "when X dies" triggers referencing this creature DO NOT fire (614.6 — the replaced event never happened, so nothing to react to).
 
-**Example 6 — Abundance + Sylvan Library (draw replacement bypasses payment clause):**
+**Example 6 — Leyline of the Void token exception:**
+Leyline of the Void: "If a card would be put into an opponent's graveyard from anywhere, exile it instead." This applies only to CARDS — not tokens. Tokens dying under Leyline of the Void still die (go to the graveyard, then cease to exist per SBA 704.5d). Abilities that trigger "when a creature dies" WILL fire for token deaths under Leyline. Only card-based creatures are exiled by Leyline and have their death triggers suppressed.
+(Gatherer ruling 9/20/2024: "While Leyline of the Void is on the battlefield, nontoken creatures your opponents control won't die. They'll be exiled instead. Abilities that would trigger when those creatures die won't trigger. Tokens can still die while Leyline of the Void is on the battlefield.")
+
+**Example 7 — Abundance + Sylvan Library (draw replacement bypasses payment clause):**
 Sylvan Library: triggered ability — "draw 2 additional cards. If you do, choose two cards drawn this turn. For each, pay 4 life or put it on top of your library."
 Abundance: replacement effect — "If you would draw a card, you may instead choose land or nonland and reveal until you find one."
 If Abundance replaces both of Sylvan Library's extra draws, those draws never happen. Sylvan Library's clause says "if you do [draw 2]" — you didn't draw (Abundance replaced the draws). Sylvan Library's official ruling: "If you haven't actually drawn any cards that turn, the rest of the ability has no effect." Zero life paid, full Abundance filtering.

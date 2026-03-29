@@ -65,6 +65,16 @@ Next death: Finks has +1/+1 counter → Undying won't fire (condition false). Pe
 
 ## Additional Examples
 
+**Example 1b — Persist on a token (trigger fires, can't return):**
+A token with persist dies with no -1/-1 counter. Persist triggers and goes on the stack. When the trigger resolves, it can't find the card to return — tokens in the graveyard cease to exist immediately (CR 704.5d). The trigger fires but fizzles. Persist can't return tokens from the graveyard because tokens don't exist there.
+(Scryfall ruling 2013-06-07: "If a token with no -1/-1 counters on it has persist, the ability will trigger when the token is put into the graveyard. However, the token will cease to exist and can't return to the battlefield.")
+
+**Example 1c — Persist vs. +1/+1 counters:**
+A creature with persist has both +1/+1 counters and -1/-1 counters. SBAs first remove matched pairs (CR 704.5q). If any -1/-1 counters remain after matching, persist won't return the creature — persist checks last known information, which includes the surviving -1/-1 counter.
+
+Example: Persist creature has 2 +1/+1 and 3 -1/-1 counters → SBA removes 2 pairs → creature has 0 +1/+1 and 1 -1/-1 counter → creature dies to 0 toughness → persist checks LKI: creature HAD a -1/-1 counter → persist does NOT trigger.
+(Scryfall ruling 2013-06-07: "persist checks the creature's existence just before it leaves the battlefield, and it still has all those counters on it at that point")
+
 **Example 2 — Two "when this dies, exile it" effects:**
 A creature with two separate "when this dies, exile it" abilities (e.g., from two different sources). Both trigger. First resolves — exiles the creature. Second resolves — looks in graveyard — finds nothing — fizzles. Creature ends up exiled once, not twice.
 

@@ -13,6 +13,8 @@ examples_count: 2
 ## Abstract
 **Companion** (702.139) lets you choose one card with companion from outside your deck before the game begins, provided your starting deck satisfies the companion's construction condition. Once per game, during your main phase when the stack is empty, you may pay {3} (a special action, not a spell) to put the companion card from outside the game into your hand. The key rules: (1) the companion condition is checked at game start (deck construction), not during the game; (2) violating the companion condition means you can't use that card as a companion at all; (3) you can only use the companion once per game; (4) companion cards follow normal rules once they enter the game (they become a legal card in your hand). In Commander, companion adds additional deck construction constraints and the {3} companion fee applies.
 
+> **Updated 20260329:** Corrected error: Grafdigger's Cage does NOT stop companion. The pattern incorrectly quoted Cage as having "outside the game" restriction text, but Cage's actual oracle text only restricts graveyards and libraries. Companion's {3} action puts the card into your hand from outside the game — neither a graveyard nor library is involved.
+
 ## The Definitive Rules
 
 **CR 702.139a** (verbatim): *"Companion is a keyword ability that functions outside the game. It's written as 'Companion—[Condition].' Before the game begins, you may reveal one card you own from outside the game with a companion ability whose condition is fulfilled by your starting deck. (See rule 103.2b.) Once during the game, any time you have priority and the stack is empty, but only during a main phase of your turn, you may pay {3} and put that card into your hand. This is a special action that doesn't use the stack (see rule 116.2g). This is a change from previous rules."*
@@ -104,11 +106,14 @@ COMPANION AND COPY EFFECTS:
   Only one companion was revealed at game start. The other is just a regular card.
 
 COMPANION AND GRAFDIGGER'S CAGE:
-  Cage's relevant text: "Players can't cast spells from outside the game or put cards from outside
-    the game into the game."
-  Paying {3} to put your companion into your hand: "put cards from outside the game into the game."
-  Grafdigger's Cage prevents this. Your companion is stuck outside the game.
-  This is a relevant interaction — Cage shuts down companion access.
+  Cage's ACTUAL oracle text: "Creature cards in graveyards and libraries can't enter the battlefield.
+    Players can't cast spells from graveyards or libraries."
+  The {3} companion action is a SPECIAL ACTION that puts the card from outside the game into your HAND.
+  → "Outside the game" is not a graveyard or library → Cage's restrictions don't apply
+  → The companion then goes to your HAND, not directly to battlefield → first line doesn't apply
+  → You then cast it from your HAND (not from a graveyard or library) → second line doesn't apply
+  Grafdigger's Cage does NOT stop companion access.
+  (Note: if Cage had "outside the game" text, it would matter, but it doesn't — confirmed by Scryfall oracle)
 ```
 
 ## Definitive Conclusions
@@ -117,7 +122,7 @@ COMPANION AND GRAFDIGGER'S CAGE:
 - **Using a companion costs {3} as a special action** (not a spell) — during your main phase, stack empty; once per game; the card enters your hand from outside the game.
 - **Once in your hand, the companion is a normal card** — it follows normal zone rules if it dies, is discarded, etc.; it doesn't return to "outside the game" unless a card's effect specifically puts it there.
 - **In Commander, the commander counts as part of the "starting deck"** for companion condition checks (702.139b) — making most companions very restrictive in Commander.
-- **Grafdigger's Cage prevents companion activation** — it stops putting cards from outside the game into the game, which includes the {3} companion action.
+- **Grafdigger's Cage does NOT prevent companion activation.** Cage's oracle text restricts graveyards and libraries only. The companion's {3} special action puts the card from outside the game into your hand (not the battlefield), and you then cast it from your hand — neither step involves a graveyard or library. Cage is irrelevant to companion strategies. (Confirmed by verifying current Cage oracle text: "Players can't cast spells from graveyards or libraries.")
 
 ## Canonical Example
 **Lurrus of the Dream-Den Companion in Modern:**
@@ -138,8 +143,9 @@ Recurring Goblin Guide ({R}) from GY? Yes, but it has haste — you could rebuil
 Recurring Aether Vial (MV 1)? Yes — put it back and start charging it again.
 
 Opponent's Grafdigger's Cage (in play from their sideboard):
-"Players can't put cards from outside the game into the game."
-You can't pay {3} to get Lurrus. Companion is blocked for the rest of the game (unless Cage is removed).
+Cage's actual text: "Creature cards in graveyards and libraries can't enter the battlefield. Players can't cast spells from graveyards or libraries."
+The {3} companion special action is unaffected — it puts the card into your hand from outside the game (not a graveyard or library), and you then cast it from your hand normally.
+Cage does NOT block companion access.
 
 **Example 2 — Kaheera Commander Companion:**
 Kaheera, the Orphanguard ({1}{G/W}{G/W}: 3/2 Nightmare Cat Beast, companion — each creature in your starting deck is a Cat, Elemental, Nightmare, Dinosaur, or Beast):

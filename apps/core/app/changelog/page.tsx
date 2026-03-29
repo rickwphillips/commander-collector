@@ -38,6 +38,21 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '3.4.0',
+    date: '2026-03-29',
+    title: 'Decklist Gallery Filters & Rules Guru Improvements',
+    changes: [
+      { type: 'added', text: 'Decklist page now has a shared search and filter bar across both Breakdown and Gallery tabs — persists when switching tabs' },
+      { type: 'added', text: 'Filter cards by type (Creature, Instant, Sorcery, etc.), color, proxy, and commander — only shows filters relevant to the current deck' },
+      { type: 'added', text: 'Color filter supports a toggle between card color (mana cost) and color identity (all pips on the card)' },
+      { type: 'added', text: 'Gallery tab groups filtered results by card type' },
+      { type: 'added', text: 'Card thumbnails now appear inline on the left of each row in the Breakdown list — hover for full card preview' },
+      { type: 'improved', text: 'Rules Guru thinking indicator cycles through MTG-flavored status messages while waiting for a response' },
+      { type: 'improved', text: 'Active game player chips in Rules Guru are now clickable — inserts a question about that commander into the input' },
+      { type: 'fixed', text: 'Rules Guru token usage further reduced to prevent API rate limit errors' },
+    ],
+  },
+  {
     version: '3.3.0',
     date: '2026-03-29',
     title: 'Rules Guru Game Awareness & Deck Icons',

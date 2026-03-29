@@ -66,6 +66,7 @@ CRITICAL ASYMMETRY:
 - **Activated sacrifice outlets cannot be used.** Viscera Seer, Altar of Dementia, any "{cost}: sacrifice" ability is blocked.
 - **Triggered sac responses still work.** A creature with a triggered "whenever this is targeted, sacrifice it" ability fires and goes on the stack above the Split Second spell.
 - **Stifle cannot interact with a triggered ability already on the stack above the Split Second spell.** Stifle is a spell — casting it is blocked. The trigger resolves unimpeded.
+- **Triggered abilities that resolve while split second is on the stack CANNOT cast spells as part of their resolution.** Even though triggered abilities slip through Split Second and resolve first, the split second spell is still on the stack during that resolution. If the triggered ability's text says "cast a spell" as part of its effect (e.g., a Cascade trigger, a "cast target instant/sorcery" effect), that spell cannot be cast. (Gatherer ruling 3/19/2021: "If the resolution of a triggered ability involves casting a spell, that spell can't be cast if a spell with split second is on the stack.")
 - **Multiple Split Second spells on the stack don't stack their restrictions.** CR 702.61c: redundant instances have no additional effect.
 
 ## Canonical Example

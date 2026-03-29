@@ -71,6 +71,7 @@ STACKING MULTIPLE REPLACEMENT EFFECTS (player controls all):
 - **Hardened Scales adds +1 to +1/+1 counter placements** — not a doubler, an adder. Apply before doublers for maximum output.
 - **Player choice of replacement order.** When multiple replacement effects modify the same counter placement event and you control all of them, you choose the order. Pick additive effects first (scale better), then multiplicative.
 - **Ozolith's counter duplication on creature death** = effect → doubled. A creature dying with 4 counters → Ozolith receives 8 under Doubling Season.
+- **Battles enter with doubled defense counters under Doubling Season.** Battles (introduced in March of the Machine) have defense counters placed on entry as an effect — Doubling Season doubles them. A Battle that normally enters with 4 defense counters enters with 8. (Scryfall ruling 2024-11-08: "Battles will enter with double the normal number of defense counters.")
 
 ## Canonical Example
 **Doubling Season + Doubling Season + Hardened Scales (1 +1/+1 counter placed):**

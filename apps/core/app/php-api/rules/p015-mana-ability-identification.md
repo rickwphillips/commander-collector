@@ -65,6 +65,8 @@ COSTS ARE PAID BEFORE STACK:
 - **Mana abilities bypass priority entirely.** There is never a window to respond, not even for instants or abilities with flash.
 - **The test is "adds mana when it resolves"** — not "involves lands" or "eventually enables mana production." A fetchland ultimately enables future mana but doesn't produce it at resolution.
 - **Triggered mana abilities** (e.g., "whenever you tap a land for mana, add one mana of any color") also skip the stack if they meet 605.1b — they trigger and resolve immediately.
+- **Stony Silence prevents mana ability activation via static "can't" — this is different from Stifle.** Stifle is a spell that targets abilities on the stack; mana abilities never go on the stack, so Stifle can't target them. But Stony Silence is a static "can't activate" restriction that applies before activation, bypassing the stack entirely. Gatherer ruling: "No abilities of artifacts can be activated, including mana abilities." The key distinction: *targeting an ability on the stack* (Stifle) vs. *preventing the activation entirely* (Stony Silence). Mana abilities are immune to the former but not the latter.
+- **Deathrite Shaman's first ability (exile land from GY for mana) is NOT a mana ability — it requires a target.** Because it targets a land card in a graveyard, it fails criterion #1 of 605.1a. It uses the stack, can be responded to, and can be Stifled. Exile happens at resolution, not as a cost. (Gatherer ruling 6/8/2016: "Because the first ability requires a target, it is not a mana ability. It uses the stack and can be responded to.")
 
 ## Canonical Example
 **Stifle targeting Misty Rainforest activation:**

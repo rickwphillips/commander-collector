@@ -81,6 +81,11 @@ You control both. An opponent in their main phase casts Swords to Plowshares fro
 **Teferi, Time Raveler vs. Teferi, Mage of Zhalfir:**
 Both Teferis restrict opponents to sorcery timing. With Knowledge Pool + either Teferi, the lock functions the same way.
 
+**Rule of Law retroactive scope (Gatherer ruling 2011-06-01):**
+- Rule of Law checks the entire turn for whether a spell was cast — even if Rule of Law wasn't on the battlefield when that spell was cast. Example: you cast Rule of Law, then try to cast another spell. Rule of Law sees the earlier cast and prevents it.
+- A spell that was countered still counts as a "cast" for Rule of Law's purposes. Casting a spell and having it countered uses up your one cast per turn.
+- Rule of Law reads: "Each player can't cast more than one spell each turn." This is a static "can't" restriction (P008), evaluated across the whole turn.
+
 ## Commonly Confused With
 - **P008 (Can't vs. May)** — P008 covers direct conflicts between "can't" and "can/may" effects. P021 is about a restriction on *timing/conditions* that makes a granted permission inaccessible — the restriction doesn't say "can't cast" directly, it says "only when X" and X is never true.
 - **P007 (Priority Windows)** — P007 covers the window to respond between events. P021 is about whether a granted opportunity can be used within its window, given external casting restrictions.

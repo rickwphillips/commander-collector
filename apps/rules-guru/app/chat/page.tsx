@@ -101,8 +101,36 @@ export default function ChatPage() {
 
   const [gameContext, setGameContext] = useState<ActiveGameContext | null>(null);
 
+  const [thinkingText, setThinkingText] = useState('Consulting the rules…');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const THINKING_MESSAGES = [
+    'Consulting the rules…',
+    'Checking the Comprehensive Rules…',
+    'Resolving triggered abilities…',
+    'Checking state-based actions…',
+    'Passing priority…',
+    'Searching the pattern library…',
+    'Cross-referencing CR 117…',
+    'Untapping, upkeep, draw…',
+    'Looking up Oracle text…',
+    'Verifying with Gatherer rulings…',
+    'Checking the stack…',
+    'Declaring attackers…',
+  ];
+
+  useEffect(() => {
+    if (!loading) return;
+    let i = 0;
+    setThinkingText(THINKING_MESSAGES[0]);
+    const interval = setInterval(() => {
+      i = (i + 1) % THINKING_MESSAGES.length;
+      setThinkingText(THINKING_MESSAGES[i]);
+    }, 4000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -470,14 +498,25 @@ export default function ChatPage() {
               Live game
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-              {gameContext.players.map(p => (
-                <Chip
-                  key={p.playerName}
-                  label={p.partner ? `${p.playerName}: ${p.commander} + ${p.partner}` : `${p.playerName}: ${p.commander ?? p.deckName}`}
-                  size="small"
-                  sx={{ fontSize: '0.65rem', height: 18, bgcolor: 'rgba(255,255,255,0.2)', color: 'success.contrastText' }}
-                />
-              ))}
+              {gameContext.players.map(p => {
+                const cmd = p.partner
+                  ? `${p.commander} + ${p.partner}`
+                  : (p.commander ?? p.deckName);
+                const question = p.partner
+                  ? `What are the key rules interactions between ${p.commander} and ${p.partner} as partner commanders?`
+                  : `What are the tricky rules interactions for ${cmd} in our current game?`;
+                return (
+                  <Tooltip key={p.playerName} title={`Ask about ${cmd}`}>
+                    <Chip
+                      label={`${p.playerName}: ${cmd}`}
+                      size="small"
+                      clickable
+                      onClick={() => { setInput(question); setTimeout(() => inputRef.current?.focus(), 100); }}
+                      sx={{ fontSize: '0.65rem', height: 18, bgcolor: 'rgba(255,255,255,0.2)', color: 'success.contrastText', cursor: 'pointer', '&:hover': { bgcolor: 'rgba(255,255,255,0.35)' } }}
+                    />
+                  </Tooltip>
+                );
+              })}
             </Box>
           </Box>
         )}
@@ -588,7 +627,7 @@ export default function ChatPage() {
               <Paper elevation={1} sx={{ p: 1.5, borderRadius: '16px 16px 16px 4px' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <CircularProgress size={16} />
-                  <Typography variant="body2" color="text.secondary">Consulting the rules…</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ transition: 'opacity 0.3s', minWidth: 220 }}>{thinkingText}</Typography>
                 </Box>
               </Paper>
             </Box>

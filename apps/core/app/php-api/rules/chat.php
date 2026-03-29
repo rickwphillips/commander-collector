@@ -39,20 +39,36 @@ $stmt = $db->prepare("
     SELECT role, content FROM rules_messages
     WHERE conversation_id = ?
     ORDER BY id DESC
-    LIMIT 8
+    LIMIT 6
 ");
 $stmt->execute([$conversationId]);
 $history = array_reverse($stmt->fetchAll());
 
-// ── Load pattern index (metadata only, compact) ───────────────────────────
-$patternRows = $db->query("SELECT pattern_id, name, category FROM rules_patterns ORDER BY pattern_id")->fetchAll();
+// ── Pre-match patterns server-side, inject top 3 distilled (no index dump) ─
+$allPatterns = $db->query("SELECT pattern_id, name, category, tags, content FROM rules_patterns ORDER BY pattern_id")->fetchAll();
 
-$patternsContext = '';
-if ($patternRows) {
-    $patternsContext = "\n\n---\n\n## Interaction Pattern Library\n\nUse `get_pattern` to fetch any pattern's full detail. Index:\n";
-    foreach ($patternRows as $p) {
-        $patternsContext .= "{$p['pattern_id']} — {$p['name']} ({$p['category']})\n";
+$msgTokens = array_unique(array_filter(
+    preg_split('/\W+/', strtolower($userMessage)),
+    fn($t) => strlen($t) >= 3
+));
+
+$scored = [];
+foreach ($allPatterns as $i => $p) {
+    $haystack = strtolower("{$p['name']} {$p['category']} {$p['tags']}");
+    $score = 0;
+    foreach ($msgTokens as $t) {
+        if (str_contains($haystack, $t)) $score++;
     }
+    if ($score > 0) $scored[$i] = $score;
+}
+arsort($scored);
+
+$patternsContext = "\n\n---\n\n## Interaction Pattern Library\n\nUse `get_pattern` to look up any pattern by ID.\n\n";
+$rank = 0;
+foreach ($scored as $i => $_) {
+    if ($rank >= 3) break;
+    $patternsContext .= distillPattern($allPatterns[$i]) . "---\n\n";
+    $rank++;
 }
 
 // ── System prompt ──────────────────────────────────────────────────────────
@@ -65,7 +81,7 @@ When card names are mentioned, use the `lookup_card` tool to fetch current Oracl
 
 ## Step 2: Pattern Match
 
-The most relevant patterns for this question are pre-loaded below with full detail. Check those first. For any other pattern in the index that looks applicable, use `get_pattern` to fetch its full content. When applying a pattern, say: *"This looks like it falls under [Pattern Name] (P###) — applying that logic here..."* then state the definitive ruling.
+The top matching patterns are pre-loaded below. If none match, use `get_pattern` with a known ID. When applying a pattern, say: *"This looks like it falls under [Pattern Name] (P###) — applying that logic here..."* then state the definitive ruling.
 
 If the user corrects a pattern application:
 1. Do NOT immediately accept the correction.

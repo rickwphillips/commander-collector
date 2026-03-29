@@ -59,6 +59,9 @@ STACK ORDER:
 
 Note: If timestamps were reversed (Opalescence entered first, Humility second), Humility's effect would win layer 7b → Humility would be 1/1. Opalescence would still not be a creature. Timestamp is decisive.
 
+**Humility removes mana abilities from animated creatures:**
+Humility strips ALL abilities from creatures, including mana abilities. If a land is animated into a creature (e.g., via Nantuko Monastery's activated ability or a Garruk emblem), Humility removes its `{T}: Add {G}` ability. The animated land can no longer tap for mana while it's a creature under Humility. (Gatherer ruling 2/1/2007: "Removes all creature abilities. This includes mana abilities. Animated lands will also lose the ability to tap for mana.")
+
 ## Additional Examples
 
 *(Add over time)*
