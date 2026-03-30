@@ -59,6 +59,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [posOverrides, setPosOverrides] = useState<Record<number, PlayerState['position']>>({});
   const [viewingPlayerIdx, setViewingPlayerIdx] = useState<number | null>(null);
+  const settingsLoadedRef = useRef(false);
 
   // Start a 15s countdown when a winner is detected; auto-save when it hits 0
   useEffect(() => {
@@ -120,6 +121,9 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
 
   // Load game settings from DB on mount
   useEffect(() => {
+    if (settingsLoadedRef.current) return;
+    settingsLoadedRef.current = true;
+
     api.getGameSettings()
       .then((settings) => {
         setHighlightMode(settings.highlight_mode);
@@ -132,10 +136,30 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
         setSettingsLoaded(true);
       })
       .catch(() => {
-        // On error, use defaults and proceed
         setSettingsLoaded(true);
       });
-  }, [onUpdate]);
+  }, []);
+
+  // Re-apply timer setting when game resets (firstPlayerSet goes false)
+  const firstPlayerSetRef = useRef(firstPlayerSet);
+  useEffect(() => {
+    const wasGameActive = firstPlayerSetRef.current;
+    firstPlayerSetRef.current = firstPlayerSet;
+
+    if (wasGameActive && !firstPlayerSet) {
+      // Game was reset, re-apply timer setting from DB
+      api.getGameSettings()
+        .then((settings) => {
+          if (!settings.turn_timer_enabled) {
+            onUpdate({ turnTimerSeconds: 0 });
+          } else {
+            onUpdate({ turnTimerSeconds: settings.turn_timer_seconds });
+          }
+        })
+        .catch(() => {});
+    }
+  }, [firstPlayerSet, onUpdate]);
+
 
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const rollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
