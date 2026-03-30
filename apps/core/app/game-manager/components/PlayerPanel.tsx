@@ -1030,14 +1030,14 @@ export function PlayerPanel({
           ? '3px solid #DAA520'
           : isHighlighted
           ? '3px solid #DAA520'
-          : (highlightMode ? undefined : currentPlayerBorder)
+          : (!highlightMode ? currentPlayerBorder : undefined)
           ?? (isWarning ? '2px solid #e53935' : undefined)
           ?? ((theme: import('@mui/material').Theme) => `1px solid ${theme.palette.divider}`),
         boxShadow: showEliminateConfirm
           ? '0 0 24px 6px rgba(218,165,32,0.6)'
           : isHighlighted
           ? '0 0 24px 6px rgba(218,165,32,0.6)'
-          : (highlightMode ? null : currentPlayerShadow) ?? 'none',
+          : (!highlightMode ? currentPlayerShadow : null) ?? 'none',
         ...(!highlightMode && isTimerExpired && {
           animation: 'timerBlink 0.5s step-end infinite',
           '@keyframes timerBlink': {

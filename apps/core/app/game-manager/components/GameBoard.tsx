@@ -38,15 +38,14 @@ interface GameBoardProps {
   onRestartGame: (players: PlayerState[]) => void;
   onLogGame: () => void;
   onSaveGame: (state: GameManagerState) => Promise<void>;
-  isResumed?: boolean;
 }
 
-export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGame, isResumed = false }: GameBoardProps) {
+export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGame }: GameBoardProps) {
   const { players, commanderDamage, currentPlayerIdx, turnNumber, turnTimerSeconds, turnStartTime, startingLife } = state;
 
   const [rollState, setRollState] = useState<RollState>(IDLE_ROLL_STATE);
-  const [firstPlayerSet, setFirstPlayerSet] = useState(isResumed);
-  const [firstPlayerIdx, setFirstPlayerIdx] = useState(isResumed ? state.currentPlayerIdx : 0);
+  const [firstPlayerSet, setFirstPlayerSet] = useState(!!state.firstPlayerIdx);
+  const [firstPlayerIdx, setFirstPlayerIdx] = useState(state.firstPlayerIdx ?? 0);
   const [winner, setWinner] = useState<PlayerState | null>(null);
   const [winnerCountdown, setWinnerCountdown] = useState<number | null>(null);
   const winnerStateRef = useRef<GameManagerState | null>(null);
@@ -56,13 +55,17 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   const [monarchTransfer, setMonarchTransfer] = useState<{ fromPos: string | null; toPos: string | null }>({ fromPos: null, toPos: null });
   const [highlightMode, setHighlightMode] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const [highlightLoading, setHighlightLoading] = useState(false);
-  const [soundLoading, setSoundLoading] = useState(false);
-  const [timerLoading, setTimerLoading] = useState(false);
   const [posOverrides, setPosOverrides] = useState<Record<number, PlayerState['position']>>({});
   const [viewingPlayerIdx, setViewingPlayerIdx] = useState<number | null>(null);
   const settingsLoadedRef = useRef(false);
+
+  // Sync local firstPlayerIdx/firstPlayerSet with game state when loaded from DB
+  useEffect(() => {
+    if (state.firstPlayerIdx && !firstPlayerSet) {
+      setFirstPlayerIdx(state.firstPlayerIdx);
+      setFirstPlayerSet(true);
+    }
+  }, [state.firstPlayerIdx, firstPlayerSet]);
 
   // Start a 15s countdown when a winner is detected; auto-save when it hits 0
   useEffect(() => {
@@ -131,17 +134,10 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
       .then((settings) => {
         setHighlightMode(settings.highlight_mode);
         setSoundEnabled(settings.sound_enabled);
-        if (settings.turn_timer_enabled) {
-          onUpdate({ turnTimerSeconds: settings.turn_timer_seconds });
-        } else {
-          onUpdate({ turnTimerSeconds: 0 });
-        }
-        setSettingsLoaded(true);
+        // Note: game state turnTimerSeconds comes from game setup, not user settings
       })
-      .catch(() => {
-        setSettingsLoaded(true);
-      });
-  }, []);
+      .catch(() => {});
+  }, [onUpdate]);
 
   // Re-apply all settings when game resets (firstPlayerSet goes false)
   const firstPlayerSetRef = useRef(firstPlayerSet);
@@ -150,16 +146,11 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
     firstPlayerSetRef.current = firstPlayerSet;
 
     if (wasGameActive && !firstPlayerSet) {
-      // Game was reset, re-apply all settings from DB
+      // Game was reset, re-apply UI settings from DB
       api.getGameSettings()
         .then((settings) => {
           setHighlightMode(settings.highlight_mode);
           setSoundEnabled(settings.sound_enabled);
-          if (!settings.turn_timer_enabled) {
-            onUpdate({ turnTimerSeconds: 0 });
-          } else {
-            onUpdate({ turnTimerSeconds: settings.turn_timer_seconds });
-          }
         })
         .catch(() => {});
     }
@@ -564,12 +555,19 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
           elapsedSeconds={elapsedSeconds}
           turnTimerSeconds={turnTimerSeconds}
           onTimerChange={(s) => {
-            setTimerLoading(true);
             updateState({ turnTimerSeconds: s });
             api.updateGameSettings({
               turn_timer_enabled: s > 0,
               turn_timer_seconds: s > 0 ? s : 300,
-            }).finally(() => setTimerLoading(false));
+            })
+              .then((response) => {
+                if (response.turn_timer_enabled) {
+                  updateState({ turnTimerSeconds: response.turn_timer_seconds });
+                } else {
+                  updateState({ turnTimerSeconds: 0 });
+                }
+              })
+              .catch(() => {});
           }}
           isFullscreen={isFullscreen}
           onToggleFullscreen={toggleFullscreen}
@@ -577,22 +575,24 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
           onNotesChange={(n) => updateState({ notes: n })}
           highlightMode={highlightMode}
           onToggleHighlightMode={() => {
-            setHighlightLoading(true);
             const newVal = !highlightMode;
             setHighlightMode(newVal);
-            api.updateGameSettings({ highlight_mode: newVal }).finally(() => setHighlightLoading(false));
+            api.updateGameSettings({ highlight_mode: newVal })
+              .then((response) => {
+                setHighlightMode(response.highlight_mode);
+              })
+              .catch(() => {});
           }}
           soundEnabled={soundEnabled}
           onToggleSound={() => {
-            setSoundLoading(true);
             const newVal = !soundEnabled;
             setSoundEnabled(newVal);
-            api.updateGameSettings({ sound_enabled: newVal }).finally(() => setSoundLoading(false));
+            api.updateGameSettings({ sound_enabled: newVal })
+              .then((response) => {
+                setSoundEnabled(response.sound_enabled);
+              })
+              .catch(() => {});
           }}
-          settingsLoaded={settingsLoaded}
-          timerLoading={timerLoading}
-          highlightLoading={highlightLoading}
-          soundLoading={soundLoading}
           commanderDamage={commanderDamage}
         />
       </Box>

@@ -104,21 +104,24 @@ switch ($method) {
             }
         }
 
+        // Extract optional user_id (passed by authenticated client) — keep as string UUID
+        $userId = isset($data['user_id']) ? (string)$data['user_id'] : null;
+
         try {
             $pdo->beginTransaction();
 
-            // Deactivate any previously active sessions — prevents stale sessions
-            // from accumulating when the host starts a new game without explicitly
-            // ending the previous one (e.g. hard refresh, old browser sessions).
-            $pdo->prepare('UPDATE live_game_sessions SET is_active = 0 WHERE is_active = 1')
-                ->execute();
+            // Deactivate any previously active sessions for this user — prevents stale sessions
+            if ($userId) {
+                $pdo->prepare('UPDATE live_game_sessions SET is_active = 0 WHERE user_id = ? AND is_active = 1')
+                    ->execute([$userId]);
+            }
 
             // Create session
             $stmt = $pdo->prepare('
-                INSERT INTO live_game_sessions (state, expires_at)
-                VALUES (?, DATE_ADD(NOW(), INTERVAL 24 HOUR))
+                INSERT INTO live_game_sessions (user_id, state, expires_at)
+                VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))
             ');
-            $stmt->execute([json_encode($data['state'])]);
+            $stmt->execute([$userId, json_encode($data['state'])]);
             $sessionId = (int)$pdo->lastInsertId();
 
             // Create one code per seat

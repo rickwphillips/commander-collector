@@ -38,6 +38,18 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '3.7.0',
+    date: '2026-03-30',
+    title: 'DB-Backed Game Session & Settings Persistence',
+    changes: [
+      { type: 'fixed', text: 'Game state now persists across page reloads — no more flash or reset to setup form' },
+      { type: 'fixed', text: 'Sound, highlight, and turn timer preferences save and load from the database' },
+      { type: 'fixed', text: '"Choose or Roll Off" panel no longer reappears after accepting a dice roll and reloading' },
+      { type: 'changed', text: 'Highlight mode ON shows dynamic gradient background; OFF shows dynamic colored border' },
+      { type: 'fixed', text: 'Game settings table updated to support UUID-based user identifiers' },
+    ],
+  },
+  {
     version: '3.4.0',
     date: '2026-03-29',
     title: 'Decklist Gallery Filters & Rules Guru Improvements',

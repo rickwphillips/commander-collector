@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/AuthGuard';
 import { GameSetup } from './components/GameSetup';
 import { GameBoard } from './components/GameBoard';
 import { GameEndSummary } from './components/GameEndSummary';
@@ -15,8 +16,6 @@ const POSITIONS_BY_COUNT: Record<number, Array<PlayerState['position']>> = {
   3: ['bottom', 'left', 'top'],
   4: ['bottom', 'left', 'top', 'right'],
 };
-const GAME_STATE_KEY = 'commander_game_state';
-
 const DEFAULT_STATE: GameManagerState = {
   players: [],
   commanderDamage: {},
@@ -31,16 +30,13 @@ const DEFAULT_STATE: GameManagerState = {
   sessionSeats: null,
 };
 
-function loadSavedState(): GameManagerState | null {
-  try {
-    const raw = localStorage.getItem(GAME_STATE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as GameManagerState;
-    if (parsed.phase === 'playing' || parsed.phase === 'ended') return parsed;
-    return null;
-  } catch {
-    return null;
-  }
+// Validate that a loaded game state is valid and playable
+function isValidPlayableState(state: GameManagerState): boolean {
+  if (!state.players || state.players.length === 0) return false;
+  if (state.phase !== 'playing') return false;
+  if (state.currentPlayerIdx < 0 || state.currentPlayerIdx >= state.players.length) return false;
+  if (!state.commanderDamage) return false;
+  return true;
 }
 
 function buildInitialState(playerSetups: PlayerSetup[], startingLife: number): GameManagerState {
@@ -88,90 +84,86 @@ const POLL_INTERVAL_MS = 3000;
 
 export default function GameManagerPage() {
   const router = useRouter();
-  const [isResumed, setIsResumed] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return loadSavedState() !== null;
-  });
-  const [state, setState] = useState<GameManagerState>(() => {
-    if (typeof window === 'undefined') return DEFAULT_STATE;
-    return loadSavedState() ?? DEFAULT_STATE;
-  });
+  const { user } = useAuth();
+  const [state, setState] = useState<GameManagerState>(DEFAULT_STATE);
   const [setupPrefill, setSetupPrefill] = useState<PlayerSetup[] | null>(null);
 
-  // Ref for live session sync (write timestamp used by sessionVerifiedRef logic only)
+  // Ref for live session sync (tracks when last write happened)
   const lastWriteTimeRef = useRef<number>(0);
 
-  // On reload from localStorage we must verify the saved sessionCode is still active before
-  // writing — otherwise we replay stale local state into a live session that may have moved on.
-  // Starts false only when a playing session was resumed; becomes true after the GET verifies it.
-  const sessionVerifiedRef = useRef<boolean>(
-    typeof window === 'undefined' ||
-    (() => { const s = loadSavedState(); return !s?.sessionCode || s.phase !== 'playing'; })(),
-  );
+  // Single flag: don't render until DB check completes and state is actually loaded
+  // This prevents any rendering while checking for active session
+  const [dbCheckComplete, setDbCheckComplete] = useState<boolean>(false);
+  const dbCheckRef = useRef<boolean>(false);
 
-  // State mirror of sessionVerifiedRef — used to gate the event polling loop so it doesn't
-  // consume and discard remote events before session verification has loaded DB state.
-  const [sessionVerified, setSessionVerified] = useState<boolean>(
-    typeof window === 'undefined' ||
-    (() => { const s = loadSavedState(); return !s?.sessionCode || s.phase !== 'playing'; })(),
-  );
-
-  // Persist to localStorage
+  // On mount: query DB for active game session
+  // Don't render ANYTHING until this completes and state is set
   useEffect(() => {
-    if (state.phase !== 'setup') {
-      localStorage.setItem(GAME_STATE_KEY, JSON.stringify(state));
-    } else {
-      localStorage.removeItem(GAME_STATE_KEY);
-    }
-  }, [state]);
+    if (dbCheckRef.current) return;
+    dbCheckRef.current = true;
 
-  // Fire-and-forget DB write on every state change while playing.
-  // Gated on sessionVerifiedRef so a reload never replays stale localStorage state into DB
-  // before we've confirmed the session is still active.
-  useEffect(() => {
-    if (state.phase !== 'playing' || !state.sessionCode) return;
-    if (!sessionVerifiedRef.current) return;
-    lastWriteTimeRef.current = Date.now();
-    api.updateLiveGame(state.sessionCode, state).catch(() => {});
-  }, [state]);
+    const checkAndLoad = async () => {
+      let loadedGame: GameManagerState | null = null;
+      let sessionCode: string | null = null;
 
-  // On mount: if we resumed a playing session from localStorage, verify it's still active.
-  // If yes  → sync to current DB state (don't replay potentially stale localStorage).
-  // If no   → clear the sessionCode so we don't write to a dead session.
-  useEffect(() => {
-    if (sessionVerifiedRef.current) return;
-    const saved = loadSavedState();
-    if (!saved?.sessionCode) { sessionVerifiedRef.current = true; return; }
-    api.getLiveGame(saved.sessionCode)
-      .then((res) => {
-        sessionVerifiedRef.current = true;
-        if (res.is_active) {
-          setState((prev) => ({
-            ...res.state,
-            sessionCode: prev.sessionCode,
-            sessionSeats: prev.sessionSeats,
-          }));
-        } else {
-          setState((prev) => ({ ...prev, sessionCode: null, sessionSeats: null }));
+      try {
+        const res = await api.getActiveGame();
+
+        if (res.is_active && res.state) {
+          sessionCode = res.session_code;
+
+          // Check: is state valid AND in playing phase?
+          if (isValidPlayableState(res.state) && res.state.phase === 'playing') {
+            // Valid, playable game — load it
+            loadedGame = {
+              ...res.state,
+              sessionCode: res.session_code,
+              sessionSeats: null
+            };
+          } else {
+            // Bad state or ended game — delete corrupted session
+            if (sessionCode) {
+              api.deleteLiveGame(sessionCode).catch(() => {});
+            }
+          }
         }
-        // Only open the event polling loop AFTER DB state is loaded — prevents consuming
-        // the remote event queue before the authoritative state is in place.
-        setSessionVerified(true);
-      })
-      .catch(() => {
-        sessionVerifiedRef.current = true;
-        setState((prev) => ({ ...prev, sessionCode: null, sessionSeats: null }));
-        setSessionVerified(true);
-      });
+      } catch (err) {
+        // No active session or error — start fresh
+      }
+
+      // Update state and complete check in same effect
+      if (loadedGame) {
+        setState(loadedGame);
+      }
+      // Mark check complete
+      setDbCheckComplete(true);
+    };
+
+    checkAndLoad();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fire-and-forget DB write on every state change while playing.
+  useEffect(() => {
+    if (state.phase !== 'playing' || !state.sessionCode || !dbCheckComplete) return;
+    lastWriteTimeRef.current = Date.now();
+    api.updateLiveGame(state.sessionCode, state).catch(() => {});
+  }, [state, dbCheckComplete]);
+
+  // Also save state when sessionCode first becomes available (in case state changed while waiting for session)
+  useEffect(() => {
+    if (state.phase !== 'playing' || !state.sessionCode || !dbCheckComplete) return;
+    // Only trigger if enough time has passed since last write (avoid duplicate saves)
+    if (Date.now() - lastWriteTimeRef.current < 100) return;
+    api.updateLiveGame(state.sessionCode, state).catch(() => {});
+  }, [state.sessionCode]);
 
   // Poll for remote events. The host is the sole writer of full state; remotes
   // append typed events to the queue instead. We consume (read + clear) the queue
   // every second and apply any events to our local state. The existing write effect
   // then persists the merged result to the DB.
   useEffect(() => {
-    if (state.phase !== 'playing' || !state.sessionCode || !sessionVerified) return;
+    if (state.phase !== 'playing' || !state.sessionCode || !dbCheckComplete) return;
     const code = state.sessionCode;
 
     const poll = async () => {
@@ -196,11 +188,12 @@ export default function GameManagerPage() {
     document.addEventListener('visibilitychange', onVisible);
 
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisible); };
-  }, [state.phase, state.sessionCode, sessionVerified]);
+  }, [state.phase, state.sessionCode, dbCheckComplete]);
 
   const handleStart = async (playerSetups: PlayerSetup[], startingLife: number, turnTimerSeconds: number) => {
-    // Mark verified immediately — this is a fresh game, no localStorage session to worry about
-    sessionVerifiedRef.current = true;
+    // New game starting — mark check as complete since we're creating a fresh session
+    dbCheckRef.current = true;
+    setDbCheckComplete(true);  // Also set state so fire-and-forget effect works
     // Await the delete so the old session is gone before the new one is created.
     // If it fails we proceed anyway — the new game gets a new code so it's isolated.
     if (state.sessionCode) {
@@ -213,10 +206,12 @@ export default function GameManagerPage() {
       const seats = playerSetups.map((_, i) =>
         (POSITIONS_BY_COUNT[playerSetups.length] ?? POSITIONS_BY_COUNT[4])[i]
       );
-      const session = await api.createLiveGame(newState, seats);
+      // Always pass user ID so session can be loaded later via active-game endpoint
+      const session = await api.createLiveGame(newState, seats, user?.id ?? undefined);
+      const newSessionCode = session.seats[newState.players.find((p) => p.position === 'bottom')?.position ?? 'bottom'] ?? null;
       setState((prev) => ({
         ...prev,
-        sessionCode: session.seats[prev.players.find((p) => p.position === 'bottom')?.position ?? 'bottom'] ?? null,
+        sessionCode: newSessionCode,
         sessionSeats: session.seats,
       }));
     } catch {/* silent — live session is optional */}
@@ -234,7 +229,6 @@ export default function GameManagerPage() {
   };
 
   const handleLogGame = () => {
-    localStorage.removeItem(GAME_STATE_KEY);
     router.push('/games/new');
   };
 
@@ -254,7 +248,6 @@ export default function GameManagerPage() {
     ];
     const cleanNotes = currentState.notes.replace(/\[(?:cmdkill|poisonkill):[^\]]+\]\s*/g, '').trim() || null;
     const { id } = await api.createGame({ played_at: today, notes: cleanNotes, game_type: 'standard', results });
-    localStorage.removeItem(GAME_STATE_KEY);
     router.push(`/games/detail?id=${id}`);
   };
 
@@ -262,7 +255,6 @@ export default function GameManagerPage() {
     if (state.sessionCode) {
       api.deleteLiveGame(state.sessionCode).catch(() => {/* silent */});
     }
-    localStorage.removeItem(GAME_STATE_KEY);
     setSetupPrefill(null);
     setState(DEFAULT_STATE);
   };
@@ -271,7 +263,6 @@ export default function GameManagerPage() {
     if (state.sessionCode) {
       api.deleteLiveGame(state.sessionCode).catch(() => {/* silent */});
     }
-    localStorage.removeItem(GAME_STATE_KEY);
     router.push('/games');
   };
 
@@ -279,8 +270,6 @@ export default function GameManagerPage() {
     if (state.sessionCode) {
       api.deleteLiveGame(state.sessionCode).catch(() => {/* silent */});
     }
-    localStorage.removeItem(GAME_STATE_KEY);
-    setIsResumed(false);
     setSetupPrefill(currentPlayers.map((p) => ({
       playerId: p.playerId,
       deckId: p.deckId,
@@ -292,11 +281,14 @@ export default function GameManagerPage() {
     setState(DEFAULT_STATE);
   };
 
-  if (state.phase === 'setup') {
-    return <GameSetup onStart={handleStart} prefillPlayers={setupPrefill ?? undefined} />;
+
+  // Don't render visible content until DB check completes
+  if (!dbCheckComplete) {
+    return null;
   }
 
-  if (state.phase === 'playing') {
+  // Show GameBoard if state is valid, playable, and in playing phase
+  if (isValidPlayableState(state) && state.phase === 'playing') {
     return (
       <GameBoard
         state={state}
@@ -305,20 +297,10 @@ export default function GameManagerPage() {
         onRestartGame={handleRestartGame}
         onLogGame={handleLogGame}
         onSaveGame={handleSaveGame}
-        isResumed={isResumed}
       />
     );
   }
 
-  return (
-    <GameEndSummary
-      players={state.players}
-      turnNumber={state.turnNumber}
-      startingLife={state.startingLife}
-      commanderDamage={state.commanderDamage}
-      onLogGame={handleLogGame}
-      onNewGame={handleNewGame}
-      onDiscard={handleDiscard}
-    />
-  );
+  // All else fails: show setup form (covers bad state, ended games, new games)
+  return <GameSetup onStart={handleStart} prefillPlayers={setupPrefill ?? undefined} />;
 }
