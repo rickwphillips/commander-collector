@@ -90,12 +90,12 @@ TARGETING FOR SPLICE COPIES:
     targets for the copy."
   When a copy effect like Fork or Reverberate creates a copy, you may choose new targets.
   For the spliced text's targets: these are also changeable when the copy is created.
-  Example: Glacial Ray spliced onto Reach Through Mists, targeting Goblin Guide (1/2).
+  Example: Glacial Ray spliced onto Reach Through Mists, targeting Goblin Guide (2/2).
     You Fork the spell. Copy of the spliced spell goes on stack.
     You may choose new targets for the copy: choose Monastery Swiftspear (1/2) instead.
     Copy: draws a card + deals 2 damage to Monastery Swiftspear.
     Original: draws a card + deals 2 damage to Goblin Guide.
-    Two creatures take 2 damage each. Potentially fatal to both 1/X creatures.
+    Monastery Swiftspear dies (2 damage = 2 toughness, lethal). Goblin Guide survives (2 damage, 2 toughness).
 
 STORM COPIES AND TARGET CHOICE:
   Storm trigger creates copies: "you may choose new targets for any of the copies" (702.40a).

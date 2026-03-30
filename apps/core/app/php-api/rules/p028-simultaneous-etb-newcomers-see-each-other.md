@@ -82,6 +82,8 @@ NOTE ON "ANOTHER" SELF-EXCLUSION:
 - **Simultaneous entry multiplies Cathars' Crusade counters vs. sequential entry.** 5 entering simultaneously → each gets 5 counters. Sequential → 4, 3, 2, 1, 0.
 - **Soul Warden sees all simultaneous newcomers.** If you create 5 tokens at once, Soul Warden triggers 5 times for 5 life. It does NOT gain life for its own ETB.
 - **Multiple newcomers with mutually-triggering ETBs create a web.** N creatures with "whenever another creature enters" generate N×(N-1) total trigger instances between all newcomers.
+- **Multiple Panharmonicons are ADDITIVE, not multiplicative.** Two Panharmonicons cause ETB triggers to fire 3 times (base 1 + 1 + 1), not 4. Three Panharmonicons: 4 times. Each "triggers an additional time" adds 1, they don't multiply. Same applies to multiple Yaroks. (Gatherer ruling 2021-03-19: "If you control two Panharmonicons, an artifact or creature entering the battlefield causes abilities to trigger three times, not four.")
+- **You don't need to control the permanent entering — only the permanent with the trigger.** Panharmonicon doubles ETB triggers of YOUR permanents even when your OPPONENT'S artifact or creature enters. (Gatherer ruling 2021-03-19)
 - **Triggers are placed on the stack in APNAP order** (CR 603.3b). Each player orders their own triggers. Active player's triggers go on the stack first (meaning they resolve last, as LIFO).
 
 ## Canonical Example

@@ -3,7 +3,7 @@ id: p436
 name: Crew/Vehicles, Fabricate, Overload, and Scavenge — Kaladesh/Ravnica Activated and Modal Mechanics
 category: costs
 cr_refs: [702.122a, 702.122b, 702.122c, 702.122d, 702.123a, 702.123b, 702.96a, 702.96b, 702.96c, 702.97a]
-tags: [crew, vehicle, fabricate, overload, scavenge, artifact-creature-until-EOT, tap-power-total, servo-tokens, counters-or-tokens, text-changing-effect, target-becomes-each, Smuggler-Copter, Skysovereign, Gonti's-Aether-Heart, Panharmonicon-fabricate, Cyclonic-Rift, Mizzium-Mortars, Golgari-Grave-Troll, scavenge-exile, fabricate-panharmonicon, crew-summoning-sickness, vehicle-damage, Kaladesh, Aether-Revolt]
+tags: [crew, vehicle, fabricate, overload, scavenge, artifact-creature-until-EOT, tap-power-total, servo-tokens, counters-or-tokens, text-changing-effect, target-becomes-each, Smuggler-Copter, Skysovereign, Gonti's-Aether-Heart, Panharmonicon-fabricate, Cyclonic-Rift, Mizzium-Mortars, Deadbridge-Goliath, scavenge-exile, fabricate-panharmonicon, crew-summoning-sickness, vehicle-damage, Kaladesh, Aether-Revolt]
 created: 2026-03-29
 examples_count: 2
 ---
@@ -132,12 +132,10 @@ SCAVENGE (702.97a):
 
   POWER OF THE EXILED CARD:
     Scavenge puts counters equal to the POWER of the card you exiled (the scavenge card itself).
-    Golgari Grave-Troll ({4}{G}: 0/N where N = number of creature cards in GY; scavenge {0}{G}):
-      At time of scavenging: Grave-Troll's power in the GY = 0 (in GY, not on battlefield where
-      power is variable based on GY contents). Its PRINTED power = 0 + number of creature cards...
-      wait: CDAs function in all zones (P004/P422). Grave-Troll's power CDA works in GY.
-      At the moment of scavenging, check Grave-Troll's power in the GY: 0 + number of creature
-      cards in YOUR GY. If 7 creatures in GY: Troll power = 7. Scavenge puts 7 counters.
+    Deadbridge Goliath ({2}{G}{G}: 5/5; scavenge {4}{G}{G}):
+      At time of scavenging: Deadbridge Goliath's power = 5. Scavenge puts 5 counters on a creature.
+    A card with a variable power CDA (like Mortivore, whose power = number of creature cards in all
+      graveyards) would have its power checked in the GY at the moment scavenge resolves.
     IMPORTANT: the power is WHEN EXILED (when scavenge resolves), not when the card entered the GY.
 
   SCAVENGE PERMANENTLY EXILES:

@@ -57,7 +57,7 @@ LOYALTY COST MECHANICS:
   Negative loyalty abilities ([-2], [-5], [-14]): remove that many counters as cost.
   Zero loyalty abilities ([0]): no counter change.
   REQUIREMENT: negative ability requires that many counters to exist (CR 606.6).
-    Jace, the Mind Sculptor at 3 loyalty: can activate [+2] (goes to 5), [0] (stays at 3), [-1] (goes to 2).
+    Jace, the Mind Sculptor at 3 loyalty: can activate [+2] Fateseal (→5), [0] Brainstorm (→3), [-1] Unsummon (→2).
     Cannot activate [-12] (needs 12 loyalty). That's Jace's ultimate.
   HOW TO BUILD TO AN ULTIMATE:
     Activate the + ability each turn (assuming it survives). After several turns: enough loyalty.
@@ -111,7 +111,10 @@ ULTMATES — JUST HIGH-COST LOYALTY ABILITIES:
     Destroying the planeswalker while the ultimate is on the stack: the ultimate still resolves.
     (The source of the ability is gone, but the ability is already on the stack and will resolve.)
   COMMON ULTIMATES:
-    Jace, the Mind Sculptor [-12]: "Exile all cards from target player's library, then that player shuffles their hand into their library." → "Mill everything, then make them draw nothing." Win condition.
+    Jace, the Mind Sculptor [+2]: Fateseal (look at top card of target player's library; may put on bottom).
+    [-0]: Brainstorm (draw 3, put 2 on top of library in any order).
+    [-1]: Unsummon (return target creature to its owner's hand).
+    [-12]: "Exile all cards from target player's library, then that player shuffles their hand into their library." → Win condition.
     Liliana of the Veil [-6]: "Separate all permanents on the battlefield into two piles. Target player sacrifices all permanents in the pile of their choice."
     Garruk Wildspeaker [-4]: "You get an emblem with 'Creatures you control have trample.' Creatures you control get +3/+3 until end of turn." Low loyalty, very accessible.
     Teferi, Hero of Dominaria [-8]: "You get an emblem with 'Whenever you draw a card, exile target permanent an opponent controls.'"
@@ -148,9 +151,9 @@ CARTH THE LION AND LOYALTY COSTS:
 ## Canonical Example
 **Jace, the Mind Sculptor — Four Abilities, One Per Turn:**
 Turn 4: Cast Jace, the Mind Sculptor ({2}{U}{U}). Enters with 3 loyalty (printed).
-Abilities: [+2] Brainstorm (look at top 3, put 2 back), [0] Unsummon (bounce target creature), [-1] Fateseal (look at top 2, put one on bottom), [-12] Ultimate.
+Abilities: [+2] Fateseal (look at top card of target player's library; may put on bottom), [0] Brainstorm (draw 3, put 2 back on top), [-1] Unsummon (bounce creature to hand), [-12] Ultimate.
 This turn: can activate one ability.
-  Choose [+2] Brainstorm: look at top 3, put 2 back. Jace goes from 3 → 5 loyalty.
+  Choose [+2] Fateseal: look at top card of opponent's library; put on bottom. Jace goes from 3 → 5 loyalty.
 Opponent's turn: they can attack Jace to reduce loyalty, or cast spells to deal damage to Jace.
   They attack with a 3/3. You block with a 2/2. 3 damage to Jace → remove 3 loyalty counters. 5 → 2 loyalty.
 Your turn: activate [+2] Brainstorm again. 2 → 4 loyalty.

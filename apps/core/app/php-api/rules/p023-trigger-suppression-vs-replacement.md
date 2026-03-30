@@ -58,6 +58,10 @@ TORPOR ORB CHECKS AT ENTRY TIME:
 - **Stifle vs. Torpor Orb:** Stifle counters individual triggers after they fire. Torpor Orb prevents triggers from firing at all. Neither affects replacement effects.
 - **March of the Machines interaction:** If an artifact enters under March of the Machines, it's a creature at entry time. Torpor Orb suppresses ETB triggers for it — including triggers on OTHER permanents watching for "an artifact enters."
 - **Torpor Orb entering simultaneously with creatures:** If Torpor Orb and a creature enter simultaneously (e.g., Sundering Titan effect), the creatures' ETB triggers are suppressed by Torpor Orb. Ruling confirms this.
+- **Hushbringer also suppresses death triggers.** Hushbringer reads "Creatures entering or dying don't cause abilities to trigger." It suppresses both ETB and "dies" triggers — including triggers from other permanents that watch for "a creature dies."
+- **Hushbringer: "sacrifice cause" triggers still fire.** An ability that triggers on the event CAUSING death (e.g., "whenever you sacrifice a creature") still triggers under Hushbringer — the trigger is on the sacrifice action, not on dying. But "when this creature dies" triggers are suppressed. (Gatherer ruling 2019-10-04)
+- **Hushbringer: "leaves the battlefield" ≠ "dies."** An ability that triggers when a creature "leaves the battlefield" won't trigger when a creature dies while Hushbringer is on the battlefield. (Gatherer ruling 2019-10-04)
+- **Trigger suppression checks the permanent as it exists on the battlefield.** For example, under March of the Machines, artifacts ARE creatures when they enter — so Torpor Orb/Hushbringer suppresses triggers from those artifacts entering. (Gatherer ruling 2024-04-12)
 
 ## Canonical Example
 **Torpor Orb + Phyrexian Dreadnought:**

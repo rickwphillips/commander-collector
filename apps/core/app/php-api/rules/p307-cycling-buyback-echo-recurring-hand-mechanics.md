@@ -49,9 +49,11 @@ CYCLING:
       In Death's Shadow: lose life deliberately. Street Wraith cycling = free life loss + draw.
 
     Krosan Tusker ({5}{G}{G}): 6/5. Cycling {2}{G}.
-      When you cycle Krosan Tusker: "You may search your library for a basic land card, put it into play."
-      Combined cycling + trigger: cycle it for {2}{G}, get a land drop + draw a card.
-      "Cycling Krosan Tusker" = Rampant Growth ({1}{G}) + card draw, but from a 7-drop creature.
+      When you cycle Krosan Tusker: "You may search your library for a basic land card, reveal that card,
+        put it into your hand, then shuffle."
+      Combined cycling + trigger: cycle it for {2}{G}, get a land into hand + draw a card.
+      The land goes to HAND — you still need to play it normally as your land drop.
+      "Cycling Krosan Tusker" = Tithe-like land fetch + card draw from a 7-drop creature.
 
   TYPECYCLING (CR 702.29e):
     Instead of drawing a card: search library for a [type] card, reveal, put in hand.
@@ -84,7 +86,7 @@ BUYBACK:
       Ultimate lock: in counterspell heavy control, Capsize every threat every turn.
 
     Whispers of the Muse ({U}): Instant. Buyback {5}. "Draw a card."
-      With buyback: {1}{U} = draw a card, card goes back to hand. Repeat.
+      With buyback: {U} + {5} = {5}{U} (6 mana) = draw a card, card goes back to hand. Repeat.
       In infinite mana scenarios: draw your entire library with Whispers of the Muse.
 
     Reclaim ({G}): Sorcery. Buyback {2}{G}. "Put target card from GY on top of library."

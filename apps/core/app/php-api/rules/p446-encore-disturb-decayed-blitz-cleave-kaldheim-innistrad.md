@@ -36,7 +36,7 @@ ENCORE (702.141a):
   TOKEN COPIES:
     Each token is a copy of the original card: same P/T, abilities, types.
     Each token's ETB triggers: fire separately when each token enters.
-    Amphin Mutineer ({3}{U}: "when it enters, exile up to one target non-Salamander creature"):
+    Amphin Mutineer ({3}{U}: 3/3; "when it enters, exile up to one target non-Salamander creature"):
       3 opponents → 3 tokens; each ETB fires → up to 3 non-Salamander creatures exiled.
     The token is forced to attack the specific opponent it was designated for.
     "Attacks that opponent this turn if able": normal attack rules apply (must be untapped,
@@ -182,11 +182,11 @@ CLEAVE (702.148a):
 
 ## Canonical Example
 **Encore + Legendary problem:**
-Amphin Mutineer ({3}{U}: 4/3; "when this creature enters, exile up to one target non-Salamander creature; that creature's controller creates a 4/3 blue Salamander Warrior"; encore {4}{U}{U}) is in your GY in a 4-player Commander game.
+Amphin Mutineer ({3}{U}: 3/3; "when this creature enters, exile up to one target non-Salamander creature; that creature's controller creates a 4/3 blue Salamander Warrior"; encore {4}{U}{U}) is in your GY in a 4-player Commander game.
 
 3 opponents. You activate encore: {4}{U}{U} + exile the card.
 3 Amphin Mutineer tokens created (one per opponent), each attacks the designated opponent.
-Each token: 4/3, non-legendary (Amphin Mutineer is NOT legendary).
+Each token: 3/3, non-legendary (Amphin Mutineer is NOT legendary).
 ETBs: each token fires "when this creature enters." Each chooses a non-Salamander creature to exile.
 3 ETBs → up to 3 creatures exiled. Then 3 tokens attack their designated opponents.
 At beginning of next end step: all 3 tokens are sacrificed.

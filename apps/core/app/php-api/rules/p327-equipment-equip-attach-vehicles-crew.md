@@ -116,8 +116,8 @@ NOTABLE EQUIPMENT INTERACTIONS:
     Each 1/1 token with Skullclamp: auto-dies, draws 2. Banned in most formats.
 
   EMBERCLEAVE ({4}{R}{R}): Equipment with flash, enters attached.
-    "Whenever you attack with two or more creatures, this spell costs {2} less to cast."
-    Also: grants +1/+0 and double strike to equipped creature.
+    "This spell costs {1} less to cast for each attacking creature you control."
+    Also: grants +1/+1, double strike, AND trample to equipped creature.
     The "attaches on ETB" triggers as part of entering: the creature immediately gets double strike.
     This can be done at instant speed (flash): attack, opponent doesn't block properly, cast Embercleave mid-combat attaching to biggest threat for a lethal double-strike attack.
 
@@ -139,15 +139,15 @@ NOTABLE EQUIPMENT INTERACTIONS:
 **Embercleave Alpha Strike:**
 Turn 6, you have 4 attacking creatures: 3/3, 3/3, 2/2, 2/2.
 You have {1}{R}{R} in mana.
-Declare all 4 attackers. Embercleave's cost reduction: "Whenever you attack with 2+ creatures, costs {2} less."
-With 4 attackers: cost reduced by {2}. Embercleave now costs {2}{R}{R} instead of {4}{R}{R}.
-After declaring attackers (but before blockers), cast Embercleave ({2}{R}{R}) — you have {1}{R}{R} plus floating.
-Wait: {2}{R}{R} = 4 mana. You have 6 lands (6 mana available). No problem.
+Declare all 4 attackers. Embercleave's cost reduction: "{1} less per attacking creature you control."
+With 4 attackers: cost reduced by {4}. Embercleave now costs {R}{R} instead of {4}{R}{R}.
+After declaring attackers (but before blockers), cast Embercleave ({R}{R}) — 2 mana needed.
+You have 6 lands available. No problem.
 Embercleave has flash. Cast it during the declare attackers step (opponent just declared attackers).
 When Embercleave enters: "Attach it to target creature you control." Target 3/3.
-3/3 gains +1/+0 (becomes 4/3) and double strike.
-Opponent blocked your 2/2s and one 3/3, leaving the other 3/3 (now 4/3 double strike) unblocked.
-Unblocked 4/3 with double strike: deals 4 damage in first strike step → 4 more in regular step = 8 damage total to player.
+3/3 gains +1/+1 (becomes 4/4), double strike, and trample.
+Opponent blocked your 2/2s and one 3/3, leaving the other 3/3 (now 4/4 double strike trample) unblocked.
+Unblocked 4/4 with double strike: deals 4 damage in first strike step → 4 more in regular step = 8 damage total to player.
 If opponent is at 8 life: dead.
 The Embercleave surprise: opponent expected normal combat, suddenly their blocking plan is wrong.
 They can't re-block after Embercleave resolves.

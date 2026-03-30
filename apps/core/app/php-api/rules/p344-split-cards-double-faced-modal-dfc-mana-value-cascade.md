@@ -52,11 +52,10 @@ SPLIT CARDS (CR 709):
 
   CASCADE AND SPLIT CARDS:
     Bloodbraid Elf ({2}{R}{G}) has cascade: exile cards until you find one with MV < 4.
-    If you hit a split card (say, Boom // Bust = {1}{R} and {5}{R}{R}{R}):
-      MV in exile = combined = 1+6+1+1+1 = uhh let me recalculate.
-      Boom: {1}{R} = MV 2. Bust: {5}{R}{R}{R} = MV 8. Combined: MV = 10.
+    If you hit a split card (say, Boom // Bust = {1}{R} and {5}{R}):
+      Boom: {1}{R} = MV 2. Bust: {5}{R} = MV 6. Combined: MV = 8.
     Cascade requires MV less than the cascade spell's MV (4 for Bloodbraid Elf).
-    A split card's MV in exile = combined = 10. That's NOT less than 4.
+    A split card's MV in exile = combined = 8. That's NOT less than 4.
     Result: Bloodbraid can't cascade into Boom // Bust.
     BUT: if you COULD cascade into it and choose Boom (MV 2): the spell on the stack has MV 2.
     In practice: the card's MV in the cascade zone is checked BEFORE choosing half.
@@ -67,8 +66,8 @@ SPLIT CARDS (CR 709):
     Some split cards have fuse: you can cast BOTH halves simultaneously for the combined cost.
     On stack as fused: characteristics of BOTH halves combined (709.4d).
     MV of fused spell: combined mana costs.
-    Example: Breaking // Entering ({U}{B} // {5}{B}{R}), fused = {U}{B}{5}{B}{R} = MV 9.
-    Either half alone: Breaking = MV 2, Entering = MV 7.
+    Example: Breaking // Entering ({U}{B} // {4}{B}{R}), fused = {U}{B}{4}{B}{R} = MV 8.
+    Either half alone: Breaking = MV 2, Entering = MV 6.
     Cascade into Breaking // Entering: MV in exile (not on stack) = 2 + 7 = 9. Not < 4. No cascade.
 
 NONMODAL DOUBLE-FACED CARDS (TRANSFORM/CONVERT) (CR 712.2):

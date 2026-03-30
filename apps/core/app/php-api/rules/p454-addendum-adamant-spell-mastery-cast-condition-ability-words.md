@@ -103,7 +103,7 @@ Check: Are there 2+ instant cards and/or sorcery cards in your graveyard right n
 - *Emergency Powers* (Ravnica Allegiance): "Each player shuffles their hand and graveyard into their library, then draws seven cards. Addendum — If you cast this spell during your main phase, you may put a permanent card from your hand onto the battlefield." Cast at opponent's end step: each player draws 7. Cast during your main phase: draw 7 AND put a permanent into play.
 
 **Adamant:**
-- *Emry, Lurker of the Loch* doesn't have adamant but illustrates the mana-paid concept. A true adamant example: *Blacklance Paragon* ("Flash. Adamant — If at least three black mana was spent to cast Blacklance Paragon, it enters the battlefield with a deathtouch counter and a lifelink counter on it.") You pay {3}{B}{B}{B}: three black mana spent = adamant satisfied.
+- *Emry, Lurker of the Loch* doesn't have adamant but illustrates the mana-paid concept. A true adamant example: *Lonesome Unicorn* ("Adamant — If at least three white mana was spent to cast this spell, put a +1/+1 counter on Lonesome Unicorn.") You pay {4}{W}{W}{W}: three white mana spent = adamant satisfied. (Note: *Blacklance Paragon* does NOT have Adamant — it is a {1}{B} 3/1 Flash creature whose ETB gives a target Knight deathtouch and lifelink until end of turn.)
 
 **Spell Mastery:**
 - Graveyard has 2 instants: *Opt* and *Fatal Push*. You cast *Fiery Conclusion* targeting a creature for 2 damage. Spell mastery: 2+ instant/sorcery cards in GY → deals 5 damage instead. Opponent casts a counterspell in response and you counter THEIR counterspell — 3 instant/sorcery cards now in GY. Still satisfied.

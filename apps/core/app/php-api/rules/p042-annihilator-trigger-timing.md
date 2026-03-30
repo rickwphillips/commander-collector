@@ -74,6 +74,8 @@ DEFENDING PLAYER CHOICE:
 - **Having 0 permanents means sacrificing 0.** You can't sacrifice what doesn't exist; annihilator doesn't cause a loss condition on its own.
 - **The defender chooses what to sacrifice.** They can pick strategically — though the situation is usually dire regardless.
 - **Annihilator fires once per attack declaration, not per damage.** Blocking and killing the attacker before damage doesn't prevent the annihilator sacrifice.
+- **Creatures sacrificed via annihilator can't block.** Sacrifices resolve before the declare blockers step — sacrificed creatures are gone and can't be declared as blockers. (Gatherer ruling 2010-06-15)
+- **Attacking a planeswalker: if that planeswalker is sacrificed via annihilator, the attacker continues to attack and may be blocked.** The creature is still in combat as an attacker, but since it was attacking the planeswalker (not the player), if unblocked it won't redirect damage to the player. (Gatherer ruling 2010-06-15)
 
 ## Canonical Example
 **Emrakul, the Aeons Torn (Annihilator 6) attacks:**

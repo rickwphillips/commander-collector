@@ -42,11 +42,13 @@ HIDEAWAY + CASTING THE HIDDEN CARD:
   Non-land cards: cast for free
 
 HIDEAWAY LANDS (Lorwyn, enters tapped per errata):
-  Shelldock Isle ({Hideaway 4}): "Play the hidden card if your library has 20 or fewer cards."
-    Condition: reduced library size (late game or milled down).
+  Shelldock Isle ({Hideaway 4}): "Play the hidden card if A library has 20 or fewer cards."
+    Condition: ANY player's library has 20 or fewer cards — not just yours.
+    (Gatherer ruling 2007-10-01: "It doesn't matter which library has twenty or fewer cards in it.")
     Hidden cards: in decks that mill themselves (Dredge, etc.), Shelldock Isle fires frequently.
     Classic: self-mill to 20 cards → play anything from library for free.
-    Combo: hide Emrakul or another huge card; once at 20 cards, cast it for free.
+    Also: if an OPPONENT has been milled to 20 cards, your Shelldock Isle condition is met.
+    Combo: hide Emrakul or another huge card; once any library is at 20 cards, cast it for free.
 
   Windbrisk Heights ({W}, Hideaway 4): "Play the hidden card if you attacked with 3+ creatures this turn."
     Condition: aggressive attacking.
@@ -103,14 +105,15 @@ HIDEAWAY NONLAND (Lorwyn):
 - **Hideaway N** exiles a face-down card from the top N of your library on ETB; the hidden card is yours to see but opponents can't.
 - **Each hideaway permanent has its own condition** to cast the hidden card for free.
 - **Blink the permanent**: triggers a new hideaway, creating a new hidden card (the old one stays in exile, unclaimed).
-- **Shelldock Isle + Emrakul** is the iconic combo: mill down to 20 cards, cast Emrakul for free.
+- **Shelldock Isle's condition is any library ≤ 20, not just yours.** If an opponent has been milled to 20 or fewer cards, Shelldock Isle's condition is met. (Gatherer ruling 2007-10-01)
+- **Shelldock Isle + Emrakul** is the iconic combo: mill down to 20 cards (anyone's), cast Emrakul for free.
 - **Windbrisk Heights** rewards attacking with 3+ creatures — the most aggressive hideaway land.
 
 ## Canonical Example
 **Dredge + Shelldock Isle Combo:**
 Turn 3: Shelldock Isle enters tapped (standard Lorwyn errata). ETB: look at top 4. Find Emrakul, the Aeons Torn (15/15). Hide it face down. Put other 3 at bottom.
 Turns 3-5: Dredge aggressively. Golgari Grave-Troll mills 6 per draw step. Library shrinks to under 20 cards.
-Turn 6: Library has 18 cards. Tap Shelldock Isle: condition met (≤ 20 cards). Play the hidden card for free.
+Turn 6: Library has 18 cards. Tap Shelldock Isle: condition met (≤ 20 cards in any player's library). Play the hidden card for free.
 Emrakul enters: annihilator 6 triggers. Opponent sacrifices 6 permanents.
 Attack with 15/15 Emrakul for 15 damage.
 Shelldock Isle finishes Dredge games that went long: one land holds a kill condition.

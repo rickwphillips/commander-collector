@@ -119,9 +119,9 @@ MERGED PERMANENT WITH -1/-1 COUNTER ALREADY (WITHER DAMAGE):
 - **Multiple persist instances don't cause double-return** — the second trigger resolves after the first has already returned the components to the battlefield; the components are no longer in the GY; the second trigger does nothing.
 
 ## Canonical Example
-**Gemrazer (top, 4/4 reach trample; no persist) + Kitchen Finks (bottom; 3/2 lifelink; persist) merged permanent:**
+**Gemrazer (top, 4/4 reach trample; no persist) + Kitchen Finks (bottom; 3/2 gain-life-on-ETB; persist) merged permanent:**
 
-The merged permanent: characteristics from Gemrazer (4/4, reach, trample, green). Abilities from both: reach, trample, lifelink, persist.
+The merged permanent: characteristics from Gemrazer (4/4, reach, trample, green). Abilities from both: reach, trample, Kitchen Finks' ETB (gain 2 life when it enters), persist.
 
 Opponent casts Doom Blade: destroy target nonblack creature. The merged permanent is destroyed.
 Merged permanent goes to GY. Both components — Gemrazer and Kitchen Finks — are put into the GY (729.3).
@@ -134,7 +134,7 @@ Both are returned to the battlefield, each with a -1/-1 counter.
 
 Result: You now have:
 - Gemrazer (3/3 after -1/-1 counter): reach, trample. No persist on this card.
-- Kitchen Finks (2/1 after -1/-1 counter): lifelink (you gain 2 life when it enters, from the ETB "you gain 2 life"). Has persist — but the -1/-1 counter means persist won't re-trigger if it dies.
+- Kitchen Finks (2/1 after -1/-1 counter): ETB triggers "you gain 2 life" when it enters. Has persist — but the -1/-1 counter means persist won't re-trigger if it dies.
 
 ETBs fire:
 - Kitchen Finks: "When this creature enters, you gain 2 life." (2 life gained.)

@@ -67,11 +67,11 @@ BESTOW (702.103a–g):
     The card that was an Aura is now a creature entering the battlefield — it's a new object entering.
     ETB triggers on the bestow creature fire when it falls off and enters.
   EXAMPLES:
-    Nighthowler ({2}{B}): "Bestow {5}{B}. Nighthowler's power and toughness are each equal to the number of creature cards in all graveyards." (Bestowed: enchanted creature gets +X/+X.)
-    Nessian Demolok ({4}{G}): "Bestow {6}{G}{G}. Tribute 3. When this enters, if tribute wasn't paid, destroy target noncreature artifact or enchantment." (3/4 with both bestow and tribute.)
-    Doomwake Giant ({4}{B}): "Bestow {8}{B}. Constellation — Whenever this creature or another enchantment enters under your control, creatures your opponents control get -1/-0 until end of turn."
-      As a creature: constellation triggers for each enchantment entering.
-      Bestowed: the enchanted creature gets +4/+6, and you still trigger constellation.
+    Nighthowler ({1}{B}{B}): "Bestow {2}{B}{B}. Nighthowler's power and toughness are each equal to the number of creature cards in all graveyards." (Bestowed: enchanted creature gets +X/+X.)
+    Nessian Demolok ({3}{G}{G}): "Tribute 3. When this enters, if tribute wasn't paid, destroy target noncreature permanent." (3/3 with tribute; does NOT have bestow.)
+    Doomwake Giant ({4}{B}): 4/6 Enchantment Creature — Giant. "Constellation — Whenever this creature or another enchantment you control enters, creatures your opponents control get -1/-1 until end of turn."
+      Does NOT have bestow. It's an enchantment creature (triggers constellation on entry).
+      The constellation effect is -1/-1 (not -1/-0).
   BESTOW AND AURA SYNERGIES:
     When cast bestowed: it IS an Aura. Cards that count Auras (Kor Spiritdancer) count it.
     When on the battlefield as a creature: it's NOT an Aura. Kor Spiritdancer doesn't count it.
@@ -91,11 +91,11 @@ TRIBUTE (702.104a–b):
     Classic "lose-lose" design: one of the two outcomes is always bad for the opponent.
     The "tribute wasn't paid" ability is usually so powerful that paying tribute is the lesser evil.
   EXAMPLES:
-    Nessian Wilder ({6}{G}): "Tribute 3. If tribute wasn't paid, target player sacrifices a creature."
-      Opponent: pay 3 +1/+1 counters (creature is 9/9) OR sacrifice a creature.
+    Nessian Wilds Ravager ({4}{G}{G}): 6/6. "Tribute 6. When this enters, if tribute wasn't paid, you may have this creature fight another target creature."
+      Opponent: pay 6 +1/+1 counters (creature is 12/12) OR let you fight any creature with a 6/6.
       Both bad for opponent. You choose the lesser evil for them.
-    Nessian Demolok ({4}{G}): "Tribute 3. If tribute wasn't paid, destroy target noncreature artifact or enchantment."
-      Pay tribute → 6/6. Don't pay → you destroy their key artifact/enchantment.
+    Nessian Demolok ({3}{G}{G}): 3/3. "Tribute 3. When this enters, if tribute wasn't paid, destroy target noncreature permanent."
+      Pay tribute → 6/6. Don't pay → you destroy their key noncreature permanent.
     Fire-Field Ogre ({U}{B}{R}): no tribute. But similar "dilemma" design precedes tribute.
   TRIBUTE AND MULTIPLAYER:
     "Choose an opponent" — in Commander, you choose ONE of potentially 3 opponents.
@@ -160,7 +160,7 @@ DASH (702.109a):
 ## Canonical Example
 **Nighthowler Bestowed — Target Dies:**
 GY has 8 creature cards total. Nighthowler's P/T = 8/8 (it would be huge).
-You cast Nighthowler bestowed ({5}{B}) targeting your 3/3 Soldier.
+You cast Nighthowler bestowed ({2}{B}{B}) targeting your 3/3 Soldier.
 Nighthowler is on the stack as a bestowed Aura (targeting the Soldier).
 Opponent casts Doom Blade on the Soldier in response.
 Soldier dies. Now Nighthowler's target (the Soldier) is gone before Nighthowler resolves.

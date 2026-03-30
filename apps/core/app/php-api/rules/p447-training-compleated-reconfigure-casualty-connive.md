@@ -68,9 +68,9 @@ COMPLEATED (702.150a):
   REDUCTION FOR LIFE PAYMENT:
     If you pay life (not mana) for ANY Phyrexian mana symbol {P}:
     Enters with (normal loyalty - 2) per {P} symbol paid with life.
-    Jace, the Perfected Mind ({2}{U}{U/P}: normally enters with 4 loyalty):
-      Pay {2}{U}{U}: no life paid. Enters with 4 loyalty. Full power.
-      Pay {2}{U} + 2 life: one {P} paid with life. Enters with 2 loyalty.
+    Jace, the Perfected Mind ({2}{U}{U/P}: normally enters with 5 loyalty):
+      Pay {2}{U}{U}: no life paid. Enters with 5 loyalty. Full power.
+      Pay {2}{U} + 2 life: one {P} paid with life. Enters with 3 loyalty.
     The reduction is "for each of those [Phyrexian mana] symbols" you paid life for.
     If there are two {P} symbols and you pay life for both: -4 total loyalty.
 
@@ -188,18 +188,18 @@ CONNIVE (701.50a):
 
 ## Canonical Example
 **Training vs. Mentor power-check comparison:**
-Battlefield: Hopeful Initiate (1/1; training; "{2}{W}, remove 2 counters from among creatures you control: destroy target artifact or enchantment") and a 3/3 creature you control.
+Battlefield: Hopeful Initiate (1/2; training; "{2}{W}, remove 2 counters from among creatures you control: destroy target artifact or enchantment") and a 3/3 creature you control.
 
-Both attack. Training fires: "1/1 and another creature with power > 1 (the 3/3 has power 3 > 1) attack." Trigger fires. On the stack.
+Both attack. Training fires: "1/2 and another creature with power > 1 (the 3/3 has power 3 > 1) attack." Trigger fires. On the stack.
 
-Opponent's Giant Growth on 3/3 in response? If the 3/3 becomes a 6/6: training trigger already fired. At resolution: no re-check. Training puts a +1/+1 counter on Hopeful Initiate. (2/2 now.)
+Opponent's Giant Growth on 3/3 in response? If the 3/3 becomes a 6/6: training trigger already fired. At resolution: no re-check. Training puts a +1/+1 counter on Hopeful Initiate. (2/3 now.)
 
 Contrast with Mentor (P440): if Hopeful Initiate were mentoring the 3/3 (Hopeful Initiate would need power 4+ for that) and the 3/3 were pumped to equal power: Mentor's target becomes illegal at resolution.
 
 Key difference: Training targets ITSELF (no separate target). No resolution-time targeting restriction.
 
 **Example 2 — Reconfigure during removal:**
-Lion Sash ({W}: 1/1 artifact creature Equipment; "{W}: exile a GY card, if permanent card put +1/+1 counter on this permanent"; reconfigure {2}) not attached, currently a 1/1 artifact creature with 3 +1/+1 counters (4/4 effectively; equipped creature gets +4/+4).
+Lion Sash ({1}{W}: 1/1 artifact creature Equipment; "{W}: exile a GY card, if permanent card put +1/+1 counter on this permanent"; reconfigure {2}) not attached, currently a 1/1 artifact creature with 3 +1/+1 counters (4/4 effectively; equipped creature gets +4/+4).
 
 Opponent casts Doom Blade targeting Lion Sash (it's a nonblack creature).
 Can you reconfigure to avoid the removal? No — reconfigure is sorcery speed. You're in your opponent's turn (or combat). Can't use a sorcery-speed ability.

@@ -74,7 +74,7 @@ TURNING FACE UP (702.37e):
   CRITICAL: No ETBs trigger. No static ETB effects apply. The permanent was
     already on the battlefield. "Enters" abilities don't fire.
   HOWEVER: Any abilities that trigger on TURN FACE UP (not ETB) DO trigger.
-    Example: Willbender ({1}{U}: 1/1, morph {1}{U}, "when Willbender is turned face up,
+    Example: Willbender ({1}{U}: 1/2, morph {1}{U}, "when Willbender is turned face up,
       change the target of target spell or ability with a single target"):
     Willbender's ability says "when turned face up" — NOT "when it enters."
     This DOES trigger when it turns face up. This is the key!
@@ -150,7 +150,7 @@ MULTIPLE FACE-DOWN PERMANENTS (708.6):
 
 ## Canonical Example
 **Willbender Mid-Combat Turn-Face-Up:**
-You control a face-down 2/2 (actually Willbender — {1}{U}: 1/1 morph {1}{U}, "when Willbender is turned face up, change the target of target spell or ability with a single target to Willbender").
+You control a face-down 2/2 (actually Willbender — {1}{U}: 1/2 morph {1}{U}, "when Willbender is turned face up, change the target of target spell or ability with a single target to Willbender").
 
 Opponent casts Doom Blade targeting your best creature (say, a 4/4 Tarmogoyf).
 
@@ -158,31 +158,31 @@ You have priority after Doom Blade goes on the stack. (Note: turning face up is 
 
 You turn Willbender face up. Show all players: morph cost {1}{U}. Pay {1}{U}. It turns face up.
 → Special action: no stack, no response window.
-Willbender is now face up as a 1/1 blue Wizard.
+Willbender is now face up as a 1/2 blue Wizard.
 
 "When Willbender is turned face up" triggers. Goes on stack.
 Trigger resolves: change the target of Doom Blade (single target) to Willbender.
 Doom Blade now targets Willbender.
-Doom Blade resolves: destroys Willbender (the 1/1).
+Doom Blade resolves: destroys Willbender (the 1/2).
 Tarmogoyf is safe. You sacrificed a 3-mana investment (1U face-down + 1U flip) to save your 4/4.
 
 Note: this only works because "turned face up" IS a trigger — unlike ETBs, it fires here.
 
 **Example 2 — Exalted Angel and Bluff Value:**
-You morph Exalted Angel ({4}{W}{W}: 4/5 flying; morph {2}{W}{W}; "when Exalted Angel is turned face up, you gain 4 life"; "whenever Exalted Angel deals damage, you gain that much life").
+You morph Exalted Angel ({4}{W}{W}: 4/5 flying; morph {2}{W}{W}; "whenever Exalted Angel deals damage, you gain that much life").
 
-Note: "when turned face up" is an ETB-style trigger on this card, but it says "when turned face up" not "when it enters." So it DOES trigger.
+Note: Exalted Angel does NOT have a "when turned face up" trigger. When it turns face up, no ETB-style trigger fires (the permanent was already on the battlefield). You simply reveal a 4/5 flying lifelinker.
 
 Face-down in play: opponent sees a 2/2. They might not kill it immediately.
 
 Turn 3: You have {2}{W}{W} (6 mana). Tap. Turn Exalted Angel face up (show morph cost {2}{W}{W}).
-"When Exalted Angel is turned face up" → gain 4 life.
-The 4/5 flying lifelinker is now face up. You gained 4 life and have a 4/5 flying beater.
+No "turned face up" trigger fires — Exalted Angel has no such ability.
+The 4/5 flying lifelinker is now revealed face up.
 
 VS. comparison — cast normally: {4}{W}{W} = 6 mana. Same cost! But face-down:
   You paid {3} on turn 1 (early 2/2 to attack/block).
   You paid {2}{W}{W} on turn 3 to flip (when you have mana to spare).
-  The "when turned face up" gain 4 life IS an effect — different wording confirms it fires.
+  No life gain on flip — the life gain ability only triggers when the angel deals damage.
 
 Bluff element: opponent who sees a face-down 2/2 might alpha strike, taking combat damage.
 Outcome: they attacked into your face-down creature, took damage, and you flipped a 4/5.

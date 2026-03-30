@@ -72,6 +72,10 @@ PROLIFERATE + DOUBLE COUNTERS:
 - **Proliferate doesn't target.** Hexproof, shroud, and protection don't stop it.
 - **Doubling Season doubles counters added to YOUR permanents** via proliferate.
 - **In 2HG, shared poison counters can only be added once** even if both team members are chosen.
+- **Cards not on the battlefield cannot be proliferated**, even if they have counters on them. Only permanents (on the battlefield) and players can be chosen. (Gatherer ruling 2023-02-04)
+- **"Whenever you proliferate" triggers even if you chose zero permanents/players.** The choice of zero still counts as proliferating. (Gatherer ruling 2023-02-04)
+- **When proliferating a permanent with multiple counter types, it must receive one of each type — you can't choose to add only some types.** You can avoid adding to a permanent entirely by not choosing it. (Gatherer ruling 2023-02-04)
+- **Double proliferate (Contagion Engine): no priority window between the two proliferate actions.** You complete the first proliferate entirely, then immediately the second. Players can't respond in between. (Gatherer ruling 2011-01-01)
 
 ## Canonical Example
 **Flux Channeler (whenever you cast a noncreature spell, proliferate):**

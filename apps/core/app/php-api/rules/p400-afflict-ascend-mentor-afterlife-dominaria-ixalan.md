@@ -55,8 +55,8 @@ AFFLICT (702.130):
     This creates a dilemma: block (take the afflict life loss + prevent combat damage)
       vs. don't block (take full combat damage).
     With high-power afflict creatures: the life loss from not blocking + afflict can be severe.
-    Example: Ammit Eternal ({2}{B}: 5/5, afflict 3, "-1/-1 counter on each nonland permanent
-      opponents control whenever you cast a spell"):
+    Example: Ammit Eternal ({2}{B}: 5/5, afflict 3, "whenever an opponent casts a spell, put a
+      -1/-1 counter on Ammit Eternal; whenever it deals combat damage to a player, remove all -1/-1 counters"):
       If opponent blocks Ammit: they lose 3 life + take 5 combat damage = 8 life total if they die.
       If opponent doesn't block: they take 5 combat damage.
       Blocking "costs" 3 life but prevents up to 5 damage. Net: blocking is worth it only if the
@@ -182,7 +182,7 @@ AFTERLIFE (702.135):
 
 ## Canonical Example
 **Ammit Eternal Afflict Dilemma:**
-Ammit Eternal ({2}{B}: 5/5, Afflict 3, "whenever you cast a spell, put a -1/-1 counter on each nonland permanent opponents control"):
+Ammit Eternal ({2}{B}: 5/5, Afflict 3, "whenever an opponent casts a spell, put a -1/-1 counter on Ammit Eternal; whenever it deals combat damage to a player, remove all -1/-1 counters"):
 
 Turn 4: Ammit Eternal attacks Player B.
 Player B's board: 3/3 blocker, 2/2 blocker. Player B at 18 life.

@@ -137,7 +137,8 @@ TRAMPLE OVER PLANESWALKERS (CR 702.19c):
 
 ## Canonical Example
 **Craterhoof Behemoth Trample Army:**
-Turn 9. Board: Craterhoof Behemoth (8/8 Trample) + 5 other creatures you've given Trample.
+Turn 9. Board: Craterhoof Behemoth (5/5 base) + 5 other creatures.
+Craterhoof has haste and ETB trigger fires immediately.
 Craterhoof enters: "When ETBs, creatures you control get +X/+X and Trample where X = creatures you control."
 6 creatures: each gets +6/+6 and Trample.
 Attack with all 6 creatures. Opponent has two 4/4 defenders.

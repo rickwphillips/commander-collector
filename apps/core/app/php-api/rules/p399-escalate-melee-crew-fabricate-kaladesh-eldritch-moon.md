@@ -47,7 +47,7 @@ ESCALATE (702.120):
     1 mode: 0 escalate payments. 2 modes: 1 escalate payment. 3 modes: 2 escalate payments.
     Example: Collective Brutality ({1}{B}: sorcery, escalate {discard a card}, 3 modes:
       • Mode 1: target creature gets -2/-2 until EOT.
-      • Mode 2: target player reveals hand, you choose noncreature nonland, they discard.
+      • Mode 2: target opponent reveals hand, you choose an instant or sorcery card, they discard it.
       • Mode 3: target opponent loses 2 life and you gain 2 life.):
       Choose 1 mode: pay {1}{B}. No escalate.
       Choose 2 modes: pay {1}{B} + discard 1 card (1 escalate payment).
@@ -167,7 +167,7 @@ FABRICATE (702.123):
   FABRICATE TOKENS:
     "1/1 colorless Servo artifact creature tokens." These are Servo-subtype artifacts.
     Artifact synergies apply. Metalcraft, Affinity for Artifacts, Improvise (P388) — all benefit.
-    Pia Nalaar ({1}{R}: 2/1, "when this enters, create a 1/1 colorless Thopter token with flying"):
+    Pia Nalaar ({2}{R}: 2/2, "when this enters, create a 1/1 colorless Thopter artifact creature token with flying"):
       Pia's version creates a Thopter (flyer). Fabricate creates Servos (ground).
 ```
 

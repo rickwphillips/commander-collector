@@ -92,6 +92,8 @@ LAST KNOWN INFO PRINCIPLE:
 - **Melira + persist + sac outlet = infinite triggers**, because Melira prevents the -1/-1 counter from being placed, so persist always fires.
 - **Persist and undying on the same creature = only one returns the creature.** Both trigger simultaneously; APNAP order determines which goes on stack first (resolves last). The second trigger fizzles because the creature is no longer in the graveyard.
 - **Persist/undying don't fire for zone changes other than battlefield → graveyard.** They specifically say "put into a graveyard FROM THE BATTLEFIELD."
+- **Mikaeus's +1/+1 bonus is NOT a counter — undying still fires.** Mikaeus gives non-Human creatures "+1/+1 and undying" as a static continuous effect. That +1 isn't a +1/+1 counter — it's a pump effect. The undying check asks "does it have any +1/+1 counters on it?" If no actual counters are present, undying fires even though the creature has a pump bonus. (Mikaeus ruling 2018-12-07.)
+- **A non-Human creature dying simultaneously with Mikaeus still gets undying.** If Mikaeus and one of his non-Human creatures die at the same time (e.g., combat damage), the creature's undying ability (granted by Mikaeus) triggers and returns the creature. Mikaeus's ability used last known information — it was granting undying when they were all on the battlefield together. (Mikaeus ruling 2018-12-07: "If a non-Human creature you control without a +1/+1 counter dies at the same time as Mikaeus, that creature's undying ability granted by Mikaeus triggers and will return it to the battlefield.")
 
 ## Canonical Example
 **Melira + Kitchen Finks + Viscera Seer = infinite life:**

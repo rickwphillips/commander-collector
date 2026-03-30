@@ -104,13 +104,13 @@ KICKER (702.33):
       Those abilities check the kicked status when the spell resolves.
     Example: Thornscape Battlemage ({2}{G}: 2/2):
       "Kicker {W} and/or {R}"
-      "When Thornscape Battlemage enters, if it was kicked with its {W} kicker, destroy target
-        enchantment."
       "When Thornscape Battlemage enters, if it was kicked with its {R} kicker, deal 2 damage
-        to target creature."
-      Pay {W} kicker: ETB destroys an enchantment.
-      Pay {R} kicker: ETB deals 2 damage to a creature.
-      Pay both {W} and {R}: both ETBs trigger. Destroy enchantment AND deal 2 damage.
+        to any target."
+      "When Thornscape Battlemage enters, if it was kicked with its {W} kicker, destroy target
+        artifact."
+      Pay {R} kicker: ETB deals 2 damage to any target.
+      Pay {W} kicker: ETB destroys an artifact.
+      Pay both {W} and {R}: both ETBs trigger. Destroy artifact AND deal 2 damage.
       Base cost: {2}{G}. Full cost with both kickers: {2}{G}{W}{R} = 5 mana.
   KICKER TARGETS (702.33g):
     If the kicked effect includes targets: targets are chosen only if the spell WAS kicked.

@@ -32,8 +32,8 @@ REANIMATION (SPELLS AND ABILITIES):
     Reanimate ({B}): "Put target creature card from a graveyard onto the battlefield under your control.
       You lose life equal to its mana value."
     Animate Dead ({1}{B}): enchantment that brings back a creature from any GY.
-    Unburial Rites ({4}{W}): "Return target creature card from your GY to the battlefield.
-      Flashback {2}{B}."
+    Unburial Rites ({4}{B}): "Return target creature card from your GY to the battlefield.
+      Flashback {3}{W}."
     Necromancy ({2}{B}): similar to Animate Dead; brings back a creature from any GY.
   REANIMATION TARGETS:
     Any creature card in ANY graveyard (yours or opponent's).
@@ -121,8 +121,8 @@ MADNESS (CR 702.35a):
   MADNESS EXAMPLES:
     Fiery Temper ({2}{R}, Madness {R}): when discarded (e.g., via Faithless Looting), cast for {R}.
       {R} Shock-equivalent (3 damage to any target). Free discount from the discard.
-    Archfiend of Ifnir ({3}{B}{B}, Madness {4}{B}): when discarded, cast for {4}{B}.
-      Powerful in cycling/discard decks.
+    Archfiend of Ifnir ({3}{B}{B}, Cycling {2}): 5/4 Flying. Does NOT have Madness.
+      Has a triggered ability: "Whenever you cycle or discard another card, put a -1/-1 counter on each creature your opponents control." Strong in cycling/discard decks but is not itself a madness card.
     Circular Logic ({2}{U}, Madness {U}): counterspell for {U} when discarded.
   DISCARD OUTLETS FOR MADNESS:
     Any "discard a card" effect is a madness outlet.

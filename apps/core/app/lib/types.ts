@@ -62,6 +62,35 @@ export interface CreateDeckCardInput {
   is_proxy?: boolean;
 }
 
+// Card Lists (standalone, no commander restriction)
+export interface CardList {
+  id: number;
+  name: string;
+  description: string | null;
+  card_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CardListDetail extends CardList {
+  cards: ListCard[];
+}
+
+export interface ListCard {
+  id?: number;
+  list_id: number;
+  scryfall_id: string | null;
+  card_name: string;
+  quantity: number;
+  is_commander: number;
+  is_proxy: number;
+  image_uri?: string | null;
+  colors?: string;
+  color_identity?: string;
+  type_line?: string | null;
+  mana_cost?: string | null;
+}
+
 export interface CardPrint {
   scryfall_id: string;
   name: string;

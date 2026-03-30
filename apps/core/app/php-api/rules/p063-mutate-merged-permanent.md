@@ -76,6 +76,8 @@ HUMAN RESTRICTION:
 - **If the mutation target leaves before the spell resolves,** the mutating spell enters as a normal creature (ETBs fire).
 - **When a mutated permanent dies,** each component goes to its owner's graveyard — death triggers fire per component.
 - **Target must be non-Human.** Humans are immune to mutation; they can't be targeted by mutate spells.
+- **Brokkos cast from graveyard via its own ability MUST use the mutate cost.** "You may cast this card from your graveyard using its mutate ability" only grants permission to cast it from the graveyard — you still must pay the mutate cost. You cannot choose to pay the regular mana cost instead. (Gatherer ruling 2020-04-17: "If you cast Brokkos with the permission granted by its last ability, you must pay its mutate cost to cast it. You can't choose to pay its mana cost or another alternative cost.")
+- **Nethroi's "return creatures" targets use power as it exists in the graveyard,** not on the battlefield. A 0/0 creature card that will enter as a 15/15 can still be targeted (power is 0 in the graveyard). (Gatherer ruling 2020-04-17)
 
 ## Canonical Example
 **Gemrazer (Mutate {1}{G}) on a Gilded Goose:**

@@ -68,13 +68,13 @@ EMERGE:
   "You may cast this spell by paying [emerge cost] and sacrificing a creature rather than paying mana cost."
 
   EMERGE MATH:
-    Elder Deep-Fiend ({8}): Emerge {5}{U}. 5/6. "When cast, tap up to 4 target permanents."
+    Elder Deep-Fiend ({8}): Emerge {5}{U}{U}. 5/6. Flash. "When cast, tap up to four target permanents."
     Normal cost: {8} generic. Expensive.
-    Emerge {5}{U} + sacrifice a creature worth N mana:
-      Total emerge cost = {5}{U} + sacrifice, then subtract N from {5}.
-      Sacrifice a 3-MV creature: cost = {2}{U} + sacrifice.
-      Sacrifice a 5-MV creature: cost = {0}{U} + sacrifice = {U}.
-      You pay {U} and sacrifice a 5-mana creature to cast an 8-mana Eldrazi!
+    Emerge {5}{U}{U} + sacrifice a creature worth N mana:
+      Total emerge cost = {5}{U}{U} + sacrifice, then subtract N from {5} (generic only).
+      Sacrifice a 3-MV creature: cost = {2}{U}{U} + sacrifice.
+      Sacrifice a 5-MV creature: cost = {0}{U}{U} + sacrifice = {U}{U}.
+      You pay {U}{U} and sacrifice a 5-mana creature to cast an 8-mana Eldrazi!
     In a ramp or token deck: sacrifice a creature you were going to lose anyway.
 
   EMERGE IMPORTANT RULES:
@@ -84,7 +84,7 @@ EMERGE:
     The sacrifice is paid as part of casting — you can't respond to it.
 
   EMERGE NOTABLE CARDS:
-    Elder Deep-Fiend ({8}, emerge {5}{U}): flash. Tap 4 permanents on cast.
+    Elder Deep-Fiend ({8}, emerge {5}{U}{U}): flash. Tap up to 4 permanents on cast.
       In Standard, emerge during opponent's untap step with a token sacrifice:
       Tap their lands during their upkeep (before they untap if you get it at end of their turn? No...
       Actually Flash means cast instant-speed during opponent's turn).
@@ -165,8 +165,8 @@ Turn 4: board has a 2/2 Vessel of Nascency (MV 1) and {U}{U} available.
 Opponent's turn begins. They're tapping mana to cast something.
 Flash trigger: you can cast Elder Deep-Fiend at instant speed (it has Flash).
 Before opponent untaps (end step): cast Elder Deep-Fiend with Emerge.
-Sacrifice Vessel of Nascency (MV 1): Emerge cost {5}{U}, subtract 1 = {4}{U}.
-Pay {4}{U}. Sacrifice Vessel.
+Sacrifice Vessel of Nascency (MV 1): Emerge cost {5}{U}{U}, subtract 1 = {4}{U}{U}.
+Pay {4}{U}{U}. Sacrifice Vessel.
 Cast trigger fires: "Tap up to 4 target permanents."
 Tap opponent's 4 lands. Their spell that needed 4 mana: can't be cast.
 Elder Deep-Fiend (5/6) enters. No summoning sickness (it was cast — wait, yes it has summoning sickness for attacking, but it's there as a blocker).

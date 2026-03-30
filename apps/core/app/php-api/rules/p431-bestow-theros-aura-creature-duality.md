@@ -167,7 +167,7 @@ ANYONE's spells). You can't bestow onto your own shroud creature. But hexproof (
 spells/abilities) doesn't prevent you from targeting your own creature with bestow.
 
 Alternatively: Boon Satyr bestowed targeting your own creature. Opponent responds: Vapor Snag
-({U}: return target creature to its owner's hand; it loses 1 life) targeting YOUR creature.
+({U}: return target creature to its owner's hand; its controller loses 1 life) targeting YOUR creature.
 Your creature goes to hand. Boon Satyr's target is now illegal (enchant creature requires a
 creature on the battlefield; your creature is in your hand now).
 Boon Satyr begins resolving: 702.103e — target is illegal. Ceases to be bestowed.

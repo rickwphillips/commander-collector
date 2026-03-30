@@ -38,10 +38,10 @@ VOTING (701.38):
     "Will of the Council": MAJORITY wins; ties may have specific tie-breaking text (or do both).
     "Council's Dilemma": each vote independently contributes to a running total (no majority needed).
       The spell does something for each vote of each type.
-      Example: "Council's dilemma — Starting with you, each player votes for time or adventure.
-        Each time player votes for time, take an extra turn.
-        Each time player votes for adventure, you put target land onto battlefield from any graveyard."
-        (Expropriate): 4 votes → 3 for adventure, 1 for time: take 1 extra turn, 3 lands.
+      Example: Expropriate ({7}{U}{U}): "Council's dilemma — Starting with you, each player votes for time or money.
+        For each time vote, take an extra turn after this one.
+        For each money vote, choose a permanent owned by the voter and gain control of it. Exile Expropriate."
+        4 votes → 3 for money, 1 for time: take 1 extra turn, gain control of 3 permanents.
   VOTING IS PUBLIC:
     No rule makes voting secret by default.
     Players announce their vote openly (starting player votes first, others can see their votes).

@@ -9,6 +9,14 @@ export interface GameContextPlayer {
 
 export interface ActiveGameContext {
   players: GameContextPlayer[];
+  _timerNote?: string;
+  _liveTimer?: {
+    timerSeconds: number;
+    elapsedSeconds: number;
+    remaining: number;
+    currentPlayer: string | null;
+    turnNumber: number | null;
+  };
 }
 
 export interface RulesPattern {

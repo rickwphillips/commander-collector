@@ -129,7 +129,7 @@ You control Elder Deep-Fiend in your hand and on the battlefield: Boon Satyr ({1
 
 Your battlefield: Elvish Mystic enchanted with Boon Satyr (Elvish Mystic gets +4/+2; Boon Satyr on battlefield as an Aura, NOT as a creature).
 
-You want to cast Elder Deep-Fiend ({8}: 5/6; flash; emerge {5}{U}). Emerge: sacrifice a creature.
+You want to cast Elder Deep-Fiend ({8}: 5/6; flash; emerge {5}{U}{U}). Emerge: sacrifice a creature.
 Can you sacrifice Boon Satyr to emerge Elder Deep-Fiend? Boon Satyr while bestowed = Aura enchantment.
 No. Boon Satyr is not a creature while bestowed. You cannot sacrifice it for emerge.
 

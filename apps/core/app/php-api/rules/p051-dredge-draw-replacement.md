@@ -71,6 +71,9 @@ WHAT DREDGE DOESN'T DO:
 - **Dredge doesn't trigger "when you draw a card" abilities.** The draw was replaced, not executed.
 - **Chaining dredge is possible.** Each draw in a turn can trigger a new dredge choice if a dredge card is in the graveyard.
 - **Dredge cards returned to hand have not been cast.** Still need to be played normally.
+- **"Puts a card into your hand" ≠ draw — dredge can't replace it.** Dredge only replaces events that specifically use the word "draw." Effects that put cards into your hand (e.g., tutors, topdeck-to-hand effects) don't trigger dredge. (Gatherer ruling 2024-01-12: "If an effect puts a card into your hand without specifically using the word 'draw,' you're not drawing a card. Dredge can't replace this event.")
+- **One draw cannot be replaced by multiple dredge abilities simultaneously.** Even if two dredge cards are in your graveyard, one draw = one dredge choice. (Gatherer ruling 2024-01-12)
+- **Dredge resolution is atomic once announced.** Once you announce you're using dredge, no player can take any actions until the dredge card is in your hand and the milled cards are in your graveyard. (Gatherer ruling 2024-01-12)
 
 ## Canonical Example
 **Golgari Grave-Troll (Dredge 6):**

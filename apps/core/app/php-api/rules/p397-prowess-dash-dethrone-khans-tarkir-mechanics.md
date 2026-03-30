@@ -101,9 +101,8 @@ DASH (702.109):
       power 2 or greater"):
       Dash {1}{R}: enters with haste. Attacks for 2 damage. Returns to hand.
       Next turn: dash again. Persistent 2 damage each turn for {1}{R}.
-    Dragon-style creatures: Thunderbreak Regent ({2}{R}{R}: 4/4 Flying, dash {3}{R}{R}):
-      Pay {3}{R}{R}: 4/4 flying with haste. Attacks for 4 in the air. Returns to hand.
-      Much cheaper than casting it normally, but you lose it at end of step.
+    Note: Thunderbreak Regent ({2}{R}{R}: 4/4 Flying) does NOT have dash — it's a Dragon with
+      a punishment ETB for targeting Dragons. Don't confuse it with dash creatures.
   DASH AND REMOVAL:
     If a dashed creature is destroyed before the end step: it dies (goes to GY).
     The delayed trigger "return to hand at end step" still fires when the end step begins.
@@ -134,7 +133,7 @@ DETHRONE (702.105):
     Most powerful in Commander (4 players, starting 40 life).
     Early game: you typically don't have the most life. You attack whoever does.
     The idea: reward aggression against the player who is "winning" (has the most life).
-    Marchesa, the Black Rose ({1}{U}{B}: 3/3, Dethrone, "whenever you or another creature you control
+    Marchesa, the Black Rose ({1}{U}{B}{R}: 3/3, Dethrone, "whenever you or another creature you control
       attacks and deals combat damage to a player, if that creature has a +1/+1 counter on it,
       return it from GY to battlefield under your control at the beginning of EOT"):
     Marchesa gets counters from dethrone. Any creature she helps die (that has a counter) returns.

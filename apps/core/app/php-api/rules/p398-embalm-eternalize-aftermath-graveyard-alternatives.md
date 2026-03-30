@@ -33,7 +33,7 @@ EMBALM (702.128):
       - It has no mana cost (the mana cost line is removed/replaced with none).
       - It's a Zombie in addition to its other types.
     "In addition to" — it keeps its original creature types, just also becomes Zombie.
-    Example: Sacred Cat ({W}: 1/1 Cat with lifelink, embalm {2}{W}):
+    Example: Sacred Cat ({W}: 1/1 Cat with lifelink, embalm {W}):
       Embalm creates a 1/1 white Cat Zombie token with lifelink and no mana cost.
       The embalmed token has all of Sacred Cat's original abilities (lifelink).
   MANA COST AND MANA VALUE:
@@ -69,9 +69,8 @@ ETERNALIZE (702.129):
       Eternalize creates a 4/4 black Zombie Jackal Warrior token with haste.
       Still has haste (it's a copy of Earthshaker Khenra, which has haste).
       Still has its attack trigger (if any).
-    Example: Honored Hydra ({4}{G}: 6/6 trample, eternalize {3}{G}):
-      Eternalize creates a 4/4 black Zombie Serpent token with trample.
-      Note: Honored Hydra's normal size is 6/6, but the eternalize token is always 4/4.
+    Note: Honored Hydra ({5}{G}: 6/6 trample) has EMBALM {3}{G} (not eternalize) — it creates
+      a white Zombie Snake Hydra token that's 6/6 with trample (same P/T as original).
   WHY 4/4?
     Eternalize creatures are typically stronger original cards. Making the token 4/4 standardizes
       the eternalize token's P/T. You trade the original card's P/T for a fixed 4/4 with its abilities.
@@ -105,7 +104,7 @@ AFTERMATH (702.127):
       Cut (top half): Sorcery, "Target player sacrifices a creature. If you control a black permanent,
         put a -1/-1 counter on each creature that player controls instead."
         Wait, the actual text might differ. Let me use the correct text:
-        "Cut" ({2}{R}): Deal 4 damage to target creature. (Instant half, front.)
+        "Cut" ({1}{R}): Deal 4 damage to target creature. (Instant half, front.)
       Ribbons (aftermath, {X}{B}{B}): "Each opponent loses X life."
       How to use: Cast Cut to deal 4 to a creature on opponent's turn (flash/main phase).
         Cut resolves, goes to GY.
@@ -153,11 +152,11 @@ Key interactions:
   Eternalize creates a token, not casting a creature card. Grafdigger's Cage doesn't stop it.
 
 **Example 2 — Cut // Ribbons Split Card:**
-Cut // Ribbons (Cut: {X}{R}, instant, "Cut deals X damage to target creature"; Ribbons: aftermath {X}{B}{B}, "each opponent loses X life"):
+Cut // Ribbons (Cut: {1}{R}, instant, "Cut deals 4 damage to target creature"; Ribbons: aftermath {X}{B}{B}, "each opponent loses X life"):
 
 You're in a Commander game. Opponents are at 28, 25, 20 life.
 
-Turn 3: Cast Cut for X=4 ({4}{R}). Kill an opponent's 4/4. Cut resolves, goes to your GY.
+Turn 3: Cast Cut ({1}{R}). Kill an opponent's 4-toughness creature (4 damage). Cut resolves, goes to your GY.
 
 Turn 6: You have {7}{B}{B} available. Opponent at 28 life is the winning player.
 Cast Ribbons from your GY for X=7 ({7}{B}{B}).

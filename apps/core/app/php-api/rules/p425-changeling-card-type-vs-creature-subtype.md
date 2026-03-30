@@ -98,7 +98,7 @@ MODULAR + CHANGELING — THE KEY RULING:
        Mycosynth Lattice ({6}: artifact; "all permanents are artifacts"): all permanents including
          your Changeling become artifacts. Now the Changeling IS an artifact creature. Modular can
          target it.
-       Liquimetal Torque ({2}: artifact, {2}{T}: "target permanent becomes an artifact until EOT"):
+       Liquimetal Torque ({2}: artifact, {T}: "target nonland permanent becomes an artifact in addition to its other types until end of turn"):
          target your Changeling with Liquimetal Torque. Changeling temporarily becomes an artifact.
          During that turn, it's a legal Modular target.
     3. The "artifact creature" effect doesn't target artifacts specifically but targets creatures:
@@ -154,7 +154,7 @@ You control Arcbound Ravager (Artifact Creature — Beast; Modular 1; sacrifice 
 Ravager dies. Modular trigger fires: "put 5 +1/+1 counters on target artifact creature."
 
 You look at your battlefield. You control:
-- Avian Changeling ({3}{W}: Creature — Shapeshifter; 3/3 flying; Changeling): NOT an artifact.
+- Avian Changeling ({2}{W}: Creature — Shapeshifter; 2/2 flying; Changeling): NOT an artifact.
   Avian Changeling is a creature (Creature card type). Changeling makes it every creature subtype
   including Construct, Golem, and Myr. But it is NOT an artifact (no Artifact card type).
   Cannot be targeted by Modular's trigger.
@@ -166,7 +166,7 @@ Conclusion: Modular transfers 5 counters to Ornithopter. Avian Changeling receiv
 If Mycosynth Lattice were in play ("all permanents are artifacts"):
 Avian Changeling BECOMES an artifact (gains Artifact card type from Lattice's effect).
 Now Avian Changeling is an "artifact creature." Legal Modular target.
-Modular transfers 5 counters to Avian Changeling (now a 8/8 flying artifact creature).
+Modular transfers 5 counters to Avian Changeling (now a 7/7 flying artifact creature).
 
 **Example 2 — Protection from Artifacts vs. Changeling:**
 Your creature has "protection from artifacts" (e.g., via Sword of Hearth and Home's other sword giving protection). A Changeling (non-artifact) attacks you. Can it deal damage to your protected creature?

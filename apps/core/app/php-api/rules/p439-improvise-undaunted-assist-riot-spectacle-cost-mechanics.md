@@ -62,8 +62,9 @@ IMPROVISE (702.126):
 
   INSPIRING STATUARY + ALL SPELLS:
     Inspiring Statuary ({3}: "nonartifact spells you cast have improvise"):
-    Extends improvise to ALL noncreature spells. Any nonartifact spell you cast can use
-    your artifacts to reduce its generic mana. This effect stacks with existing improvise.
+    Extends improvise to ALL nonartifact spells — including non-artifact creatures. Any nonartifact
+    spell you cast (creature or not) can use your artifacts to reduce its generic mana.
+    This effect stacks with existing improvise.
 
   NON-ARTIFACT CREATURES FOR IMPROVISE:
     Improvise specifically requires tapping "an untapped ARTIFACT you control."

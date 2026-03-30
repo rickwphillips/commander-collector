@@ -88,6 +88,8 @@ CASCADE:
 - **X costs are 0 when cast for free** via cascade.
 - **Casting the found card is still "casting"** — triggers cascade, storm, etc.
 - **Multiple cascade instances trigger separately** — Maelstrom Wanderer gets two free casts.
+- **2021 rules change: the CAST spell's MV must also be lower**, not just the exiled card's MV. Before this change, cascade could be exploited with modal double-faced cards (MDFCs) or Adventure cards whose exiled MV was low but the spell face had higher MV. Now both checks must pass: the exiled card's MV must be less AND the spell you cast from it must also have MV less than the cascading spell. (Gatherer ruling 2021-06-18)
+- **Split cards: cascade checks both halves combined.** The mana value of a split card is its two halves combined, but if cascade lets you cast a split card, you may cast either half (not both). (Gatherer ruling 2021-06-18)
 
 ## Canonical Example
 **Bloodbraid Elf (Cascade — CMC 4):**

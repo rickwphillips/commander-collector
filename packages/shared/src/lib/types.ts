@@ -567,3 +567,16 @@ export interface CreateGameInput {
   game_type: GameType;
   results: GameResultInput[];
 }
+
+export interface GameManagerPrefill {
+  playedAt: string;
+  results: Array<{
+    playerId: number;
+    deckId: number;
+    finishPosition: number | '';
+    eliminatedTurn: number | '';
+  }>;
+}
+
+export const GAME_MANAGER_PREFILL_KEY = 'commander_game_prefill';
+

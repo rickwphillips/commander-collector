@@ -43,7 +43,7 @@ COMPANION SETUP (103.2b, 702.139a):
       has mana value 2 or less."
       Your entire deck (every permanent card): each must have mana value ≤ 2.
       Spells/instants/sorceries: check their mana value. Creatures/artifacts/enchantments: same.
-    Yorion, Sky Nomad ({3}{W}{U}): "Companion — Your starting deck contains at least 20 cards more
+    Yorion, Sky Nomad ({3}{W/U}{W/U}): "Companion — Your starting deck contains at least 20 cards more
       than the minimum deck size."
       Standard minimum: 60 cards. So your deck must have at least 80 cards.
       Commander minimum: 100 cards. So your commander deck must have at least 120 cards.

@@ -92,8 +92,8 @@ COUNTER CHECK ON THE MERGED PERMANENT:
   Persist condition: "if it had no -1/-1 counters."
   The merged permanent is ONE permanent. Counter checks apply to the WHOLE permanent.
   Example:
-    Top card: Vorapede (5/4 trample persist; no counters)
-    Bottom card: Kitchen Finks (3/2 "when Kitchen Finks enters, gain 3 life"; persist)
+    Top card: Vorapede (5/4 vigilance trample undying; no counters)
+    Bottom card: Kitchen Finks (3/2 "when Kitchen Finks enters, gain 2 life"; persist)
     The merged permanent: 5/4 trample (topmost), all abilities from both.
     Counters: whatever the merged permanent has accumulated.
   If the merged permanent was returned by its own persist once already:
@@ -130,7 +130,7 @@ PERSIST/UNDYING RETURNED CARD RE-ENTERING:
   The card with persist returns "to the battlefield under its owner's control."
   It's a standalone creature now (not merged).
   Its ETBs fire normally. (It's a fresh ETB — the returned card enters the battlefield.)
-  Kitchen Finks ETB: "when Kitchen Finks enters, gain 3 life." Fires. Gain 3 life.
+  Kitchen Finks ETB: "when Kitchen Finks enters, gain 2 life." Fires. Gain 2 life.
   If you want to rebuild the mutate pile: cast a new mutate spell targeting the returned card.
 ```
 
@@ -144,9 +144,9 @@ PERSIST/UNDYING RETURNED CARD RE-ENTERING:
 
 ## Canonical Example
 **Glen-Elendra Archmage Mutate Pile:**
-Glen-Elendra Archmage ({3}{U}: 2/2 faerie wizard, persist, "sacrifice Glen-Elendra Archmage: counter target noncreature spell"):
+Glen-Elendra Archmage ({3}{U}: 2/2 faerie wizard, persist, "{U}, sacrifice Glen-Elendra Archmage: counter target noncreature spell"):
 
-You mutate Illuna, Apex of Wishes ({3}{R}{G}{U}: 6/6 flying trample, mutate {2}{R}{G}{U}, "when this creature mutates, exile cards until you hit a nonland permanent, put it in play") onto Glen-Elendra Archmage.
+You mutate Illuna, Apex of Wishes ({2}{G}{U}{R}: 6/6 flying trample, mutate {3}{R/G}{U}{U}, "when this creature mutates, exile cards until you hit a nonland permanent, put it in play") onto Glen-Elendra Archmage.
 
 Merged pile: Illuna (top) + Glen-Elendra (bottom).
 Characteristics: 6/6 flying trample (Illuna), with all Glen-Elendra abilities INCLUDING persist AND the sacrifice-to-counter ability.
@@ -172,7 +172,7 @@ If Glen-Elendra is sacrificed (to counter a spell): it goes to GY. Persist fires
 To rebuild the pile: cast Illuna again (or another mutate creature) targeting Glen-Elendra.
 
 **Example 2 — Kitchen Finks + Vorapede Pile Counter Interaction:**
-Kitchen Finks ({1}{G/W}{G/W}: 3/2, persist, "when Kitchen Finks enters, gain 3 life"):
+Kitchen Finks ({1}{G/W}{G/W}: 3/2, persist, "when Kitchen Finks enters, gain 2 life"):
 You control Kitchen Finks. It died once: returned from persist with -1/-1 counter: now 2/1.
 
 You want to build a mutate pile. Cast Migratory Greathorn ({2}{G}: 3/4; mutate {1}{G}; "when this creature mutates, search for basic land, put in play tapped").
@@ -192,7 +192,7 @@ Persist DOES NOT trigger. Both Greathorn and Kitchen Finks go to GY and stay the
 LESSON: If you mutate onto a Kitchen Finks that already returned once, you lose the persist recursion forever (unless a separate effect removes the -1/-1 counter before death).
 
 Correct play: build the pile on a FRESH Kitchen Finks (no -1/-1 counter).
-Then the merged permanent has no -1/-1 counters → persist works → Kitchen Finks returns on death → enter the battlefield alone → gain 3 life → rebuild pile next turn.
+Then the merged permanent has no -1/-1 counters → persist works → Kitchen Finks returns on death → enter the battlefield alone → gain 2 life → rebuild pile next turn.
 
 ## Commonly Confused With
 - **P403 (Mutate)** — P403 establishes that merged permanents have all abilities from all cards and die as one event. P412 zooms into the specific persist/undying interaction that makes the "return it" wording non-obvious.

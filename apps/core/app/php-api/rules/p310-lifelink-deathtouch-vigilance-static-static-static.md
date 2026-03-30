@@ -138,9 +138,10 @@ VIGILANCE:
 LIFELINK + DEATHTOUCH + VIGILANCE TOGETHER:
   Vampire Nighthawk: Flying, Deathtouch, Lifelink. Missing Vigilance but strong without it.
   Serra's Emissary ({4}{W}{W}{W}): Flying, Lifelink, Vigilance. Plus immunity ability.
-  Lyra Dawnbringer ({3}{W}{W}): 5/5 Flying, First Strike, Lifelink, Vigilance.
-    Attacks → doesn't tap → has first strike + lifelink → gains 5 life + stays untapped.
-    Classic finisher: difficult to attack into (first strike), blocks reliably next turn (vigilance), lifelink races.
+  Lyra Dawnbringer ({3}{W}{W}): 5/5 Flying, First Strike, Lifelink. (No vigilance.)
+    "Other Angels you control get +1/+1 and have lifelink."
+    Attacks → first strike kills blockers in step 1, lifelink gains 5 life, taps to attack.
+    Classic finisher: difficult to attack into (first strike), lifelink races quickly.
 ```
 
 ## Definitive Conclusions
@@ -167,10 +168,10 @@ Opponent attacks with 6/6 Wurm:
 Vampire Nighthawk: efficiently kills large creatures (deathtouch), provides life advantage (lifelink), attacks freely (flying).
 
 **Example 2 — Lyra Dawnbringer Racing:**
-Board: Lyra Dawnbringer (5/5 Flying, First Strike, Lifelink, Vigilance). Life total: 10.
+Note: Lyra does NOT have Vigilance (she taps to attack). This example focuses on First Strike + Lifelink.
+Board: Lyra Dawnbringer (5/5 Flying, First Strike, Lifelink). Life total: 10.
 Opponent has: 5/5 Flying creature. Life total: 10.
-Your turn: attack with Lyra.
-Lyra doesn't tap (vigilance). First strike: deals damage in step 1.
+Your turn: attack with Lyra (she taps). First strike: deals damage in step 1.
 Opponent blocks with their 5/5 Flying.
 Step 1: Lyra (first strike) deals 5 to 5/5 → 5/5 dies. SBAs. Lifelink: gain 5. You're at 15.
 Step 2: no blocker remaining. Lyra deals 5 to player. Wait: Lyra is blocked but blocker died.
@@ -181,10 +182,8 @@ Wait, actually: "The rules for... 702.7b" says creatures that dealt damage in fi
 So Lyra with just first strike (no double strike): deals damage in step 1. Nothing in step 2.
 Lifelink from step 1: gain 5 (damage to the 5/5). You go from 10 to 15.
 Opponent's turn: their 5/5 Flying is dead. They must attack with something else.
-Lyra stays untapped (vigilance): can block!
-Their 3/3 attacks: Lyra blocks, kills it via first strike + 5 power (3/3 can't survive).
-Lifelink: more life gain.
-Lyra is a complete defensive + offensive powerhouse: attacks safely, stays back as a blocker.
+Lyra is tapped from attacking. Opponent attacks with something next turn; Lyra can't block until untapped.
+Lyra is a powerful offensive finisher: first strike kills blockers safely, lifelink turns a race around quickly.
 
 ## Commonly Confused With
 - **P309 (First Strike/Double Strike)** — Deathtouch + first strike creates a powerful combination covered in both patterns; P309 focuses on the damage step mechanics, P310 focuses on the deathtouch and lifelink interactions.

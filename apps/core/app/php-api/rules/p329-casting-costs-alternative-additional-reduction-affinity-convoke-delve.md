@@ -83,7 +83,7 @@ ADDITIONAL COSTS (CR 118.8):
 COST REDUCTION:
   Effects that reduce the cost to cast spells.
   Applied AFTER alternative/additional costs are added.
-  Goblin Electromancer ({1}{U/R}): instants and sorceries cost {1} less.
+  Goblin Electromancer ({U}{R}): instants and sorceries cost {1} less.
   Helm of Awakening ({2}: artifact): "Spells cost {1} less to cast." (All spells, not just yours.)
   Multiple reductions: apply in any order (player chooses). Result is the same.
   REDUCTION FLOOR: mana component can't go below {0}. Non-mana costs still apply.

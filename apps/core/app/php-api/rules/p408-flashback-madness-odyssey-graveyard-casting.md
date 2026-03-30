@@ -94,7 +94,7 @@ MADNESS (702.35):
   DISCARD OUTLETS AND MADNESS:
     Madness requires a way to discard cards. "Discard outlets" are key.
     Loot effects: "draw a card, then discard a card" — yes, this triggers madness.
-    Faithless Looting ({R}: "draw 2 cards, then discard 2 cards; flashback {1}{R}"):
+    Faithless Looting ({R}: "draw 2 cards, then discard 2 cards; flashback {2}{R}"):
       Cast Faithless Looting. Draw 2, then discard 2.
       Discard Fiery Temper (madness {R}) and Arrogant Wurm (4/4 trampler, madness {2}{G}):
       Fiery Temper exiled → madness trigger: cast for {R} → 3 damage to any target.

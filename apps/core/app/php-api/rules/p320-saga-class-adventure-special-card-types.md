@@ -91,10 +91,11 @@ HOW THEY WORK:
   Classes DON'T sacrifice themselves automatically. They stay until removed.
   Classes don't use lore counters or chapter abilities.
 
-  RANGER CLASS ({1}{G}{G}):
-    Level 1 (free on entry): "Creatures you control can't be countered."
-    Level 2 ({3}{G}{G}): "Whenever a land enters under your control, put a +1/+1 counter on each creature you control."
-    Level 3 ({5}{G}{G}{G}): "Whenever a creature enters under your control, put a +1/+1 counter on it and it gets +1/+1 until end of turn."
+  RANGER CLASS ({1}{G}):
+    ETB + Level 1: "When this Class enters, create a 2/2 green Wolf creature token."
+    Level 2 ({1}{G}): "Whenever you attack, put a +1/+1 counter on target attacking creature."
+    Level 3 ({3}{G}): "You may look at the top card of your library any time.
+      You may cast creature spells from the top of your library."
   Abilities are cumulative: at level 3, you have all three effects.
 
   CLASS LEVEL ACTIVATION:
@@ -119,7 +120,7 @@ HOW THEY WORK:
     Now you can cast the creature side: your main phase only (creature = sorcery speed).
     The card remains exiled until cast as creature or until something removes it.
 
-  BRAZEN BORROWER ({1}{U}{U}, creature: 3/1 Flying, "can't block")):
+  BRAZEN BORROWER ({1}{U}{U}, creature: 3/1 Flying, "can block only creatures with flying")):
     Adventure: Petty Theft ({1}{U}): "Return target nonland permanent an opponent controls to its owner's hand."
     Turn 2: cast Petty Theft for {1}{U}. Bounce opponent's 3/3. Card exiles.
     Turn 3: cast Brazen Borrower from exile for {1}{U}{U}. 3/1 Flying enters.

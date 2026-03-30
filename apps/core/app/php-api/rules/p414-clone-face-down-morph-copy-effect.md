@@ -77,7 +77,7 @@ IF THE REAL MORPH TURNS FACE UP AFTER CLONE:
   The Clone already copied the face-down characteristics. 707.2b: "Once an object has
     been copied, changing the copiable values of the original object won't cause the
     copy to change."
-  Original morph turns face up: original becomes Grinning Demon (a 7/7).
+  Original morph turns face up: original becomes Grinning Demon (a 6/6).
   The Clone is still a 2/2 colorless with no abilities.
   The Clone does NOT update to match the face-up real card.
   The copy locked in the face-down characteristics at the moment of copying.
@@ -109,7 +109,7 @@ PRACTICAL CLONING STRATEGIES:
   Clone the FACE-UP morph (after it's flipped): gets real characteristics + morph.
     The clone has morph! Can cast from face-up state.
     Wait — Clone enters as a copy of the current creature. If the real morph is face-up
-    as Grinning Demon (7/7), Clone entering as a copy = 7/7 Grinning Demon WITH morph.
+    as Grinning Demon (6/6), Clone entering as a copy = 6/6 Grinning Demon WITH morph.
     The Clone (now face-up Grinning Demon) has morph {2}{B}{B} as an ability.
     But Clone doesn't enter face-down (it entered normally). To use morph from hand:
     the Clone would need to be in hand, which it isn't. On the battlefield: no.
@@ -131,7 +131,7 @@ PRACTICAL CLONING STRATEGIES:
 
 ## Canonical Example
 **Clone + Face-Down Grinning Demon (CR's own example):**
-Opponent controls Grinning Demon ({2}{B}{B}: 7/7; morph {2}{B}{B}) cast face-down as a 2/2.
+Opponent controls Grinning Demon ({2}{B}{B}: 6/6; morph {2}{B}{B}) cast face-down as a 2/2.
 
 You play Clone ({3}{U}: "You may have this creature enter as a copy of any creature on the battlefield").
 
@@ -141,7 +141,7 @@ CR 707.2 Example applies directly: "The Clone is a colorless 2/2 creature with n
 Your Clone is a 2/2 colorless with nothing. You gain nothing useful.
 
 Later: Opponent turns their Grinning Demon face up (pays {2}{B}{B}).
-Now they have a real 7/7 Grinning Demon on the battlefield.
+Now they have a real 6/6 Grinning Demon on the battlefield.
 Your Clone is still a 2/2 colorless blank — it does NOT update to match the now-face-up Demon.
 (CR 707.2b: "Once an object has been copied, changing the copiable values of the original object won't cause the copy to change.")
 
@@ -159,7 +159,7 @@ The Doppelganger is now a 2/2 colorless blob.
 
 Actually, the useful play: target the face-down morph AFTER you've revealed it (turned it face up).
 Or: use the upkeep ability to RETARGET to a different creature once your morph reveals itself.
-Example: You flip your Rattleclaw Mystic (2/1; morph {1}{G}; "when turned face up, add {R}{G}{W}") on your opponent's upkeep as a trick. On YOUR upkeep, Vesuvan Doppelganger can now copy the face-up Rattleclaw Mystic's characteristics (2/1 with its mana ability).
+Example: You flip your Rattleclaw Mystic (2/1; morph {2}; "when turned face up, add {G}{U}{R}") on your opponent's upkeep as a trick. On YOUR upkeep, Vesuvan Doppelganger can now copy the face-up Rattleclaw Mystic's characteristics (2/1 with its mana ability).
 
 This is the correct play for Doppelganger + morph: flip the morph first, then copy it.
 Copying face-down = wasted copy; copying face-up = real value.

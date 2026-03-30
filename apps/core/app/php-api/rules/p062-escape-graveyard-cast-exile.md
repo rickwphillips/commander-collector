@@ -70,6 +70,9 @@ ESCAPE FROM GRAVEYARD ONLY:
 - **"Escapes with counters" applies only to escape casts.** Reanimation doesn't grant escape counters.
 - **If escape spell is countered:** the spell goes to the graveyard (can escape again).
 - **Escape cost often requires exiling other graveyard cards** as part of the cost payment.
+- **Non-permanent escape spells return to the graveyard after resolving.** An instant or sorcery cast with escape goes to the graveyard when it resolves (it can escape again later). Permanent escape spells enter the battlefield; if they die they go to graveyard. (Gatherer ruling 2020-01-24)
+- **Reanimating a creature bypasses "escaped" status.** "Escaped" means specifically cast from the graveyard using an escape ability. Reanimation and other non-cast methods do not count as "escaped," so abilities like Uro's "sacrifice unless it escaped" still trigger. (Gatherer ruling 2020-01-24)
+- **Multiple graveyard-cast permissions (escape + flashback): choose one.** You decide which applies; the others are ignored. (Gatherer ruling 2020-01-24)
 
 ## Canonical Example
 **Escape to the Wilds (escape {3}{G}{R}, exile five other cards from your graveyard):**

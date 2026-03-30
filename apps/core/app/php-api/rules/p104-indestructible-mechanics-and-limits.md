@@ -65,6 +65,8 @@ REGENERATION AND INDESTRUCTIBLE:
 - **Exile bypasses indestructible.** So does sacrifice, bounce, and toughness-reduction to 0.
 - **Deathtouch cannot kill indestructible creatures.** Deathtouch works by making any damage lethal; lethal damage is ignored.
 - **-X/-X reducing toughness to ≤ 0 kills indestructible creatures** via SBA 704.5f (not 704.5g).
+- **Lethal damage is marked on an indestructible creature and persists.** If the creature later loses indestructibility (e.g., its Indestructibility Aura is destroyed) while that marked damage is still present, SBA 704.5g fires immediately and the creature is destroyed. Indestructible is checked at SBA time, not at damage time. (Gatherer ruling 2013-07-01: "If a creature enchanted by Indestructibility is dealt lethal damage, the creature isn't destroyed, but the damage remains marked on the creature. If Indestructibility stops enchanting that creature later in the turn, the creature will no longer have indestructible and will be destroyed.")
+- **Simultaneously destroying an Indestructibility Aura and its enchanted creature: only the Aura is destroyed.** The enchanted creature cannot be destroyed because it has indestructible at the time of the "destroy all" effect. The Aura (which does NOT have indestructible itself) is destroyed. (Gatherer ruling 2009-10-01 on Indestructibility)
 
 ## Canonical Example
 **Darksteel Colossus (Indestructible):**

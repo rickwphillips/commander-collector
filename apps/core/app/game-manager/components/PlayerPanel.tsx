@@ -5,6 +5,7 @@ import { usePoisonSound } from '@/game-manager/hooks/usePoisonSound';
 import { useSounds } from '@/game-manager/hooks/useSounds';
 import { keyframes } from '@emotion/react';
 import { Box, Stack, Typography, IconButton, Button, TextField, Tooltip, SvgIcon } from '@mui/material';
+import { ControlFocusModal } from './ControlFocusModal';
 import { QRCodeSVG } from 'qrcode.react';
 import { ASSET_BASE } from '@/lib/api';
 const CrownIcon = (props: React.ComponentProps<typeof SvgIcon>) => (
@@ -573,6 +574,12 @@ export function PlayerPanel({
   const [damageFlash, setDamageFlash] = useState(0);
   const [lastCmdDmgSourceIdx, setLastCmdDmgSourceIdx] = useState<number | null>(null);
   const [openSnapshotKey, setOpenSnapshotKey] = useState<string | null>(null);
+  type FocusedControl = {
+    type: 'life' | 'poison' | 'energy' | 'experience' | 'commanderTax' | 'commanderDamage';
+    sourceIdx?: number;
+    isPartner?: boolean;
+  } | null;
+  const [focusedControl, setFocusedControl] = useState<FocusedControl>(null);
   const prevLife = useRef(player.life);
   useEffect(() => {
     if (player.life < prevLife.current) {
@@ -2013,7 +2020,7 @@ export function PlayerPanel({
                   <Typography sx={{ fontSize: fsCounterBtn, fontWeight: 700, lineHeight: 1 }}>−</Typography>
                 </IconButton></span>
               </Tooltip>,
-              <Typography key={`${sourceIdx}-val`} sx={{ fontSize: fsCounterValue, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', color: dmg[0] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary' }}>
+              <Typography key={`${sourceIdx}-val`} onClick={() => setFocusedControl({ type: 'commanderDamage', sourceIdx, isPartner: false })} sx={{ fontSize: fsCounterValue, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', cursor: 'pointer', color: dmg[0] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary' }}>
                 {dmg[0]}
               </Typography>,
               <Tooltip key={`${sourceIdx}-inc`} open={lpKey === `${sourceIdx}-inc`} title="+5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
@@ -2032,7 +2039,7 @@ export function PlayerPanel({
                     <Typography sx={{ fontSize: fsCounterBtn, fontWeight: 700, lineHeight: 1 }}>−</Typography>
                   </IconButton></span>
                 </Tooltip>,
-                <Typography key={`${sourceIdx}-pval`} sx={{ fontSize: fsCounterValue, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', color: dmg[1] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary' }}>
+                <Typography key={`${sourceIdx}-pval`} onClick={() => setFocusedControl({ type: 'commanderDamage', sourceIdx, isPartner: true })} sx={{ fontSize: fsCounterValue, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', cursor: 'pointer', color: dmg[1] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary' }}>
                   {dmg[1]}
                 </Typography>,
                 <Tooltip key={`${sourceIdx}-pinc`} open={lpKey === `${sourceIdx}-pinc`} title="+5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
@@ -2217,11 +2224,12 @@ export function PlayerPanel({
                   </Typography>
                 ))
               )}
-              <Typography sx={{
+              <Typography onClick={() => setFocusedControl({ type: 'life' })} sx={{
                 position: 'relative', zIndex: 1,
                 fontWeight: 900,
                 fontSize: remoteMode ? 'clamp(80px, 22dvmax, 260px)' : 'clamp(34px, 10dvh, 112px)',
                 lineHeight: 1,
+                cursor: 'pointer',
                 color: computedLifeColor || ((theme: import('@mui/material').Theme) => theme.palette.primary.main),
                 transition: 'color 0.4s ease, font-size 0.2s ease',
                 ...(damageFlash > 0 && { animation: `${damageFlashAnim} 0.6s ease-out forwards` }),
@@ -2359,13 +2367,92 @@ export function PlayerPanel({
             <Tooltip key={`${label}-dec`} open={lpKey === `${label}-dec`} title="-5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
               <IconButton onClick={guardClick(onDec)} onPointerDown={() => startLongPress(`${label}-dec`, onDec5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: cmdBtnWidth, minHeight: cmdBtnHeight }}><Typography sx={{ fontSize: fsCounterBtn, fontWeight: 700 }}>−</Typography></IconButton>
             </Tooltip>,
-            <Typography key={`${label}-val`} sx={{ fontSize: fsCounterValue, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', color, filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none', ...(label === 'Poison' && value === 9 && { animation: 'poisonPulse 2.5s ease-in-out infinite', '@keyframes poisonPulse': { '0%, 100%': { opacity: 1, transform: 'scale(1)', textShadow: '0 0 8px rgba(0,200,60,0.9), 0 0 20px rgba(0,200,60,0.5)' }, '50%': { opacity: 0.3, transform: 'scale(0.85)', textShadow: '0 0 2px rgba(0,200,60,0.2)' } } }), ...(label === 'Experience' && xpGlow && { textShadow: xpGlow, ...(xpShimmerAnim && { animation: `${xpShimmerAnim} 3s ease-in-out infinite` }) }) }}>{value}</Typography>,
+            <Typography key={`${label}-val`} onClick={() => { const t = { 'Poison': 'poison', 'Energy': 'energy', 'Experience': 'experience', 'Commander Tax': 'commanderTax' }[label] as 'poison' | 'energy' | 'experience' | 'commanderTax' | undefined; if (t) setFocusedControl({ type: t }); }} sx={{ fontSize: fsCounterValue, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', cursor: 'pointer', color, filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none', ...(label === 'Poison' && value === 9 && { animation: 'poisonPulse 2.5s ease-in-out infinite', '@keyframes poisonPulse': { '0%, 100%': { opacity: 1, transform: 'scale(1)', textShadow: '0 0 8px rgba(0,200,60,0.9), 0 0 20px rgba(0,200,60,0.5)' }, '50%': { opacity: 0.3, transform: 'scale(0.85)', textShadow: '0 0 2px rgba(0,200,60,0.2)' } } }), ...(label === 'Experience' && xpGlow && { textShadow: xpGlow, ...(xpShimmerAnim && { animation: `${xpShimmerAnim} 3s ease-in-out infinite` }) }) }}>{value}</Typography>,
             <Tooltip key={`${label}-inc`} open={lpKey === `${label}-inc`} title="+5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
               <IconButton onClick={guardClick(onInc)} onPointerDown={() => startLongPress(`${label}-inc`, onInc5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: cmdBtnWidth, minHeight: cmdBtnHeight }}><Typography sx={{ fontSize: fsCounterBtn, fontWeight: 700 }}>+</Typography></IconButton>
             </Tooltip>,
           ])}
         </Box>
       </Box>
+
+      {/* Focused control modal — enlarged single counter/damage control */}
+      {(() => {
+        if (!focusedControl) return null;
+        const fc = focusedControl;
+        let label = '';
+        let value = 0;
+        let onDec: () => void = () => {};
+        let onInc: () => void = () => {};
+        let onDec5: (() => void) | undefined;
+        let onInc5: (() => void) | undefined;
+        let valueColor: string = 'text.primary';
+        if (fc.type === 'life') {
+          label = 'Life Total';
+          value = player.life;
+          onDec = () => onLifeChange(playerIdx, -1);
+          onInc = () => onLifeChange(playerIdx, 1);
+          onDec5 = () => onLifeChange(playerIdx, -5);
+          onInc5 = () => onLifeChange(playerIdx, 5);
+          valueColor = computedLifeColor || 'primary.main';
+        } else if (fc.type === 'poison') {
+          label = 'Poison';
+          value = player.poison;
+          onDec = () => onPoisonChange(playerIdx, -1);
+          onInc = () => onPoisonChange(playerIdx, 1);
+          onDec5 = () => onPoisonChange(playerIdx, -5);
+          onInc5 = () => onPoisonChange(playerIdx, 5);
+          valueColor = player.poison >= 10 ? 'error.main' : player.poison > 0 ? 'warning.main' : 'text.disabled';
+        } else if (fc.type === 'energy') {
+          label = 'Energy';
+          value = player.energy;
+          onDec = () => onEnergyChange(playerIdx, -1);
+          onInc = () => onEnergyChange(playerIdx, 1);
+          onDec5 = () => onEnergyChange(playerIdx, -5);
+          onInc5 = () => onEnergyChange(playerIdx, 5);
+          valueColor = player.energy > 0 ? 'primary.main' : 'text.disabled';
+        } else if (fc.type === 'experience') {
+          label = 'Experience';
+          value = player.experience;
+          onDec = () => onExperienceChange(playerIdx, -1);
+          onInc = () => onExperienceChange(playerIdx, 1);
+          onDec5 = () => onExperienceChange(playerIdx, -5);
+          onInc5 = () => onExperienceChange(playerIdx, 5);
+          valueColor = player.experience > 0 ? 'primary.main' : 'text.disabled';
+        } else if (fc.type === 'commanderTax') {
+          label = 'Commander Tax';
+          value = player.commanderTax;
+          onDec = () => onCommanderTaxChange(playerIdx, -1);
+          onInc = () => onCommanderTaxChange(playerIdx, 1);
+          onDec5 = () => onCommanderTaxChange(playerIdx, -5);
+          onInc5 = () => onCommanderTaxChange(playerIdx, 5);
+          valueColor = player.commanderTax > 0 ? 'warning.main' : 'text.disabled';
+        } else if (fc.type === 'commanderDamage' && fc.sourceIdx !== undefined) {
+          const src = allPlayers[fc.sourceIdx];
+          const dmg = commanderDamage[playerIdx]?.[fc.sourceIdx] ?? [0, 0];
+          const isPartner = fc.isPartner ?? false;
+          const srcName = isPartner ? (src?.partner?.name ?? 'Partner') : (src?.commander?.name ?? src?.playerName ?? `Player ${fc.sourceIdx + 1}`);
+          label = `CMD Dmg — ${srcName}`;
+          value = isPartner ? dmg[1] : dmg[0];
+          onDec = () => handleCmdDmgChange(playerIdx, fc.sourceIdx!, isPartner, -1);
+          onInc = () => handleCmdDmgChange(playerIdx, fc.sourceIdx!, isPartner, 1);
+          onDec5 = () => handleCmdDmgChange(playerIdx, fc.sourceIdx!, isPartner, -5);
+          onInc5 = () => handleCmdDmgChange(playerIdx, fc.sourceIdx!, isPartner, 5);
+          valueColor = value >= 21 ? 'error.main' : 'text.primary';
+        }
+        return (
+          <ControlFocusModal
+            open
+            onClose={() => setFocusedControl(null)}
+            label={label}
+            value={value}
+            color={valueColor}
+            onDec={onDec}
+            onInc={onInc}
+            onDec5={onDec5}
+            onInc5={onInc5}
+          />
+        );
+      })()}
 
       {/* QR overlay — in-panel, does not take over the board */}
       {seatCode && qrOpen && (

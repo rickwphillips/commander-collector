@@ -3,7 +3,7 @@ id: p434
 name: Emerge, Surge, Awaken, Devoid, and Myriad — Battle for Zendikar/Eldritch Moon Mechanics
 category: costs
 cr_refs: [702.119a, 702.119b, 702.119c, 702.117a, 702.113a, 702.113b, 702.114a, 702.116a, 702.116b]
-tags: [emerge, surge, awaken, devoid, myriad, sacrifice-cost-reduction, team-cast-condition, land-animation, colorless-CDA, token-copy-multiplayer, Eldrazi, Elder-Deep-Fiend, Decimator-of-the-Provinces, Crush-of-Tentacles, Exquisite-Firecraft, Dimensional-Infiltrator, myriad-token-exile-end-of-combat, myriad-combat-damage-triggers, emerge-sacrifice-timing, surge-teammate, awaken-land-becomes-creature, BFZ, SOI, EMN]
+tags: [emerge, surge, awaken, devoid, myriad, sacrifice-cost-reduction, team-cast-condition, land-animation, colorless-CDA, token-copy-multiplayer, Eldrazi, Elder-Deep-Fiend, Decimator-of-the-Provinces, Crush-of-Tentacles, Exquisite-Firecraft, Dimensional-Infiltrator, myriad-token-exile-end-of-combat, myriad-combat-damage-triggers, emerge-sacrifice-timing, surge-teammate, awaken-land-becomes-creature, Hammers-of-Moradin, BFZ, SOI, EMN]
 created: 2026-03-29
 examples_count: 2
 ---
@@ -34,12 +34,12 @@ EMERGE (702.119a, 702.119c):
   ALTERNATIVE COST + COST REDUCTION:
     Pay emerge cost + sacrifice a creature INSTEAD of paying mana cost.
     The generic mana portion of the emerge cost is reduced by the sacrificed creature's MV.
-    Example: Elder Deep-Fiend ({8}: 5/6; flash; emerge {5}{U}):
-      Emerge cost: {5}{U} (6 total). Sacrifice a creature with MV 4.
-      Reduced: {5}{U} - {4} generic = {1}{U}. Pay {1}{U} total.
+    Example: Elder Deep-Fiend ({8}: 5/6; flash; emerge {5}{U}{U}):
+      Emerge cost: {5}{U}{U} (7 total). Sacrifice a creature with MV 4.
+      Reduced: {5}{U}{U} - {4} generic = {1}{U}{U}. Pay {1}{U}{U} total.
       The sacrificed creature's MV reduces the GENERIC portion (colored mana isn't reduced).
-    Elder Deep-Fiend with emerge by sacrificing a MV 5 creature: {5}{U} - {5} = {0}{U} = {U}.
-    Pay only {U}! Enormous value.
+    Elder Deep-Fiend with emerge by sacrificing a MV 5 creature: {5}{U}{U} - {5} = {0}{U}{U} = {U}{U}.
+    Pay only {U}{U}! Enormous value.
 
   TIMING OF SACRIFICE (702.119c):
     "You choose which permanent to sacrifice as you choose to pay the emerge cost (601.2b)"
@@ -205,25 +205,23 @@ MYRIAD (702.116a):
 ## Canonical Example
 **Elder Deep-Fiend emerge flash timing:**
 Opponent casts a 4-mana spell (Collected Company, etc.).
-You have Elder Deep-Fiend ({8}: 5/6; flash; emerge {5}{U}; "when Elder Deep-Fiend enters, tap up to 4 target permanents") in hand and a creature with MV 4 on battlefield.
-Emerge {5}{U} minus sacrificed creature's MV {4} = {1}{U}. You pay {1}{U} total.
+You have Elder Deep-Fiend ({8}: 5/6; flash; emerge {5}{U}{U}; "when you cast this spell, tap up to four target permanents") in hand and a creature with MV 4 on battlefield.
+Emerge {5}{U}{U} minus sacrificed creature's MV {4} = {1}{U}{U}. You pay {1}{U}{U} total.
 Sacrifice the creature as part of paying the emerge cost (601.2h: sacrifice at cost payment step).
 Elder Deep-Fiend enters (flash speed — instant timing). ETB: tap up to 4 permanents.
 Tap opponent's 4 lands (or key creatures + lands). Opponent's Collected Company resolves but
   with lands tapped, they may not be able to do much on their turn.
 
-Persist interaction: you sacrifice Kitchen Finks (MV 3) for emerge. Cost: {5}{U} - {3} = {2}{U}.
+Persist interaction: you sacrifice Kitchen Finks (MV 3) for emerge. Cost: {5}{U}{U} - {3} = {2}{U}{U}.
 Kitchen Finks goes to GY. Persist triggers. Elder Deep-Fiend enters with ETB (tap 4 permanents).
 Kitchen Finks returns with -1/-1 counter. You now have Elder Deep-Fiend + Kitchen Finks.
 
 **Example 2 — Myriad in Commander:**
-Hammers of Bogardan ({2}{R}: 3/2; myriad; "whenever it deals combat damage to a player, it deals 3 damage to another target"). You attack Player A.
-Myriad: create token copies of Hammers attacking Players B and C.
-Token 1 (3/2) attacks Player B. Token 2 (3/2) attacks Player C.
-Combat damage: Hammers deals 3 to Player A; triggers fire for Hammers AND for each token.
-Hammers trigger: deal 3 to any target. Token 1 trigger: deal 3 to any target. Token 2 trigger: deal 3 to any target.
-3 targets: players D, D, D (or other targets). 9 total damage from triggers.
-Plus 9 combat damage across 3 players. Total: 18 damage from one creature's attack.
+Hammers of Moradin ({2}{W}: 3/3; myriad; "whenever this creature attacks, for each opponent, tap up to one target creature that player controls"). You attack Player A.
+Myriad: create token copies of Hammers of Moradin attacking Players B and C.
+Token 1 (3/3) attacks Player B. Token 2 (3/3) attacks Player C.
+Combat damage: Hammers deals 3 to Player A; attack triggers fire for Hammers AND for each token.
+Hammers trigger: tap up to one creature each opponent controls. Each token trigger similarly.
 End of combat: tokens exiled. Hammers stays.
 
 Legendary version warning: if the creature were legendary, myriad tokens would be immediately

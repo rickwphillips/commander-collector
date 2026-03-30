@@ -72,7 +72,7 @@ MUTATE CASTING (702.140a):
   THE MUTATE TRIGGER (702.140d):
     "Whenever a creature mutates" — fires when a spell merges with a creature via mutate.
     This trigger is typically on the mutating creatures themselves.
-    Example: Migratory Greathorn ({2}{G}: 3/4, mutate {1}{G}, "when this creature mutates, search
+    Example: Migratory Greathorn ({3}{G}: 3/4, mutate {2}{G}, "when this creature mutates, search
       your library for a basic land, put it onto the battlefield tapped, shuffle"):
       When any creature in the pile mutates: Migratory Greathorn's ability triggers.
       If Migratory Greathorn is in the pile (anywhere), and another mutate happens on this creature:
@@ -114,7 +114,7 @@ MERGED PERMANENT RULES:
     Important: in Commander, if one component is your commander:
       The commander component can go to the command zone. The other components go to GY/exile as normal.
   ABILITIES FROM BOTTOM CARDS:
-    Brokkos, Apex of Forever ({2}{B}{G}{U}: 6/6 trampler, mutate {3}{B}{G}, "you may cast Brokkos
+    Brokkos, Apex of Forever ({2}{B}{G}{U}: 6/6 trampler, mutate {2}{U/B}{G}{G}, "you may cast Brokkos
       from your GY using its mutate ability"):
       If Brokkos is on the bottom of a pile: it's still in the pile (not in the GY).
       Brokkos's GY ability can't activate because Brokkos is on the battlefield (in the pile).
@@ -139,13 +139,13 @@ MERGED PERMANENT RULES:
 
 ## Canonical Example
 **Gemrazer + Illuna Pile with Mutate Triggers:**
-Gemrazer ({2}{G}: 4/4 reach trample, mutate {1}{G}, "when this creature mutates, destroy target artifact or enchantment"):
-Illuna, Apex of Wishes ({3}{R}{G}{U}: 6/6 flying trample, mutate {2}{R}{G}{U}, "when this creature mutates, exile cards from the top of your library until you exile a nonland permanent, put that card onto the battlefield"):
+Gemrazer ({3}{G}: 4/4 reach trample, mutate {1}{G}{G}, "when this creature mutates, destroy target artifact or enchantment"):
+Illuna, Apex of Wishes ({2}{G}{U}{R}: 6/6 flying trample, mutate {3}{R/G}{U}{U}, "when this creature mutates, exile cards from the top of your library until you exile a nonland permanent, put that card onto the battlefield"):
 
 You control: a 2/2 Human... wait, Human can't be mutated. Use a 2/2 non-Human creature.
 You control: Llanowar Elves ({G}: 1/1 elf, "{T}: Add {G}").
 
-Turn 3: Cast Gemrazer using its mutate cost ({1}{G}). Target: Llanowar Elves (non-Human elf).
+Turn 3: Cast Gemrazer using its mutate cost ({1}{G}{G}). Target: Llanowar Elves (non-Human elf).
 Gemrazer merges with Llanowar Elves. You put Gemrazer on top.
 Merged permanent: topmost = Gemrazer (4/4 reach trample).
 Abilities: Gemrazer's abilities + Llanowar Elves' "{T}: Add {G}".
@@ -154,7 +154,7 @@ Destroy opponent's Sol Ring.
 
 The merged permanent is a 4/4 reach trample elf that also taps for {G}.
 
-Turn 5: Cast Illuna using mutate cost ({2}{R}{G}{U}). Target: the Gemrazer/Elf pile.
+Turn 5: Cast Illuna using mutate cost ({3}{R/G}{U}{U}). Target: the Gemrazer/Elf pile.
 Illuna merges with the pile. You put Illuna on top.
 Stack is now: Illuna (top) / Gemrazer / Llanowar Elves (bottom).
 Characteristics: topmost = Illuna (6/6 flying trample).

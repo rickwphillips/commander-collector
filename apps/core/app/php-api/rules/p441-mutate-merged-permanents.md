@@ -96,7 +96,7 @@ MUTATE (702.140a):
     TOPMOST component determines: name, mana cost, color indicators, card types,
       subtypes, supertypes, P/T (or CDA for P/T), and "other characteristics" (CR 729.2a).
     ALL components contribute their ABILITIES (activated, triggered, static, keyword).
-    Example: Gemrazer ({1}{G}{G}, 4/4, reach, trample; "when this creature mutates,
+    Example: Gemrazer ({3}{G}, 4/4, reach, trample; mutate {1}{G}{G}; "when this creature mutates,
       destroy target artifact or enchantment") mutates on top of a 2/2 Gilded Goose
       ({G}: bird, 0/2; mana ability):
       Merged permanent characteristics: Gemrazer (4/4, reach, trample, green, artifact creature).
@@ -166,7 +166,7 @@ Destroy target artifact or enchantment your opponent controls.
 The merged permanent can attack this turn: 7/5 trample reach.
 
 **Example 2 — Merged permanent dying, individual components separate:**
-You've stacked mutate 3 times: Pouncing Shoreshark (top, 3/3, flash, "when mutates: bounce a creature"), Gemrazer (middle, 4/4, reach, trample), and a base 2/2 Gilded Goose (bottom).
+You've stacked mutate 3 times: Pouncing Shoreshark (top, 4/3, flash, "when mutates: bounce a creature"), Gemrazer (middle, 4/4, reach, trample), and a base 2/2 Gilded Goose (bottom).
 
 The merged permanent is: Pouncing Shoreshark (name/P/T), with reach, trample from Gemrazer, {T}: {G} from Gilded Goose.
 

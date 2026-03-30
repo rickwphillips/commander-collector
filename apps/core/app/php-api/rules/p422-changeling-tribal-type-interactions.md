@@ -168,34 +168,34 @@ CHANGELING ON THE BATTLEFIELD — TRIBAL INTERACTIONS:
 
 ## Canonical Example
 **Changeling + Sliver Lords (Sliver Overlord deck):**
-You control: Avian Changeling ({3}{W}: 3/3; Shapeshifter; flying; changeling), Muscle Sliver ({1}{G}: 1/1 Sliver; "Slivers you control get +1/+1"), Crystalline Sliver ({W}{U}: 1/1 Sliver; "Slivers you control have shroud"), Fury Sliver ({5}{R}: 3/3 Sliver; "Slivers you control have double strike").
+You control: Avian Changeling ({2}{W}: 2/2; Shapeshifter; flying; changeling), Muscle Sliver ({1}{G}: 1/1 Sliver; "Slivers you control get +1/+1"), Crystalline Sliver ({W}{U}: 1/1 Sliver; "Slivers you control have shroud"), Fury Sliver ({5}{R}: 3/3 Sliver; "Slivers you control have double strike").
 
 Avian Changeling is a Sliver (changeling = every creature type = Sliver too).
-Muscle Sliver: Avian Changeling is a Sliver you control → it gets +1/+1. Avian is now 4/4.
+Muscle Sliver: Avian Changeling is a Sliver you control → it gets +1/+1. Avian is now 3/3.
 Crystalline Sliver: Avian Changeling is a Sliver you control → it gains shroud. Avian can't be targeted.
 Fury Sliver: Avian Changeling is a Sliver you control → it gains double strike.
 
-Avian Changeling: 4/4 flier with shroud and double strike. All three Sliver lords stack.
+Avian Changeling: 3/3 flier with shroud and double strike. All three Sliver lords stack.
 
 Opponent attempts to target Avian Changeling with Doom Blade. Avian has shroud (from Crystalline).
 Doom Blade can't target it. Opponent must use a mass-removal effect.
 
-You attack with Avian (4/4 double strike flying). Opponent blocks with a 3/3.
-Double strike: first strike damage — Avian deals 4 damage. 3/3 dies. Avian still alive.
-Regular damage step: Avian deals 4 damage again (double strike both steps). Total: 8 damage to opponent.
+You attack with Avian (3/3 double strike flying). Opponent blocks with a 3/3.
+Double strike: first strike damage — Avian deals 3 damage. 3/3 dies. Avian still alive.
+Regular damage step: Avian deals 3 damage again (double strike both steps). Total: 6 damage to opponent.
 
 Note: Changelings also trigger ALL "when a Sliver enters" effects, "when an Elf enters" effects, etc.
 simultaneously when they enter the battlefield.
 
 **Example 2 — Changeling enables Prowl:**
-Your deck: Avian Changeling, Morsel Theft ({3}{B}: Rogue prowl cost {1}{B}; "target player loses 2 life, you gain 2 life, you draw a card"; prowl {1}{B}).
+Your deck: Avian Changeling, Morsel Theft ({2}{B}{B}: Kindred Sorcery — Rogue; prowl {1}{B}; "target player loses 3 life and you gain 3 life. If this spell's prowl cost was paid, draw a card").
 
 Turn 1: attack with Avian Changeling. It deals combat damage to opponent.
 Avian Changeling is a Rogue (changeling). A Rogue you controlled dealt combat damage this turn.
 Prowl condition for Rogue prowl cards is satisfied.
 
-Turn 1 post-combat main phase: cast Morsel Theft for its prowl cost {1}{B} instead of {3}{B}.
-Result: you spend {1}{B} instead of {3}{B} for the full spell effect.
+Turn 1 post-combat main phase: cast Morsel Theft for its prowl cost {1}{B} instead of {2}{B}{B}.
+Result: you spend {1}{B} instead of {2}{B}{B} for the full spell effect (including the draw, since prowl cost was paid).
 
 Avian Changeling is also a Goblin, Merfolk, Warrior, Ninja, Faerie... etc.
 ANY prowl-cost card you cast this turn can use the cheaper prowl cost, since Changeling dealt

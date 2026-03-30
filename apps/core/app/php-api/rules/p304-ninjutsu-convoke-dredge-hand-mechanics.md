@@ -51,21 +51,21 @@ NINJUTSU:
     Trample: if the Ninja has trample, it resolves with trample
 
   NOTABLE NINJUTSU CARDS (Kamigawa):
-    Yuriko, the Tiger's Shadow ({1}{U}{B}):
-      Commander ninjutsu: can be used from the command zone (not just hand)
+    Yuriko, the Tiger's Shadow ({1}{U}{B}): 1/3.
+      Commander ninjutsu {U}{B}: can be used from the command zone (not just hand)
       "Whenever a Ninja you control deals combat damage to a player, reveal the top card of your library
-        and put it into your hand. You lose life equal to that card's mana value."
+        and put it into your hand. Each opponent loses life equal to that card's mana value."
       In Commander: Yuriko is the Ninja commander. Put a cheap 1-mana evasive creature out turn 1.
       Turn 2: attack with 1-drop. Ninjutsu Yuriko in from command zone.
       Yuriko deals combat damage → reveal top card (library is full of high-MV cards).
       Reveal Blightsteel Colossus (MV 12): opponents all lose 12 life (Yuriko hits multiple players in some formats).
       Or: in 1v1, opponent loses 12 life from one reveal.
 
-    Fallen Shinobi ({4}{U}{B}): 5/4. Ninjutsu {2}{U}{B}. "Whenever Fallen Shinobi deals combat damage
+    Fallen Shinobi ({3}{U}{B}): 5/4. Ninjutsu {2}{U}{B}. "Whenever Fallen Shinobi deals combat damage
       to a player, that player exiles the top two cards of their library. Until EOT, you may play those
       cards without paying their mana costs."
       Hit opponent → play their cards for free!
-      Ninjutsu cost {2}{U}{B}: much cheaper than casting it for {4}{U}{B}.
+      Ninjutsu cost {2}{U}{B}: much cheaper than casting it for {3}{U}{B}.
 
     Mistblade Shinobi ({1}{U}): 1/1. Ninjutsu {U}. "Whenever this Ninja deals combat damage to a player,
       you may return target creature that player controls to its owner's hand."
@@ -165,9 +165,9 @@ DREDGE:
 **Yuriko Commander Damage Chain:**
 Turn 1: cast Changeling Outcast (1/1 unblockable Shapeshifter — has all creature types including Ninja).
 Turn 2: Changeling Outcast attacks (no blocker possible, it's unblockable).
-During the declare blockers step: activate Yuriko from command zone (commander ninjutsu {1}{U}{B}).
+During the declare blockers step: activate Yuriko from command zone (commander ninjutsu {U}{B}).
 Return Changeling Outcast to hand. Yuriko enters tapped and attacking.
-Yuriko deals 2 combat damage (2/2) to opponent.
+Yuriko deals 1 combat damage (1/3 — power is 1) to opponent.
 Yuriko's trigger: reveal top card of library. It's Blightsteel Colossus (MV 12).
 Opponent loses 12 life.
 Opponent at 8 life (20 - 12).

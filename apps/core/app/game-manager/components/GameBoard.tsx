@@ -521,6 +521,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
           onToggleHighlightMode={() => setHighlightMode(m => !m)}
           soundEnabled={soundEnabled}
           onToggleSound={() => setSoundEnabled(s => !s)}
+          commanderDamage={commanderDamage}
         />
       </Box>
 

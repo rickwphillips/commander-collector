@@ -118,8 +118,9 @@ TOKENS IN MUTATE PILES:
   Cards in the pile below the token: they go to GY as normal cards (729.3e).
 
 NETHROI + MUTATE COMBO:
-  Nethroi, Apex of Death (Mutate {2}{W}{B}{G}): "Whenever this creature mutates,
-    return from GY all creature cards with total power 10 or less."
+  Nethroi, Apex of Death ({2}{W}{B}{G}, Mutate {4}{G/W}{B}{B}): 5/5 Deathtouch, Lifelink.
+    "Whenever this creature mutates, return any number of target creature cards with
+    total power 10 or less from your graveyard to the battlefield."
   At 0/0 or 0/1 base: power 0. Return creatures with total power 10 = up to ten 1/1s or a 10/X.
   Strategy: build a mutate pile focused on Nethroi. Each mutate triggers more GY recursion.
   With Nethroi in a pile at any position (bottom or top): each mutate onto that pile triggers Nethroi's ability.
@@ -137,9 +138,9 @@ NETHROI + MUTATE COMBO:
 
 ## Canonical Example
 **Gemrazer Mutate Pile:**
-Board: You control Pouncing Shoreshark (non-Human, 3/3 Flash, Mutate {3}{U}).
-You cast Gemrazer ({2}{G} or Mutate {1}{G}): 4/4 Reach, Trample, "whenever this creature mutates, destroy target artifact or enchantment an opponent controls."
-Choose to mutate (pay {1}{G}): target Pouncing Shoreshark.
+Board: You control Pouncing Shoreshark (non-Human, 4/3 Flash, Mutate {3}{U}).
+You cast Gemrazer ({3}{G} or Mutate {1}{G}{G}): 4/4 Reach, Trample, "whenever this creature mutates, destroy target artifact or enchantment an opponent controls."
+Choose to mutate (pay {1}{G}{G}): target Pouncing Shoreshark.
 Choose: put Gemrazer on TOP of Pouncing Shoreshark.
 The merged permanent:
   Top (Gemrazer): 4/4, Reach, Trample, destroy-artifact-or-enchantment trigger.
@@ -153,8 +154,8 @@ If the pile dies: Gemrazer (4/4) and Pouncing Shoreshark (3/3) each go to GY sep
 Reanimate one: you have a standalone creature. Reanimate the other: another standalone creature.
 
 **Example 2 — Nethroi Pile Recursion Engine:**
-Board: you control a 2/3 Birds of Paradise (non-Human, Flying, {T}: add any color).
-Turn 5: Cast Nethroi, Apex of Death with Mutate cost ({2}{W}{B}{G}).
+Board: you control a Birds of Paradise (0/1, non-Human, Flying, {T}: add any color).
+Turn 5: Cast Nethroi, Apex of Death with Mutate cost ({4}{G/W}{B}{B}).
 Target: Birds of Paradise. Choose: Nethroi on BOTTOM.
 Top: Birds of Paradise (2/3 Flying, {T}: add color).
 Bottom: Nethroi (0/0 Deathtouch Lifelink, whenever this creature mutates, return creatures from GY with total power ≤ 10).

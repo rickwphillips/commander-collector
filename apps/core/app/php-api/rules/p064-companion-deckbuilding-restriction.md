@@ -29,9 +29,13 @@ COMPANION SETUP (BEFORE THE GAME):
   If condition is not met: cannot use that card as companion
 
 COMPANION CONDITION EXAMPLES:
-  "Your starting deck contains only cards with even mana values" (Yorion)
-  "Your starting deck contains no more than one of any card with the same name" (Lurrus)
-  Wait — some companions have restrictions on deck size or card types
+  Yorion: "Your starting deck contains at least twenty cards more than the minimum deck size."
+    (Constructed minimum 60 → Yorion needs 80+; Commander requires exactly 100 → Yorion NEVER valid in Commander)
+  Lurrus: "Each permanent card in your starting deck has mana value 2 or less."
+    (Instants/sorceries exempt — only permanent cards matter)
+  Lutri: "Each nonland card in your starting deck has a different name." (unique singleton)
+  Gyruda: "Each card in your starting deck has an even mana value."
+  Obosh: "Each card in your starting deck has an odd mana value."
   Conditions are checked against starting deck (before sideboard cards)
 
 BRINGING COMPANION IN (DURING THE GAME):
@@ -73,7 +77,8 @@ SPECIAL ACTION = NO STACK:
 
 - **Companion requires deck construction compliance.** If your starting deck doesn't meet the condition, you can't use that companion.
 - **Bringing companion in costs {3} and is a special action.** Main phase, stack empty, once per game.
-- **The {3} cost can't be responded to.** It's a special action, not an ability.
+- **The {3} cost can't be responded to.** It's a special action, not an ability. It also can't be stopped by Phyrexian Revoker or similar effects that stop activated abilities. (Gatherer ruling 2020-06-01)
+- **Yorion can never be a companion in Commander.** Commander requires exactly 100 cards — Yorion requires at least 20 more than the minimum deck size. Commander has no "minimum," just "exactly 100." (Gatherer ruling 2020-04-17)
 - **Once in the game, companion stays.** If it dies or goes to exile, it remains in the game.
 - **After sideboarding, re-check the condition.** If your post-sideboard deck violates the companion's condition, the companion is invalid for that game.
 

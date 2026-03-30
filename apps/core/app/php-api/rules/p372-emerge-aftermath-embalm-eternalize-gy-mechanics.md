@@ -84,13 +84,13 @@ AFTERMATH (702.127a):
       but aftermath is a different ability — the "exile on leave stack" is aftermath's own rule).
   AFTERMATH EXAMPLES:
     Farm // Market (Amonkhet):
-      Farm ({2}{W}): "Destroy target creature with power 4 or greater."
-      Market ({3}{U}): Aftermath. "Draw two cards." (or similar)
-      Play: cast Farm to destroy a big creature. Card goes to GY. Then cast Market from GY for card draw.
+      Farm ({2}{W}): "Destroy target attacking or blocking creature."
+      Market ({2}{U}): Aftermath. "Draw two cards, then discard two cards."
+      Play: cast Farm to destroy an attacking/blocking creature. Card goes to GY. Then cast Market from GY for card draw/discard.
     Cut // Ribbons (Amonkhet):
-      Cut ({1}{R}): "Target creature gets +2/+0 until end of turn and deals damage to itself equal to its power."
-      Ribbons ({X}{B}): Aftermath. "Each opponent loses X life."
-      Cut + Ribbons: kill a creature with Cut (via self-damage), then drain opponents with Ribbons.
+      Cut ({1}{R}): "Cut deals 4 damage to target creature."
+      Ribbons ({X}{B}{B}): Aftermath. "Each opponent loses X life."
+      Cut + Ribbons: deal 4 damage to a creature with Cut, then drain opponents with Ribbons from GY.
       Ribbons alone (from GY, after putting Cut in GY somehow): win-condition late-game.
     The aftermath half of the split card stays in GY until cast. It's always there if the card was discarded or
       destroyed. You can hold the aftermath half in reserve.
@@ -111,8 +111,8 @@ EMBALM (702.128a):
     Creatures with powerful ETB triggers (that fire when the token enters):
       The token entering the battlefield = entering the battlefield. ETBs fire.
     Creatures that provide value while on the battlefield: the token repeats that value.
-    Honored Hydra ({4}{G}{G}): "Trample. Embalm {5}{G}."
-      Embalm: create a white/green 6/6 Zombie Hydra with trample.
+    Honored Hydra ({5}{G}): 6/6. "Trample. Embalm {3}{G}."
+      Embalm: create a white Zombie Hydra token that's a copy (6/6 trample).
       (Tokens are copies of the original; the Honored Hydra is 6/6 with trample.)
     Glyph Keeper ({3}{U}{U}): Whenever ~ becomes the target of a spell for the first time each turn,
       counter that spell. Embalm {5}{U}{U}.

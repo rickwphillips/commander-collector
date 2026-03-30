@@ -24,18 +24,12 @@ Storm triggers when you cast a spell: "copy this spell for each other spell cast
 ```
 STORM COUNT:
   Storm count = number of spells cast this turn BEFORE this storm spell
-  Includes: all spells cast by all players this turn (not just you in most versions)
-  Wait: CR 702.40a says "each OTHER spell cast before it this turn" — "this turn" means current turn
-  All players who have cast spells contribute to the storm count? Let me check:
-  CR 702.40a: "each other spell that was cast before it this turn" — "this turn" is the current player's turn
-  In practice: spells cast by you AND opponents before this spell contribute to storm count
-
-  Actually the CR text in this version may have been updated — let me read carefully:
-  "copy it for each other spell that was cast before it this turn"
-  "this turn" = the entire current turn (all players combined? or just active player?)
-  Classic ruling: storm counts ALL spells cast by ALL players this turn
-  Example: on your turn, cast 5 spells, opponent responds with 1 spell = 6 total before your storm spell
-  Your storm spell: copies 6 times (for the 6 spells cast before it this turn)
+  "This turn" means the entire current turn — includes ALL spells by ALL players
+  Spells cast by opponents (in response) before the storm spell also count
+  Example: on your turn, cast 5 spells, opponent casts 1 in response = 6 total before your storm spell
+  Your storm spell: copies 6 times
+  Copies are NOT "cast" and don't increase storm count for later storm spells
+  Countered spells and spells from non-hand zones (escape, flashback) DO count (Gatherer 2022-12-08)
 
 STORM COPIES:
   Each copy is a separate spell on the stack (created when storm trigger resolves)
@@ -117,9 +111,10 @@ Opponent's storm turn, storm count is 8. They cast Tendrils of Agony.
 Storm trigger goes on stack: "create 8 copies of Tendrils."
 You have Flusterstorm in hand ({U}).
 Cast Flusterstorm targeting the ORIGINAL Tendrils spell.
-Flusterstorm storm trigger: 9 copies of Flusterstorm (one per spell cast this turn including Tendrils+Flusterstorm).
-Resolve Flusterstorm copies: each counter one copy of Tendrils.
-Counter all 9 copies + original Tendrils = entire storm chain stopped.
+Storm count for Flusterstorm = 9 (the 8 prior spells + Tendrils). Storm trigger creates 9 copies of Flusterstorm.
+Total: 10 Flusterstorms (1 original + 9 copies). Need to counter: 1 original Tendrils + 8 Tendrils copies = 9 targets.
+Assign each of the 10 Flusterstorms to a Tendrils target (one is extra). Counter all 9 Tendrils = entire storm chain stopped.
+Note: Flusterstorm does NOT count its own casting in storm — only spells cast BEFORE it. (Gatherer ruling 2022-12-08)
 Flusterstorm is the premier Storm hate in Legacy precisely for this property.
 
 ## Commonly Confused With

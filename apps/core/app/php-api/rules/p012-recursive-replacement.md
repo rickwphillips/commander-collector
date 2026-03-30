@@ -50,6 +50,7 @@ KEY INSIGHT: This is NOT an infinite loop — there is always a termination cond
 - **Empty hand is the termination state.** With Chains on the board, any non-exempt draw when your hand is empty simply mills 1 card — no discard, no recursion.
 - **Multiple replacement effects on the same event extend the chain.** If two different replacement effects both apply to draw events, each new event generated must go through both. The order of application is chosen by the affected player (614.5 still governs the specific event each replacement sees).
 - **Design intent vs. recursion:** The intent of Chains-style effects is "pay a cost to draw." The recursion means the cost is paid repeatedly until the condition no longer applies — not just once.
+- **Draws as costs are affected by Chains.** If an ability requires drawing a card as a cost (rather than as an effect), Chains still intercepts it — replacement effects can apply to cost payments. (Chains ruling 2004-10-04: "Cards which are drawn as a cost are affected by this card because replacement effects can alter the payment of costs.") This is rare since most draw-as-cost abilities are uncommon, but it confirms Chains has no "effect draws only" exemption.
 
 ## Canonical Example
 **Chains of Mephistopheles — drawing a non-exempt card with 3 cards in hand:**

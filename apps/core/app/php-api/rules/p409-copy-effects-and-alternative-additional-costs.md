@@ -152,7 +152,7 @@ EXCEPTIONS: COPY EFFECTS THAT ALLOW NEW TARGET CHOICE (707.10c):
 
 ## Canonical Example
 **Reverberate on Kicked Thornscape Battlemage:**
-You cast Thornscape Battlemage ({2}{G}: 2/2; Kicker {W} and/or {R}; "When Thornscape Battlemage enters, if it was kicked with its {W} kicker, destroy target enchantment"; "...if kicked with {R} kicker, Thornscape Battlemage deals 2 damage to target creature or player").
+You cast Thornscape Battlemage ({2}{G}: 2/2; Kicker {R} and/or {W}; "When Thornscape Battlemage enters, if it was kicked with its {R} kicker, it deals 2 damage to any target"; "...if kicked with its {W} kicker, destroy target artifact").
 
 You kick with both {W} and {R}: total cost {2}{G}{W}{R} = 5 mana.
 
@@ -163,15 +163,15 @@ Stack: [Copy of Battlemage (kicked W+R)] [Original Battlemage (kicked W+R)]
 Copy resolves first:
 - Enters as a token. Wait — no. 707.10f: copy of permanent spell "ceases being a copy of a spell and becomes a token permanent."
 - The copy is also kicked with both W and R (707.2).
-- "When this creature enters, if kicked with W, destroy target enchantment" — both triggers fire from the copy entering.
-- "If kicked with R, deal 2 damage to target creature" — triggers.
-- You get: an additional 2/2 creature entering, destroying an enchantment, and 2 damage.
+- "When this creature enters, if kicked with R, deal 2 damage to any target" — trigger fires from copy entering.
+- "If kicked with W, destroy target artifact" — trigger fires.
+- You get: an additional 2/2 creature entering, destroying an artifact, and 2 damage.
 
 Original resolves:
 - The real Thornscape Battlemage enters. Both ETBs fire again.
 - Destroy another enchantment. Deal 2 more damage.
 
-Net: 2 creature tokens on battlefield, 2 enchantments destroyed, 4 damage dealt.
+Net: 2 creature tokens on battlefield, 2 artifacts destroyed, 4 damage dealt.
 
 **Example 2 — Fork Copying Flashed-Back Brain Freeze:**
 You cast Brain Freeze ({1}{U}: "target player mills 3 cards for each spell cast this turn including this one; Storm"):

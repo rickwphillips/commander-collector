@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -39,7 +39,10 @@ import CloseIcon from '@mui/icons-material/Close';
 import AutoStoriesIcon from '@mui/icons-material/AutoStories';
 import AddCommentIcon from '@mui/icons-material/AddComment';
 import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
+import NoteAddIcon from '@mui/icons-material/NoteAdd';
+import CheckIcon from '@mui/icons-material/Check';
 import { rulesApi } from '../lib/api';
+import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import type { ActiveGameContext, RulesConversation, RulesMessage, RulesPattern } from '../lib/types';
 
 // ── Local message type (includes pending_pattern for new messages) ──────────
@@ -82,6 +85,53 @@ function buildGameSuggestions(ctx: ActiveGameContext): string[] {
   return result.slice(0, 4);
 }
 
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function nodeText(node: React.ReactNode): string {
+  if (typeof node === 'string') return node;
+  if (typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(nodeText).join('');
+  if (node && typeof node === 'object' && 'props' in node)
+    return nodeText((node as React.ReactElement<{ children?: React.ReactNode }>).props.children);
+  return '';
+}
+
+// ── Parse CARDS: manifest from assistant response ────────────────────────────
+function parseCardManifest(content: string): { cleaned: string; cards: string[] } {
+  const match = content.match(/\nCARDS:\s*(.+)$/m);
+  if (!match) return { cleaned: content, cards: [] };
+  const cards = match[1]
+    .split(',')
+    .map(s => s.trim().replace(/^\[\[|\]\]$/g, '').trim())
+    .filter(Boolean);
+  const cleaned = content.replace(/\nCARDS:\s*.+$/m, '').trimEnd();
+  return { cleaned, cards };
+}
+
+// ── Markdown components ──────────────────────────────────────────────────────
+
+function looksLikeCardName(text: string): boolean {
+  if (!text || text.length < 2) return false;
+  if (text.includes(':')) return false;           // CR refs, labels
+  if (/^\d/.test(text)) return false;             // "7c", "117.3"
+  if (text === text.toUpperCase()) return false;  // "APNAP", "SBA"
+  if (text.split(' ').length > 7) return false;   // no real card has 8+ words
+  if (/^(Note|Example|Important|Warning|Summary|Result|Step|Phase|Rule|Effect|Trigger|Action|Cost|Event|Zone|Stack|Turn|Ability|Creature|Spell|Permanent|Player|Target|Source|Object|Card)s?$/.test(text)) return false;
+  return true;
+}
+
+const mdComponents = {
+  strong: ({ children }: { children?: React.ReactNode }) => {
+    const text = nodeText(children).trim();
+    if (!text || !looksLikeCardName(text)) return <strong>{children}</strong>;
+    return (
+      <CardTooltip name={text} style={{ borderBottom: '1px dotted currentColor' }}>
+        <strong>{children}</strong>
+      </CardTooltip>
+    );
+  },
+};
+
 export default function ChatPage() {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<LocalMessage[]>([]);
@@ -100,35 +150,72 @@ export default function ChatPage() {
   const [patternsLoading, setPatternsLoading] = useState(true);
 
   const [gameContext, setGameContext] = useState<ActiveGameContext | null>(null);
+  const [isEmbedded, setIsEmbedded] = useState(false);
+  const [savedNoteIndices, setSavedNoteIndices] = useState<Set<number>>(new Set());
 
   const [thinkingText, setThinkingText] = useState('Consulting the rules…');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const retryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const THINKING_MESSAGES = [
-    'Consulting the rules…',
-    'Checking the Comprehensive Rules…',
-    'Resolving triggered abilities…',
-    'Checking state-based actions…',
-    'Passing priority…',
-    'Searching the pattern library…',
-    'Cross-referencing CR 117…',
-    'Untapping, upkeep, draw…',
-    'Looking up Oracle text…',
-    'Verifying with Gatherer rulings…',
-    'Checking the stack…',
-    'Declaring attackers…',
+    'Consulting the rules...',
+    'Checking the Comprehensive Rules...',
+    'Resolving triggered abilities...',
+    'Checking state-based actions...',
+    'Passing priority...',
+    'Searching the pattern library...',
+    'Cross-referencing CR 117...',
+    'Untapping, upkeep, draw...',
+    'Looking up Oracle text...',
+    'Verifying with Gatherer rulings...',
+    'Checking the stack...',
+    'Declaring attackers...',
   ];
 
   useEffect(() => {
-    if (!loading) return;
-    let i = 0;
-    setThinkingText(THINKING_MESSAGES[0]);
-    const interval = setInterval(() => {
-      i = (i + 1) % THINKING_MESSAGES.length;
-      setThinkingText(THINKING_MESSAGES[i]);
-    }, 4000);
-    return () => clearInterval(interval);
+    if (!loading) {
+      setThinkingText('');
+      return;
+    }
+
+    let cancelled = false;
+    let msgIdx = 0;
+    let charIdx = 0;
+    type Phase = 'typing' | 'hold' | 'erasing' | 'gap';
+    let phase: Phase = 'typing';
+    let tid: ReturnType<typeof setTimeout>;
+
+    setThinkingText('');
+
+    function tick() {
+      if (cancelled) return;
+      const msg = THINKING_MESSAGES[msgIdx];
+      if (phase === 'typing') {
+        charIdx++;
+        setThinkingText(msg.slice(0, charIdx));
+        if (charIdx >= msg.length) { phase = 'hold'; tid = setTimeout(tick, 1000); return; }
+        tid = setTimeout(tick, 95);
+      } else if (phase === 'hold') {
+        phase = 'erasing';
+        tid = setTimeout(tick, 55);
+      } else if (phase === 'erasing') {
+        charIdx--;
+        setThinkingText(msg.slice(0, charIdx));
+        if (charIdx <= 0) { phase = 'gap'; tid = setTimeout(tick, 500); }
+        else { tid = setTimeout(tick, 55); }
+      } else {
+        let next = Math.floor(Math.random() * THINKING_MESSAGES.length);
+        if (next === msgIdx) next = (next + 1) % THINKING_MESSAGES.length;
+        msgIdx = next;
+        charIdx = 0;
+        phase = 'typing';
+        tid = setTimeout(tick, 30);
+      }
+    }
+
+    tid = setTimeout(tick, 30);
+    return () => { cancelled = true; clearTimeout(tid); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
@@ -136,7 +223,24 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
+  // Scroll to bottom only when the user sends a message (not on incoming assistant responses)
+  const prevMessageCountRef = useRef(0);
+  useEffect(() => {
+    const prev = prevMessageCountRef.current;
+    const curr = messages.length;
+    prevMessageCountRef.current = curr;
+    // Only scroll when a user message was just added (odd → even, or count increased by user action)
+    if (curr > prev && messages[curr - 1]?.role === 'user') {
+      scrollToBottom();
+    }
+  }, [messages, scrollToBottom]);
+
+  // Clean up retry countdown interval on unmount
+  useEffect(() => {
+    return () => {
+      if (retryIntervalRef.current) clearInterval(retryIntervalRef.current);
+    };
+  }, []);
 
   // Load conversations, patterns, and active game on mount
   useEffect(() => {
@@ -152,9 +256,116 @@ export default function ChatPage() {
       })
       .catch(() => {})
       .finally(() => setPatternsLoading(false));
-    rulesApi.getActiveGame()
-      .then(r => setGameContext(r.game))
-      .catch(() => {});
+
+    // Check for inline game context passed via ?ctx= (from game manager chat button)
+    const params = new URLSearchParams(window.location.search);
+    const ctxParam = params.get('ctx');
+    if (ctxParam) {
+      setIsEmbedded(true);
+      try {
+        const raw = JSON.parse(atob(decodeURIComponent(ctxParam)));
+        // Map to ActiveGameContext shape (players only — life/poison are extra but harmless)
+        const ctx: ActiveGameContext = {
+          players: (raw.players ?? []).map((p: Record<string, unknown>) => ({
+            playerName: p.playerName ?? 'Unknown',
+            deckName: p.deckName ?? '',
+            commander: p.commander ?? null,
+            partner: p.partner ?? null,
+            deckId: p.deckId ?? null,
+            cards: [],
+          })),
+        };
+        setGameContext(ctx);
+        // Also store turn/life state for display in system message
+        if (raw.turnNumber || raw.currentPlayer) {
+          const playerLines = (raw.players ?? [])
+            .map((p: Record<string, unknown>) => {
+              const name = p.playerName ?? '?';
+              const life = p.life ?? '?';
+              const parts: string[] = [`${life} life`];
+              if ((p.poison as number) > 0) parts.push(`${p.poison} poison`);
+              if ((p.energy as number) > 0) parts.push(`${p.energy} energy`);
+              if ((p.experience as number) > 0) parts.push(`${p.experience} experience`);
+              if ((p.commanderTax as number) > 0) parts.push(`commander tax +${(p.commanderTax as number) * 2}`);
+              const badges: string[] = [];
+              if (p.isMonarch) badges.push('Monarch');
+              if (p.hasInitiative) badges.push('Initiative');
+              if (p.hasCitysBlessing) badges.push("City's Blessing");
+              if (badges.length) parts.push(badges.join(', '));
+              if (p.isEliminated) parts.push('eliminated');
+              let line = `  • ${name}: ${parts.join(', ')}`;
+              // Commander damage received
+              const dmg = p.commanderDamage as Record<string, number[]> | undefined;
+              if (dmg && Object.keys(dmg).length > 0) {
+                const dmgParts = Object.entries(dmg).map(([src, vals]) =>
+                  vals.length > 1 ? `${vals[0]}+${vals[1]} from ${src}` : `${vals[0]} from ${src}`
+                );
+                line += ` (cmd dmg: ${dmgParts.join(', ')})`;
+              }
+              return line;
+            })
+            .join('\n');
+          const systemMsg = [
+            `**Active game — Turn ${raw.turnNumber ?? '?'}, ${raw.currentPlayer ?? '?'}\'s turn**`,
+            playerLines,
+          ].join('\n');
+          // Build hidden timer note for AI context (not shown to user)
+          if (raw.timerSeconds && raw.currentPlayer) {
+            const elapsed = (raw.elapsedSeconds as number) ?? 0;
+            const total = raw.timerSeconds as number;
+            const remaining = Math.max(0, total - elapsed);
+            const pct = elapsed / total;
+            const name = raw.currentPlayer as string;
+            const quips =
+              pct >= 0.75
+                ? [
+                    `${name} has used ${Math.round(pct * 100)}% of the turn timer and still hasn't acted. Feel free to weave in a gentle ribbing if it's relevant.`,
+                    `${name} is deep in the tank with only ~${Math.round(remaining)}s left on the timer. You can playfully acknowledge the delay if appropriate.`,
+                  ]
+                : pct >= 0.4
+                ? [
+                    `${name} is about halfway through the turn timer (${Math.round(elapsed)}s elapsed). You can lightly tease them about thinking time if it fits.`,
+                  ]
+                : [
+                    `${name}'s turn just started — timer is running but no pressure yet.`,
+                  ];
+            ctx._timerNote = quips[Math.floor(Math.random() * quips.length)];
+            setGameContext(ctx);
+          }
+          setMessages([{ role: 'assistant', content: systemMsg }]);
+        }
+      } catch {
+        // Malformed ctx param — fall back to DB lookup
+        rulesApi.getActiveGame().then(r => setGameContext(r.game)).catch(() => {});
+      }
+    } else {
+      rulesApi.getActiveGame().then(r => setGameContext(r.game)).catch(() => {});
+    }
+  }, []);
+
+  // postMessage bridge for saving notes back to game manager (embedded mode only)
+  const saveToGameNotes = useCallback((content: string) => {
+    if (typeof window !== 'undefined') {
+      window.parent.postMessage({ type: 'rules_save_notes', content }, '*');
+    }
+  }, []);
+
+  // Real-time timer state pushed from parent every second
+  const liveTimerRef = useRef<ActiveGameContext['_liveTimer']>(undefined);
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === 'rules_timer_update') {
+        liveTimerRef.current = {
+          timerSeconds:   event.data.timerSeconds,
+          elapsedSeconds: event.data.elapsedSeconds,
+          remaining:      event.data.remaining,
+          currentPlayer:  event.data.currentPlayer,
+          turnNumber:     event.data.turnNumber,
+        };
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
   }, []);
 
   const loadConversation = async (id: number) => {
@@ -215,15 +426,67 @@ export default function ChatPage() {
     const userMsg: LocalMessage = { role: 'user', content: raw };
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
+    if (isEmbedded) window.parent.postMessage({ type: 'rules_loading', value: true }, '*');
 
-    try {
-      const res = await rulesApi.sendMessage({
-        message: resolved,
-        conversation_id: conversationId ?? undefined,
-        new_conversation_title: !conversationId ? raw.slice(0, 80) : undefined,
-        game_context: gameContext ?? undefined,
+    const isRateLimitError = (err: unknown): boolean => {
+      const msg = err instanceof Error ? err.message : String(err);
+      return /rate|overload|529|429/i.test(msg);
+    };
+
+    const waitWithCountdown = (seconds: number): Promise<void> => {
+      return new Promise(resolve => {
+        let remaining = seconds;
+        setThinkingText(`The rules oracle is a bit overwhelmed — trying again in a moment.`);
+        if (retryIntervalRef.current) clearInterval(retryIntervalRef.current);
+        retryIntervalRef.current = setInterval(() => {
+          remaining -= 1;
+          if (remaining <= 0) {
+            if (retryIntervalRef.current) clearInterval(retryIntervalRef.current);
+            retryIntervalRef.current = null;
+            resolve();
+          } else {
+            setThinkingText(`Retrying in ${remaining}s…`);
+          }
+        }, 1000);
+        // Initial countdown display
+        setThinkingText(`Retrying in ${remaining}s…`);
       });
+    };
 
+    const RETRY_DELAYS = [5, 15, 30, 60];
+    let res: Awaited<ReturnType<typeof rulesApi.sendMessage>> | null = null;
+    let lastErr: unknown = null;
+
+    for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
+      try {
+        const contextWithTimer = gameContext
+          ? { ...gameContext, _liveTimer: liveTimerRef.current ?? gameContext._liveTimer }
+          : undefined;
+        res = await rulesApi.sendMessage({
+          message: resolved,
+          conversation_id: conversationId ?? undefined,
+          new_conversation_title: !conversationId ? raw.slice(0, 80) : undefined,
+          game_context: contextWithTimer,
+        });
+        lastErr = null;
+        break; // success
+      } catch (err) {
+        lastErr = err;
+        if (isRateLimitError(err) && attempt < RETRY_DELAYS.length) {
+          await waitWithCountdown(RETRY_DELAYS[attempt]);
+          // Continue to next attempt
+        } else {
+          break; // non-rate-limit error or retries exhausted
+        }
+      }
+    }
+
+    if (retryIntervalRef.current) {
+      clearInterval(retryIntervalRef.current);
+      retryIntervalRef.current = null;
+    }
+
+    if (res) {
       setConversationId(res.conversation_id);
 
       const assistantMsg: LocalMessage = {
@@ -235,13 +498,21 @@ export default function ChatPage() {
       setMessages(prev => [...prev, assistantMsg]);
 
       rulesApi.getConversations().then(r => setConversations(r.conversations)).catch(() => {});
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send message');
+
+      if (isEmbedded && typeof window !== 'undefined') {
+        window.parent.postMessage({ type: 'rules_new_content' }, '*');
+      }
+    } else {
+      const errMsg = isRateLimitError(lastErr)
+        ? 'The rules oracle is a bit overwhelmed — trying again in a moment.'
+        : (lastErr instanceof Error ? lastErr.message : 'Failed to send message');
+      setError(errMsg);
       setMessages(prev => prev.slice(0, -1));
-    } finally {
-      setLoading(false);
-      setTimeout(() => inputRef.current?.focus(), 100);
     }
+
+    setLoading(false);
+    if (isEmbedded) window.parent.postMessage({ type: 'rules_loading', value: false }, '*');
+    setTimeout(() => inputRef.current?.focus(), 100);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -458,11 +729,13 @@ export default function ChatPage() {
           square
           sx={{ px: 2, py: 1.5, display: 'flex', alignItems: 'center', gap: 1, zIndex: 10 }}
         >
-          <Tooltip title="Commander Collector">
-            <IconButton component="a" href={process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '/app/projects/commander'} size="small">
-              <ArrowBackIcon />
-            </IconButton>
-          </Tooltip>
+          {!isEmbedded && (
+            <Tooltip title="Commander Collector">
+              <IconButton component="a" href={process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '/app/projects/commander'} size="small">
+                <ArrowBackIcon />
+              </IconButton>
+            </Tooltip>
+          )}
           <Tooltip title="History">
             <IconButton onClick={() => setHistoryOpen(true)} size="small">
               <HistoryIcon />
@@ -564,22 +837,66 @@ export default function ChatPage() {
                   borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                 }}
               >
-                {msg.role === 'assistant' ? (
-                  <Box sx={{
-                  '& p': { m: 0, mb: 1, lineHeight: 1.6, fontSize: '0.875rem' },
-                  '& p:last-child': { mb: 0 },
-                  '& ul, & ol': { mt: 0.5, mb: 1, pl: 2.5 },
-                  '& li': { fontSize: '0.875rem', lineHeight: 1.6 },
-                  '& strong': { fontWeight: 600 },
-                  '& code': { fontFamily: 'monospace', fontSize: '0.8rem', bgcolor: 'action.hover', px: 0.5, borderRadius: 0.5 },
-                  '& table': { borderCollapse: 'collapse', width: '100%', fontSize: '0.8rem', mb: 1 },
-                  '& th, & td': { border: '1px solid', borderColor: 'divider', px: 1, py: 0.5, textAlign: 'left' },
-                  '& th': { bgcolor: 'action.hover', fontWeight: 600 },
-                  '& tr:nth-of-type(even)': { bgcolor: 'action.hover' },
-                }}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                  </Box>
-                ) : renderUserContent(msg.content)}
+                {msg.role === 'assistant' ? (() => {
+                  const { cleaned, cards } = parseCardManifest(msg.content);
+                  return (
+                    <>
+                      <Box sx={{
+                        '& p': { m: 0, mb: 1, lineHeight: 1.6, fontSize: '0.875rem' },
+                        '& p:last-child': { mb: 0 },
+                        '& ul, & ol': { mt: 0.5, mb: 1, pl: 2.5 },
+                        '& li': { fontSize: '0.875rem', lineHeight: 1.6 },
+                        '& strong': { fontWeight: 600 },
+                        '& code': { fontFamily: 'monospace', fontSize: '0.8rem', bgcolor: 'action.hover', px: 0.5, borderRadius: 0.5 },
+                        '& table': { borderCollapse: 'collapse', width: '100%', fontSize: '0.8rem', mb: 1 },
+                        '& th, & td': { border: '1px solid', borderColor: 'divider', px: 1, py: 0.5, textAlign: 'left' },
+                        '& th': { bgcolor: 'action.hover', fontWeight: 600 },
+                        '& tr:nth-of-type(even)': { bgcolor: 'action.hover' },
+                      }}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{cleaned}</ReactMarkdown>
+                      </Box>
+                      {/* Card chip bar */}
+                      {cards.length > 0 && (
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+                          {cards.map(name => (
+                            <CardTooltip key={name} name={name}>
+                              <Chip
+                                label={name}
+                                size="small"
+                                variant="outlined"
+                                sx={{ fontSize: '0.7rem', height: 20, cursor: 'default', '& .MuiChip-label': { px: 0.75 } }}
+                              />
+                            </CardTooltip>
+                          ))}
+                        </Box>
+                      )}
+                      {/* Save to game notes (embedded only) */}
+                      {isEmbedded && (
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.5 }}>
+                          <Tooltip title={savedNoteIndices.has(i) ? 'Saved to game notes' : 'Save to game notes'}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                disabled={savedNoteIndices.has(i)}
+                                onClick={() => {
+                                  saveToGameNotes(cleaned);
+                                  setSavedNoteIndices(prev => new Set(prev).add(i));
+                                }}
+                                sx={{
+                                  opacity: savedNoteIndices.has(i) ? 1 : 0.5,
+                                  color: savedNoteIndices.has(i) ? 'success.main' : 'inherit',
+                                  '&:hover': { opacity: 1 },
+                                }}
+                              >
+                                {savedNoteIndices.has(i) ? <CheckIcon sx={{ fontSize: 16 }} /> : <NoteAddIcon sx={{ fontSize: 16 }} />}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </Box>
+                      )}
+                    </>
+                  );
+                })() : renderUserContent(msg.content)}
 
                 {/* Pending pattern proposal */}
                 {msg.pending_pattern && (
@@ -627,7 +944,29 @@ export default function ChatPage() {
               <Paper elevation={1} sx={{ p: 1.5, borderRadius: '16px 16px 16px 4px' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <CircularProgress size={16} />
-                  <Typography variant="body2" color="text.secondary" sx={{ transition: 'opacity 0.3s', minWidth: 220 }}>{thinkingText}</Typography>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ minWidth: 220, fontFamily: 'monospace', fontSize: '0.8rem' }}
+                  >
+                    {thinkingText}
+                    <Box
+                      component="span"
+                      sx={{
+                        display: 'inline-block',
+                        width: '1ch',
+                        height: '0.9em',
+                        bgcolor: 'text.secondary',
+                        verticalAlign: 'text-bottom',
+                        ml: '1px',
+                        animation: 'blink-cursor 1s step-end infinite',
+                        '@keyframes blink-cursor': {
+                          '0%, 100%': { opacity: 1 },
+                          '50%': { opacity: 0 },
+                        },
+                      }}
+                    />
+                  </Typography>
                 </Box>
               </Paper>
             </Box>

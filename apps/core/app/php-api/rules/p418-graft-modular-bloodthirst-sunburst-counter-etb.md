@@ -73,7 +73,7 @@ MODULAR (702.43a):
       Example: Arcbound Ravager has 5 +1/+1 counters. Opponent targets it with removal.
         In response: activate Ravager: sacrifice another artifact, adding a counter (6 total).
         Ravager dies: modular trigger fires. Transfer 6 +1/+1 counters to a target artifact creature.
-        Choose: Arcbound Worker (which you have as a 1/1 + 6 = 7/7 after counters).
+        Choose: Arcbound Worker (which you have as a 0/0 base + 6 counters = 6/6 after counters).
     OPTIONAL TRANSFER:
       The transfer is optional ("you may put"). If no valid target (no artifact creature in play):
         the trigger is still placed on the stack but fizzles (no target possible, or you just
@@ -141,13 +141,14 @@ GRAFT + MODULAR COUNTER INTERACTIONS:
     (including the one moved to it by Graft) to another artifact creature.
   Chain: Graft distributes → Modular artifacts collect → Modular transfers on death.
   Example:
-    Turn 1: Simic Initiate (0/0 graft 2) enters. Has 2 counters.
-    Turn 2: Arcbound Worker ({1}: 1/1 artifact creature; modular 1) enters. Has 1 counter.
+    Turn 1: Simic Initiate ({G}: 0/0 graft 1) enters. Has 1 counter.
+    Turn 2: Arcbound Worker ({1}: 0/0 artifact creature; modular 1) enters. Has 1 counter (from modular).
     Simic Initiate's graft triggers: move a counter from Initiate to Worker.
-    Worker now has 2 counters (1 modular + 1 from graft). Initiate has 1.
+    Worker now has 2 counters (1 modular + 1 from graft). Initiate has 0.
     Turn 3: Worker is destroyed (Shock).
     Modular trigger: transfer 2 counters to target artifact creature.
-    Arcbound Ravager gets 2 counters. Becomes 2/2 (plus its 0/0 base = 2/2).
+    Arcbound Ravager (already on field with its own 1 modular counter) gets 2 more counters.
+    Ravager now has 3 counters total. Becomes 3/3 (0/0 base + 3 counters).
     The Graft counter "survived" through the Modular chain.
 ```
 
@@ -161,30 +162,30 @@ GRAFT + MODULAR COUNTER INTERACTIONS:
 
 ## Canonical Example
 **Arcbound Ravager Modular Chain (Legacy Affinity):**
-You control: Arcbound Ravager (0/0; sacrifice artifact: +1/+1 counter; modular 1), Arcbound Worker (1/1; modular 1), Steel Overseer ({2}: {T}: put +1/+1 counter on each artifact creature you control).
+You control: Arcbound Ravager (0/0; sacrifice artifact: +1/+1 counter; modular 1), Arcbound Worker (0/0 base; modular 1; effectively 1/1 with its modular counter), Steel Overseer ({2}: {T}: put +1/+1 counter on each artifact creature you control).
 
 Turn 3: Steel Overseer taps. All artifact creatures get +1/+1 counter.
 Ravager: 0/0 base + 1 modular + 1 overseer = 2/2.
-Worker: 1/1 base + 1 modular + 1 overseer = 3/3.
+Worker: 0/0 base + 1 modular + 1 overseer = 2/2.
 
 Opponent casts Naturalize targeting Steel Overseer. You respond.
 Sacrifice artifacts to Ravager: sacrifice Worker (Ravager gets +1/+1 counter per activation).
-Worker being sacrificed: goes to GY. Worker's modular trigger fires: transfer 3 counters (from Worker) to Ravager.
-Ravager now has: original modular 1 + overseer 1 + sacrifice counter + Worker's 3 = 6 counters. Ravager is 6/6.
+Worker being sacrificed: goes to GY. Worker's modular trigger fires: transfer 2 counters (from Worker) to Ravager.
+Ravager now has: original modular 1 + overseer 1 + sacrifice counter + Worker's 2 = 5 counters. Ravager is 5/5.
 
 Naturalize resolves: destroys Steel Overseer (not an artifact). Wait — Naturalize targets artifacts OR enchantments. Steel Overseer IS an artifact. It's destroyed.
 No counters to save from Overseer (it's a non-modular artifact — just has {T} ability).
 
-Attack with Ravager (6/6). Opponent takes 6 damage.
+Attack with Ravager (5/5). Opponent takes 5 damage.
 
 If opponent tries to kill Ravager: sacrifice remaining artifacts in response, grow Ravager further.
 When Ravager dies: modular transfers all its counters to another artifact creature.
-Your Walking Ballista (target artifact creature) receives 6 counters → tap to ping for 6 total.
+Your Walking Ballista (target artifact creature) receives 5 counters → tap to ping for 5 total.
 
 **Example 2 — Sunburst with Chromatic Lantern:**
 You control Chromatic Lantern ({3}: artifact; "lands you control have {T}: add one mana of any color"; all permanents tap for {T}: add one mana of any color).
 
-You cast Etched Oracle ({4}: artifact creature; sunburst; {T}, remove four +1/+1 counters from it: target player draws three cards) by tapping:
+You cast Etched Oracle ({4}: artifact creature; sunburst; {1}, remove four +1/+1 counters from it: target player draws three cards) by tapping:
 Land 1 → {G}
 Land 2 → {U}
 Land 3 → {B}

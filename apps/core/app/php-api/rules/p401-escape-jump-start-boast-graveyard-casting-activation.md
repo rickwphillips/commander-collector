@@ -36,8 +36,8 @@ ESCAPE (702.138):
   THE COST STRUCTURE:
     Escape [cost] = an alternative cost (not the normal mana cost).
     Escape costs always include BOTH a mana cost AND "Exile N other cards from your GY."
-    Example: Uro, Titan of Nature's Wrath ({1}{G}{U}: 6/6, escape {3}{G}{G}{U}, exile 5 cards):
-      To escape Uro: pay {3}{G}{G}{U} AND exile 5 cards from your GY (not Uro itself).
+    Example: Uro, Titan of Nature's Wrath ({1}{G}{U}: 6/6, escape {G}{G}{U}{U}, exile 5 other cards):
+      To escape Uro: pay {G}{G}{U}{U} AND exile 5 other cards from your GY (not Uro itself).
     The exile is part of the cost, not an effect. Paid when you announce the spell.
     "Other cards" — you exile OTHER cards from your GY, not the card you're escaping.
     To pay the exile cost: you must have enough cards in your GY.
@@ -61,17 +61,15 @@ ESCAPE (702.138):
       The key is when "escapes with" gives MORE counters than the normal cast.
   ESCAPE WITH ABILITY (702.138d):
     "Escapes with [ability]" = if escaped, the permanent has that ability while on the battlefield.
-    Example: Kroxa, Titan of Death's Hunger ({B}{R}: 6/6, escape {4}{B}{B}{R}, exile 5 cards,
-      "Kroxa escapes with indestructible"):
-      Wait — that's not Kroxa's actual text. Let me use correct examples.
+    Example: Kroxa, Titan of Death's Hunger ({B}{R}: 6/6, escape {B}{B}{R}{R}, exile 5 other cards):
+      Kroxa doesn't "escape with" any specific ability — this is an example of the general principle.
+      To use "escapes with [ability]," look for cards that specifically have that text.
     The principle: if escaped, the creature might have an additional keyword like haste or indestructible.
   ESCAPE AND GRAFDIGGER'S CAGE:
-    Grafdigger's Cage: "Creature cards can't enter the battlefield from graveyards."
-    Wait: that's one of Cage's effects. Does this stop escape?
-    Escape involves CASTING the card from the GY. The card goes on the stack, then resolves.
-    It doesn't directly "enter the battlefield from the GY" — it goes to the stack first.
-    Grafdigger's Cage (actual oracle): "Players can't cast spells from graveyards."
-    Under this oracle text: Cage prevents escape entirely (you can't cast from the GY).
+    Grafdigger's Cage (oracle): "Creature cards in graveyards and libraries can't enter the battlefield. Players can't cast spells from graveyards or libraries."
+    Cage prevents escape entirely — the second ability blocks casting from the GY.
+    Note: the first Cage ability ("creature cards can't enter from graveyards") would also be
+    redundant for creature escapes, but the key restriction is the spell-casting prohibition.
 
 JUMP-START (702.133):
   WHAT IT IS:
@@ -153,7 +151,7 @@ BOAST (702.142):
 
 ## Canonical Example
 **Uro, Titan of Nature's Wrath Escape Sequence:**
-Uro, Titan of Nature's Wrath ({1}{G}{U}: 6/6, "When this enters or attacks, gain 3 life, draw a card, then put a land from your hand onto the battlefield. Escape {3}{G}{G}{U}, exile 5 other cards from your GY"):
+Uro, Titan of Nature's Wrath ({1}{G}{U}: 6/6, "When this enters or attacks, gain 3 life, draw a card, then put a land from your hand onto the battlefield. Escape {G}{G}{U}{U}, exile 5 other cards from your GY"):
 Uro has additional text: "When Uro enters, if it didn't escape, sacrifice it."
 
 Turn 3: Cast Uro normally from hand ({1}{G}{U}). It enters the battlefield.

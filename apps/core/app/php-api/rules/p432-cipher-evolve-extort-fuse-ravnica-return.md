@@ -202,16 +202,16 @@ Opponent tries to remove Stalker: can't target Stalker (hexproof). Must use a no
 
 **Example 2 — Fuse + Cascade:**
 Boros Charm ({R}{W}: Instant with fuse; each half has a different effect) doesn't have fuse.
-Use Turn // Burn ({1}{U}: "target creature loses all abilities and becomes 0/1 until EOT" // {1}{R}:
-  "deal 2 damage to target creature or player"; fuse {1}{U}{R}).
+Use Turn // Burn ({2}{U}: "until EOT, target creature loses all abilities and becomes a red Weird
+  with base power and toughness 0/1" // {1}{R}: "deal 2 damage to any target"; fuse {2}{U}{R}).
 
-From hand: cast both halves fused for {1}{U}{R}. Total cost {3} (1+1+1). Combined MV = 4 ({1}{U} +
-  {1}{R} = 4... wait: MV of Turn = 2 ({1}{U}), MV of Burn = 2 ({1}{R}), combined = 4).
+From hand: cast both halves fused for {2}{U}{R}. Total cost {4} (2+1+1). Combined MV = 5 ({2}{U} = 3,
+  {1}{R} = 2, combined = 5).
 Fused spell resolves: execute Turn (make target a 0/1 with no abilities) THEN Burn (deal 2 damage).
 Net: opponent's 7/7 Dragon becomes a 0/1 with no abilities (evasion removed), then takes 2 damage.
 0/1 with 2 damage marked ≥ 1 toughness: dies.
 
-From cascade (cascade spell MV ≥ 5): find Turn // Burn (combined MV = 4 < 5). Cast ONE HALF.
+From cascade (cascade spell MV ≥ 6): find Turn // Burn (combined MV = 5 < 6). Cast ONE HALF.
 You choose Turn OR Burn, not both. Fuse doesn't apply from cascade (not from hand).
 Less efficient but still a free 2-damage spell from Burn.
 

@@ -105,7 +105,7 @@ DEFENSIVE USE (PROTECTION FROM REMOVAL):
 
 ## Canonical Example
 **Pouncing Shoreshark (top) + Gemrazer (middle) + base 2/2 creature (bottom):**
-The merged permanent on the battlefield is a Pouncing Shoreshark 3/3 flash, with reach+trample from Gemrazer and the base creature's abilities.
+The merged permanent on the battlefield is a Pouncing Shoreshark 4/3 flash, with reach+trample from Gemrazer and the base creature's abilities.
 
 Opponent plays Wrath of God (destroy all creatures). You respond with Ephemerate: "Exile target creature you control, then return it to the battlefield under its owner's control."
 

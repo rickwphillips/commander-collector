@@ -126,23 +126,23 @@ ADDITIONAL: CARD TYPE SWITCHING VIA TOPMOST
 
 ## Canonical Example
 **Emerge + Mutate optimization:**
-You have two mutate creatures in hand: Gemrazer ({1}{G}{G}: Beast, 4/4; "when it mutates, destroy artifact or enchantment") and Trumpeting Gnarr ({4}{G}: Beast, 5/5; "when it mutates, put a +1/+1 counter on each other creature you control"). You also have Illuna, Apex of Wishes ({3}{R/G}{U}{U}: emerge {5}{U}{U}).
+You have two mutate creatures in hand: Gemrazer ({3}{G}: Beast, 4/4; mutate {1}{G}{G}; "when it mutates, destroy artifact or enchantment") and Trumpeting Gnarr ({1}{G}{U}: Beast, 3/3; mutate {3}{G/U}{G/U}; "when it mutates, create a 3/3 green Beast creature token"). You also have Elder Deep-Fiend ({8}: 5/6; flash; emerge {5}{U}{U}).
 
 On the battlefield: a base 2/2 creature. You mutate both Gemrazer and Trumpeting Gnarr onto it over two turns.
 
 Stack order: You chose to put Gemrazer on top (so it's Gemrazer on top, Trumpeting Gnarr middle, 2/2 base).
 
-Merged permanent characteristics: Gemrazer (4/4, {1}{G}{G} mana cost, MV 3).
-All abilities: reach, trample (Gemrazer), +1/+1 counter effect on mutate (Trumpeting Gnarr), 2/2's abilities.
+Merged permanent characteristics: Gemrazer (4/4, {3}{G} mana cost, MV 4).
+All abilities: reach, trample (Gemrazer), Beast token creation on mutate (Trumpeting Gnarr), 2/2's abilities.
 
-Now you want to sacrifice this merged permanent for emerge to cast Illuna.
-Emerge {5}{U}{U}: reduce by sacrifice's MV = 3 (Gemrazer on top). Pay {2}{U}{U}.
+Now you want to sacrifice this merged permanent for emerge to cast Elder Deep-Fiend.
+Emerge {5}{U}{U}: reduce by sacrifice's MV = 4 (Gemrazer on top). Pay {1}{U}{U}.
 
-Alternative: if you'd put Trumpeting Gnarr ({4}{G}: MV 5) on top instead:
-Merged permanent MV = 5. Emerge cost reduction = 5. Pay {U}{U}.
-Saves {2} more mana.
+Alternative: if you'd put Trumpeting Gnarr ({1}{G}{U}: MV 3) on top instead:
+Merged permanent MV = 3. Emerge cost reduction = 3. Pay {2}{U}{U}.
+Actually Gemrazer (MV 4) on top is the BETTER option here for emerge fodder.
 
-Decision: which card on top matters for emerge sacrifice value. Trumpeting Gnarr on top = better emerge fodder. Gemrazer on top = better stats (4/4 vs 5/5, but closer to what you want for combat) and better destruction trigger when it mutates. Strategic tradeoff.
+Decision: which card on top matters for emerge sacrifice value. Gemrazer on top (MV 4) = better emerge discount. Trumpeting Gnarr on top (MV 3) = better Beast token trigger synergy. Strategic tradeoff.
 
 **Example 2 — Improvise + artifact creature mutated under:**
 You control an artifact creature: Arcbound Ravager ({2}: artifact, 0/0 with +1/+1 counters). You mutate Gemrazer ON TOP of Arcbound Ravager.

@@ -64,9 +64,9 @@ HASTE ON SUSPENDED CREATURES (702.62a):
   Casting the same card from hand (normally) doesn't grant haste.
   Haste lasts "until you lose control" — if an opponent steals the suspended creature, it
     loses haste (you lost control of the permanent it became).
-  This is powerful: Rift Bolt ({2}{R}: instant, deal 3 damage to any target; suspend 1—{R}):
+  This is powerful: Rift Bolt ({2}{R}: sorcery, deal 3 damage to any target; suspend 1—{R}):
     Suspend on turn 1 for {R}. Next turn: the last counter trigger fires, cast it for free.
-    It deals 3 damage. (Rift Bolt is an instant, not a creature — no haste applies here.)
+    It deals 3 damage. (Rift Bolt is a sorcery, not a creature — no haste applies here.)
   Greater Gargadon ({9}{R}: 9/7; suspend 10—{R}):
     Suspend on turn 1 for {R}. Each turn: remove a counter (10 turns).
     While suspended (10 turns): you may sacrifice permanents to Greater Gargadon?
@@ -105,8 +105,8 @@ PROLIFERATE AND TIME COUNTERS:
   Proliferate on vanishing permanent: ADD a time counter → extends the permanent's life.
     You can use proliferate with Vanishing creatures to keep them alive longer.
     Combine with Clockspinning (to remove counters) to control the timing.
-  Clockspinning ({U}: instant, "add or remove a time counter from target permanent or suspended card"):
-    Can remove ALL remaining time counters from a suspended card, forcing immediate cast.
+  Clockspinning ({U}: instant, buyback {3}, "choose a counter on target permanent or suspended card; remove that counter or put another of those counters on it"):
+    Can remove one time counter from a suspended card each cast (repeat with buyback to accelerate).
     Can add time counters to vanishing to extend life.
     Can remove the last time counter from vanishing to force sacrifice.
 
@@ -166,26 +166,22 @@ Proliferate interaction: if you proliferate on turn 5 (when Gargadon has 5 count
 
 Clockspinning interaction: cast Clockspinning targeting Greater Gargadon, remove 1 counter.
   Now Gargadon has 4 counters (from 5). Speeds up its emergence by 1 turn.
-  Cast Clockspinning with buyback ({1}{U} extra): remove counter AND return Clockspinning to hand.
+  Cast Clockspinning with buyback ({3} extra): remove counter AND return Clockspinning to hand.
   Repeat each turn: accelerate Gargadon's emergence.
 
 **Example 2 — Vanishing and Vampire Hexmage:**
-You control a Phyrexian Ingester ({5}{U}: 3/3 vanishing 2; "when Phyrexian Ingester enters, exile target nontoken creature"):
-Ingester entered with 2 time counters.
+You control a hypothetical vanishing 2 creature (using this example to illustrate vanishing + counter removal).
+The permanent entered with 2 time counters.
 Upkeep 1: remove 1 counter. 1 remaining.
-Upkeep 2: remove last counter. Vanishing trigger: sacrifice Phyrexian Ingester.
+Upkeep 2: remove last counter. Vanishing trigger: sacrifice the permanent.
 
-But: before upkeep 2, opponent controls Vampire Hexmage ({1}{B}: 2/1, "when Vampire Hexmage enters, remove all counters from target permanent").
+But: before upkeep 2, opponent controls Vampire Hexmage ({B}{B}: 2/1, first strike, "sacrifice this creature: remove all counters from target permanent").
 
-They target Phyrexian Ingester. Remove all counters (1 remaining → 0).
-"When the LAST time counter is removed" — the Hexmage removed the last counter.
-Vanishing trigger fires IMMEDIATELY (next priority window): sacrifice Phyrexian Ingester.
-Ingester goes to GY before your upkeep. The exiled creature (from Ingester's ETB) stays in exile.
-(The exiled creature is "exiled until Phyrexian Ingester leaves the battlefield" — it's now back.)
+They sacrifice Hexmage targeting your vanishing permanent. Remove all counters (1 remaining → 0).
+"When the LAST time counter is removed" — the Hexmage's activated ability removed the last counter.
+Vanishing trigger fires IMMEDIATELY (next priority window): sacrifice the permanent.
 
-Wait: Phyrexian Ingester's exile effect: "when it enters, exile target creature... return that creature when Ingester leaves the battlefield." If Ingester dies early (via vanishing triggered by Hexmage), the exiled creature returns.
-
-Lesson: opponents can weaponize vanishing by removing counters early to return exiled creatures.
+Lesson: opponents can weaponize vanishing by removing counters early to trigger the sacrifice sooner than expected. Vampire Hexmage (sacrifice to remove all counters) is a clean answer to vanishing permanents your opponents are relying on.
 
 ## Commonly Confused With
 - **P416 (Split Second)** — Suspending a card is a special action allowed during split second (116.2d). Vanishing sacrifice is a triggered ability (also allowed during split second). Both mechanics can be relevant in split-second scenarios.

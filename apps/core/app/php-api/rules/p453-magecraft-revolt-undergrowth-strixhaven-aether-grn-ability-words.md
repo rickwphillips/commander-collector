@@ -113,7 +113,7 @@ Count: creature CARDS in your graveyard only
 **Magecraft:**
 - *Prismari Command* + Magecraft creature in play: casting Prismari Command → 1 Magecraft trigger.
 - *Grapeshot* in a deck with *Archmage Emeritus*: Cast Grapeshot (1 trigger), Storm creates 9 copies (9 triggers) = 10 total draws from Archmage Emeritus's Magecraft. This is a one-turn draw-10 engine.
-- *Lorehold Apprentice*: "Magecraft — Whenever you cast or copy an instant or sorcery spell, create a 1/1 white and red Spirit creature token." In a storm deck, Magecraft creates tokens for every copy made.
+- *Lorehold Apprentice*: "Magecraft — Whenever you cast or copy an instant or sorcery spell, until end of turn, Spirit creatures you control gain '{T}: This creature deals 1 damage to each opponent.'" In a spirit-heavy deck, Magecraft lets all your Spirits ping opponents for the turn. (Note: Lorehold Apprentice does NOT create Spirit tokens — it grants a pinging activated ability to existing Spirit creatures.)
 
 **Revolt:**
 - *Fatal Push* is the iconic Revolt card: base mode kills creatures with MV 2 or less; revolt mode kills creatures with MV 4 or less. Fetch + Fatal Push is a staple interaction: fetchland leaves → revolt active → Fatal Push destroys a 4-MV creature.

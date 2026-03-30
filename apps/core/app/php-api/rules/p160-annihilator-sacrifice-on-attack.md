@@ -82,6 +82,8 @@ ANNIHILATOR:
 - **Multiple annihilator triggers** each demand separate sacrifices.
 - **Annihilator is brutal in Commander** — multiple opponents each sacrifice if attacked.
 - **Emrakul, the Aeons Torn** with Annihilator 6 is the definitive annihilator card.
+- **Creatures sacrificed via annihilator can't block** — they're gone before the declare blockers step. (Gatherer ruling 2010-06-15)
+- **Attacking a planeswalker: if the planeswalker is sacrificed to annihilator, the attacker continues attacking and may be blocked** — but won't deal damage to the player since it was attacking the planeswalker, not the player. (Gatherer ruling 2010-06-15)
 
 ## Canonical Example
 **Emrakul, the Aeons Torn (Annihilator 6, Flying, Protection from colored spells, CMC 15):**

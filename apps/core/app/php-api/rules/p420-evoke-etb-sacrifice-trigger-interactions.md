@@ -58,10 +58,8 @@ STIFLE/DISALLOW ON THE EVOKE SACRIFICE TRIGGER:
   You spend {2}{U} + 1 counterspell to keep Mulldrifter. Trade-off vs. just casting normally.
 
 HUSHBRINGER AND TORPOR ORB INTERACTION:
-  Hushbringer ({1}{W}: 1/2 fairy; "creatures entering the battlefield don't cause triggered
-    abilities to trigger"):
-  Torpor Orb ({2}: artifact; "creatures entering the battlefield don't cause triggered abilities
-    to trigger"):
+  Hushbringer ({1}{W}: 1/2 Faerie; "creatures entering or dying don't cause abilities to trigger"):
+  Torpor Orb ({2}: artifact; "creatures entering don't cause abilities to trigger"):
   With Hushbringer or Torpor Orb out:
     You evoke Mulldrifter ({2}{U}).
     Mulldrifter enters. BUT: Hushbringer prevents triggered abilities from triggering when creatures enter.
@@ -71,7 +69,7 @@ HUSHBRINGER AND TORPOR ORB INTERACTION:
     Result: Mulldrifter is on the battlefield. NO draw. NO sacrifice. Just a 2/2 flier for {2}{U}.
     This is EXTREMELY powerful. You paid the evoke (cheap) cost and got the creature for free.
   Notable: the ETB and the sacrifice are both prevented. You gain the creature, lose the ETB effect.
-  With Grief ({3}{B}{B}: 3/2; evoke — exile a black card from hand):
+  With Grief ({2}{B}{B}: 3/2; evoke — exile a black card from hand):
     Grief's ETB: "when Grief enters, target opponent reveals their hand. You choose a nonland
       card from it. That player discards that card."
     Grief's evoke cost: exile a black card from your hand.
@@ -85,16 +83,16 @@ HUSHBRINGER AND TORPOR ORB INTERACTION:
 PITCH EVOKE ELEMENTALS (MODERN HORIZONS 2):
   Five elementals with "free" evoke costs by exiling a card of a specific color:
     Grief: exile black card → opponent discards.
-    Solitude: exile white card → exile target creature.
-    Subtlety: exile blue card → put target spell/creature on top of library.
-    Endurance: exile green card → exile all GY cards, put on bottom of libraries.
+    Solitude: exile white card → exile up to one other target creature (its controller gains life equal to its power).
+    Subtlety: exile blue card → put target creature or planeswalker spell on top or bottom of its owner's library (their choice).
+    Endurance: exile green card → target player puts all cards from their graveyard on the bottom of their library in a random order.
     Fury: exile red card → distribute 4 damage.
   These are commonly played WITHOUT evoke in midrange/control decks.
   But the key "Ephemerate" interaction:
     You evoke Grief (exile black card, trigger: force discard).
     Evoke sacrifice trigger goes on stack.
     Cast Ephemerate ({W}: instant — "exile target creature you control, return it to the
-      battlefield under your control; rebound") targeting Grief in response to evoke trigger.
+      battlefield under its owner's control; rebound") targeting Grief in response to evoke trigger.
     Ephemerate resolves: Grief is exiled (leaves battlefield). Evoke sacrifice trigger checks:
       "when this permanent enters, if evoke cost was paid, sacrifice it."
       Wait — the trigger is already on the stack. It targets Grief (a permanent).
@@ -164,7 +162,7 @@ EVOKE + CLONE:
 
 ## Canonical Example
 **Stifle + Evoked Shriekmaw:**
-Shriekmaw ({4}{B}: 3/2 terror fear; evoke {1}{B}; "when Shriekmaw enters, destroy target nonartifact, nonblack creature"):
+Shriekmaw ({4}{B}: 3/2 fear; evoke {1}{B}; "when Shriekmaw enters, destroy target nonartifact, nonblack creature"):
 
 You evoke Shriekmaw for {1}{B}: enters.
 Two triggers go on the stack:
@@ -183,7 +181,7 @@ Wait — you want this? Yes! You cast Shriekmaw for {1}{B} (evoke cost), destroy
 The opponent spent {U} to keep your creature alive. Good deal for you.
 
 **Example 2 — Hushbringer + Mulldrifter:**
-You control Hushbringer ({1}{W}: 1/2 faerie; "creatures entering don't cause triggered abilities to trigger").
+You control Hushbringer ({1}{W}: 1/2 faerie; "creatures entering or dying don't cause abilities to trigger").
 You evoke Mulldrifter ({2}{U}): pays evoke cost, Mulldrifter enters.
 
 Hushbringer prevents triggered abilities from triggering when creatures enter.

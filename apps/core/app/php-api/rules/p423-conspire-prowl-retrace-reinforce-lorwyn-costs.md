@@ -145,13 +145,13 @@ REINFORCE (702.77a, 702.77b):
       The reinforce ability continues to exist on the object in all zones.
       Effects that care about "objects with activated abilities" treat reinforce permanents
         as having an activated ability — even on the battlefield, even in GY.
-      Example: Vedalken Shackles ({3}: artifact; "{T}: gain control of target creature with power
-        ≤ the number of Islands you control until Shackles leaves"): not directly relevant.
-      Better: Biomancer's Familiar ({G}{U}: 2/2; "activated abilities of creatures your opponents
-        control cost {2} less to activate"): reduces activated ability costs. If opponent has a
+      Example: Vedalken Shackles ({3}: artifact; "{2}{T}: gain control of target creature with power
+        ≤ the number of Islands you control for as long as this artifact remains tapped"): not directly relevant.
+      Better: Biomancer's Familiar ({G}{U}: 2/2; "activated abilities of creatures you
+        control cost {2} less to activate"): reduces activated ability costs. If you have a
         reinforce creature on the battlefield, does Biomancer's Familiar reduce the reinforce
         cost? The reinforce ability IS an activated ability that exists on the battlefield (702.77b),
-        but can only be ACTIVATED from the hand. Biomancer's Familiar reduces the cost... but
+        but can only be ACTIVATED from the hand. Biomancer's Familiar would reduce the cost... but
         the ability can't be activated from the battlefield anyway. In practice: no interaction.
     REINFORCE IS NOT A MANA ABILITY:
       Reinforce doesn't add mana. It's a non-mana activated ability.
@@ -175,13 +175,13 @@ REINFORCE (702.77a, 702.77b):
 **Conspire + Wort, the Raidmother:**
 Wort, the Raidmother ({4}{R/G}{R/G}: 3/3 Goblin Shaman; "whenever you cast an instant or sorcery spell, if you control two or more creatures that share a color with it, you may copy that spell"):
 
-You cast Firespout ({X}{R}{G}: sorcery; "Firespout deals X damage to each creature without flying, or X damage to each creature with flying, or both — one or both of those modes"):
+You cast Firespout ({2}{R/G}: sorcery; "Firespout deals 3 damage to each creature without flying if {R} was spent to cast it, and 3 damage to each creature with flying if {G} was spent"):
 Firespout has conspire? Wait — Wort has a triggered ability that copies, not conspire proper.
 Let me use a better example for Conspire specifically.
 
-Wurmweaver Coil ({G}{G}{G}{G}{G}{G}: enchantment Aura; "enchanted creature gets +6/+6"; conspire):
+Wurmweaver Coil ({4}{G}{G}: enchantment Aura; "enchanted creature gets +6/+6"; conspire):
 You control two untapped green creatures.
-Cast Wurmweaver Coil for {G}{G}{G}{G}{G}{G} (6 mana) + tap two green creatures (conspire cost).
+Cast Wurmweaver Coil for {4}{G}{G} (6 mana) + tap two green creatures (conspire cost).
 Conspire trigger fires: copy the spell. Choose new target for the copy.
 Result: two copies of Wurmweaver Coil — two creatures each getting +6/+6.
 
@@ -194,11 +194,11 @@ Wurmweaver Coil resolves normally (enchants one creature for +6/+6). You spent t
 conspire additional cost for nothing (the cost was paid; the trigger just did nothing).
 
 **Example 2 — Retrace vs. Grafdigger's Cage:**
-Your GY: Call the Skybreaker ({5}{R}{G}: sorcery; "create two 5/5 red and green Element tokens"; retrace).
+Your GY: Call the Skybreaker ({5}{U/R}{U/R}: sorcery; "create a 5/5 blue and red Elemental creature token with flying"; retrace).
 
 You have lands in hand and the mana available.
-Normal situation: discard a land, pay {5}{R}{G}, cast Call the Skybreaker from GY.
-Resolves: two 5/5 tokens. Call the Skybreaker goes back to your GY (retrace cards aren't exiled).
+Normal situation: discard a land, pay {5}{U/R}{U/R}, cast Call the Skybreaker from GY.
+Resolves: one 5/5 flying Elemental token. Call the Skybreaker goes back to your GY (retrace cards aren't exiled).
 Next main phase: retrace it again with another land.
 
 Opponent plays Grafdigger's Cage: "players can't cast spells from graveyards or libraries."

@@ -28,7 +28,10 @@ import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import ReplayIcon from '@mui/icons-material/Replay';
 import SettingsIcon from '@mui/icons-material/Settings';
 import TextFieldsIcon from '@mui/icons-material/TextFields';
-import type { PlayerState } from '../types';
+import ChatIcon from '@mui/icons-material/Chat';
+import MinimizeIcon from '@mui/icons-material/Minimize';
+import Badge from '@mui/material/Badge';
+import type { PlayerState, CommanderDamageMap } from '../types';
 
 function D20Icon({ size = 16 }: { size?: number }) {
   return (
@@ -80,6 +83,7 @@ interface CenterZoneProps {
   onToggleHighlightMode: () => void;
   soundEnabled: boolean;
   onToggleSound: () => void;
+  commanderDamage: CommanderDamageMap;
 }
 
 function rollDie(sides: number): number {
@@ -113,6 +117,7 @@ export function CenterZone({
   onToggleHighlightMode,
   soundEnabled,
   onToggleSound,
+  commanderDamage,
 }: CenterZoneProps) {
   type RollEntry = { label: string; rolls: (number | string)[]; total: number | null; color: string };
   const [history, setHistory] = useState<RollEntry[]>([]);
@@ -127,6 +132,10 @@ export function CenterZone({
   const [diceOpen, setDiceOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesDraft, setNotesDraft] = useState('');
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMinimized, setChatMinimized] = useState(false);
+  const [chatHasNewContent, setChatHasNewContent] = useState(false);
+  const [chatSearching, setChatSearching] = useState(false);
   const [prevTurnTooltip, setPrevTurnTooltip] = useState(false);
   const [choosingFirst, setChoosingFirst] = useState(false);
   const [rollOffState, setRollOffState] = useState<RollOffState>({ phase: 'idle' });
@@ -140,6 +149,8 @@ export function CenterZone({
   const lpFired = useRef(false);
   const diceAudio = useRef<{ d20: HTMLAudioElement | null; d6: HTMLAudioElement | null }>({ d20: null, d6: null });
   const lastRoundScores = useRef<Record<string, number>>({});
+  const chatUrlRef = useRef<string | null>(null);
+  const chatIframeRef = useRef<HTMLIFrameElement | null>(null);
   useEffect(() => {
     const basePath = process.env.NODE_ENV === 'production' ? '/app/projects/commander' : '';
     const d20 = new Audio(`${basePath}/audio/d-20.mp3`);
@@ -148,6 +159,40 @@ export function CenterZone({
     d6.preload  = 'auto';
     diceAudio.current = { d20, d6 };
   }, []);
+
+  // Push real-time timer state to the iframe every second while chat is open
+  useEffect(() => {
+    if (!(chatOpen || chatMinimized) || !turnTimerSeconds) return;
+    const iframeWin = chatIframeRef.current?.contentWindow;
+    if (!iframeWin) return;
+    iframeWin.postMessage({
+      type: 'rules_timer_update',
+      timerSeconds: turnTimerSeconds,
+      elapsedSeconds,
+      remaining: Math.max(0, turnTimerSeconds - elapsedSeconds),
+      currentPlayer: firstPlayerSet ? (players[currentPlayerIdx]?.playerName ?? null) : null,
+      turnNumber: firstPlayerSet ? turnNumber : null,
+    }, '*');
+  }, [elapsedSeconds, chatOpen, chatMinimized, turnTimerSeconds, firstPlayerSet, players, currentPlayerIdx, turnNumber]);
+
+  // Listen for save-to-notes and new-content messages from the embedded Rules Guru iframe
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === 'rules_save_notes' && typeof event.data.content === 'string') {
+        const incoming = event.data.content as string;
+        onNotesChange(notes ? `${notes}\n\n---\n\n${incoming}` : incoming);
+      }
+      if (event.data?.type === 'rules_new_content') {
+        if (chatMinimized) setChatHasNewContent(true);
+      }
+      if (event.data?.type === 'rules_loading') {
+        setChatSearching(!!event.data.value);
+        if (!event.data.value && chatMinimized) setChatHasNewContent(true);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [notes, onNotesChange, chatMinimized]);
 
   const addRoll = (label: string, sides: number | null) => {
     animTimers.current.forEach(clearTimeout);
@@ -541,6 +586,86 @@ export function CenterZone({
           >
             <CasinoIcon sx={{ fontSize: 28 }} />
           </IconButton>
+
+          {/* Rules Guru chat toggle */}
+          <IconButton
+            onClick={() => {
+              if (chatMinimized) {
+                setChatMinimized(false);
+                setChatHasNewContent(false);
+              } else {
+                // Build and freeze the URL once when opening fresh
+                const ctx = {
+                  players: players.map((p, idx) => {
+                    const entry: Record<string, unknown> = {
+                      playerName: p.playerName,
+                      deckName: p.deckName,
+                      commander: p.commander?.name ?? null,
+                      partner: p.partner?.name ?? null,
+                      deckId: p.deckId,
+                      life: p.life,
+                      isEliminated: p.isEliminated,
+                    };
+                    if (p.poison > 0) entry.poison = p.poison;
+                    if (p.energy > 0) entry.energy = p.energy;
+                    if (p.experience > 0) entry.experience = p.experience;
+                    if (p.commanderTax > 0) entry.commanderTax = p.commanderTax;
+                    if (p.isMonarch) entry.isMonarch = true;
+                    if (p.hasInitiative) entry.hasInitiative = true;
+                    if (p.hasCitysBlessing) entry.hasCitysBlessing = true;
+                    const dmgReceived = commanderDamage[idx];
+                    if (dmgReceived) {
+                      const dmg: Record<string, number[]> = {};
+                      for (const [srcIdx, vals] of Object.entries(dmgReceived)) {
+                        const [regular, partner] = vals as [number, number];
+                        if (regular > 0 || partner > 0) {
+                          dmg[players[Number(srcIdx)]?.playerName ?? srcIdx] = partner > 0 ? [regular, partner] : [regular];
+                        }
+                      }
+                      if (Object.keys(dmg).length > 0) entry.commanderDamage = dmg;
+                    }
+                    return entry;
+                  }),
+                  turnNumber: firstPlayerSet ? turnNumber : null,
+                  currentPlayer: firstPlayerSet ? (players[currentPlayerIdx]?.playerName ?? null) : null,
+                  timerSeconds: turnTimerSeconds > 0 ? turnTimerSeconds : null,
+                  elapsedSeconds: turnTimerSeconds > 0 ? elapsedSeconds : null,
+                };
+                const ctxParam = encodeURIComponent(btoa(JSON.stringify(ctx)));
+                const base = typeof window !== 'undefined' && process.env.NODE_ENV === 'development'
+                  ? 'http://localhost:3003'
+                  : '/app/projects/commander/rules';
+                chatUrlRef.current = `${base}/chat?ctx=${ctxParam}`;
+                setChatOpen(true);
+              }
+            }}
+            sx={{
+              position: 'absolute', bottom: 6, left: 6, color: 'text.secondary',
+              ...(chatSearching && {
+                animation: 'chatGlow 1.5s ease-in-out infinite',
+                '@keyframes chatGlow': {
+                  '0%, 100%': { opacity: 0.5, filter: 'drop-shadow(0 0 2px currentColor)' },
+                  '50%':      { opacity: 1,   filter: 'drop-shadow(0 0 8px currentColor)' },
+                },
+              }),
+              ...(!chatSearching && chatMinimized && {
+                animation: 'chatPulse 1.5s ease-in-out infinite',
+                '@keyframes chatPulse': {
+                  '0%, 100%': { opacity: 1 },
+                  '50%':      { opacity: 0.5 },
+                },
+              }),
+            }}
+            title={chatMinimized ? 'Restore Rules Guru' : 'Ask Rules Guru'}
+          >
+            <Badge
+              variant="dot"
+              color="error"
+              invisible={!chatHasNewContent}
+            >
+              <ChatIcon sx={{ fontSize: 24 }} />
+            </Badge>
+          </IconButton>
         </CardContent>
 
         {/* Settings overlay */}
@@ -631,6 +756,39 @@ export function CenterZone({
             </Stack>
           </Box>
         )}
+
+        {/* Rules Guru chat Dialog */}
+        <Dialog
+          open={chatOpen && !chatMinimized}
+          keepMounted
+          onClose={() => { setChatOpen(false); setChatMinimized(false); setChatHasNewContent(false); setChatSearching(false); chatUrlRef.current = null; }}
+          fullWidth
+          maxWidth="md"
+          PaperProps={{ sx: { height: '85vh', display: 'flex', flexDirection: 'column' } }}
+        >
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1.5, fontWeight: 600, fontSize: '1rem' }}>
+            Rules Guru — Game Context
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <IconButton size="small" onClick={() => { setChatMinimized(true); setChatHasNewContent(false); }} title="Minimize">
+                <MinimizeIcon />
+              </IconButton>
+              <IconButton size="small" onClick={() => { setChatOpen(false); setChatMinimized(false); setChatHasNewContent(false); setChatSearching(false); chatUrlRef.current = null; }}>
+                <CloseIcon />
+              </IconButton>
+            </Box>
+          </DialogTitle>
+          <DialogContent sx={{ p: 0, flex: 1, overflow: 'hidden' }}>
+            {(chatOpen || chatMinimized) && chatUrlRef.current && (
+              <iframe
+                ref={chatIframeRef}
+                src={chatUrlRef.current}
+                style={{ width: '100%', height: '100%', border: 'none' }}
+                title="Rules Guru"
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+
 
         {/* Dice & More overlay */}
         {diceOpen && (

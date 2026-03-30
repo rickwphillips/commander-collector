@@ -81,11 +81,11 @@ Condition check: "Do I control a creature with power 4 or greater?"
 - Ferocious checks power "4 or greater" — a creature with a base power of 3 that has been given +1/+0 by an effect qualifies (power is currently 4). A creature with base 5 that has been reduced to 3 does not qualify.
 - Toughness doesn't matter for Ferocious. A 4/1 qualifies; a 3/10 does not.
 - The check is a snapshot at resolution. If you cast a Ferocious spell and the opponent kills your 4-power creature in response, Ferocious is NOT satisfied at resolution.
-- Example: *Become Immense* (Khans) — "Ferocious — If you control a creature with power 4 or greater, instead of +6/+6 until end of turn, [effect]." This checks at resolution.
+- Example: *Stubborn Denial* (Khans) — "Counter target noncreature spell unless its controller pays {1}. Ferocious — If you control a creature with power 4 or greater, counter that spell instead." This checks at resolution. (Note: *Become Immense* does NOT have Ferocious — it is a Delve spell that simply grants +6/+6 until end of turn.)
 
 **Formidable:**
 - Identical to Ferocious mechanically. Same power-4+ check, same timing.
-- Key card: *Hydra Broodmaster* (Magic Origins): "Formidable — {X}{X}{G}: Monstrosity X. Activate only if Hydra Broodmaster has power 4 or greater." Wait — the Formidable ability here is actually on the Hydra's own power check. If the Hydra has been reduced below 4, you can't activate.
+- Key card: *Surrak, the Hunt Caller* (Magic Origins) is a Formidable card: "At the beginning of combat on your turn, if creatures you control have total power 8 or greater, target creature you control gains haste until end of turn." (Note: Hydra Broodmaster does NOT have Formidable — it has {X}{X}{G}: Monstrosity X with no Formidable condition.)
 - More commonly on instants/sorceries: *Atarka's Command* (Khans) has options including a Formidable-adjacent power check.
 
 ## Canonical Examples

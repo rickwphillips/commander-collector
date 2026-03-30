@@ -90,15 +90,15 @@ When [creature with Poisonous N] deals combat damage to a player:
 ## Canonical Examples
 
 **Amplify:**
-- *Canopy Crawler* (Onslaught) — "Amplify 1: As Canopy Crawler enters, you may reveal any number of Beast and/or Elf cards from your hand. It enters with a +1/+1 counter on it for each card revealed this way." Revealing 4 Beast cards while casting Canopy Crawler → enters as a 7/6 (3/2 base + 4 counters).
+- *Canopy Crawler* (Onslaught) — "Amplify 1: As Canopy Crawler enters, you may reveal any number of Beast cards from your hand. It enters with a +1/+1 counter on it for each card revealed this way." Revealing 4 Beast cards while casting Canopy Crawler → enters as a 6/6 (2/2 base + 4 counters).
 
 **Recover:**
-- *Withered Wretch* is in your graveyard (it has Recover {2}{B}). A creature dies to lethal combat damage. Recover triggers. You pay {2}{B}: Withered Wretch returns to hand. If you decline, Withered Wretch is exiled.
+- *Grim Harvest* is in your graveyard (it has Recover {2}{B}). A creature dies to lethal combat damage. Recover triggers. You pay {2}{B}: Grim Harvest returns to hand. If you decline, Grim Harvest is exiled. (Note: Withered Wretch does NOT have Recover; it is a {B}{B} 2/2 that simply has "{1}: Exile target card from a graveyard.")
 - *Grim Harvest* — "Recover {1}{B}" — the classic Recover card. Careful: if Grim Harvest is in your GY and you have two creatures die simultaneously, two recover triggers both fire; you'll need to pay {1}{B} for the first trigger or exile Grim Harvest, preventing the second trigger from doing anything.
 
 **Poisonous:**
-- *Pit Scorpion* (Ice Age, errata'd to have Poisonous 1): whenever it deals combat damage to a player, that player gets 1 poison counter (in addition to the life loss). The player dies when they reach 10 poison counters.
-- *Crypt Cobra* (Mirage, Poisonous 4): Dealing combat damage to a player gives them 4 poison counters. A single hit puts a player halfway to losing.
+- *Pit Scorpion* (Ice Age): "Whenever this creature deals damage to a player, that player gets a poison counter." Note: Pit Scorpion uses the original oracle text — it has NOT been errata'd to use the formal Poisonous keyword. Its wording says "deals damage" (not specifically combat damage), and it grants 1 poison counter per damage event.
+- *Crypt Cobra* (Mirage): Whenever it attacks and isn't blocked, the defending player gets a poison counter. The card uses the original Mirage-era oracle text (not the modern Poisonous keyword) and grants only 1 poison counter per unblocked hit, not 4.
 
 ## Commonly Confused With
 

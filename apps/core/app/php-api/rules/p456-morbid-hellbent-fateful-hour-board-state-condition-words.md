@@ -82,8 +82,8 @@ Check: Does the affected player have 5 or fewer life right now?
 **Hellbent:**
 - Hellbent rewards aggressive discard strategies (Rakdos-style) where your hand is emptied early.
 - If you discard your last card to cast a madness card, you have zero cards in hand while the Hellbent check would occur — but the madness spell itself is on the stack, not in hand.
-- Key card interaction: *Hellhole Flailer* (Return to Ravnica adjacent): "Hellbent — {1}, Sacrifice Hellhole Flailer: It deals damage equal to its power to any target. Activate only if you have no cards in hand." Must have zero cards WHEN activating.
-- Key card: *Anthem of Rakdos* — "Whenever a creature you control attacks, it gets +2/+0 until end of turn. Hellbent — If you have no cards in hand, each opponent loses 2 life."
+- Key card interaction: *Hellhole Flailer* ({1}{B}{R}, 3/2 Unleash): "{2}{B}{R}, Sacrifice this creature: It deals damage equal to its power to target player or planeswalker." (Note: Hellhole Flailer does NOT have a Hellbent ability; it has the Unleash mechanic and a sacrifice ability. For a Hellbent activated-ability example, see Anthem of Rakdos above.)
+- Key card: *Anthem of Rakdos* — "Whenever a creature you control attacks, it gets +2/+0 until end of turn and this enchantment deals 1 damage to you. Hellbent — As long as you have no cards in hand, if a source you control would deal damage to a permanent or player, it deals double that damage instead."
 
 **Fateful Hour:**
 - Fateful Hour rewards low-life situations, creating high-tension game states.
@@ -97,7 +97,7 @@ Check: Does the affected player have 5 or fewer life right now?
 - *Garruk, the Veil-Cursed* (DFC): "Morbid — At the beginning of your upkeep, if a creature died last turn, put a +1/+1 counter on each creature you control." (Note: "last turn" vs. "this turn" matters — this is a trigger with intervening if clause.)
 
 **Hellbent:**
-- *Anthem of Rakdos*: "Whenever a creature you control attacks, it gets +2/+0 until end of turn. Hellbent — If you have no cards in hand, each opponent loses 2 life." Playing aggressively, discarding your hand to Rakdos mechanics creates repeated life drain.
+- *Anthem of Rakdos*: "Whenever a creature you control attacks, it gets +2/+0 until end of turn and the enchantment deals 1 damage to you. Hellbent — As long as you have no cards in hand, if a source you control would deal damage to a permanent or player, it deals double that damage instead." Playing aggressively and emptying your hand turns all your damage into double damage.
 
 **Fateful Hour:**
 - *Gather the Townsfolk* (Dark Ascension): Gets 5 tokens instead of 2 if you're at 5 or fewer life. A perfect topdeck when losing.

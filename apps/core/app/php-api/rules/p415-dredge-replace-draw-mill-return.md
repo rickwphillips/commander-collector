@@ -104,7 +104,7 @@ DREDGE AND REST IN PEACE:
 
 DREDGE + NOTION THIEF (OPPONENT REDIRECT):
   Notion Thief ({2}{U}{B}: 3/1 flash; "if an opponent would draw a card except the first one
-    they draw each turn, that player skips that draw and you draw a card instead"):
+    they draw in each of their draw steps, that player skips that draw and you draw a card instead"):
   An opponent has Notion Thief on the battlefield. You would draw on your draw step.
   Two replacement effects compete for your draw:
     A. Notion Thief: skip the draw (except first draw per turn).
@@ -129,9 +129,9 @@ THE DREDGE DECK PATTERN:
     Life from the Loam ({1}{G}: sorcery, return up to 3 target lands from GY to hand; dredge 3).
     Narcomoeba ({1}{U}: 1/1 flier; "when Narcomoeba is put into your GY from library,
       you may put it onto the battlefield").
-    Ichorid ({3}{B}: 3/1; at beginning of opponent's upkeep, sacrifice unless exile a
-      black creature from your GY; "when Ichorid is put into GY from anywhere, at beginning
-      of next end step during your upkeep, return Ichorid to the battlefield").
+    Ichorid ({3}{B}: 3/1 haste; "at the beginning of the end step, sacrifice this creature;
+      at the beginning of your upkeep, if this card is in your GY, you may exile a black
+      creature card other than Ichorid from your GY. If you do, return Ichorid to the battlefield").
 
   Turn 1: Discard Stinkweed Imp or Grave-Troll to a discard outlet (Faithless Looting).
   Draw step: replace draw with dredge. Mill 5-6 cards.

@@ -50,16 +50,16 @@ ENCORE (702.141):
     Encore: creates tokens from the GY after the original creature is dead.
     Both create tokens that attack each opponent. Both sacrifice the tokens after combat.
     Key difference: encore is post-death recursion; myriad is a living creature ability.
-  EXAMPLE — TOXRILL, THE CORROSIVE:
-    Toxrill, the Corrosive ({5}{B}{B}: 7/7, "at the beginning of each end step, put a slime counter
-      on each creature you don't control. Creatures you don't control get -1/-1 for each slime counter
-      on them. When a creature you don't control with a slime counter dies, create a 1/1 token.
-      Encore {7}{B}{B}"):
-    Encore Toxrill from GY: pay {7}{B}{B}, exile Toxrill.
-    3 opponents: create 3 Toxrill tokens. Each attacks a different opponent.
-    Each Toxrill token (7/7!): ETB if any... (Toxrill's ETB is the end-step ability, not ETB).
-    3 Toxrills attacking all three opponents simultaneously. Each opponent takes 7+ damage.
+  EXAMPLE — ANGEL OF INDEMNITY:
+    Angel of Indemnity ({5}{W}: 5/5 Flying, Lifelink, "When it enters, return target permanent card
+      with MV 4 or less from your GY to battlefield. Encore {6}{W}{W}"):
+    Encore from GY: pay {6}{W}{W}, exile Angel of Indemnity.
+    3 opponents: create 3 Angel tokens. Each attacks a different opponent.
+    Each Angel token ETB: trigger fires → return a permanent card from GY to battlefield!
+    3 ETB triggers from 3 tokens = return 3 permanents from GY.
+    Each token: 5/5 Flying Lifelink, attacks an opponent for 5 damage + lifelink.
     At end of turn: sacrifice all 3 tokens.
+    Note: Toxrill the Corrosive ({5}{B}{B}, 7/7) does NOT have encore — it's a common misconception.
 
 BLITZ (702.152):
   THREE ABILITIES (similar to Dash, P397):
@@ -85,23 +85,13 @@ BLITZ (702.152):
     You MUST sacrifice it at the beginning of the next end step (if it's still on the battlefield).
     If it's already dead (killed by opponent or by combat): the delayed trigger fires but can't sacrifice
       (creature is already in GY). The draw trigger already fired when it died.
-  EXAMPLE — CORPSE EXPLOSION / OB NIXILIS ADVERSARY:
-    Ob Nixilis, the Adversary ({1}{B}{R}: 4/3, blitz {B}{R}):
-      Normal cast ({1}{B}{R}): 4/3. No haste. No draw.
-      Blitz cast ({B}{R}): 4/3 with haste. When sacrificed or killed: draw a card.
-      Sacrifice at next end step.
-      For {B}{R}: get 4 damage + a draw. Often better than paying {1}{B}{R} for a 4/3 without haste.
-      Plus: Ob Nixilis's ETB: "If a non-token creature was sacrificed this turn, create a token
-        copy of Ob Nixilis that's a 4/3 devil without the blitz ability."
-      Wait, let me be precise — Ob Nixilis, the Adversary's actual rules:
-        Casualty N cost (see casualty section above). Not blitz specifically.
-      Let me use a simpler blitz example.
-    Strike it Rich ({R}: Sorcery, blitz {R}, "create a Treasure token"):
-      Blitz version: pay {R} normally for the Sorcery effect.
-      Wait, Strike it Rich creates a Treasure when cast normally. Does it have blitz?
-      Let me use the actual blitz card: Cemetery Gatekeeper ({1}{R}: 2/1 first strike, blitz {R}).
-      Blitz {R}: pay {R} instead of {1}{R}. 2/1 first strike haste. Sacrifice at EOT. Draw a card when dies.
-      For {R}: a 2/1 first strike that attacks immediately, then draws a card when sacrificed.
+  EXAMPLE — NIGHT CLUBBER:
+    Night Clubber ({1}{B}{B}: 2/2, blitz {2}{B}, "when this enters, creatures your opponents control
+      get -1/-1 until end of turn"):
+      Normal cast ({1}{B}{B}): 2/2. ETB fires (-1/-1 to opponents' creatures). No haste. Stays.
+      Blitz cast ({2}{B}): 2/2 with haste. ETB fires. Sacrifice at next end step. Draw when dies.
+      Note: Ob Nixilis, the Adversary is a PLANESWALKER (not a creature) with Casualty X — it does
+        NOT have Blitz. Cemetery Gatekeeper ({1}{R}: 2/1 first strike) also has no Blitz.
 
 CASUALTY (702.153):
   TWO ABILITIES:
@@ -125,20 +115,14 @@ CASUALTY (702.153):
     You can sacrifice the creature to get something valuable in GY (Persist, Undying, Afterlife, etc.).
     Sacrificing something with Afterlife: you get spirits AND the spell copy. Combo!
   EXAMPLE — OB NIXILIS, THE ADVERSARY:
-    Ob Nixilis, the Adversary ({1}{B}{R}: 3/2 flying, casualty 2, ETB: "if a non-token creature
-      was sacrificed this turn, each opponent loses 1 life and you gain 1 life"):
-    Casualty 2: sacrifice a creature with power 2 or greater.
-    When you do: copy Ob Nixilis. You may choose new targets for the copy (if any).
-    A copy of Ob Nixilis enters the battlefield!
-    Wait: casualty copies the SPELL. The copy of the spell resolves → creates a token copy of Ob Nixilis.
-    Actually: Ob Nixilis resolves → the original enters the battlefield as a creature.
-    The COPY (from casualty) also resolves → another Ob Nixilis enters.
-    But Ob Nixilis is legendary. Legend rule: you choose one to keep.
-    Or: the casualty copy is a token copy of Ob Nixilis. If it's a token: different name? Same name (it's a copy).
-    Actually: the copy is a copy of the spell. It resolves and also creates an Ob Nixilis creature.
-    Two legendary Ob Nixilises → legend rule → sacrifice one.
-    The ETBs of both fire (each time one enters, the ETB fires).
-    Net: 2 ETBs from 2 Ob Nixilises entering, then legend rule applies.
+    Ob Nixilis, the Adversary ({1}{B}{R}: Planeswalker, Casualty X):
+    IMPORTANT: Ob Nixilis is a Planeswalker (not a creature). Casualty X means you sacrifice a
+      creature with power X, and the copy becomes a non-legendary token planeswalker with starting
+      loyalty X. So if you sacrifice a 3-power creature: the copy has 3 starting loyalty.
+    Original + copy both enter. Two Ob Nixilis planeswalkers on the battlefield.
+    The copy is non-legendary (explicitly in its casualty text): "the copy isn't legendary."
+    So the legend rule does NOT apply to the casualty copy! Both stay.
+    Both Ob Nixilises generate loyalty abilities separately each turn.
 
 ENLIST (702.154):
   WHAT IT IS:
@@ -177,50 +161,43 @@ ENLIST (702.154):
 - **Blitz and encore both sacrifice at the next end step** — mandatory delayed triggers; if already dead before end step, the delayed trigger fizzles.
 
 ## Canonical Example
-**Toxrill Encore in Commander:**
-Toxrill, the Corrosive ({5}{B}{B}: 7/7, "at end of each step, put slime counters on opponents' creatures. Creatures you don't control get -1/-1 per slime counter. When a creature you don't control with a slime counter dies, create a 1/1 Slug. Encore {7}{B}{B}"):
+**Angel of Indemnity Encore in Commander:**
+Angel of Indemnity ({5}{W}: 5/5 Flying Lifelink, "When this creature enters, return target permanent card with mana value 4 or less from your graveyard to the battlefield. Encore {6}{W}{W}"):
+Note: Toxrill, the Corrosive does NOT have Encore — it's a 7/7 {5}{B}{B} with slime counters.
 
-Toxrill has died and is in your GY. You have {7}{B}{B} available. 3 opponents in your Commander game.
-Activate encore: pay {7}{B}{B}, exile Toxrill.
-Create 3 tokens, each a copy of Toxrill (7/7 with all its abilities):
+Angel of Indemnity has died and is in your GY. You have {6}{W}{W} available. 3 opponents in Commander.
+Activate encore: pay {6}{W}{W}, exile Angel of Indemnity.
+Create 3 tokens, each a copy of Angel of Indemnity (5/5 Flying Lifelink):
   Token 1 attacks Player B.
   Token 2 attacks Player C.
   Token 3 attacks Player D.
 All three tokens have haste.
 
-Each token ETB fires: "at the beginning of each end step" is NOT an ETB — it's a step trigger.
-The tokens are on the battlefield this turn. At end of turn: each puts slime counters on opponents' creatures.
+Each token enters the battlefield → ETB fires: return a permanent card (MV ≤ 4) from your GY.
+3 tokens → 3 ETB triggers → return 3 different permanents from your GY to the battlefield.
 
-But more importantly: 3 tokens attack 3 different opponents → each takes 7 damage.
-In Commander (starting 40 life): 3 opponents each take 7 damage. 7/40 = significant swing.
+Combat: each 5/5 lifelink token attacks a different opponent for 5 damage.
+If all 3 attacks hit: 15 total damage dealt, 15 life gained from lifelink.
 
-If any opponent is below 7 life: they die. If all at full: all drop from 40 to 33.
-
-Beginning of your next end step: sacrifice all 3 Toxrill tokens.
+Beginning of your next end step: sacrifice all 3 tokens.
 Delayed trigger: "sacrifice the tokens at the beginning of the next end step."
 
 **Example 2 — Ob Nixilis, the Adversary Casualty:**
-Ob Nixilis, the Adversary ({1}{B}{R}: 3/2 flying, casualty 2, "whenever an opponent loses life, that player loses 1 more life unless they pay {1}. ETB: if a non-token creature was sacrificed this turn, each opponent loses 1 life and you gain 1 life"):
+Ob Nixilis, the Adversary ({1}{B}{R}: Planeswalker, Casualty X, "+1: each opponent loses 2 life unless they discard a card..."):
+Ob Nixilis is a PLANESWALKER, not a creature. Casualty X: sacrifice a creature with power X.
+The copy becomes a non-legendary token planeswalker with starting loyalty X (so it's NOT removed by the legend rule).
 
-You have: Ob Nixilis in hand, {1}{B}{R} available, and a Myr Retriever ({2}: 2/2, "when this dies, return target artifact card from GY to hand") in play.
+You have: Ob Nixilis in hand, {1}{B}{R} available, and a 3/3 creature in play.
 
-Casualty 2: pay {1}{B}{R} as normal cost + sacrifice Myr Retriever (power 2 ≥ 2, meets casualty requirement).
-Myr Retriever dies: its "when this dies" ETB fires → return an artifact from GY to hand.
-Casualty trigger fires: "if casualty cost was paid, copy the spell."
-Stack: Ob Nixilis (original), Ob Nixilis (copy from casualty).
+Casualty X=3: pay {1}{B}{R} as normal cost + sacrifice the 3/3.
+Casualty trigger fires: copy Ob Nixilis. The copy is a non-legendary token planeswalker with 3 starting loyalty.
+Stack: Ob Nixilis original (top), Ob Nixilis copy (below).
 
-Both resolve: two Ob Nixilises enter the battlefield.
-Both are legendary with the same name. Legend rule: choose one to keep.
-Let's say keep the original. The token copy goes to GY (or if it's a spell-resolved copy: it's also legendary → also goes to GY if it's a non-token creature).
+Both resolve: original enters with its printed starting loyalty. Copy enters with 3 loyalty (as set by casualty).
+Neither is removed by legend rule (the copy is non-legendary by the casualty wording).
+Both can use loyalty abilities each turn.
 
-But BEFORE the legend rule kills one: both ETBs fire.
-Both Ob Nixilis ETBs: "if a non-token creature was sacrificed this turn" — YES (Myr Retriever was).
-Both ETBs: each opponent loses 1 life, you gain 1 life.
-In Commander: 3 opponents, 2 ETBs → each opponent loses 2 life, you gain 6 life.
-
-After ETBs: legend rule kills one. You keep one Ob Nixilis (3/2 flying).
-Plus: you drew an artifact from your GY (Myr Retriever's dies trigger).
-Net result: one attack of {1}{B}{R} + a Myr Retriever sacrifice = 2 life drained per opponent + artifact recursion + 3/2 flyer remaining.
+Net: for {1}{B}{R} + one 3-power creature, you get TWO planeswalkers — the original and a 3-loyalty token copy.
 
 ## Commonly Confused With
 - **P392 (Myriad)** — Encore and myriad both create tokens that attack each opponent. Encore uses a GY activation (after the creature is dead); myriad uses a living creature's combat trigger. Both exile/sacrifice the tokens after combat.

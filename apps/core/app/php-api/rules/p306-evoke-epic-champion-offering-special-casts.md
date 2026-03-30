@@ -60,12 +60,13 @@ EVOKE:
       One of the cheapest artifact removal spells in the game (Shatter costs {1}{R}).
       Ingot Chewer evoked is BETTER than Shatter (cheaper), in a creature deck with 4 Ingot Chewers.
 
-    Spitebellows ({4}{R}{R}): 6/1 Trample. Evoke {1}{R}{R}. "When leaves (for any reason except exile),
-      it deals 6 damage to any target."
-      Wait: on evoke, the sacrifice triggers the "leaves" ability.
+    Spitebellows ({5}{R}): 6/1 Trample. Evoke {1}{R}{R}. "When this creature leaves the battlefield,
+      it deals 6 damage to target creature."
+      On evoke, the sacrifice trigger causes it to leave the battlefield.
       Evoke {1}{R}{R}: Spitebellows enters, sacrifice trigger fires, it's sacrificed.
-      "When Spitebellows is put into a GY from the battlefield" → deals 6 damage.
-      Net: {1}{R}{R} for 6 damage to any target. A 3-mana Fireball at 6 damage.
+      "When Spitebellows leaves the battlefield" → deals 6 damage to target creature.
+      Net: {1}{R}{R} for 6 damage to a creature. A 3-mana creature-kill effect.
+      Note: only targets creatures — can't redirect to a player or planeswalker.
 
   EVOKE + RESPONSE:
     After evoke creature enters: before sacrifice trigger resolves, opponent can interact.
@@ -123,9 +124,11 @@ CHAMPION:
       If Changeling Berserker dies: the championed creature returns.
       Use case: champion a 1/1 token to get a free 5/3 Haste. Token returns when Berserker dies.
 
-    Mistform Ultimus ({3}{U}): Creature — Illusion Wizard. "This card is every creature type."
-      Champion a creature — Mistform Ultimus champions another Wizard or Illusion.
-      As everything, Mistform Ultimus can champion ANY creature type.
+    Changeling Berserker ({3}{R}) can champion any creature type because it has Changeling (every
+      creature type). Use Mistform Ultimus ({3}{U}: 3/3, "Mistform Ultimus is every creature type")
+      as the championed creature — but Mistform Ultimus itself does NOT have Champion.
+      Example: champion Mistform Ultimus with Changeling Berserker → the Illusion is exiled.
+      When Berserker dies: Mistform Ultimus returns.
 
   CHAMPION EDGE CASE — NO LEGAL CHAMPION TARGET:
     If no valid target exists when champion triggers: the champion is sacrificed.

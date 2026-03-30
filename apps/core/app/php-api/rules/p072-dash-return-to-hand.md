@@ -68,6 +68,8 @@ CASTING WITHOUT DASH:
 - **Dash enables ETB loops.** Cast, trigger ETB, attack, return, repeat next turn.
 - **Dash vs. Blitz:** Dash returns to hand (reusable); Blitz sacrifices (draw a card).
 - **Sundial of the Infinite can exile the return trigger,** making the dash permanent with haste.
+- **A copy of a dashed creature doesn't have haste and won't return to hand.** The copy isn't "a permanent whose dash cost was paid" — the dash cost characteristic belongs to the original object, not the copy. (Gatherer ruling 2021-06-18: "If a creature enters the battlefield as a copy of or becomes a copy of a creature whose dash cost was paid, the copy won't have haste and won't be returned to its owner's hand.")
+- **The return trigger requires the creature to still be on the battlefield when it resolves.** If the creature has changed zones (graveyard, exile, etc.) before the trigger resolves, the trigger does nothing and the creature stays in its current zone. (Gatherer ruling 2021-06-18)
 
 ## Canonical Example
 **Goblin Rabblemaster with Dash (Dash {3}{R}):**

@@ -21,6 +21,7 @@ import StyleIcon from '@mui/icons-material/Style';
 import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import AddIcon from '@mui/icons-material/Add';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
@@ -62,6 +63,13 @@ const navItems = [
     href: '/stats',
     icon: <BarChartIcon sx={{ fontSize: 40 }} />,
     color: '#CD853F',
+  },
+  {
+    title: 'Lists',
+    description: 'Standalone card collections',
+    href: '/lists',
+    icon: <PlaylistAddIcon sx={{ fontSize: 40 }} />,
+    color: '#5B7B5B',
   },
   {
     title: 'Play Game',

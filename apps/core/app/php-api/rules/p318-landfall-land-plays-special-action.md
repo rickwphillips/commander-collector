@@ -59,10 +59,12 @@ LANDFALL (ability word, no rules meaning):
     Your land during opponent's turn: yes (if possible — rarely but it can happen via flash/triggered effects).
 
   IMPORTANT: SEPARATE triggers per ability per land entering.
-    Omnath, Locus of Creation has Landfall twice (once for 4 life, once for 4 damage).
+    Omnath, Locus of Creation has ONE Landfall trigger with conditional effects based on resolution count:
+      1st time: gain 4 life. 2nd time: add {R}{G}{W}{U}. 3rd time: deal 4 damage to each opponent.
     ONE land enters → TWO separate Landfall triggers from Omnath.
-    You control Omnath AND Tireless Tracker: ONE land enters → three separate triggers:
-      Omnath trigger 1 (life), Omnath trigger 2 (damage/Ramp), Tracker trigger (Clue).
+    You control Omnath AND Tireless Tracker: ONE land enters → TWO triggers:
+      Omnath trigger (resolves to 4 life on 1st resolution, {R}{G}{W}{U} on 2nd, 4 damage on 3rd),
+      Tracker trigger (Clue token).
     Each trigger goes on the stack separately. APNAP order. You control them all → you stack them.
 
 FETCH LANDS AND LANDFALL:

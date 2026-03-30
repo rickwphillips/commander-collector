@@ -72,7 +72,7 @@ KICKER (CR 702.33a–h):
     "If this spell was kicked N times" or "for each time this spell was kicked": count applications.
     Example: Conqueror's Pledge ({4}{W}): "Kicker {5}. Create six 1/1 Kor Ally tokens. If kicked, create twelve instead."
       Not kicked: 6 tokens. Kicked once: 12 tokens.
-    Example: Wolfbriar Elemental ({3}{G}): "Multikicker {G}. Create a 2/2 Wolf token for each time this was kicked."
+    Example: Wolfbriar Elemental ({2}{G}{G}): "Multikicker {G}. Create a 2/2 Wolf token for each time this was kicked."
       Kicked 5 times ({G} × 5 = 5 extra mana): 5 tokens. The more mana, the more tokens.
   KICKER AS ADDITIONAL COST:
     Kicker is an ADDITIONAL cost. It stacks with the base cost.

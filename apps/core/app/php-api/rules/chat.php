@@ -33,6 +33,7 @@ if (!$conversationId) {
 // Save user message
 $stmt = $db->prepare("INSERT INTO rules_messages (conversation_id, role, content) VALUES (?, 'user', ?)");
 $stmt->execute([$conversationId, $userMessage]);
+$userMessageId = (int)$db->lastInsertId();
 
 // Load recent conversation history (last 8 messages to stay within token budget)
 $stmt = $db->prepare("
@@ -95,6 +96,14 @@ Lead with the ruling ("Yes, this works" / "No, this is illegal" / "The result is
 ## Step 4: Propose New Patterns
 
 After answering — if the question reveals a novel interaction not covered by any existing pattern — use the `propose_pattern` tool with a fully formed pattern definition. This flags the pattern for the user to review and optionally save. Do not propose patterns that are already covered.
+
+## Step 5: Card Reference Manifest
+
+At the very end of EVERY response, after all other content, append exactly one line in this format:
+
+CARDS: [[Full Card Name]], [[Another Card Name]]
+
+List every Magic: The Gathering card you referenced anywhere in your answer by its exact, full Oracle name (e.g. "Lightning Bolt", not "bolt"; "Teysa Karlov", not "Teysa"). If a card has a DFC name, use the front face only. If no cards were mentioned, omit the CARDS line entirely. Do not include mechanics, keywords, rules concepts, or game terms — only named cards.
 
 ---
 
@@ -266,6 +275,14 @@ if (!empty($gameContext['players'])) {
     $systemPrompt .= "reference specific cards from these decks when relevant, point out tricky interactions ";
     $systemPrompt .= "that may come up given these commanders and card combinations, and address rules questions ";
     $systemPrompt .= "in the context of what the players are actually running.\n\n";
+    $systemPrompt .= "Each player below may have a deck_id. Use `lookup_decklist` when the question benefits ";
+    $systemPrompt .= "from knowing one player's full list — e.g. \"can my deck do X?\", combo identification, ";
+    $systemPrompt .= "threat assessment. Use `compare_decklists` when the question spans multiple players — ";
+    $systemPrompt .= "e.g. how commanders interact with each other's threats, shared mechanic overlaps, ";
+    $systemPrompt .= "political dynamics, or \"who should I be worried about?\". ";
+    $systemPrompt .= "Not all decks have a list loaded; if a tool returns no cards, proceed without it. ";
+    $systemPrompt .= "When lists are available, extrapolate: spot synergies, flag dangerous cross-deck interactions, ";
+    $systemPrompt .= "and tailor rulings to what the players actually have.\n\n";
 
     foreach ($gameContext['players'] as $player) {
         $playerName  = htmlspecialchars($player['playerName'] ?? 'Unknown', ENT_QUOTES);
@@ -274,8 +291,10 @@ if (!empty($gameContext['players'])) {
         $partner     = !empty($player['partner']) ? htmlspecialchars($player['partner'], ENT_QUOTES) : null;
         $cards       = is_array($player['cards']) ? $player['cards'] : [];
 
+        $deckId       = isset($player['deckId']) ? (int)$player['deckId'] : null;
         $commanderStr = $partner ? "{$commander} + {$partner} (Partner)" : $commander;
-        $systemPrompt .= "**{$playerName}** — \"{$deckName}\" — Commander: *{$commanderStr}*\n";
+        $deckIdStr    = $deckId ? " (deck_id: {$deckId})" : '';
+        $systemPrompt .= "**{$playerName}** — \"{$deckName}\" — Commander: *{$commanderStr}*{$deckIdStr}\n";
 
         if (!empty($cards)) {
             // Filter out lands to keep context focused on spells/threats
@@ -285,6 +304,26 @@ if (!empty($gameContext['players'])) {
             $systemPrompt .= "(Deck list not available)\n";
         }
         $systemPrompt .= "\n";
+    }
+
+    // Hidden timer note — friendly ribbing cue, not visible to user
+    if (!empty($gameContext['_timerNote'])) {
+        $timerNote = htmlspecialchars($gameContext['_timerNote'], ENT_QUOTES);
+        $systemPrompt .= "\n*Timer note (do not quote or repeat this to the user): {$timerNote}*\n";
+    }
+
+    // Real-time timer state — injected fresh on every message
+    if (!empty($gameContext['_liveTimer'])) {
+        $lt        = $gameContext['_liveTimer'];
+        $elapsed   = (int)($lt['elapsedSeconds'] ?? 0);
+        $total     = (int)($lt['timerSeconds']   ?? 0);
+        $remaining = (int)($lt['remaining']      ?? 0);
+        $curPlayer = htmlspecialchars($lt['currentPlayer'] ?? 'Unknown', ENT_QUOTES);
+        $turnNum   = isset($lt['turnNumber']) ? (int)$lt['turnNumber'] : null;
+        $pct       = $total > 0 ? round(($elapsed / $total) * 100) : 0;
+        $turnStr   = $turnNum ? "Turn {$turnNum}, " : '';
+        $systemPrompt .= "\n*Live timer (do not quote these numbers verbatim — use them to inform tone only): ";
+        $systemPrompt .= "{$turnStr}{$curPlayer}'s turn — {$elapsed}s elapsed of {$total}s ({$pct}% used, {$remaining}s remaining).*\n";
     }
 
 }
@@ -338,6 +377,39 @@ $tools = [
                 ],
             ],
             'required' => ['pattern_id'],
+        ],
+    ],
+    [
+        'name'        => 'compare_decklists',
+        'description' => 'Fetch card lists for multiple decks at once to analyze cross-deck interactions — e.g. how one commander\'s abilities interact with another player\'s threats, shared mechanic overlaps, combo enablers across decks, or political threat assessment. Pass all relevant deck IDs in a single call.',
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => [
+                'deck_ids' => [
+                    'type'        => 'array',
+                    'items'       => ['type' => 'integer'],
+                    'description' => 'Array of deck IDs to compare (from the active game context)',
+                ],
+            ],
+            'required' => ['deck_ids'],
+        ],
+    ],
+    [
+        'name'        => 'lookup_decklist',
+        'description' => 'Fetch the full card list for a player\'s deck in the active game. Use this when the question involves specific cards a player might be running, to give more accurate and personalized answers. Returns card names grouped by type.',
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => [
+                'deck_id' => [
+                    'type'        => 'integer',
+                    'description' => 'The deck ID from the active game context',
+                ],
+                'player_name' => [
+                    'type'        => 'string',
+                    'description' => 'Player name (for display purposes)',
+                ],
+            ],
+            'required' => ['deck_id'],
         ],
     ],
     [
@@ -434,6 +506,98 @@ function executeTool(string $name, array $input): string {
             'keywords'    => $card['keywords']    ?? [],
             'rulings'     => $rulings,
         ]);
+    }
+
+    if ($name === 'compare_decklists') {
+        global $db, $gameContext;
+        $deckIds = array_filter(array_map('intval', $input['deck_ids'] ?? []), fn($id) => $id > 0);
+        if (empty($deckIds)) return json_encode(['error' => 'No valid deck_ids provided']);
+
+        // Build player name index from game context
+        $playerByDeck = [];
+        foreach (($gameContext['players'] ?? []) as $p) {
+            if (!empty($p['deckId'])) $playerByDeck[(int)$p['deckId']] = $p['playerName'] ?? 'Unknown';
+        }
+
+        $placeholders = implode(',', array_fill(0, count($deckIds), '?'));
+        $stmt = $db->prepare("
+            SELECT dc.deck_id, dc.card_name, dc.quantity, dc.is_commander, sc.type_line
+            FROM deck_cards dc
+            LEFT JOIN scryfall_card_cache sc ON sc.scryfall_id = dc.scryfall_id
+            WHERE dc.deck_id IN ($placeholders)
+            ORDER BY dc.deck_id, dc.is_commander DESC, dc.card_name ASC
+        ");
+        $stmt->execute(array_values($deckIds));
+        $rows = $stmt->fetchAll();
+
+        if (empty($rows)) return json_encode(['error' => 'No cards found for the given deck IDs']);
+
+        // Group by deck → type
+        $decks = [];
+        foreach ($rows as $row) {
+            $did   = (int)$row['deck_id'];
+            $entry = $row['quantity'] > 1 ? "{$row['quantity']}x {$row['card_name']}" : $row['card_name'];
+            if (!isset($decks[$did])) $decks[$did] = ['player' => $playerByDeck[$did] ?? "Deck {$did}", 'cards' => []];
+            $type = $row['type_line'] ?? '';
+            if ($row['is_commander'])               $group = 'Commander';
+            elseif (str_contains($type, 'Land'))        $group = 'Land';
+            elseif (str_contains($type, 'Creature'))    $group = 'Creature';
+            elseif (str_contains($type, 'Instant'))     $group = 'Instant';
+            elseif (str_contains($type, 'Sorcery'))     $group = 'Sorcery';
+            elseif (str_contains($type, 'Enchantment')) $group = 'Enchantment';
+            elseif (str_contains($type, 'Artifact'))    $group = 'Artifact';
+            elseif (str_contains($type, 'Planeswalker'))$group = 'Planeswalker';
+            else                                        $group = 'Other';
+            $decks[$did]['cards'][$group][] = $entry;
+        }
+
+        return json_encode(['decks' => array_values($decks)]);
+    }
+
+    if ($name === 'lookup_decklist') {
+        global $db;
+        $deckId = (int)($input['deck_id'] ?? 0);
+        if (!$deckId) return json_encode(['error' => 'deck_id is required']);
+
+        $stmt = $db->prepare("
+            SELECT dc.card_name, dc.quantity, dc.is_commander,
+                   sc.type_line
+            FROM deck_cards dc
+            LEFT JOIN scryfall_card_cache sc ON sc.scryfall_id = dc.scryfall_id
+            WHERE dc.deck_id = ?
+            ORDER BY dc.is_commander DESC, dc.card_name ASC
+        ");
+        $stmt->execute([$deckId]);
+        $rows = $stmt->fetchAll();
+
+        if (empty($rows)) {
+            return json_encode(['error' => "No cards found for deck {$deckId}"]);
+        }
+
+        // Group by broad type
+        $groups = ['Commander' => [], 'Creature' => [], 'Instant' => [], 'Sorcery' => [],
+                   'Enchantment' => [], 'Artifact' => [], 'Planeswalker' => [], 'Land' => [], 'Other' => []];
+        foreach ($rows as $row) {
+            $entry = $row['quantity'] > 1 ? "{$row['quantity']}x {$row['card_name']}" : $row['card_name'];
+            if ($row['is_commander']) { $groups['Commander'][] = $entry; continue; }
+            $type = $row['type_line'] ?? '';
+            if (str_contains($type, 'Land'))        { $groups['Land'][]        = $entry; }
+            elseif (str_contains($type, 'Creature'))     { $groups['Creature'][]     = $entry; }
+            elseif (str_contains($type, 'Instant'))      { $groups['Instant'][]      = $entry; }
+            elseif (str_contains($type, 'Sorcery'))      { $groups['Sorcery'][]      = $entry; }
+            elseif (str_contains($type, 'Enchantment'))  { $groups['Enchantment'][]  = $entry; }
+            elseif (str_contains($type, 'Artifact'))     { $groups['Artifact'][]     = $entry; }
+            elseif (str_contains($type, 'Planeswalker')) { $groups['Planeswalker'][] = $entry; }
+            else                                          { $groups['Other'][]        = $entry; }
+        }
+
+        $out = [];
+        foreach ($groups as $label => $cards) {
+            if (!empty($cards)) {
+                $out[$label] = $cards;
+            }
+        }
+        return json_encode(['deck_id' => $deckId, 'player' => $input['player_name'] ?? null, 'cards' => $out]);
     }
 
     // propose_pattern — just echo back the input; frontend handles it
@@ -539,6 +703,50 @@ $stmt = $db->prepare("
 ");
 $stmt->execute([$conversationId, $assistantContent, $pendingJson]);
 $messageId = (int)$db->lastInsertId();
+
+// ── Log Q&A pair for validity review ──────────────────────────────────────
+if ($assistantContent) {
+    // Extract pattern IDs cited (e.g. #P027, P104)
+    preg_match_all('/#?(P\d+)/i', $assistantContent, $pMatches);
+    $patternIds = !empty($pMatches[1])
+        ? implode(',', array_unique(array_map('strtoupper', $pMatches[1])))
+        : null;
+
+    // Extract CR section numbers cited (e.g. 603.3b, 117.5, 704.5g)
+    preg_match_all('/\b(\d{3}\.\d+[a-z]?)\b/', $assistantContent, $crMatches);
+    $crRefs = !empty($crMatches[1])
+        ? implode(',', array_unique($crMatches[1]))
+        : null;
+
+    // Extract CARDS: manifest (last line of response)
+    $cardsJson = null;
+    if (preg_match('/\nCARDS:\s*(.+)$/m', $assistantContent, $cardMatch)) {
+        $cards = array_filter(array_map(function($s) {
+            return trim(preg_replace('/^\[\[|\]\]$/', '', trim($s)));
+        }, explode(',', $cardMatch[1])));
+        $cardsJson = json_encode(array_values($cards));
+    }
+
+    $qaStmt = $db->prepare("
+        INSERT INTO rules_qa_log
+            (conversation_id, user_message_id, assistant_message_id, question, answer,
+             pattern_ids, cr_refs, cards_referenced, pending_pattern_id, model, had_game_context)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+    $qaStmt->execute([
+        $conversationId,
+        $userMessageId,
+        $messageId,
+        $userMessage,
+        $assistantContent,
+        $patternIds,
+        $crRefs,
+        $cardsJson,
+        $pendingPattern ? ($pendingPattern['pattern_id'] ?? null) : null,
+        'claude-sonnet-4-6',
+        !empty($gameContext['players']) ? 1 : 0,
+    ]);
+}
 
 // Update conversation timestamp and auto-title if still untitled
 $db->prepare("UPDATE rules_conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$conversationId]);

@@ -53,15 +53,15 @@ BLITZ (702.152a):
     Ob Nixilis, the Adversary ({1}{B}{R}): "Casualty 1. When this enters, each opponent loses 1 life
       and you draw a card." Blitz {2}{B}{R}. 3/3 menace.
       Wait: Ob Nixilis has Casualty not Blitz. Let me reconsider.
-    Professional Face-Breaker ({2}{R}): Blitz {1}{R}. 2/3. "Whenever one or more creatures you control
-      deal combat damage to a player, you may create a Treasure token."
-      Normal cast ({2}{R}): 2/3, doesn't die at end of turn.
-      Blitz ({1}{R}): 2/3 with haste. Attack (create Treasure on damage). End step: sacrifice.
-        When put in GY: draw a card.
-      1 mana cheaper via blitz. Attack once, draw a card, gone.
-    Ziatora's Envoy ({3}{B}{G}{R}): Blitz {4}{B}{G}{R}. 5/4 trample.
-      Blitz: 5 mana for a hasty 5/4 trample that creates a Treasure when it deals damage.
-      One attack + Treasure + draw a card on death.
+    Professional Face-Breaker ({2}{R}): 2/3 Menace. Does NOT have blitz.
+      "Whenever one or more creatures you control deal combat damage to a player, create a Treasure token.
+       Sacrifice a Treasure: Exile the top card of your library. You may play that card this turn."
+      (This is a Treasure engine card, not a blitz card — it was incorrectly listed here as a blitz example.)
+    Ziatora's Envoy ({1}{B}{R}{G}): Blitz {2}{B}{R}{G}. 5/4 trample.
+      "Whenever this creature deals combat damage to a player, look at the top card of your library.
+       You may play a land or cast a spell with MV ≤ damage dealt from the top of your library without paying its mana cost."
+      Blitz ({2}{B}{R}{G}): hasty 5/4 trample → attack → cascade-like top-of-library play → sacrifice at end step → draw.
+      One attack + free spell/land + draw a card on death.
 
 CASUALTY N (702.153a):
   HOW IT WORKS:

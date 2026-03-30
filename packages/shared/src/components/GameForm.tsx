@@ -24,15 +24,15 @@ import GroupsIcon from '@mui/icons-material/Groups';
 import ListSubheader from '@mui/material/ListSubheader';
 import { ColorIdentityChips } from './ColorIdentityChips';
 import { LoadingSpinner } from './LoadingSpinner';
-import { api } from '@/lib/api';
+import { api } from '../lib/api';
 import type {
   Player,
   DeckWithPlayer,
   GameResultInput,
   GameType,
   GameWithResults,
-} from '@/lib/types';
-import type { GameManagerPrefill } from '@/game-manager/types';
+  GameManagerPrefill,
+} from '../lib/types';
 
 interface DeckOption extends DeckWithPlayer {
   total_games?: number;
@@ -102,7 +102,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
           localStorage.removeItem('commander_game_prefill');
           // Apply prefill: set playedAt, and build results array from prefill data
           setPlayedAt(prefill.playedAt);
-          const prefillResults: PlayerResult[] = prefill.results.map(r => ({
+          const prefillResults: PlayerResult[] = prefill.results.map((r) => ({
             player_id: r.playerId,
             deck_id: r.deckId,
             finish_position: r.finishPosition,

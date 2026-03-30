@@ -40,7 +40,7 @@ EMBALM (702.128a):
     Copies the printed characteristics of the card: name, P/T, types, abilities.
     Honored Hydra ({4}{G}{G}: 6/6 trample; embalm {3}{G}):
       Embalm token: 6/6 (same P/T), trample (same ability), white, no mana cost, Zombie Snake Hydra.
-    The token copies ETB abilities: Champion of Wits ({2}{U}: 3/1; "when it enters,
+    The token copies ETB abilities: Champion of Wits ({2}{U}: 2/1; "when it enters,
       draw cards equal to power; if you do, discard 2"; eternalize {5}{U}{U}):
       Eternalized token: 4/4 black Zombie Snake Wizard, no mana cost. Has the ETB draw/discard.
       When the eternalize token enters: trigger fires (draw 4, discard 2).
@@ -79,9 +79,9 @@ EMBALM (702.128a):
     Embalm: same P/T as printed; changes color to white; adds Zombie.
     Eternalize: always 4/4; changes color to black; adds Zombie.
     Honored Hydra (6/6): embalm gives a 6/6 white Zombie Snake Hydra with trample.
-    Champion of Wits (3/1): eternalize gives a 4/4 black Zombie Snake Wizard (upgraded).
+    Champion of Wits (2/1): eternalize gives a 4/4 black Zombie Snake Wizard (upgraded).
     Earthshaker Khenra (2/1): eternalize gives a 4/4 black Zombie Jackal Warrior (major upgrade).
-      ETB "target creature with power ≤ this creature's power can't block" = ≤ 4, not ≤ 2.
+      ETB "target creature with power less than or equal to this creature's power can't block" = ≤ 4, not ≤ 2.
 
 AFTERMATH (702.127a):
   SPLIT CARD STRUCTURE:
@@ -125,8 +125,8 @@ AFTERMATH (702.127a):
   CASCADE INTO AN AFTERMATH SPLIT CARD:
     In library: split card's MV = combined MV of both halves (709.4b).
     Bloodbraid Elf cascades and finds Cut // Ribbons:
-      Cut ({1}{R}: sorcery; "target creature gets -2/-0 until EOT")
-      Ribbons (aftermath; {X}{B}{B}: "target player loses X life")
+      Cut ({1}{R}: sorcery; "Cut deals 4 damage to target creature")
+      Ribbons (aftermath; {X}{B}{B}: "each opponent loses X life")
       Combined MV in library = {1}{R}{X}{B}{B} where X=0 = 1+1+0+2 = 4... wait: X=0 in library
       (split card MV in library: both halves' costs combined; X=0 per CR 202.3e).
       Bloodbraid Elf has MV 4. Cascade threshold: MV < 4. Cut // Ribbons in library = MV 4
@@ -150,7 +150,7 @@ AFTERMATH (702.127a):
 
 ## Canonical Example
 **Champion of Wits eternalize + Grafdigger's Cage:**
-You have Champion of Wits ({2}{U}: 3/1; "when it enters, draw cards equal to power; discard 2"; eternalize {5}{U}{U}) in your graveyard.
+You have Champion of Wits ({2}{U}: 2/1; "when it enters, draw cards equal to power; discard 2"; eternalize {5}{U}{U}) in your graveyard.
 
 Your opponent controls Grafdigger's Cage.
 
@@ -163,8 +163,8 @@ Token enters: 4/4 black Zombie Snake Wizard with no mana cost.
 ETB triggers: "When this creature enters, you may draw cards equal to its power." Power = 4.
 Draw 4 cards, discard 2.
 
-MV of the token = 0 (no mana cost). If you sacrifice the token to emerge Elder Deep-Fiend ({5}{U}: emerge {5}{U}{U}): reduce emerge cost by token's MV = 0. Pay full {5}{U}{U}.
-Compare: sacrificing the original 3/1 Champion (MV 3): reduce emerge cost by 3. Pay {2}{U}{U}.
+MV of the token = 0 (no mana cost). If you sacrifice the token to emerge Elder Deep-Fiend ({8}: 5/6; flash; emerge {5}{U}{U}): reduce emerge cost by token's MV = 0. Pay full {5}{U}{U}.
+Compare: sacrificing the original 2/1 Champion (MV 3): reduce emerge cost by 3. Pay {2}{U}{U}.
 
 **Example 2 — Dusk // Dawn aftermath interaction:**
 Your library contains Dusk // Dawn. You cast Dusk from hand: "destroy all creatures with power 3 or greater."

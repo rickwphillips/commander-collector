@@ -34,8 +34,8 @@ EMBALM:
   The token enters the battlefield. The original card is exiled.
 
   EMBALM EXAMPLES:
-    Angel of Sanctions ({3}{W}{W}): 3/4 Flying. "When ETBs, exile target non-land permanent."
-      Embalm {5}{W}{W}: exile Angel of Sanctions from GY → create a white 3/4 Flying Zombie Angel token.
+    Angel of Sanctions ({3}{W}{W}): 3/4 Flying. "When ETBs, exile target nonland permanent."
+      Embalm {5}{W}: exile Angel of Sanctions from GY → create a white 3/4 Flying Zombie Angel token.
       Token ETBs: trigger fires → exile another non-land permanent!
       Two exile effects from one card: cast + embalm.
 
@@ -89,12 +89,12 @@ AFTERMATH:
 
   AFTERMATH EXAMPLES:
     Cut // Ribbons ({X}{R} // {X}{B}{B}):
-      Cut: "Create a 4/4 red Rhino Warrior creature token."
-      Wait: check oracle text. Actually Cut is combat-related; Ribbons is drain.
-      Ribbons (aftermath): "{X}{B}{B}, cast from GY: target player loses X life."
+      Cut ({1}{R}): "Cut deals 4 damage to target creature."
+      Ribbons (aftermath, {X}{B}{B}): "Each opponent loses X life."
+      Note: Ribbons hits ALL opponents in multiplayer — not just one target.
       Play Cut on turn 3 for the immediate effect.
       Cut resolves → goes to GY (Cut // Ribbons in GY).
-      Later: pay {X}{B}{B}, cast Ribbons from GY. Target opponent loses X life. Card exiles.
+      Later: pay {X}{B}{B}, cast Ribbons from GY. Each opponent loses X life. Card exiles.
       The aftermath half gets additional turns of mana to accumulate X.
 
     Driven // Despair ({G} // {1}{B}):
@@ -156,13 +156,12 @@ Original card permanently exiled after embalm — cannot embalm a third time.
 
 **Example 2 — Cut // Ribbons Game-Ending Aftermath:**
 Game state: Turn 6. Opponent at 14 life. They have a board presence.
-Cast Cut from hand: create a 4/4 Rhino. Slice 4 from a creature? Check oracle.
-Actually exact Cut text: "Destroy target creature you control. It deals damage equal to its power to target creature an opponent controls." (Sacrifice/fight variant.)
-Let's use the known aftermath pattern instead: Cast Cut, which deals damage and puts the card in GY.
+Cast Cut ({1}{R}) from hand: "Cut deals 4 damage to target creature." Deals 4 to a blocker, card goes to GY.
 Turn 8: board stalled. Have {8}{B}{B} available.
-Cast Ribbons from GY with X=6: opponent loses 6 life. From 14 → 8.
+Cast Ribbons from GY with X=6: each opponent loses 6 life. Opponent from 14 → 8.
 Turn 9: opponent still at 8. No more Ribbons (exiled).
 Alternative: save Ribbons for the exact lethal. {X=14}{B}{B}: opponent loses 14 = dead from 14.
+In multiplayer (Commander): Ribbons drains ALL opponents for X — enormous value at table.
 Ribbons from GY as a "finisher" when opponent is at low life: cast Cut whenever convenient,
 then use Ribbons as a mana-sink kill spell later. Two spells in one card.
 

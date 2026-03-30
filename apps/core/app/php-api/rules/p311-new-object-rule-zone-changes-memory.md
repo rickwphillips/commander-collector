@@ -47,8 +47,8 @@ THE CORE RULE:
         Reanimated: enters as printed. No memory of any effects from when it was on battlefield.
 
   FLICKERING (specific case):
-    Ephemerate ({W}): "Exile target creature you control, return it to the battlefield at beginning
-      of next end step." (Or some versions immediately.)
+    Ephemerate ({W}): "Exile target creature you control, then return it to the battlefield under its
+      owner's control." Rebound means the spell fires again at your next upkeep (exile+return again).
     Restoration Angel: "Flash. When it enters, target non-Angel creature blinks (temporarily)."
     Yorion, Sky Nomad: "When it enters, exile other nonland permanents you own that came into play
       under your control. Return them at beginning of next end step."
@@ -151,8 +151,7 @@ Target: Siege Rhino. Rhino is exiled (leaves battlefield).
 Now Path to Exile is still on stack. Its target: Siege Rhino.
 Path resolves: target Siege Rhino. Siege Rhino is NOT on the battlefield.
 Path to Exile targets a creature "on the battlefield." Target is now illegal. Path fizzles.
-At beginning of next end step (or "immediately" depending on Resto Angel's version):
-Siege Rhino returns to battlefield as a NEW OBJECT.
+Restoration Angel's trigger resolves immediately: Siege Rhino returns to battlefield as a NEW OBJECT.
 New Siege Rhino enters: ETB trigger fires → drain each opponent 3 life, gain 3 life.
 Result: Path countered, Rhino ETB triggered TWICE (original cast + flicker), Restoration Angel in play.
 

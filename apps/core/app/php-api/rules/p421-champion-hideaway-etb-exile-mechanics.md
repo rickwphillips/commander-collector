@@ -61,8 +61,8 @@ CHAMPION (702.72a):
 
   CHAMPION AND BLINKING:
     Ephemerate ({W}: "exile target creature you control, return it to the battlefield"):
-      You control a Cloudthresher ({4}{G}{G}: 7/7 reach; evoke {G}{G}; champion a green creature):
-        Wait — Cloudthresher has champion a green creature.
+      You control a Changeling Titan ({4}{G}: 7/7; champion a creature):
+        Changeling Titan has champion a creature.
       Better example: Wren's Run Packmaster ({3}{G}: 5/5; champion an Elf; {2}{G}: create a
         2/2 Wolf with deathtouch token; Wolf tokens get deathtouch from Packmaster).
       Packmaster enters: champion an Elf. You exile your Llanowar Elves.
@@ -191,7 +191,7 @@ You have Llanowar Elves ({G}: 1/1 Elf).
 Packmaster enters: champion ETB trigger fires → you exile Llanowar Elves (championed).
 Packmaster is now a 5/5 with Wolf-generating ability.
 
-Cast Ephemerate ({W}: exile target creature you control, return it to the battlefield) targeting Packmaster.
+Cast Ephemerate ({W}: exile target creature you control, return it to the battlefield under its owner's control) targeting Packmaster.
 Ephemerate resolves:
 1. Packmaster exiled (leaves battlefield). Packmaster's leaves-battlefield trigger fires.
 2. Packmaster re-enters (Ephemerate immediately returns it).

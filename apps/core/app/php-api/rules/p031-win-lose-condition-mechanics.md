@@ -126,11 +126,13 @@ CAN'T LOSE / CAN'T WIN EFFECTS:
 - **Life ≤ 0 → next SBA check, not instantly.** You don't die "during" the spell — you die at the next SBA check after the spell resolves. There's no window between then to act, but you can cast preventatives before that point.
 - **Thassa's Oracle's win condition is a triggered ability on the stack.** It can be countered. Reducing your devotion to blue or adding cards to your library before it resolves can prevent the win.
 - **Laboratory Maniac's win is a replacement effect.** It happens within the draw event itself. Kill Lab Maniac before the draw event triggers and the replacement is gone — you lose instead.
+- **If Lab Maniac's replacement fires but you can't win** (opponent has Angel's Grace or similar "can't win" effect), you still don't lose. The ruling (2021-03-19): "If for some reason you can't win the game (because your opponent has cast Angel's Grace this turn, for example), you won't lose for having tried to draw a card from a library with no cards in it. The draw was still replaced." — The replacement applied (draw was replaced by "win"), even though the winning was blocked. The draw-from-empty-library never happened, so the SBA that would cause you to lose never triggers.
 - **Angel's Grace prevents SBA losses** (life ≤ 0 doesn't kill you if you can't lose), effect-based losses, and also prevents damage from taking you below 1.
 - **Win and lose simultaneously → lose.** No exception; losing always wins the tiebreaker in 104.3f.
 - **All players lose simultaneously → draw** (104.4a). Relevant in multiplayer.
 - **The only thing that overrides "can't win" effects is 104.2a** (opponents all leave the game). Nothing else breaks through Platinum Angel.
 - **Conceding is instant (104.3a).** It doesn't use the stack. A player who concedes leaves the game immediately.
+- **Angel's Grace "can't lose" does NOT allow overpaying life.** Even if you can't lose this turn, you can't pay more life than your current total. Example: you have 3 life with Angel's Grace in effect — you cannot pay 5 life for a Phyrexian mana cost. Angel's Grace ruling (2021-03-19): "You can't pay more life than you have, even if you won't lose the game."
 
 ## Canonical Example
 **Thassa's Oracle entering with empty library:**

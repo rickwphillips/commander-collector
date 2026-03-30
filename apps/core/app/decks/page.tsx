@@ -68,6 +68,7 @@ export default function DecksPage() {
   const [colorFilter, setColorFilter] = useState<Set<MtgColorOrColorless>>(new Set());
   const [colorMode, setColorMode] = useState<ColorFilterMode>('and');
   const [sortOption, setSortOption] = useState<SortOption>('name-asc');
+  const [hasListFilter, setHasListFilter] = useState(false);
 
   useEffect(() => {
     fetchDecks();
@@ -127,6 +128,11 @@ export default function DecksPage() {
       result = result.filter((d) => d.player_name === playerFilter);
     }
 
+    // Has card list filter
+    if (hasListFilter) {
+      result = result.filter((d) => d.card_count > 0);
+    }
+
     // Color filter
     if (colorFilter.size > 0) {
       const selected = [...colorFilter];
@@ -173,7 +179,7 @@ export default function DecksPage() {
     return sorted;
   }, [decks, searchQuery, playerFilter, colorFilter, colorMode, sortOption]);
 
-  const hasActiveFilters = searchQuery || playerFilter || colorFilter.size > 0;
+  const hasActiveFilters = searchQuery || playerFilter || colorFilter.size > 0 || hasListFilter;
 
   const clearFilters = () => {
     setSearchQuery('');
@@ -181,6 +187,7 @@ export default function DecksPage() {
     setColorFilter(new Set());
     setColorMode('and');
     setSortOption('name-asc');
+    setHasListFilter(false);
   };
 
   if (loading) {
@@ -253,7 +260,7 @@ export default function DecksPage() {
                     </Select>
                   </FormControl>
                 </Grid>
-                <Grid size={{ xs: 6, sm: 3 }}>
+                <Grid size={{ xs: 6, sm: 2 }}>
                   <FormControl fullWidth size="small">
                     <InputLabel>Sort</InputLabel>
                     <Select
@@ -269,6 +276,19 @@ export default function DecksPage() {
                       <MenuItem value="games-asc">Games Least</MenuItem>
                     </Select>
                   </FormControl>
+                </Grid>
+                <Grid size={{ xs: 6, sm: 1 }}>
+                  <Tooltip title={hasListFilter ? 'Showing decks with card lists' : 'Show only decks with card lists'}>
+                    <ToggleButton
+                      value="has-list"
+                      selected={hasListFilter}
+                      onChange={() => setHasListFilter((v) => !v)}
+                      size="small"
+                      sx={{ width: '100%', height: 40 }}
+                    >
+                      <StyleIcon fontSize="small" />
+                    </ToggleButton>
+                  </Tooltip>
                 </Grid>
                 <Grid size={{ xs: 12, sm: 2 }}>
                   <Stack spacing={0.75} alignItems="center">

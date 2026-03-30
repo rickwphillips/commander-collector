@@ -79,7 +79,7 @@ SPECIAL ACTIONS STILL WORK (702.61b, 116.2):
      BUT: you CAN turn your morph face up (special action).
      Pay {2}{W}{W}: flip Exalted Angel face up. It's now a 4/5.
      Sudden Death resolves: "target creature gets -4/-4." The 4/5 becomes 0/1.
-     Or: flip a Willbender ({1}{U}: 1/1; morph {1}{U}; "when Willbender is turned face up,
+     Or: flip a Willbender ({1}{U}: 1/2; morph {1}{U}; "when Willbender is turned face up,
        change the target of target spell or ability with a single target"):
      Willbender flips. "When turned face up" trigger fires (goes on stack ABOVE Sudden Death).
      Wait — can Willbender's triggered ability FIRE while split second is on the stack?
@@ -162,7 +162,7 @@ PLANESWALKER ABILITY EXCEPTION:
 
 ## Canonical Example
 **Willbender Beats Sudden Shock (Split Second):**
-You control a face-down 2/2 morph (secretly Willbender: {1}{U}: 1/1; morph {1}{U}; "when Willbender is turned face up, change the target of target spell or ability with a single target to Willbender").
+You control a face-down 2/2 morph (secretly Willbender: {1}{U}: 1/2; morph {1}{U}; "when Willbender is turned face up, change the target of target spell or ability with a single target to Willbender").
 
 You also control a Tarmogoyf (currently 3/4).
 
@@ -173,14 +173,14 @@ Split second is now active: you can't cast counterspells, can't activate abiliti
 But: you can take special actions. You flip your morph.
 Pay {1}{U}: special action. Show all players morph cost. Turn Willbender face up.
 
-Willbender is now a 1/1 face-up.
+Willbender is now a 1/2 face-up.
 "When Willbender is turned face up" trigger fires. Goes on stack on top of Sudden Shock.
 
 Stack: [Willbender trigger] [Sudden Shock → targeting Tarmogoyf]
 
 Willbender trigger resolves: change the target of Sudden Shock to Willbender.
-Sudden Shock now targets Willbender (1/1).
-Sudden Shock resolves: deal 2 damage to Willbender. Willbender dies (2 > 1 toughness).
+Sudden Shock now targets Willbender (1/2).
+Sudden Shock resolves: deal 2 damage to Willbender. Willbender dies (2 = 2 toughness, lethal damage).
 
 Tarmogoyf survives. Willbender saved it by dying in its place, through a technically illegal-seeming sequence that's actually fully legal.
 

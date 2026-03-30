@@ -12,7 +12,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { ManaSymbol } from '@/components/ManaSymbol';
+import { ManaSymbol } from './ManaSymbol';
 
 export interface BreakdownCard {
   card_name: string;

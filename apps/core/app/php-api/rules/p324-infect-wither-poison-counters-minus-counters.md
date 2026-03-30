@@ -165,7 +165,7 @@ Turn 3: attack with Glistener Elf. Opponent doesn't block.
 Opponent's turn 4: they have removal.
 Your turn 4: attack with Glistener Elf. No blockers.
 During combat, Glistener Elf (1/1 infect) is about to connect for 1 poison.
-Cast Invigorate ({G}: target gets +4/+0. This costs you 3 life instead of mana).
+Cast Invigorate ({2}{G}; if you control a Forest, you may instead have an opponent gain 3 life rather than pay its mana cost): target gets +4/+4 until end of turn.
 Glistener Elf becomes 5/1. Deals 5 infect damage → 5 poison counters.
 Cast Might of Old Krosa (if it's your main phase, +4/+4; otherwise +2/+2). During combat → +2/+2.
 Glistener Elf becomes 7/3. 7 poison counters total.

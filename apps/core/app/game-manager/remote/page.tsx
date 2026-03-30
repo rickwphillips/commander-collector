@@ -2,8 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Box, Typography, TextField, Button, Stack, CircularProgress, IconButton, Chip } from '@mui/material';
+import { Box, Typography, TextField, Button, Stack, CircularProgress, IconButton, Chip, Fab } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import ChatIcon from '@mui/icons-material/Chat';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
+import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import { PlayerPanel } from '../components/PlayerPanel';
 import { api } from '@/lib/api';
 import type { GameManagerState, PlayerState, LiveGameEvent } from '@/lib/types';
@@ -39,6 +42,35 @@ function RemotePageInner() {
   const [poisonKillPending, setPoisonKillPending] = useState(false);
   const [viewingPlayerIdx, setViewingPlayerIdx] = useState<number | null>(null);
   const { mode, toggleTheme } = useThemeMode();
+
+  // Cross-browser fullscreen: try native API, fall back to CSS fixed overlay (iOS Safari)
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [cssFullscreen, setCssFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handler = () => {
+      if (!document.fullscreenElement) { setIsFullscreen(false); setCssFullscreen(false); }
+    };
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
+
+  const toggleFullscreen = () => {
+    const el = containerRef.current;
+    if (isFullscreen) {
+      if (document.fullscreenElement) { document.exitFullscreen(); }
+      else { setCssFullscreen(false); setIsFullscreen(false); }
+    } else if (el?.requestFullscreen) {
+      el.requestFullscreen()
+        .then(() => { setIsFullscreen(true); setCssFullscreen(false); })
+        .catch(() => { setCssFullscreen(true); setIsFullscreen(true); });
+    } else {
+      // iOS Safari — CSS-only fullscreen
+      setCssFullscreen(true);
+      setIsFullscreen(true);
+    }
+  };
 
   // Lock body scroll and prevent pull-to-refresh while on the remote panel
   useEffect(() => {
@@ -371,7 +403,19 @@ function RemotePageInner() {
   const isMyTurn = state.players[state.currentPlayerIdx]?.position === seat;
 
   return (
-    <Box sx={{ width: '100dvw', height: '100dvh', overflow: 'hidden', position: 'relative', pt: 'env(safe-area-inset-top)', boxSizing: 'border-box', touchAction: 'manipulation', overscrollBehavior: 'none' }}>
+    <Box
+      ref={containerRef}
+      sx={{
+        width: '100dvw', height: '100dvh', overflow: 'hidden', position: 'relative',
+        pt: 'env(safe-area-inset-top)', boxSizing: 'border-box',
+        touchAction: 'manipulation', overscrollBehavior: 'none',
+        ...(cssFullscreen && {
+          position: 'fixed', inset: 0, zIndex: 1400,
+          width: '100%', height: '100%',
+          bgcolor: 'background.default',
+        }),
+      }}
+    >
       {showReconnect && (
         <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30, bgcolor: 'warning.main', px: 2, py: 0.75, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'warning.contrastText' }}>Connection lost</Typography>
@@ -427,6 +471,68 @@ function RemotePageInner() {
           },
         })}
       />
+
+      {/* Fullscreen toggle Fab */}
+      <Fab
+        size="small"
+        color="default"
+        onClick={toggleFullscreen}
+        sx={{ position: 'fixed', bottom: 76, right: 16, zIndex: 50 }}
+        title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+      >
+        {isFullscreen ? <FullscreenExitIcon sx={{ fontSize: 20 }} /> : <FullscreenIcon sx={{ fontSize: 20 }} />}
+      </Fab>
+
+      {/* Rules Guru chat Fab */}
+      <Fab
+        size="small"
+        color="primary"
+        sx={{ position: 'fixed', bottom: 20, right: 16, zIndex: 50 }}
+        onClick={() => {
+          if (!state) return;
+          const ctx = {
+            players: state.players.map((p, idx) => {
+              const entry: Record<string, unknown> = {
+                playerName: p.playerName,
+                deckName: p.deckName,
+                commander: p.commander?.name ?? null,
+                partner: p.partner?.name ?? null,
+                deckId: p.deckId,
+                life: p.life,
+                isEliminated: p.isEliminated,
+              };
+              if (p.poison > 0) entry.poison = p.poison;
+              if (p.energy > 0) entry.energy = p.energy;
+              if (p.experience > 0) entry.experience = p.experience;
+              if (p.commanderTax > 0) entry.commanderTax = p.commanderTax;
+              if (p.isMonarch) entry.isMonarch = true;
+              if (p.hasInitiative) entry.hasInitiative = true;
+              if (p.hasCitysBlessing) entry.hasCitysBlessing = true;
+              const dmgReceived = state.commanderDamage[idx];
+              if (dmgReceived) {
+                const dmg: Record<string, number[]> = {};
+                for (const [srcIdx, vals] of Object.entries(dmgReceived)) {
+                  const [regular, partner] = vals as [number, number];
+                  if (regular > 0 || partner > 0) {
+                    dmg[state.players[Number(srcIdx)]?.playerName ?? srcIdx] = partner > 0 ? [regular, partner] : [regular];
+                  }
+                }
+                if (Object.keys(dmg).length > 0) entry.commanderDamage = dmg;
+              }
+              return entry;
+            }),
+            turnNumber: state.turnNumber ?? null,
+            currentPlayer: state.players[state.currentPlayerIdx]?.playerName ?? null,
+          };
+          const ctxParam = encodeURIComponent(btoa(JSON.stringify(ctx)));
+          const base = process.env.NODE_ENV === 'development'
+            ? 'http://localhost:3003'
+            : '/app/projects/commander/rules';
+          window.open(`${base}/chat?ctx=${ctxParam}`, '_blank');
+        }}
+      >
+        <ChatIcon sx={{ fontSize: 20 }} />
+      </Fab>
 
       {/* Read-only overlay — view another player's panel */}
       {viewingPlayerIdx !== null && state && (() => {

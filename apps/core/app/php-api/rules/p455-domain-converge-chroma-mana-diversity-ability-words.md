@@ -112,7 +112,7 @@ Count: Specific colored mana symbol pips in mana costs of permanents you control
 
 **Chroma:**
 - *Primalcrux* (Eventide): "Chroma — Primalcrux's power and toughness are each equal to the number of green mana symbols in the mana costs of permanents you control." A deck full of mono-green permanents with many {G} symbols can make this an enormous creature.
-- *Phosphorescent Feast* (Eventide): "Chroma — You gain life equal to the number of green mana symbols among the mana costs of permanents you control."
+- *Phosphorescent Feast* (Eventide): "Chroma — Reveal any number of cards in your hand. You gain 2 life for each green mana symbol in those cards' mana costs." (Note: Phosphorescent Feast counts green symbols from cards REVEALED FROM HAND, not from permanents you control. Primalcrux is the correct example of a card checking permanents you control.)
 
 ## Commonly Confused With
 

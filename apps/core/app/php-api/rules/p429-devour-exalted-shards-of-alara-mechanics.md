@@ -61,11 +61,11 @@ DEVOUR (702.82a):
     Sacrifice tokens to devour: the tokens go to GY immediately (devour sacrifice).
     Tokens sacrifice to devour = count for devour counters.
     SYNERGY: create tokens, then sacrifice them to a devour creature for a large counter total.
-    Mycoloth ({3}{G}{G}: 4/4; devour 2; "at beginning of upkeep, create X 1/1 Saproling tokens
-      where X is Mycoloth's power"):
+    Mycoloth ({3}{G}{G}: 4/4; devour 2; "at beginning of upkeep, create a 1/1 green Saproling
+      token for each +1/+1 counter on this creature"):
     You sacrifice 5 Saproling tokens to Mycoloth: enters with 10 +1/+1 counters (Devour 2 × 5).
-    Mycoloth: 14/14. Upkeep: create 14 Saproling tokens. Next devour cycle: sacrifice 14 tokens
-      → even bigger Mycoloth. Exponential scaling.
+    Mycoloth: 14/14. Upkeep: create 10 Saproling tokens (one per +1/+1 counter). Next devour cycle:
+      sacrifice 10 tokens → even bigger Mycoloth. Exponential scaling.
 
   DEVOUR AND "AS [PERMANENT] ENTERS" CHOICES:
     Devour happens during the "as ... enters" window. Other "as enters" replacements also apply
@@ -107,12 +107,12 @@ EXALTED (702.83a):
     If 3 permanents you control have exalted and a creature attacks alone:
       3 separate exalted triggers fire. EACH puts +1/+1 on the attacking creature.
       Total: +3/+3 for the one creature.
-    Example: Noble Hierarch ({G}: 1/1 Exalted; {T}: add {G/W/U}); you have 3 copies of
+    Example: Noble Hierarch ({G}: 0/1 Exalted; {T}: add {G/W/U}); you have 3 copies of
       Noble Hierarch. One creature attacks alone: +3/+3 until end of turn.
     STACKING: many exalted sources stack cumulatively.
       Rafiq of the Many ({1}{G}{W}{U}: 3/3; exalted; "whenever a creature attacks alone,
         it gains double strike until EOT") adds exalted trigger + double strike.
-      With Rafiq + 2 Noble Hierarchs + Rhox War Monk (exalted too):
+      With Rafiq + 2 Noble Hierarchs + Battlegrace Angel (exalted too):
         Creature attacks alone: +4/+4 (4 exalted triggers) + double strike from Rafiq's other ability.
 
   VIGILANCE AND EXALTED:
@@ -159,18 +159,18 @@ EXALTED (702.83a):
 ## Canonical Example
 **Mycoloth + Saproling Sacrifice (Devour scaling):**
 You control: 5 Saproling tokens (1/1 each). Cast Mycoloth ({3}{G}{G}: 4/4; devour 2; "at beginning
-  of upkeep, create X 1/1 Saproling tokens where X = Mycoloth's power").
+  of upkeep, create a 1/1 green Saproling token for each +1/+1 counter on this creature").
 
 As Mycoloth enters: devour triggers. You may sacrifice any creatures.
 Sacrifice all 5 Saprolings: Mycoloth enters with 5 × 2 = 10 +1/+1 counters.
-Mycoloth: 14/14.
+Mycoloth: 14/14 (base 4/4 + 10 counters).
 
 The 5 Saprolings go to GY. They don't have persist/undying so nothing recursion happens.
-Next upkeep: create X Saproling tokens where X = Mycoloth's power = 14.
-Create 14 Saproling tokens. You now have 14 1/1 creatures.
+Next upkeep: create one Saproling per +1/+1 counter = 10 counters = 10 Saproling tokens.
+You now have 10 1/1 creatures.
 
 Next cycle (if you bounce and replay Mycoloth or sacrifice it and reanimate):
-Sacrifice 14 Saprolings: 14 × 2 = 28 counters. Mycoloth 32/32. Creates 32 Saprolings next upkeep.
+Sacrifice 10 Saprolings: 10 × 2 = 20 counters. Mycoloth 24/24. Creates 20 Saprolings next upkeep.
 
 Persist interaction: if your tokens had persist (e.g., Kitchen Finks proxy in a hypothetical):
 Sacrifice persist creature (no -1/-1 counter) to devour: persist fires, creature returns with
@@ -179,10 +179,10 @@ Next time: sacrifice same creature (now has -1/-1 counter). Persist WON'T fire. 
 
 **Example 2 — Exalted Stacking with Rafiq:**
 Your creatures: Rafiq of the Many (3/3; exalted; "solo attacker gains double strike"), Noble
-  Hierarch (1/1; exalted; {T}: {G/W/U}), Rhox War Monk (3/4; lifelink; exalted), Elspeth Knight-
+  Hierarch (0/1; exalted; {T}: {G/W/U}), Battlegrace Angel (4/4; flying; exalted), Elspeth Knight-
   Errant emblem giving all your creatures +3/+3... wait, simplified:
 
-You control: Rafiq of the Many + 2 Noble Hierarchs + Rhox War Monk. All have exalted.
+You control: Rafiq of the Many + 2 Noble Hierarchs + Battlegrace Angel. All have exalted.
 4 permanents with exalted total.
 
 You attack alone with Rafiq (3/3).
@@ -190,7 +190,7 @@ You attack alone with Rafiq (3/3).
   Trigger 1 (Rafiq's exalted): Rafiq gets +1/+1 → 4/4.
   Trigger 2 (Noble Hierarch 1's exalted): Rafiq gets +1/+1 → 5/5.
   Trigger 3 (Noble Hierarch 2's exalted): Rafiq gets +1/+1 → 6/6.
-  Trigger 4 (Rhox War Monk's exalted): Rafiq gets +1/+1 → 7/7.
+  Trigger 4 (Battlegrace Angel's exalted): Rafiq gets +1/+1 → 7/7.
 Rafiq's "attacks alone" additional trigger: Rafiq gains double strike.
 
 Rafiq attacks as 7/7 with double strike.

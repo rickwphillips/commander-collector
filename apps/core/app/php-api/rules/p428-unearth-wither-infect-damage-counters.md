@@ -11,7 +11,7 @@ examples_count: 2
 # P428 — Unearth, Wither, and Infect — Damage as Counters and Exile-Replacement Death Mechanics
 
 ## Abstract
-**Unearth** (702.84) returns a creature from the GY temporarily with haste, exiling it at end of turn (or any time it would leave the battlefield). **Wither** (702.80) converts damage dealt to creatures into -1/-1 counters rather than marked damage. **Infect** (702.90) converts damage to players into poison counters AND damage to creatures into -1/-1 counters (the same as wither for creature damage). Key non-obvious interactions: (1) **unearth's exile-replacement applies to ALL zone changes** — if a spell would return the unearthed creature to your hand, it's exiled instead (not returned); (2) **wither/infect damage and regeneration** — wither places -1/-1 counters instead of damage; regeneration removes "damage marked on it" but since wither creates counters, not damage, regeneration removes 0 damage but the counters remain; (3) **wither + persist = persist can't fire if the creature already had a -1/-1 counter** before dying (the counter came from wither), turning off persist; (4) **infect + persist** creates an explicit soft interaction where infect sources can disable persist by landing a -1/-1 counter before the kill; and (5) **Necroskitter** ({2}{B}: 2/1 Hornet; wither; "whenever a creature an opponent controls with a -1/-1 counter is put into a graveyard, return it to the battlefield under your control") creates a powerful takeover with any wither/infect source.
+**Unearth** (702.84) returns a creature from the GY temporarily with haste, exiling it at end of turn (or any time it would leave the battlefield). **Wither** (702.80) converts damage dealt to creatures into -1/-1 counters rather than marked damage. **Infect** (702.90) converts damage to players into poison counters AND damage to creatures into -1/-1 counters (the same as wither for creature damage). Key non-obvious interactions: (1) **unearth's exile-replacement applies to ALL zone changes** — if a spell would return the unearthed creature to your hand, it's exiled instead (not returned); (2) **wither/infect damage and regeneration** — wither places -1/-1 counters instead of damage; regeneration removes "damage marked on it" but since wither creates counters, not damage, regeneration removes 0 damage but the counters remain; (3) **wither + persist = persist can't fire if the creature already had a -1/-1 counter** before dying (the counter came from wither), turning off persist; (4) **infect + persist** creates an explicit soft interaction where infect sources can disable persist by landing a -1/-1 counter before the kill; and (5) **Necroskitter** ({1}{B}{B}: 1/4 Elemental; wither; "whenever a creature an opponent controls with a -1/-1 counter is put into a graveyard, return it to the battlefield under your control") creates a powerful takeover with any wither/infect source.
 
 ## The Definitive Rules
 
@@ -159,7 +159,7 @@ INFECT (702.90b, 702.90c):
       then dies, persist doesn't fire.
 
   NECROSKITTER INTERACTION:
-    Necroskitter ({2}{B}: 2/1 Hornet; wither; "whenever a creature an opponent controls with a
+    Necroskitter ({1}{B}{B}: 1/4 Elemental; wither; "whenever a creature an opponent controls with a
       -1/-1 counter on it is put into a graveyard, return it to the battlefield under your control"):
     With any wither or infect source: damage to opponent's creatures places -1/-1 counters.
     When those creatures die (any cause — combat, removal, even just toughness reduced to 0):
@@ -190,16 +190,18 @@ DEVOTED DRUID INTERACTION:
 
 ## Canonical Example
 **Wither vs. Persist creature:**
-Opponent controls Kitchen Finks (3/2; persist; currently no counters — fresh). You control Necroskitter ({2}{B}: 2/1 wither; triggered steal ability) and Blightning ({1}{B}{R}: sorcery; "Blightning deals 3 damage to each opponent and... wither" — wait, Blightning doesn't have wither).
+Opponent controls Kitchen Finks (3/2; persist; currently no counters — fresh). You control Necroskitter ({1}{B}{B}: 1/4 wither; triggered steal ability) and Blightning ({1}{B}{R}: sorcery; "Blightning deals 3 damage to target player or planeswalker. That player discards two cards." — wait, Blightning doesn't have wither).
 
-Use Cinderbones ({2}{B}: 2/1; wither; "{B}: regenerate Cinderbones") as the wither source.
+Use Cinderbones ({2}{B}: 1/1; wither; "{1}{B}: regenerate Cinderbones") as the wither source.
 Attack with Cinderbones. Opponent blocks with Kitchen Finks. Combat damage:
-Cinderbones (wither) deals 2 damage to Kitchen Finks → 2 -1/-1 counters placed on Kitchen Finks.
-Kitchen Finks (2 -1/-1 counters): toughness = 2-2 = 0. SBA 704.5f: toughness ≤ 0, put into GY.
+Cinderbones (wither) deals 1 damage to Kitchen Finks → 1 -1/-1 counter placed on Kitchen Finks.
+Kitchen Finks becomes 2/1 (from the -1/-1 counter). Kitchen Finks deals 3 damage to Cinderbones.
+Cinderbones dies (or regenerates). Kitchen Finks now has 1 -1/-1 counter.
+Now cast a removal spell to kill Kitchen Finks. Kitchen Finks goes to GY.
 
 Persist: "when this permanent is put into a graveyard, if it had no -1/-1 counters on it."
-Kitchen Finks HAD 2 -1/-1 counters when it died. Persist DOES NOT FIRE.
-Kitchen Finks goes to opponent's GY. It has -1/-1 counters on it when it dies (704.5g tracks this).
+Kitchen Finks HAD a -1/-1 counter when it died. Persist DOES NOT FIRE.
+Kitchen Finks goes to opponent's GY. It has a -1/-1 counter on it when it dies (704.5g tracks this).
 
 Necroskitter trigger: "whenever a creature an opponent controls with a -1/-1 counter is put into
   a graveyard" — Kitchen Finks had -1/-1 counters. Necroskitter fires!
@@ -208,8 +210,8 @@ Kitchen Finks returns to YOUR battlefield under YOUR control.
 Net: wither disabled persist, Necroskitter stole the creature. Opponent lost Kitchen Finks entirely.
 
 **Example 2 — Unearth + Ephemerate:**
-Your GY: Hellspark Elemental ({1}{R}: 3/1 trample haste; "at end of turn, sacrifice it"; unearth {R}).
-You unearth Hellspark Elemental: pay {R}. Returns as 3/1 with haste. "If it would leave the
+Your GY: Hellspark Elemental ({1}{R}: 3/1 trample haste; "at end of turn, sacrifice it"; unearth {1}{R}).
+You unearth Hellspark Elemental: pay {1}{R}. Returns as 3/1 with haste. "If it would leave the
   battlefield, exile it instead." "Exile it at beginning of next end step."
 
 You cast Ephemerate ({W}) targeting Hellspark Elemental.

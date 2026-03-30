@@ -105,12 +105,12 @@ TRIBUTE (702.104):
     The design intent: neither option is clearly correct. The opponent is always in a lose-lose.
     In practice: the tribute ability bonus is almost always more powerful than the counters.
       Players often don't pay tribute because the bonus ability is what makes tribute creatures strong.
-    Example: Polukranos, World Eater ({2}{G}{G}: 5/5, tribute 2, "if tribute wasn't paid, when
-      Polukranos enters, it fights target creature of your choice"):
-      Option A: Opponent pays tribute → Polukranos enters as 7/7. You just get a 7/7.
-      Option B: Opponent doesn't pay tribute → Polukranos enters as 5/5. "If tribute wasn't paid"
-        trigger fires → Polukranos fights a target creature (kills something, or trades).
-    Usually: opponent pays tribute to avoid the bonus (getting a 7/7 is often better than a 5/5 that
+    Example: Nessian Wilds Ravager ({4}{G}{G}: 6/6, tribute 6, "when this creature enters, if tribute
+      wasn't paid, you may have this creature fight another target creature"):
+      Option A: Opponent pays tribute → Nessian Wilds Ravager enters as 12/12. You get a massive creature.
+      Option B: Opponent doesn't pay tribute → Ravager enters as 6/6. "If tribute wasn't paid"
+        trigger fires → Ravager fights a target creature (kills something, or trades).
+    Usually: opponent pays tribute to avoid the bonus (getting a 12/12 is often better than a 6/6 that
       immediately removes one of their threats).
     But some tribute cards: the bonus is SO good, the opponent must decide carefully.
   CHOOSING THE OPPONENT:
@@ -161,20 +161,20 @@ Result: opponent used a removal spell to kill the target, but still got a 4/2 cr
 Bestow's resilience: you can't "waste" the spell by killing the enchant target.
 Best play for opponent: kill Boon Satyr itself (if they can) rather than the target.
 
-**Example 2 — Polukranos Tribute 2:**
-Polukranos, World Eater ({2}{G}{G}: 5/5, Tribute 2, "if tribute wasn't paid, when Polukranos, World Eater enters, it fights target creature an opponent controls"):
+**Example 2 — Nessian Wilds Ravager Tribute 6:**
+Nessian Wilds Ravager ({4}{G}{G}: 6/6, Tribute 6, "when this creature enters, if tribute wasn't paid, you may have this creature fight another target creature"):
 
-You cast Polukranos. As it enters: choose an opponent.
+You cast Nessian Wilds Ravager. As it enters: choose an opponent.
 Opponent A has a 6/6 Dragon and a 2/2 Soldier.
-Opponent A's choice: pay tribute (2 counters) OR let you fight a creature with a 5/5.
+Opponent A's choice: pay tribute (6 counters → 12/12) OR let you fight a creature with a 6/6.
 
-Option A (pay tribute): Polukranos enters as 7/7. You get a large creature.
-Option B (don't pay tribute): Polukranos enters as 5/5. "Tribute wasn't paid" trigger fires.
-  "When Polukranos enters, if tribute wasn't paid, it fights target creature an opponent controls."
-  You choose: fight the 2/2 Soldier (Polukranos kills it, takes 2 damage), or fight the 6/6 Dragon.
-  If you fight the Dragon: Polukranos and Dragon deal their damage to each other simultaneously.
-  5/5 Polukranos vs 6/6 Dragon: Dragon survives (5 damage, toughness 6), Polukranos dies (6 damage, toughness 5).
-  Polukranos removes a threat by "trading" in the fight. Net result: Dragon takes 5 damage (dead if it had 5 toughness).
+Option A (pay tribute): Ravager enters as 12/12. You get a massive creature but no fight effect.
+Option B (don't pay tribute): Ravager enters as 6/6. "Tribute wasn't paid" trigger fires.
+  "When this creature enters, if tribute wasn't paid, you may have this creature fight another target creature."
+  You choose: fight the 2/2 Soldier (Ravager kills it, takes 2 damage), or fight the 6/6 Dragon.
+  If you fight the Dragon: Ravager and Dragon deal their damage to each other simultaneously.
+  6/6 Ravager vs 6/6 Dragon: both take 6 damage. Both die (toughness = 6 = lethal).
+  Ravager removes the Dragon, trading itself. Net result: two threats removed for one spell.
 
 In Commander with multiple opponents, you choose the opponent for tribute strategically:
   - Choose the opponent who will most likely NOT pay tribute (so you get the fight effect against their best threat).

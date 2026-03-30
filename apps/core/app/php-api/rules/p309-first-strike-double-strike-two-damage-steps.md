@@ -82,7 +82,7 @@ DOUBLE STRIKE:
     SBAs: blocker dead.
     Step 2: no blocker remaining → ALL 4 damage goes to player (trample rule: no blockers = full to player).
     Player takes 2 + 4 = 6 damage. From one 4/4 through one 2/2 blocker!
-    Kaalia of the Vast (4/4 Flying, Double Strike, Haste) with Trample: nightmare blocker to deal with.
+    A 4/4 Double Strike Trample creature (e.g., Zetalpa, Primal Dawn or any creature given these via equipment): nightmare blocker to deal with.
 
   DOUBLE STRIKE CARDS:
     Mirran Crusader ({1}{W}{W}): 2/2. Double Strike. Protection from black and from green.
@@ -96,10 +96,9 @@ DOUBLE STRIKE:
       gains lifelink." + "Whenever you cast a red instant or sorcery, it deals 3 damage to target creature."
       Also has Double Strike... wait, check oracle. Let me use actual double strike creatures.
 
-    Embercleave ({4}{R}{R}, reduced via flash): "Attach to target attacking creature. Equipped
-      creature gains double strike and trample."
-      Equipment granting double strike + trample: immediately powerful when attached during combat.
-      Flash: attach during the attack declaration or in response to blocks.
+    Embercleave ({4}{R}{R}, costs {1} less per attacking creature): "Flash. When it enters, attach to target creature you control. Equipped creature gets +1/+1 and has double strike and trample."
+      Equipment granting +1/+1, double strike + trample: immediately powerful when attached during combat.
+      Flash: cast it when attackers are declared and it costs less; attaches immediately.
 
 THE RESPONSE WINDOW BETWEEN DAMAGE STEPS:
   This window is real and important!

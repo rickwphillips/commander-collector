@@ -140,7 +140,7 @@ DISGUISE (Outlaws of Thunder Junction era):
 
 ## Canonical Example
 **Brine Elemental + Vesuvan Shapeshifter Lock:**
-Board: you control Brine Elemental ({5}{U}{U}: 4/4, Morph {5}{U}{U}).
+Board: you control Brine Elemental ({4}{U}{U}: 5/4, Morph {5}{U}{U}).
 "When Brine Elemental is turned face up, each opponent skips their next untap step."
 You also control Vesuvan Shapeshifter ({4}{U}: "At the beginning of your upkeep, you may have this creature become a copy of target face-down creature you control, except it's still a Vesuvan Shapeshifter.").
 Turn 1 of lock: Turn Brine Elemental face up → trigger: opponent skips their next untap step.

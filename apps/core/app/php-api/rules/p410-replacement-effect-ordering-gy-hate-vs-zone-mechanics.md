@@ -169,7 +169,7 @@ COMPARING THE THREE GY HATE CARDS:
 ## Canonical Example
 **Madness Deck vs. Opponent with Leyline of the Void:**
 Opponent opens with Leyline of the Void in play (free if in opening hand).
-You have: Faithless Looting ({R}: draw 2, then discard 2) + Fiery Temper ({2}{R}: deal 3 damage; madness {R}) in hand.
+You have: Faithless Looting ({R}: draw 2, then discard 2) + Fiery Temper ({1}{R}{R}: deal 3 damage; madness {R}) in hand.
 
 Cast Faithless Looting. Draw 2 cards. Now discard 2.
 Discard Fiery Temper.

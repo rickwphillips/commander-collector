@@ -70,7 +70,7 @@ PROTECTION FROM A COLOR (most common):
       Opponent casts Murder (black)? Protection from black → Murder is countered.
       Mother of Runes is one of the most powerful 1-drops in Legacy.
 
-    True-Name Nemesis ({1}{U}{B}): 3/1. "Protection from the chosen player."
+    True-Name Nemesis ({1}{U}{U}): 3/1. "Protection from the chosen player."
       "As True-Name Nemesis enters, choose a player. It has protection from that player."
       In 1v1: choose your opponent → True-Name has protection from everything THEY control or own.
       Their spells can't target it. Their creatures can't block it. Their Equipments fall off.

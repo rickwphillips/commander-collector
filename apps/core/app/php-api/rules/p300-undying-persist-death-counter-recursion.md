@@ -72,11 +72,11 @@ PERSIST:
   The -1/-1 counter degrades the creature slightly (+1/+1 base minus 1/-1 = original -1/-1).
 
   PERSIST NOTABLE CARDS:
-    Kitchen Finks ({1}{G/W}{G/W}): Persist. 3/2. "When ETBs, gain 3 life."
+    Kitchen Finks ({1}{G/W}{G/W}): Persist. 3/2. "When ETBs, gain 2 life."
     First death: returns with -1/-1 → becomes 2/1 (3-1 / 2-1) with persist.
     Second death: has -1/-1 counter, persist fails.
-    But Kitchen Finks ETB also fires on persist return: gain 3 more life.
-    Total life gain from one Kitchen Finks: 3 (original) + 3 (persist return) = 6 life for {1}{G/W}{G/W}.
+    But Kitchen Finks ETB also fires on persist return: gain 2 more life.
+    Total life gain from one Kitchen Finks: 2 (original) + 2 (persist return) = 4 life for {1}{G/W}{G/W}.
 
     Voice of Resurgence ({G}{W}): Not persist, but related: "When an opponent casts a spell during your turn
       or when V.o.R dies, create an Elemental token that's X/X where X = number of creatures you control."
@@ -138,6 +138,9 @@ COUNTER REMOVAL ENABLING INFINITE:
 - **Melira, Sylvok Outcast prevents persist's -1/-1 from sticking** — enables infinite persist loops.
 - **Undying returns the creature stronger** (+1/+1); **persist returns it weaker** (-1/-1).
 - **The condition is checked immediately before dying** — if the counter was removed at instant speed just before death, the ability can fire.
+- **A persist creature with both +1/+1 and -1/-1 counters that dies from toughness ≤ 0 will NOT return.** Persist checks the creature's last known state on the battlefield — it still has the -1/-1 counters at that point (the SBA that annihilates matched +1/+1 / -1/-1 pairs and the SBA for toughness ≤ 0 both happen simultaneously). (Gatherer ruling 2013-06-07)
+- **If a token with persist dies (no -1/-1 counters), the ability triggers but the token ceases to exist and can't return.** (Gatherer ruling 2013-06-07)
+- **Multiple instances of persist each trigger separately, but only the first to resolve can return the card.** Once it's back on the battlefield, subsequent triggers find it's no longer in the graveyard. (Gatherer ruling 2013-06-07)
 
 ## Canonical Example
 **Melira + Kitchen Finks + Viscera Seer Infinite Life Loop:**
@@ -146,11 +149,11 @@ Step 1: Sacrifice Kitchen Finks to Viscera Seer. Seer scries 1.
 Kitchen Finks dies: persist triggers (no -1/-1 counters). Would return with -1/-1 counter.
 Melira: creatures you control can't have -1/-1 counters placed on them.
 Kitchen Finks returns to battlefield WITHOUT the -1/-1 counter.
-Kitchen Finks ETB triggers: gain 3 life.
+Kitchen Finks ETB triggers: gain 2 life.
 Finks is back as 3/2 with no -1/-1 counter (Melira prevented it).
 Step 2: Sacrifice Kitchen Finks again. Same process.
 Step 3: repeat infinitely.
-Each cycle: gain 3 life + scry 1.
+Each cycle: gain 2 life + scry 1.
 Infinite life + infinite scry = combo win (tutor into a finisher, or just outlive opponent).
 Winning: add a Blasting Station ({T}: deal 1 to target → untaps when creature enters). Each Finks return untaps Blasting Station: deal 1 damage. Infinite damage.
 

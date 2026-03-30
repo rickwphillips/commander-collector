@@ -1,20 +1,27 @@
 'use client';
 
 import { useEffect, useState, Suspense, useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Alert,
   Box,
+  Button,
   Card,
   CardMedia,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Grid,
   Stack,
   Tab,
   Tabs,
+  TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
+import CallSplitIcon from '@mui/icons-material/CallSplit';
 import { PageContainer } from '@/components/PageContainer';
 import { DeckBreakdown } from '@/components/DeckBreakdown';
 import { DeckFilters, EMPTY_FILTERS, TYPE_CATEGORIES, getTypeCategory, hasActiveFilters, matchesFilters } from '@/components/DeckFilters';
@@ -43,6 +50,7 @@ function GalleryCard({ card }: { card: DeckCard }) {
 
 function DecklistPageInner() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const deckId = Number(searchParams.get('id'));
 
   const [deck, setDeck] = useState<DeckDetail | null>(null);
@@ -51,6 +59,25 @@ function DecklistPageInner() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState(0);
   const [filters, setFilters] = useState<DeckFilterState>(EMPTY_FILTERS);
+
+  // Detach to List
+  const [detachOpen, setDetachOpen] = useState(false);
+  const [detachName, setDetachName] = useState('');
+  const [detaching, setDetaching] = useState(false);
+
+  const handleDetach = async () => {
+    if (!deck || !detachName.trim()) return;
+    setDetaching(true);
+    try {
+      const res = await api.detachDeckToList(deck.id, detachName.trim());
+      setCards([]);
+      setDetachOpen(false);
+      router.push(`/lists/detail?id=${res.list_id}`);
+    } catch {
+      setError('Failed to detach list');
+      setDetaching(false);
+    }
+  };
 
   useEffect(() => {
     if (!deckId) return;
@@ -124,8 +151,45 @@ function DecklistPageInner() {
       subtitle={`Commander: ${deck.commander}`}
       backHref={`/decks/detail?id=${deckId}`}
       backLabel="Back to Deck"
+      actions={
+        cards.length > 0 ? (
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<CallSplitIcon />}
+            onClick={() => { setDetachName(deck.name + ' List'); setDetachOpen(true); }}
+          >
+            Detach to List
+          </Button>
+        ) : undefined
+      }
     >
       {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+
+      {/* Detach to List Dialog */}
+      <Dialog open={detachOpen} onClose={() => setDetachOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Save as Standalone List</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            All cards will be removed from this deck and saved as a standalone list.
+          </Typography>
+          <TextField
+            label="List Name"
+            fullWidth
+            size="small"
+            autoFocus
+            value={detachName}
+            onChange={(e) => setDetachName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleDetach(); }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDetachOpen(false)}>Cancel</Button>
+          <Button variant="contained" disabled={!detachName.trim() || detaching} onClick={handleDetach}>
+            Save &amp; Remove
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
         <Tab label="Breakdown" />

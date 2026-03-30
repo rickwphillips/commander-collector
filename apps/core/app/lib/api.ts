@@ -190,6 +190,32 @@ export const api = {
   deleteDeckCards: (deckId: number) =>
     apiFetch<{ success: boolean }>(`/deck-cards?deck_id=${deckId}`, { method: 'DELETE' }),
 
+  // Card Lists
+  getLists: () => apiFetch<import('./types').CardList[]>('/lists'),
+  getList: (id: number) => apiFetch<import('./types').CardListDetail>(`/lists?id=${id}`),
+  createList: (name: string, description?: string, cards?: import('./types').CreateDeckCardInput[]) =>
+    apiFetch<{ success: boolean; list_id: number }>('/lists', {
+      method: 'POST',
+      body: JSON.stringify({ name, description, cards }),
+    }),
+  updateList: (id: number, patch: { name?: string; description?: string; cards?: import('./types').CreateDeckCardInput[] }) =>
+    apiFetch<{ success: boolean }>(`/lists?id=${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+  deleteList: (id: number) =>
+    apiFetch<{ success: boolean }>(`/lists?id=${id}`, { method: 'DELETE' }),
+  detachDeckToList: (deckId: number, name: string) =>
+    apiFetch<{ success: boolean; list_id: number }>('/lists?action=detach_deck', {
+      method: 'POST',
+      body: JSON.stringify({ deck_id: deckId, name }),
+    }),
+  attachListToDeck: (listId: number, deckId: number) =>
+    apiFetch<{ success: boolean }>('/lists?action=attach_deck', {
+      method: 'POST',
+      body: JSON.stringify({ list_id: listId, deck_id: deckId }),
+    }),
+
   // Scryfall card cache
   lookupCard: (name: string) =>
     apiFetch<import('./types').ScryfallCachedCard | null>(

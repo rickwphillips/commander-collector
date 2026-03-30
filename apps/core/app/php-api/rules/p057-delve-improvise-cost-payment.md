@@ -77,6 +77,8 @@ INTERACTION WITH OTHER COST REDUCTIONS:
 - **Neither is an alternative cost.** They layer on top of normal cost payment after total cost is determined.
 - **Artifacts with summoning sickness can improvise.** The tap is YOUR ability, not theirs.
 - **Multiple copies of delve/improvise on the same spell are redundant.** One instance covers all generic mana.
+- **Delve can be used alongside alternative costs (e.g., flashback).** Because delve is not an alternative cost itself, CR 118.9a doesn't restrict it. Delve applies to whatever generic mana remains after the alternative cost is applied. (Gatherer ruling 2021-03-19: "Because delve isn't an alternative cost, it can be used in conjunction with alternative costs, such as flashback.")
+- **Delve applies to generic mana in additional costs.** It can cover generic mana from kicker, entwine, and other additional cost components, not just the base cost. (Gatherer ruling 2021-03-19)
 
 ## Canonical Example
 **Become Immense (delve, {5}{G} → effectively {G} with 6 graveyard cards):**

@@ -44,20 +44,20 @@ THE KEY DISTINCTION — EXILE IS NOT THE GRAVEYARD:
     Champion and bounce both bypass persist/undying — different zones.
 
 CHAMPION EXILE AS A COUNTER RESET:
-  Scenario: Kitchen Finks ({1}{G/W}{G/W}: 3/2; lifelink; persist; "when it enters, gain 2 life")
+  Scenario: Kitchen Finks ({1}{G/W}{G/W}: 3/2; persist; "when it enters, you gain 2 life")
   Game state: Kitchen Finks died once, triggered persist, returned to battlefield with -1/-1
     counter (now effectively 2/1, no lifelink due to -1/-1 counters reducing stats, and the
     -1/-1 counter prevents FUTURE persist triggers).
   Problem: Kitchen Finks can no longer trigger persist again (it has a -1/-1 counter).
 
   SOLUTION via Champion:
-    Cast Cloudthresher ({4}{G}{G}: 7/5 reach; evoke {G}{G}; champion a green creature).
-    Actually: Cloudthresher has Champion a green creature. Kitchen Finks is green (has {G/W}).
-    Cloudthresher enters: champion ETB fires. You exile Kitchen Finks (champion it).
+    Cast Changeling Titan ({4}{G}: 7/7; champion a creature).
+    Changeling Titan has Champion a creature. Kitchen Finks is a creature.
+    Changeling Titan enters: champion ETB fires. You exile Kitchen Finks (champion it).
     Kitchen Finks goes to exile. The -1/-1 counter... is on the exile card? No.
     When a permanent leaves the battlefield, counters on it cease to exist (CR 122.2).
     The -1/-1 counter disappears. Kitchen Finks is just "Kitchen Finks" in exile (a card).
-  Later: Cloudthresher leaves the battlefield (destroyed, bounced, etc.).
+  Later: Changeling Titan leaves the battlefield (destroyed, bounced, etc.).
     "Return the exiled card to the battlefield under its owner's control" — Kitchen Finks returns.
     Kitchen Finks enters the battlefield as a NEW OBJECT (CR 400.7). No counters. ETB fires.
     Gain 2 life from the ETB.
@@ -133,17 +133,17 @@ CHAMPION + PERSIST COUNTER-CANCELLATION (P419 connection):
 - **The reset is symmetric** — undying creatures that have a +1/+1 counter from undying lose that counter when championed; they re-enter at base P/T but with undying re-enabled.
 
 ## Canonical Example
-**Cloudthresher + Kitchen Finks — Persist Reset:**
-Kitchen Finks (3/2; persist; lifelink; "ETB: gain 2 life") has already died and returned via persist, so it's on the battlefield as a 2/1 with a -1/-1 counter. Persist will NOT fire if it dies again.
+**Changeling Titan + Kitchen Finks — Persist Reset:**
+Kitchen Finks (3/2; persist; "ETB: gain 2 life") has already died and returned via persist, so it's on the battlefield as a 2/1 with a -1/-1 counter. Persist will NOT fire if it dies again.
 
-You cast Cloudthresher ({4}{G}{G}: 7/5 reach; champion a green creature).
-Champion ETB fires: exile a green creature you control. Kitchen Finks is green. Exile Kitchen Finks.
+You cast Changeling Titan ({4}{G}: 7/7; champion a creature).
+Champion ETB fires: exile a creature you control. Exile Kitchen Finks.
 Kitchen Finks enters exile. The -1/-1 counter on it ceases to exist (CR 122.2). Finks in exile: just a card.
 
-Later: opponent casts Wrath of God, destroying all creatures including Cloudthresher.
-Cloudthresher's "leaves battlefield" champion trigger fires: "return the exiled card to the battlefield."
+Later: opponent casts Wrath of God, destroying all creatures including Changeling Titan.
+Changeling Titan's "leaves battlefield" champion trigger fires: "return the exiled card to the battlefield."
 Kitchen Finks returns to the battlefield as a NEW OBJECT. ETB fires: gain 2 life.
-Kitchen Finks: 3/2 lifelink with persist. No -1/-1 counter (new object). Persist is ready again.
+Kitchen Finks: 3/2 with persist. No -1/-1 counter (new object). Persist is ready again.
 
 If Kitchen Finks now dies: persist triggers (no -1/-1 counter). Returns with -1/-1 counter.
 You gained an extra persist trigger by routing Kitchen Finks through champion exile.

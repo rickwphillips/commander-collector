@@ -87,7 +87,7 @@ SUSPEND:
     If it's a creature spell: gains Haste "until you lose control of the spell or the permanent."
 
   SUSPEND NOTABLE CARDS:
-    Ancestral Vision ({U}, Suspend 4 — {U}):
+    Ancestral Vision (no mana cost; Suspend 4 — {U}):
       No regular mana cost! MV = 0. Cannot be cast normally (no mana cost).
       Suspend: pay {U}, exile with 4 time counters.
       Upkeep 1: 3 counters. Upkeep 2: 2. Upkeep 3: 1. Upkeep 4: 0 → cast for free.
@@ -97,16 +97,17 @@ SUSPEND:
       On your upkeep turn 5: last counter removed. You may cast Ancestral Vision for free. Draw 3.
       4-turn investment for draw 3: powerful delayed value.
 
-    Living End ({B}{B}{B}, Suspend 3 — {2}{B}):
+    Living End (no mana cost; Suspend 3 — {2}{B}{B}):
       No regular mana cost! MV = 0.
       Suspend: exile with 3 time counters. After 3 upkeeps: cast for free.
-      Resolves: each player sacrifices all creatures; each player returns all creature cards from GY.
+      Resolves: each player exiles all creature cards from their GY, then sacrifices all creatures they control, then puts the exiled cards onto the battlefield.
+      Order matters: GY creatures are captured first, THEN battlefield creatures are sacrificed.
       The key: it can't be cast normally (no mana cost).
       BUT: cascade can find it (MV 0 < any cascade spell's MV).
       This is the Living End combo: cascade into it immediately instead of waiting 3 turns.
 
-    Crashing Footfalls ({G}{G}, Suspend 4 — {G}):
-      Also MV 0. "Create two 4/4 green Rhino creature tokens."
+    Crashing Footfalls (no mana cost; Suspend 4 — {G}):
+      Also MV 0. "Create two 4/4 green Rhino creature tokens with trample."
       Can't be cast normally. Cascade finds it.
       Cascade + Violent Outburst: instant-speed two 4/4 rhinos.
 

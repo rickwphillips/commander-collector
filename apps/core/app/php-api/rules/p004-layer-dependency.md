@@ -52,7 +52,10 @@ DEPENDENCY LOOP:
 
   **Correct resolution**: If a creature's P/T is ONLY defined by a CDA (characteristic-defining ability) and the CDA is removed by layer 6, then in layer 7b there's no set-P/T effect, in 7c no modifications, and the base P/T from the card's printing is used. For a card like Tarmogoyf, the printed "*/1+*" is the CDA. Without the CDA, the game can't compute P/T from the printed text, so it defaults to 0/0. Then Humility's layer 7b "becomes 1/1" applies. Result: 1/1.
 
-- **"All creatures are 1/1" (Humility layer 7b) + Opalescence ("enchantments are creatures with P/T = CMC")**: Humility is an enchantment. If Opalescence makes Humility a creature (layer 4), it then becomes subject to its OWN effect in layer 7b. Does Humility make itself 1/1? — This is a famous dependency question. Neither effect depends on the other in the same layer (one is layer 4, one is layer 7b). They're in different layers and simply apply in order: layer 4 (Opalescence makes Humility a creature with CMC P/T), then layer 7b (Humility makes all creatures 1/1, including itself). Result: all creatures, including Humility, are 1/1.
+- **"All creatures are 1/1" (Humility layer 7b) + Opalescence ("enchantments are creatures with P/T = CMC")**: Humility is an enchantment. Opalescence makes it a creature (layer 4). Both have layer 7b effects (Opalescence sets P/T = CMC; Humility makes all creatures 1/1). Neither depends on the other — they're not competing in the same layer for dependency purposes (one is layer 4 for type-change; both have 7b effects but neither's 7b portion depends on the other's 7b portion). In layer 7b, **timestamp order determines the result**:
+  - **Opalescence entered first** (earlier 7b timestamp): Opalescence's 7b applies first (Humility → 4/4 from CMC 4), then Humility's 7b (later timestamp) overrides → all creatures become 1/1. **Result: Humility and all creatures are 1/1.**
+  - **Humility entered first** (earlier 7b timestamp): Humility's 7b applies first → all creatures 1/1, then Opalescence's 7b (later timestamp) overrides → Humility becomes 4/4 (CMC 4). **Result: Humility is 4/4; other enchantment-creatures are also set to their CMC as P/T.**
+  (Gatherer ruling 2009-10-01 on Opalescence confirms these two cases explicitly.)
 
 - **Real dependency example**: "All noncreature artifacts become creatures" + "All creatures get +2/+2". The pump effect depends on the type-change effect (same sublayer? No — type is layer 4, pump is layer 7c). Different layers again. Dependency only matters WITHIN the same layer.
 
@@ -69,9 +72,14 @@ Two Auras each trying to set a creature's P/T (layer 7b). First Aura: "Enchanted
 **Example 3 — Humility + creature with abilities (CORRECTED):**
 Humility on battlefield. A creature enters with an ETB ability. CR 603.6b states: "There is no moment 'between' when a permanent enters the battlefield and when continuous effects apply." Therefore: the creature is on the battlefield with no abilities from the very moment it arrives (Humility layer 6 applies instantaneously). The ETB trigger ability does not exist when evaluated at entry time. **Result: ETB trigger does NOT fire.** (Prior version of this example incorrectly stated the trigger fires; this is contradicted by 603.6b and confirmed by the Magus of the Moon ruling — see Example 5.)
 
-**Example 5 — Magus of the Moon: ETB triggers lost before firing (Gatherer ruling 7/25/2025):**
-Magus of the Moon is on the battlefield: "Nonbasic lands are Mountains." A fetchland enters. Continuous effects apply immediately (603.6b): the fetchland is now a Mountain, which has no "when this enters" trigger. Result: the fetchland's ETB trigger never fires — it doesn't exist when evaluated.
-Key ruling: "If a nonbasic land has an ability that triggers 'when' it enters, it will lose that ability before it can trigger." This is the same logic as Example 3 under Humility. The ability is gone before the trigger can be generated.
+**Example 5 — Blood Moon / Magus of the Moon: BOTH triggered AND "as enters" abilities lost (Blood Moon ruling 2020-08-07; Magus ruling 7/25/2025):**
+Blood Moon (or Magus of the Moon) is on the battlefield: "Nonbasic lands are Mountains." A fetchland enters. Continuous effects apply immediately (603.6b): the fetchland is now a Mountain.
+Result: ALL of the following are lost before they can fire or apply:
+  - "When this enters" triggered abilities → never trigger
+  - "As this enters, enter tapped" abilities → never apply (land enters untapped!)
+  - "As this enters, choose a creature type" abilities (e.g., Cavern of Souls) → never apply
+Blood Moon ruling (2020-08-07): "If a nonbasic land has an ability that causes it to enter the battlefield tapped, it will lose that ability before it can apply. The same is also true of any other abilities that modify how a land enters the battlefield or apply 'as' a land enters the battlefield, such as the first ability of Cavern of Souls."
+This confirms: the type-change effect in layer 4 strips not just triggered ETB abilities but also replacement/"as enters" ETB abilities from nonbasic lands. The permanent is NEVER on the battlefield with those abilities (603.6b).
 
 **Example 6 — Magus of the Moon losing its own abilities (Gatherer ruling 7/25/2025):**
 Magus of the Moon's type-changing effect is in layer 4. If a "creatures lose all abilities" effect (like Humility, layer 6) removes Magus of the Moon's abilities, that removal happens AFTER layer 4 has already been applied. The nonbasic-lands-become-Mountains effect has already been applied in layer 4, so it persists — the lands are still Mountains. Magus losing its abilities in layer 6 cannot retroactively undo layer 4.

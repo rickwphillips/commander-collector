@@ -33,7 +33,7 @@ THE COUNTER CANCELLATION MECHANIC (122.3):
   As soon as a permanent has both types of counters, the SBA fires and removes equal numbers.
 
 PERSIST BASELINE (no combo):
-  Kitchen Finks ({1}{G/W}{G/W}: 3/2; persist; "when it enters, gain 3 life") dies.
+  Kitchen Finks ({1}{G/W}{G/W}: 3/2; persist; "when it enters, gain 2 life") dies.
   Persist trigger fires: return it to battlefield WITH -1/-1 counter.
   Kitchen Finks re-enters: 3/2 - 1/-1 = 2/1. Gain 3 life (ETB trigger).
   If it dies again: persist fires again? "If it had NO -1/-1 counters on it."
@@ -64,8 +64,8 @@ METHOD 1: GRAFT (702.58a):
   UNLESS: a way to replenish graft counters (proliferate, additional graft permanents).
 
 METHOD 2: MELIRA, SYLVOK OUTCAST:
-  Melira ({1}{G}: 2/2; "creatures you control can't have -1/-1 counters put on them; creatures
-    opponents control can't have +1/+1 counters put on them"):
+  Melira ({1}{G}: 2/2; "you can't get poison counters; creatures you control can't have -1/-1
+    counters put on them; creatures your opponents control lose infect"):
   Persist says "return it to the battlefield with a -1/-1 counter."
   Melira says "creatures you control can't have -1/-1 counters put on them."
   This is a "can't" effect (CR 614.17). The -1/-1 counter CAN'T be placed.
@@ -74,14 +74,14 @@ METHOD 2: MELIRA, SYLVOK OUTCAST:
   Dies again → persist fires (no -1/-1 counter) → returns clean → repeat INDEFINITELY.
   This IS infinite (with a sacrifice outlet).
   INFINITE COMBO: Melira + Kitchen Finks + Viscera Seer (sacrifice a creature: scry 1):
-    → Sacrifice Finks to Seer: scry 1. Finks dies. Persist fires. Finks returns (no -1/-1 with Melira). ETB: gain 3 life.
-    → Sacrifice Finks to Seer: scry 1. Finks dies again. Persist fires again. Returns. Gain 3 life.
+    → Sacrifice Finks to Seer: scry 1. Finks dies. Persist fires. Finks returns (no -1/-1 with Melira). ETB: gain 2 life.
+    → Sacrifice Finks to Seer: scry 1. Finks dies again. Persist fires again. Returns. Gain 2 life.
     → Repeat infinitely: infinite life + infinite scry.
   Win condition: Viscera Seer scry gets you to a Spike Feeder or similar win card.
 
 METHOD 3: VIZIER OF REMEDIES (Modern):
   Vizier of Remedies ({1}{W}: 2/1; "if one or more -1/-1 counters would be put on a creature
-    you control, prevent that many -1/-1 counters from being put on it"):
+    you control, that many -1/-1 counters minus one are put on it instead"):
   Like Melira but only prevents -1/-1 counter placement on your creatures.
   Same result: persist creatures return without the -1/-1 counter.
   Infinite combo: Vizier of Remedies + Devoted Druid ({1}{G}: 0/2; {T}: add {G};
@@ -97,8 +97,7 @@ METHOD 4: UNDYING + -1/-1 COUNTER SOURCE (MIRROR OF PERSIST):
   If a -1/-1 counter is placed on the undying creature after it returns (canceling the +1/+1):
     → SBA: counters cancel. Creature has no +1/+1 counter.
     → If it dies again: undying fires (no +1/+1 counter).
-  MIKAEUS, THE UNHALLOWED ({3}{B}{B}{B}: 5/5; "other nonhuman creatures you control have
-    undying"; "{T}: target player loses 1 life"):
+  MIKAEUS, THE UNHALLOWED ({3}{B}{B}{B}: 5/5 intimidate; "whenever a Human deals damage to you, destroy it; other non-Human creatures you control get +1/+1 and have undying"):
   Woodfall Primus ({5}{G}{G}{G}: 6/6 trample; persist; "when it enters, destroy target
     noncreature permanent"):
   Wait — Mikaeus gives undying to nonhuman creatures, and Woodfall Primus already has persist.
@@ -163,14 +162,14 @@ METHOD 4: UNDYING + -1/-1 COUNTER SOURCE (MIRROR OF PERSIST):
 ## Canonical Example
 **Kitchen Finks + Melira + Viscera Seer (Infinite Life Gain):**
 You control:
-- Kitchen Finks ({1}{G/W}{G/W}: 3/2; persist; "when it enters, you gain 3 life")
+- Kitchen Finks ({1}{G/W}{G/W}: 3/2; persist; "when it enters, you gain 2 life")
 - Melira, Sylvok Outcast ({1}{G}: 2/2; "creatures you control can't have -1/-1 counters")
 - Viscera Seer ({B}: 1/1; "sacrifice a creature: scry 1")
 
 Step 1: Sacrifice Kitchen Finks to Viscera Seer. Scry 1.
 Finks dies (no counters). Persist triggers: "return it with a -1/-1 counter."
 Melira is present. The "can't have -1/-1 counters" prevention: as Finks would enter with a -1/-1 counter, the counter can't be placed (CR 614.17 can't effect).
-Finks enters WITHOUT the -1/-1 counter (clean 3/2). ETB fires: gain 3 life.
+Finks enters WITHOUT the -1/-1 counter (clean 3/2). ETB fires: gain 2 life.
 
 Step 2: Sacrifice Kitchen Finks to Viscera Seer again. Scry 1.
 Finks dies (no counters — never got the -1/-1 due to Melira). Persist triggers again.
@@ -178,7 +177,7 @@ Same result: returns clean. Gain 3 life.
 
 Repeat indefinitely:
 - Each sacrifice: scry 1.
-- Each persist return: gain 3 life.
+- Each persist return: gain 2 life.
 - No counter ever accumulates.
 - Kitchen Finks never "runs out" of persist.
 
@@ -188,7 +187,7 @@ This is one of the most powerful infinite combos in Kitchen Finks's history.
 
 **Example 2 — Mikaeus the Unhallowed + Woodfall Primus Loop:**
 You control:
-- Mikaeus, the Unhallowed ({3}{B}{B}{B}: 5/5; "other nonhuman creatures get +1/+1 and have undying")
+- Mikaeus, the Unhallowed ({3}{B}{B}{B}: 5/5 intimidate; "other non-Human creatures you control get +1/+1 and have undying")
 - Woodfall Primus ({5}{G}{G}{G}: 6/6 trample; persist; "when Woodfall Primus enters, destroy target noncreature permanent")
 - Viscera Seer ({B}: 1/1; "sacrifice a creature: scry 1")
 

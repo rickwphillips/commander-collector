@@ -51,7 +51,7 @@ SOULBOND (702.95):
   WHAT PAIRING DOES:
     Pairing itself has no rules meaning. It's a shared designation.
     The soulbond creature's abilities reference "as long as [this/that creature] is paired with [a creature]."
-    Example: Silverblade Paladin ({2}{W}{W}: 2/2, soulbond, "as long as Silverblade Paladin is
+    Example: Silverblade Paladin ({1}{W}{W}: 2/2, soulbond, "as long as Silverblade Paladin is
       paired with another creature, both creatures have double strike"):
       When Silverblade Paladin enters: pair it with a creature you control.
       Both get double strike while paired.
@@ -139,7 +139,7 @@ OVERLOAD (702.96):
           Result: protection from blue does NOT prevent being bounced by overloaded Cyclonic Rift.
   EXAMPLE — MIZZIUM MORTARS:
     Mizzium Mortars ({1}{R}: Sorcery, "Mizzium Mortars deals 4 damage to target creature you don't control."
-      Overload {2}{R}{R}{R}: each creature you don't control.):
+      Overload {3}{R}{R}{R}: each creature you don't control.):
     Overloaded: deals 4 damage to each creature you don't control.
     Note: your own creatures are safe. "You don't control" — your creatures aren't targeted or affected.
     Opponents' creatures all take 4 damage.
@@ -156,7 +156,7 @@ OVERLOAD (702.96):
 
 ## Canonical Example
 **Silverblade Paladin Soulbond Sequence:**
-Silverblade Paladin ({2}{W}{W}: 2/2, soulbond, "as long as Silverblade Paladin is paired with another creature, both creatures have double strike"):
+Silverblade Paladin ({1}{W}{W}: 2/2, soulbond, "as long as Silverblade Paladin is paired with another creature, both creatures have double strike"):
 
 Turn 4: You have a 3/3 Grizzly Bears and cast Silverblade Paladin.
 Silverblade Paladin enters the battlefield. Soulbond trigger fires:

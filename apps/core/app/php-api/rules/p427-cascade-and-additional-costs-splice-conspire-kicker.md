@@ -47,15 +47,15 @@ THE RULE: "WITHOUT PAYING ITS MANA COST" ≠ "PAY NOTHING AT ALL"
   Everything else in the casting process proceeds normally.
 
 KICKER + CASCADE:
-  Thornscape Battlemage ({2}{G}: 2/2; kicker {W}, kicker {R}; "if kicked with {W}: destroy target
-    enchantment"; "if kicked with {R}: destroy target artifact"):
+  Thornscape Battlemage ({2}{G}: 2/2; kicker {R}, kicker {W}; "if kicked with {R}: deals 2 damage
+    to any target"; "if kicked with {W}: destroy target artifact"):
   MV = 3 (just the base {2}{G}).
   Cascade from a MV=4+ spell: cascade finds Thornscape Battlemage (MV 3 < MV of cascade spell).
   You cast Battlemage for FREE (without paying its mana cost = don't pay the {2}{G}).
   But you MAY still pay the kicker costs:
-    Pay {W}: kicked with {W} → destroy target enchantment.
-    Pay {R}: kicked with {R} → destroy target artifact.
-    Pay {W} and {R}: both kicks → destroy an enchantment AND an artifact.
+    Pay {R}: kicked with {R} → deals 2 damage to any target.
+    Pay {W}: kicked with {W} → destroy target artifact.
+    Pay {R} and {W}: both kicks → deal 2 damage AND destroy an artifact.
   You spend up to {W}{R} on a "free" spell to get massive ETB utility.
 
   The alternative cost ("without paying mana cost") removed the {2}{G} payment.
@@ -71,7 +71,7 @@ SPLICE + CASCADE (ARCANE):
 
   Example:
     Glacial Ray ({1}{R}: Instant — Arcane; "Glacial Ray deals 2 damage to any target"; Splice
-      onto Arcane {2}{R}):
+      onto Arcane {1}{R}):
     Evermind (Blue; Instant — Arcane; "draw a card"; Splice onto Arcane {1}{U}):
 
     Bloodbraid Elf (cascade, MV 4) cascades and finds Glacial Ray (MV 2).
@@ -147,35 +147,35 @@ MANA COST REDUCTION AFTER CASCADE:
 ## Canonical Example
 **Bloodbraid Elf cascading into Thornscape Battlemage (kicked):**
 You control Bloodbraid Elf ({2}{R}{G}: 3/2 haste; cascade). Cascade trigger fires.
-Exile from library until finding MV < 4. Find Thornscape Battlemage ({2}{G}: 2/2; kicker {W}:
-  destroy target enchantment; kicker {R}: destroy target artifact).
+Exile from library until finding MV < 4. Find Thornscape Battlemage ({2}{G}: 2/2; kicker {R}: deals 2 damage to any target; kicker {W}:
+  destroy target artifact).
 
 Cascade lets you cast Thornscape Battlemage without paying its mana cost.
-The battlefield has: an opponent's Ensnaring Bridge (artifact) and Blood Moon (enchantment).
+The battlefield has: an opponent's Ensnaring Bridge (artifact) and a creature you want to damage.
 You have {W}{R} floating.
 
-Cast Battlemage for free (no {2}{G} paid). Pay kicker {W} + kicker {R} as additional costs.
-Two kicks: when Battlemage enters, destroy Ensnaring Bridge AND destroy Blood Moon.
+Cast Battlemage for free (no {2}{G} paid). Pay kicker {R} + kicker {W} as additional costs.
+Two kicks: when Battlemage enters, deal 2 damage to target AND destroy Ensnaring Bridge.
 Bloodbraid Elf resolves: 3/2 with haste.
 
 Total spent: {2}{R}{G} (Bloodbraid's cost) + {W}{R} (kicker costs) = {2}{R}{G}{W}{R}.
-Total received: Bloodbraid 3/2 haste + Thornscape Battlemage 2/2 + both artifacts/enchantments destroyed.
+Total received: Bloodbraid 3/2 haste + Thornscape Battlemage 2/2 + 2 damage dealt + artifact destroyed.
 The kicker made the cascade hit dramatically more valuable.
 
 **Example 2 — Cascade into Arcane Spell + Splice:**
 You cascade and find Peer Through Depths ({1}{U}: Instant — Arcane; look at top 5 cards, put an
   instant or sorcery into hand, rest to bottom).
 You have in hand: Glacial Ray ({1}{R}: Instant — Arcane; "deal 2 damage to target"; splice onto
-  Arcane {2}{R}).
+  Arcane {1}{R}).
 
-Cast Peer Through Depths for free (cascade's alternative cost). Reveal Glacial Ray and pay {2}{R}
+Cast Peer Through Depths for free (cascade's alternative cost). Reveal Glacial Ray and pay {1}{R}
   as additional splice cost.
 Peer Through Depths now reads: "look at top 5, take an instant or sorcery; rest to bottom; deal 2
   damage to any target." (Both effects from both spells.)
 Peer Through Depths resolves: you look at top 5, take a card, AND deal 2 damage.
 Glacial Ray is still in your hand (splice doesn't discard the spliced card — you just pay its cost).
 
-Net: free Arcane filtering + 2 damage for {2}{R}. Glacier Ray stays in hand for another splice.
+Net: free Arcane filtering + 2 damage for {1}{R}. Glacial Ray stays in hand for another splice.
 
 ## Commonly Confused With
 - **P424 (Cascade)** — P424 covers cascade's fundamental mechanics (MV threshold, Cage doesn't stop it, chains). P427 is the specific additional-cost interaction: "without paying mana cost" replaces the mana cost but not additional costs.
