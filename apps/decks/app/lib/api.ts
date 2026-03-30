@@ -154,10 +154,10 @@ export const api = {
     apiFetch<{ success: boolean }>(`/stat-panels?id=${id}`, { method: 'DELETE' }),
 
   // Live Game Sessions (no auth — seat code is the credential)
-  createLiveGame: (state: import('./types').GameManagerState, seats: string[]) =>
+  createLiveGame: (state: import('./types').GameManagerState, seats: string[], userId?: string) =>
     apiFetch<import('./types').LiveGameSession>('/live-game', {
       method: 'POST',
-      body: JSON.stringify({ state, seats }),
+      body: JSON.stringify({ state, seats, user_id: userId }),
     }),
   // consume=true: host only — atomically returns AND clears the remote_events queue
   getLiveGame: (code: string, consume?: boolean) =>
