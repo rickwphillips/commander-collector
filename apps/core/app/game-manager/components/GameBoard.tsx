@@ -134,10 +134,14 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
       .then((settings) => {
         setHighlightMode(settings.highlight_mode);
         setSoundEnabled(settings.sound_enabled);
-        // Note: game state turnTimerSeconds comes from game setup, not user settings
+        const timerVal = settings.turn_timer_enabled ? settings.turn_timer_seconds : 0;
+        if (timerVal !== turnTimerSeconds) {
+          onUpdate({ ...state, turnTimerSeconds: timerVal });
+        }
       })
       .catch(() => {});
-  }, [onUpdate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Re-apply all settings when game resets (firstPlayerSet goes false)
   const firstPlayerSetRef = useRef(firstPlayerSet);

@@ -38,6 +38,18 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '3.7.1',
+    date: '2026-03-30',
+    title: 'Deploy & Settings Persistence Fixes',
+    changes: [
+      { type: 'fixed', text: 'Timer setting now persists across game restarts' },
+      { type: 'fixed', text: 'Deploy script preserves Rules Guru files during core static deploy' },
+      { type: 'fixed', text: 'Deploy script syncs PHP API to correct remote path' },
+      { type: 'fixed', text: 'Card names with commas no longer split into separate chips in Rules Guru chat' },
+      { type: 'fixed', text: 'Stale JS chunks from decks app no longer override core API code' },
+    ],
+  },
+  {
     version: '3.7.0',
     date: '2026-03-30',
     title: 'DB-Backed Game Session & Settings Persistence',
