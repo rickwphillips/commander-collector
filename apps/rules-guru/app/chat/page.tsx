@@ -102,10 +102,11 @@ function nodeText(node: React.ReactNode): string {
 function parseCardManifest(content: string): { cleaned: string; cards: string[] } {
   const match = content.match(/\nCARDS:\s*(.+)$/m);
   if (!match) return { cleaned: content, cards: [] };
-  const cards = match[1]
-    .split(',')
-    .map(s => s.trim().replace(/^\[\[|\]\]$/g, '').trim())
-    .filter(Boolean);
+  // Extract [[Card Name]] entries to avoid splitting on commas inside card names
+  const bracketMatches = match[1].match(/\[\[([^\]]+)\]\]/g);
+  const cards = bracketMatches
+    ? bracketMatches.map(s => s.replace(/^\[\[|\]\]$/g, '').trim()).filter(Boolean)
+    : match[1].split(',').map(s => s.trim()).filter(Boolean);
   const cleaned = content.replace(/\nCARDS:\s*.+$/m, '').trimEnd();
   return { cleaned, cards };
 }

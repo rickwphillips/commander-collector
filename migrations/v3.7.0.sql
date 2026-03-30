@@ -1,8 +1,13 @@
--- v3.7.0: Fix game_settings user_id column type for UUID support
--- v3.6.3 created the table with INT UNSIGNED but user IDs are UUIDs (VARCHAR(36))
+-- v3.7.0: Game settings persistence (corrected from v3.6.3 which never ran)
+-- Store user preferences (sound, highlight, timer) per authenticated user
 
--- Drop the foreign key constraint first (cross-DB FK doesn't work reliably)
-ALTER TABLE game_settings DROP FOREIGN KEY fk_game_settings_user;
-
--- Change column type to VARCHAR(36) for UUID values
-ALTER TABLE game_settings MODIFY COLUMN user_id VARCHAR(36) NOT NULL;
+CREATE TABLE IF NOT EXISTS game_settings (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id VARCHAR(36) NOT NULL,
+  sound_enabled TINYINT(1) NOT NULL DEFAULT 1,
+  highlight_mode TINYINT(1) NOT NULL DEFAULT 1,
+  turn_timer_enabled TINYINT(1) NOT NULL DEFAULT 1,
+  turn_timer_seconds INT NOT NULL DEFAULT 300,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_user_id (user_id)
+);
