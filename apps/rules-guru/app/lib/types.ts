@@ -51,6 +51,7 @@ export interface RulesMessage {
 export interface ChatResponse {
   conversation_id: number;
   message_id: number;
+  qa_log_id: number | null;
   response: string;
   pending_pattern: RulesPattern | null;
 }

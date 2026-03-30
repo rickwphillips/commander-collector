@@ -975,7 +975,7 @@ export function CenterZone({
                       setDiceOpen(false);
                     }
                   }}
-                  sx={{ fontSize: 12, py: 'clamp(6px, 1.4dvh, 13px)' }}
+                  sx={{ fontSize: 12, py: 'clamp(3px, 0.7dvh, 7px)' }}
                 >
                   {rollOffState.phase === 'result' ? `${rollOffState.winnerName} goes first` : 'Accept'}
                 </Button>
@@ -988,7 +988,7 @@ export function CenterZone({
                       startRollOff(rollOffState.originalIndices);
                     }
                   }}
-                  sx={{ fontSize: 12, py: 'clamp(6px, 1.4dvh, 13px)' }}
+                  sx={{ fontSize: 12, py: 'clamp(3px, 0.7dvh, 7px)' }}
                 >
                   Roll Again
                 </Button>

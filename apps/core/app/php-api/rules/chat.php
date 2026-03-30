@@ -7,7 +7,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     sendError('Method not allowed', 405);
 }
 
-set_time_limit(120);
+set_time_limit(300);
 
 $apiKey = defined('ANTHROPIC_API_KEY') ? ANTHROPIC_API_KEY : null;
 if (!$apiKey) sendError('Anthropic API key not configured', 500);
@@ -758,6 +758,7 @@ if ($newTitle) {
 sendJSON([
     'conversation_id' => $conversationId,
     'message_id'      => $messageId,
+    'qa_log_id'       => isset($qaStmt) ? (int)$db->lastInsertId() : null,
     'response'        => $assistantContent,
     'pending_pattern' => $pendingPattern,
 ]);

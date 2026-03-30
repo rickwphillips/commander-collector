@@ -149,13 +149,13 @@ SPREE — FIZZLE RULES (TARGETS BECOME ILLEGAL):
 ## Canonical Examples
 
 **Cascade hits Three Steps Ahead:**
-Bloodbraid Elf cascades → reveals Three Steps Ahead (MV 1, less than 3). You may cast it for free. "Free" waives the {U} base cost. But you must still choose at least one mode and pay: e.g., choose mode 3 (draw 2/discard 1) → pay {2}. You pay {2} total. Not truly free, but the blue mana is waived.
+Bloodbraid Elf (MV 4) cascades → reveals Three Steps Ahead (MV 1, less than 4). You may cast it for free. "Free" waives the {U} base cost. But you must still choose at least one mode and pay: e.g., choose mode 3 (draw 2/discard 1) → pay {2}. You pay {2} total. Not truly free, but the blue mana is waived.
 
 **Fork + Three Steps Ahead:**
 You cast Three Steps Ahead choosing mode 1 (counter opponent's Divination) and mode 3 (draw 2). Opponent's ally Forks your Three Steps Ahead. The Fork copy has modes 1 and 3 locked in. The Fork controller may choose new targets for mode 1 (perhaps targeting their own spell to "counter" it usefully, or targeting something else), but they cannot change to use mode 2 (create a token copy) instead.
 
 **Final Showdown (modes 1+2+3) — Protecting a creature:**
-You control five creatures; one is your best attacker. Cast Final Showdown paying all three modes ({W} + {1} + {1} + {3}{W}{W} = {W}{W}{W}{3}{W} total... or {6}{W}{W}{W} — it's expensive). At resolution:
+You control five creatures; one is your best attacker. Cast Final Showdown paying all three modes ({W} + {1} + {1} + {3}{W}{W} = {5}{W}{W}{W} total). At resolution:
 1. All creatures lose all abilities (including your key creature's indestructible, if it had it from its printed text).
 2. You choose your key creature — it gains indestructible now (this is a new grant via mode 2, not the printed ability that was stripped).
 3. All creatures are destroyed. Your key creature survives due to indestructible.

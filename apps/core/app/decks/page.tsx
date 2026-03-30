@@ -177,7 +177,7 @@ export default function DecksPage() {
     }
 
     return sorted;
-  }, [decks, searchQuery, playerFilter, colorFilter, colorMode, sortOption]);
+  }, [decks, searchQuery, playerFilter, hasListFilter, colorFilter, colorMode, sortOption]);
 
   const hasActiveFilters = searchQuery || playerFilter || colorFilter.size > 0 || hasListFilter;
 

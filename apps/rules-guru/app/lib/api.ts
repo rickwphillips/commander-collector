@@ -72,15 +72,25 @@ export const rulesApi = {
   getActiveGame: () =>
     apiFetch<{ game: ActiveGameContext | null }>('/rules/active-game.php'),
 
-  // Chat
+  rateQaLog: (payload: { qa_log_id: number; correctness: number; rating_notes: string }) =>
+    apiFetch<{ success: boolean }>('/rules/qa-log-rate.php', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  // Chat — long timeout to match PHP set_time_limit(300)
   sendMessage: (payload: {
     message: string;
     conversation_id?: number;
     new_conversation_title?: string;
     game_context?: ActiveGameContext | null;
-  }) =>
-    apiFetch<ChatResponse>('/rules/chat.php', {
+  }) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 300_000);
+    return apiFetch<ChatResponse>('/rules/chat.php', {
       method: 'POST',
       body: JSON.stringify(payload),
-    }),
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timer));
+  },
 };

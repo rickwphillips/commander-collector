@@ -48,7 +48,8 @@ Bargain is an optional additional cost mechanic from Wilds of Eldraine (WOE, 202
 
 **Torch the Tower** `{R}`
 > Bargain (You may sacrifice an artifact, enchantment, or token as you cast this spell.)
-> Torch the Tower deals 2 damage to target creature or planeswalker. If this spell was bargained, it deals 4 damage instead. If that permanent would die this turn, exile it instead.
+> Torch the Tower deals 2 damage to target creature or planeswalker. If this spell was bargained, instead it deals 3 damage to that permanent and you scry 1.
+> If a permanent dealt damage by Torch the Tower would die this turn, exile it instead.
 
 ## The Pattern
 
@@ -127,7 +128,7 @@ You cast Torch the Tower (bargain), sacrificing a Treasure token. Opponent count
 You cast Beseech the Mirror with bargain (sacrificed a Food token). Opponent controls Isochron Scepter with Fork imprinted? No — suppose you have Strionic Resonator and Beseech has an ETB trigger? Actually: suppose you cast Beseech and an opponent uses Bonus Round (copies all your sorceries). The copy of Beseech is also bargained. The copy may also cast its found card for free, without any additional sacrifice.
 
 **Example 4 — Hamlet Glutton cost reduction:**
-You cast Hamlet Glutton `{5}{G}{G}`. You pay bargain by sacrificing a Treasure token. The spell costs {2} less: you pay `{3}{G}{G}` total. The Treasure is gone (cost paid), and the 7/7 trample enters with its life gain trigger.
+You cast Hamlet Glutton `{5}{G}{G}`. You pay bargain by sacrificing a Treasure token. The spell costs {2} less: you pay `{3}{G}{G}` total. The Treasure is gone (cost paid), and the 6/6 trample enters with its life gain trigger.
 
 **Example 5 — Realm-Scorcher Hellkite mana burst:**
 You cast Realm-Scorcher Hellkite `{4}{R}{R}` with bargain (sacrifice any enchantment). It enters the battlefield. Because it was bargained, its ETB trigger fires: add four mana in any combination of colors. This mana is added during the resolution of the trigger — it can be used to cast instant-speed spells or activate abilities in response to triggers on the stack, but floats to the next phase if not used. Note: the "if it was bargained" check is checked once as the triggered ability is put on the stack; it is always true if the spell resolved with bargain paid.

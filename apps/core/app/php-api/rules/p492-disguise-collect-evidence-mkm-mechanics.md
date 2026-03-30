@@ -132,7 +132,7 @@ Turn face-up (when able): reveal card to all players. Pay {1}{B}. Special action
 Net: you paid {3} + {1}{B} = {4}{B} total for a 6/2 menace that makes opponents lose 3 life on death. No ETB token generation (that only happens when it enters the battlefield, not when turned face-up).
 
 **Example 2 — Collect Evidence Ward (Axebane Ferox):**
-Axebane Ferox ({2}{G}{G}: 4/5 Deathtouch, Haste; "Ward — Collect evidence 4"):
+Axebane Ferox ({2}{G}{G}: 4/4 Deathtouch; "Ward — Collect evidence 4"):
 
 Opponent tries to target Axebane Ferox with a removal spell.
 Ward trigger fires: the spell is countered unless the opponent exiles cards from their OWN graveyard with total MV ≥ 4.

@@ -38,7 +38,7 @@ IMPENDING N — [cost] pattern:
 Alternative cast as enchantment:
   → Pay the impending cost instead of the regular mana cost
   → Enters as an ENCHANTMENT (not a creature) with N time counters
-  → At the beginning of your upkeep: remove one time counter
+  → At the beginning of your end step: remove one time counter
   → When the last time counter is removed: it becomes a creature
     → It "becomes a creature" — it retains being an enchantment? Or transforms fully?
     → CR 702.186: "it becomes a creature" means it gains the creature card type

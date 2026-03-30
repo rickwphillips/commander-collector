@@ -41,6 +41,7 @@ import AddCommentIcon from '@mui/icons-material/AddComment';
 import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import NoteAddIcon from '@mui/icons-material/NoteAdd';
 import CheckIcon from '@mui/icons-material/Check';
+import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import { rulesApi } from '../lib/api';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import type { ActiveGameContext, RulesConversation, RulesMessage, RulesPattern } from '../lib/types';
@@ -51,6 +52,7 @@ interface LocalMessage {
   role: 'user' | 'assistant';
   content: string;
   pending_pattern?: RulesPattern | null;
+  qa_log_id?: number | null;
 }
 
 const DRAWER_WIDTH = 300;
@@ -152,6 +154,12 @@ export default function ChatPage() {
   const [gameContext, setGameContext] = useState<ActiveGameContext | null>(null);
   const [isEmbedded, setIsEmbedded] = useState(false);
   const [savedNoteIndices, setSavedNoteIndices] = useState<Set<number>>(new Set());
+
+  // Correction flagging
+  const [flaggedIdx, setFlaggedIdx] = useState<number | null>(null);
+  const [correctionText, setCorrectionText] = useState('');
+  const [submittingFlag, setSubmittingFlag] = useState(false);
+  const [flaggedIndices, setFlaggedIndices] = useState<Set<number>>(new Set());
 
   const [thinkingText, setThinkingText] = useState('Consulting the rules…');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -350,6 +358,20 @@ export default function ChatPage() {
     }
   }, []);
 
+  const submitCorrection = useCallback(async (msgIdx: number) => {
+    const msg = messages[msgIdx];
+    if (!msg?.qa_log_id || !correctionText.trim()) return;
+    setSubmittingFlag(true);
+    try {
+      await rulesApi.rateQaLog({ qa_log_id: msg.qa_log_id, correctness: 1, rating_notes: correctionText.trim() });
+      setFlaggedIndices(prev => new Set(prev).add(msgIdx));
+      setFlaggedIdx(null);
+      setCorrectionText('');
+    } finally {
+      setSubmittingFlag(false);
+    }
+  }, [messages, correctionText]);
+
   // Real-time timer state pushed from parent every second
   const liveTimerRef = useRef<ActiveGameContext['_liveTimer']>(undefined);
   useEffect(() => {
@@ -494,6 +516,7 @@ export default function ChatPage() {
         role: 'assistant',
         content: res.response,
         pending_pattern: res.pending_pattern,
+        qa_log_id: res.qa_log_id,
       };
       setMessages(prev => [...prev, assistantMsg]);
 
@@ -504,10 +527,10 @@ export default function ChatPage() {
       }
     } else {
       const errMsg = isRateLimitError(lastErr)
-        ? 'The rules oracle is a bit overwhelmed — trying again in a moment.'
+        ? 'The rules oracle is a bit overwhelmed — please try again.'
         : (lastErr instanceof Error ? lastErr.message : 'Failed to send message');
       setError(errMsg);
-      setMessages(prev => prev.slice(0, -1));
+      // Keep the user's question visible so they can retry without retyping
     }
 
     setLoading(false);
@@ -870,9 +893,9 @@ export default function ChatPage() {
                           ))}
                         </Box>
                       )}
-                      {/* Save to game notes (embedded only) */}
-                      {isEmbedded && (
-                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.5 }}>
+                      {/* Action row: save-to-notes + flag incorrect */}
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mt: 0.5, gap: 0.5 }}>
+                        {isEmbedded && (
                           <Tooltip title={savedNoteIndices.has(i) ? 'Saved to game notes' : 'Save to game notes'}>
                             <span>
                               <IconButton
@@ -892,6 +915,66 @@ export default function ChatPage() {
                               </IconButton>
                             </span>
                           </Tooltip>
+                        )}
+                        {msg.qa_log_id && (
+                          <Tooltip title={flaggedIndices.has(i) ? 'Correction saved' : 'Flag as incorrect'}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                disabled={flaggedIndices.has(i)}
+                                onClick={() => {
+                                  if (flaggedIdx === i) {
+                                    setFlaggedIdx(null);
+                                    setCorrectionText('');
+                                  } else {
+                                    setFlaggedIdx(i);
+                                    setCorrectionText('');
+                                  }
+                                }}
+                                sx={{
+                                  opacity: flaggedIndices.has(i) ? 1 : 0.5,
+                                  color: flaggedIndices.has(i) ? 'error.main' : flaggedIdx === i ? 'error.main' : 'inherit',
+                                  '&:hover': { opacity: 1 },
+                                }}
+                              >
+                                {flaggedIndices.has(i) ? <ThumbDownIcon sx={{ fontSize: 16 }} /> : <ThumbDownIcon sx={{ fontSize: 16 }} />}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        )}
+                      </Box>
+                      {/* Inline correction form */}
+                      {flaggedIdx === i && (
+                        <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+                          <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'error.main', mb: 0.75 }}>
+                            What's the correct ruling?
+                          </Typography>
+                          <TextField
+                            multiline
+                            minRows={2}
+                            maxRows={6}
+                            fullWidth
+                            size="small"
+                            placeholder="Describe the correction or cite the rule…"
+                            value={correctionText}
+                            onChange={(e) => setCorrectionText(e.target.value)}
+                            sx={{ fontSize: 12, mb: 0.75 }}
+                          />
+                          <Box sx={{ display: 'flex', gap: 0.75, justifyContent: 'flex-end' }}>
+                            <Button size="small" onClick={() => { setFlaggedIdx(null); setCorrectionText(''); }} sx={{ fontSize: 11 }}>
+                              Cancel
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="error"
+                              disabled={!correctionText.trim() || submittingFlag}
+                              onClick={() => submitCorrection(i)}
+                              sx={{ fontSize: 11 }}
+                            >
+                              {submittingFlag ? 'Saving…' : 'Save Correction'}
+                            </Button>
+                          </Box>
                         </Box>
                       )}
                     </>

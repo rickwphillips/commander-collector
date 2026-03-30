@@ -101,14 +101,14 @@ DISCOVER vs. CASCADE — structural differences:
     → Grafdigger's Cage doesn't block Discover's cast (from exile, not library/GY)
 
 GEOLOGICAL APPRAISER INFINITE LOOP:
-  Geological Appraiser (LCI): "{W}{U}{R}{G} — 4/3. When this creature enters the battlefield,
+  Geological Appraiser (LCI): "{2}{R}{R} — 3/2. When this creature enters the battlefield,
    if you cast it, discover 3."
   → Discover 3 can find another Geological Appraiser (MV = 4... wait, MV 4 > 3)
-  → Actually Geological Appraiser costs 4 mana (MV 4), Discover 3 finds MV ≤ 3
+  → Actually Geological Appraiser costs {2}{R}{R} (MV 4), Discover 3 finds MV ≤ 3
   → A SECOND APPRAISER would NOT be found by Discover 3 (MV 4 > 3)
 
-  The actual combo was with Geological Appraiser + Glasspool Mimic (MV 2):
-  → Appraiser ETB → Discover 3 → hits Glasspool Mimic (MV 2)
+  The actual combo was with Geological Appraiser + Glasspool Mimic (MV 3):
+  → Appraiser ETB → Discover 3 → hits Glasspool Mimic (MV 3)
   → Cast Glasspool Mimic as a copy of Geological Appraiser
   → Copy of Appraiser ETBs... does it trigger Discover?
   → "If you cast it" — Glasspool Mimic was CAST (from exile via discover), so YES
