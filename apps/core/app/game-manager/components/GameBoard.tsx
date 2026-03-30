@@ -140,16 +140,18 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
       });
   }, []);
 
-  // Re-apply timer setting when game resets (firstPlayerSet goes false)
+  // Re-apply all settings when game resets (firstPlayerSet goes false)
   const firstPlayerSetRef = useRef(firstPlayerSet);
   useEffect(() => {
     const wasGameActive = firstPlayerSetRef.current;
     firstPlayerSetRef.current = firstPlayerSet;
 
     if (wasGameActive && !firstPlayerSet) {
-      // Game was reset, re-apply timer setting from DB
+      // Game was reset, re-apply all settings from DB
       api.getGameSettings()
         .then((settings) => {
+          setHighlightMode(settings.highlight_mode);
+          setSoundEnabled(settings.sound_enabled);
           if (!settings.turn_timer_enabled) {
             onUpdate({ turnTimerSeconds: 0 });
           } else {
