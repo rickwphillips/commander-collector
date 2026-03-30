@@ -1,6 +1,6 @@
 <?php
-require_once dirname(__DIR__) . '/config.php';
-require_once dirname(__DIR__) . '/auth/middleware.php';
+require_once 'config.php';
+require_once 'auth/middleware.php';
 requireAuth();
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
