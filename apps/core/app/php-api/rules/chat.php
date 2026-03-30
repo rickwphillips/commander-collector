@@ -628,7 +628,7 @@ while ($iter < $maxIter) {
     $iter++;
 
     $payload = [
-        'model'      => 'claude-sonnet-4-6',
+        'model'      => 'claude-haiku-4-5-20251001',
         'max_tokens' => 4096,
         'system'     => $systemPrompt,
         'tools'      => $tools,
@@ -753,7 +753,7 @@ if ($assistantContent) {
         $crRefs,
         $cardsJson,
         $pendingPattern ? ($pendingPattern['pattern_id'] ?? null) : null,
-        'claude-sonnet-4-6',
+        'claude-haiku-4-5-20251001',
         !empty($gameContext['players']) ? 1 : 0,
     ]);
 }
