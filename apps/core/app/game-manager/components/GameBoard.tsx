@@ -5,6 +5,7 @@ import { Box, Button, Typography, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { PlayerPanel } from './PlayerPanel';
 import { CenterZone } from './CenterZone';
+import { api } from '@/lib/api';
 import type { GameManagerState, PlayerState } from '../types';
 import {
   applyCommanderDamageChange,
