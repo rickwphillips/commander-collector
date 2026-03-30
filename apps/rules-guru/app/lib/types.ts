@@ -9,6 +9,7 @@ export interface GameContextPlayer {
 
 export interface ActiveGameContext {
   players: GameContextPlayer[];
+  focusPlayerName?: string;
   _timerNote?: string;
   _liveTimer?: {
     timerSeconds: number;

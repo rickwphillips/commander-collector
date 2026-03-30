@@ -17,6 +17,7 @@ $userMessage    = trim($input['message'] ?? '');
 $conversationId = isset($input['conversation_id']) ? (int)$input['conversation_id'] : null;
 $newTitle       = trim($input['new_conversation_title'] ?? '');
 $gameContext    = $input['game_context'] ?? null;
+$focusPlayer    = isset($gameContext['focusPlayerName']) ? trim($gameContext['focusPlayerName']) : null;
 
 if (!$userMessage) sendError('message is required');
 
@@ -324,6 +325,15 @@ if (!empty($gameContext['players'])) {
         $turnStr   = $turnNum ? "Turn {$turnNum}, " : '';
         $systemPrompt .= "\n*Live timer (do not quote these numbers verbatim — use them to inform tone only): ";
         $systemPrompt .= "{$turnStr}{$curPlayer}'s turn — {$elapsed}s elapsed of {$total}s ({$pct}% used, {$remaining}s remaining).*\n";
+    }
+
+    // Focus player personalization — ask from one player's perspective
+    if ($focusPlayer) {
+        $focusPlayerEsc = htmlspecialchars($focusPlayer, ENT_QUOTES);
+        $systemPrompt .= "\n**This player is asking from their own seat:** {$focusPlayerEsc}. ";
+        $systemPrompt .= "Personalize your greeting and answers with 'you' and 'your' — focus on their deck, ";
+        $systemPrompt .= "their interactions, and how the question relates to their position in the game. ";
+        $systemPrompt .= "When answering, imagine you're a friend across the table giving advice to *them specifically*.\n";
     }
 
 }

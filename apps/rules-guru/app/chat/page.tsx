@@ -282,6 +282,7 @@ export default function ChatPage() {
             deckId: p.deckId ?? null,
             cards: [],
           })),
+          focusPlayerName: raw.focusPlayerName,
         };
         setGameContext(ctx);
         // Also store turn/life state for display in system message

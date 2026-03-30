@@ -17,6 +17,7 @@ import InitiativeIcon from '@mui/icons-material/Castle';
 import AddIcon from '@mui/icons-material/Add';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import QrCodeIcon from '@mui/icons-material/QrCode';
+import ChatIcon from '@mui/icons-material/Chat';
 import SmartphoneIcon from '@mui/icons-material/Smartphone';
 import CloseIcon from '@mui/icons-material/Close';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -346,6 +347,7 @@ interface PlayerPanelProps {
   onToggleTheme?: () => void;
   themeMode?: 'light' | 'dark';
   onToggleSound?: () => void;
+  onOpenChat?: (playerName: string) => void;
 }
 
 // ── City Flag ─────────────────────────────────────────────────────────────────
@@ -481,6 +483,7 @@ export function PlayerPanel({
   onToggleTheme,
   themeMode,
   onToggleSound,
+  onOpenChat,
 }: PlayerPanelProps) {
   usePoisonSound(player.poison, player.isEliminated, soundEnabled);
   const { playCitysBlessing } = useSounds(soundEnabled, player.hasCitysBlessing);
@@ -1913,6 +1916,16 @@ export function PlayerPanel({
                   {seatCode}
                 </Typography>
                 <QrCodeIcon sx={{ fontSize: 16 }} />
+              </Box>
+            )}
+            {/* Rules Guru chat — remote only */}
+            {remoteMode && onOpenChat && (
+              <Box
+                onClick={(e) => { e.stopPropagation(); onOpenChat(player.playerName); setStateMenuOpen(false); }}
+                sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 1, cursor: 'pointer', borderTop: (theme) => `1px solid ${theme.palette.divider}`, color: 'primary.main', '&:hover': { bgcolor: 'action.hover' }, transition: 'background-color 0.15s ease' }}
+              >
+                <ChatIcon sx={{ fontSize: 18 }} />
+                <Typography sx={{ fontSize: 13, lineHeight: 1 }}>Ask Rules</Typography>
               </Box>
             )}
             {/* Remote-only: sound + theme toggles */}
