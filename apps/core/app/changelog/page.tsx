@@ -38,6 +38,17 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '3.8.0',
+    date: '2026-03-30',
+    title: 'Commander Damage Dealt Indicator & Snapshot Panel Improvements',
+    changes: [
+      { type: 'added', text: 'Commander damage dealt indicator (⚔) shows how much damage you\'ve dealt to each opponent in the CMD damage section' },
+      { type: 'improved', text: 'Snapshot overlay panel now scrollable when content overflows' },
+      { type: 'changed', text: 'Removed commander art image from snapshot overlay header for cleaner layout' },
+      { type: 'improved', text: 'Larger close button on snapshot overlay panel' },
+    ],
+  },
+  {
     version: '3.7.1',
     date: '2026-03-30',
     title: 'Deploy & Settings Persistence Fixes',

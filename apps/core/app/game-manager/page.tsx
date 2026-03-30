@@ -217,7 +217,7 @@ export default function GameManagerPage() {
     } catch {/* silent — live session is optional */}
   };
 
-  const handleUpdate = (newState: GameManagerState) => {
+  const handleUpdate = (newState: GameManagerState | ((prev: GameManagerState) => GameManagerState)) => {
     setState(newState);
   };
 

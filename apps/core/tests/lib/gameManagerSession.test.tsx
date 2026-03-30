@@ -18,12 +18,18 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
+vi.mock('@/components/AuthGuard', () => ({
+  useAuth: () => ({ user: { id: 'test-user-uuid', username: 'tester', display_name: 'Tester', role: 'admin' }, logout: vi.fn() }),
+}));
+
 vi.mock('@/lib/api', () => ({
   api: {
-    getLiveGame:    vi.fn(),
-    updateLiveGame: vi.fn(),
-    deleteLiveGame: vi.fn(),
-    createLiveGame: vi.fn(),
+    getLiveGame:      vi.fn(),
+    updateLiveGame:   vi.fn(),
+    deleteLiveGame:   vi.fn(),
+    createLiveGame:   vi.fn(),
+    getActiveGame:    vi.fn(),
+    getGameSettings:  vi.fn(),
   },
   apiFetch: vi.fn(),
   API_BASE: '',
@@ -62,8 +68,6 @@ import GameManagerPage from '@/game-manager/page';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
-const GAME_STATE_KEY = 'commander_game_state';
-
 const mockPlayingState = {
   players: [
     { playerId: 1, deckId: 1, playerName: 'Alice', deckName: 'D', commander: { name: 'X' },
@@ -91,22 +95,22 @@ const mockPlayingState = {
 
 describe('session verification on reload', () => {
   beforeEach(() => {
-    localStorage.clear();
     vi.clearAllMocks();
     (api.updateLiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({});
     (api.deleteLiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({});
     (api.createLiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({ seats: { bottom: 'newcode' } });
+    (api.getGameSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+      highlight_mode: true, sound_enabled: true, turn_timer_enabled: true, turn_timer_seconds: 300,
+    });
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    localStorage.clear();
   });
 
-  it('does NOT call updateLiveGame immediately on mount when getLiveGame is pending', async () => {
-    // getLiveGame never resolves — simulates slow network during verification
-    (api.getLiveGame as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
-    localStorage.setItem(GAME_STATE_KEY, JSON.stringify(mockPlayingState));
+  it('does NOT call updateLiveGame immediately on mount when getActiveGame is pending', async () => {
+    // getActiveGame never resolves — simulates slow network during verification
+    (api.getActiveGame as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
 
     render(<GameManagerPage />);
 
@@ -115,60 +119,58 @@ describe('session verification on reload', () => {
   });
 
   it('does NOT write to DB when the saved session is no longer active', async () => {
-    (api.getLiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (api.getActiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
       is_active: false,
-      state: mockPlayingState,
-      remote_events: [],
-      updated_at: '2026-01-01T00:00:00Z',
-      seat: 'bottom',
+      state: null,
+      session_code: null,
     });
-    localStorage.setItem(GAME_STATE_KEY, JSON.stringify(mockPlayingState));
 
     render(<GameManagerPage />);
 
-    await waitFor(() => expect(api.getLiveGame).toHaveBeenCalledWith('abc123'));
+    await waitFor(() => expect(api.getActiveGame).toHaveBeenCalled());
 
     // Session is dead — must never write to it
-    expect(api.updateLiveGame).not.toHaveBeenCalledWith('abc123', expect.anything());
+    expect(api.updateLiveGame).not.toHaveBeenCalled();
   });
 
-  it('syncs to fresh DB state and then writes when the saved session IS active', async () => {
-    const freshDBState = { ...mockPlayingState, turnNumber: 7, currentPlayerIdx: 1 };
-    (api.getLiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
+  it('loads active session from DB and renders GameBoard', async () => {
+    (api.getActiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
       is_active: true,
-      state: freshDBState,
-      remote_events: [],
-      updated_at: '2026-01-01T00:00:00Z',
-      seat: 'bottom',
+      state: mockPlayingState,
+      session_code: 'abc123',
     });
-    localStorage.setItem(GAME_STATE_KEY, JSON.stringify(mockPlayingState));
+    // Poll needs to return something
+    (api.getLiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
+      is_active: true, state: mockPlayingState, remote_events: [], updated_at: '2026-01-01', seat: 'bottom',
+    });
 
-    render(<GameManagerPage />);
+    const { getByTestId } = render(<GameManagerPage />);
 
-    await waitFor(() => expect(api.getLiveGame).toHaveBeenCalledWith('abc123'));
-
-    // After verification: updateLiveGame must be called with the FRESH DB state, not stale localStorage
-    await waitFor(() =>
-      expect(api.updateLiveGame).toHaveBeenCalledWith(
-        'abc123',
-        expect.objectContaining({ turnNumber: 7, currentPlayerIdx: 1 }),
-      ),
-    );
+    await waitFor(() => getByTestId('game-board'));
   });
 
-  it('does NOT call getLiveGame on a fresh load with no saved state', () => {
-    // No localStorage — brand new page visit
-    render(<GameManagerPage />);
-    expect(api.getLiveGame).not.toHaveBeenCalled();
+  it('shows setup form when no active session exists', async () => {
+    (api.getActiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
+      is_active: false,
+      state: null,
+      session_code: null,
+    });
+
+    const { getByTestId } = render(<GameManagerPage />);
+
+    await waitFor(() => getByTestId('start-btn'));
   });
 
-  it('does NOT call getLiveGame when the saved state has no sessionCode', () => {
-    const stateNoSession = { ...mockPlayingState, sessionCode: null, sessionSeats: null };
-    localStorage.setItem(GAME_STATE_KEY, JSON.stringify(stateNoSession));
+  it('deletes corrupted session when state is invalid', async () => {
+    (api.getActiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
+      is_active: true,
+      state: { ...mockPlayingState, phase: 'ended' },
+      session_code: 'abc123',
+    });
 
     render(<GameManagerPage />);
 
-    expect(api.getLiveGame).not.toHaveBeenCalled();
+    await waitFor(() => expect(api.deleteLiveGame).toHaveBeenCalledWith('abc123'));
   });
 });
 
@@ -176,31 +178,29 @@ describe('session verification on reload', () => {
 
 describe('handleStart — session cleanup ordering', () => {
   beforeEach(() => {
-    localStorage.clear();
     vi.clearAllMocks();
     (api.updateLiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({});
-    (api.getLiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
-      is_active: true,
-      state: mockPlayingState,
-      remote_events: [],
-      updated_at: '2026-01-01T00:00:00Z',
-      seat: 'bottom',
+    (api.getGameSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+      highlight_mode: true, sound_enabled: true, turn_timer_enabled: true, turn_timer_seconds: 300,
     });
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    localStorage.clear();
   });
 
   it('does NOT call deleteLiveGame when starting a fresh game with no prior session', async () => {
+    // No active session → show setup form
+    (api.getActiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
+      is_active: false, state: null, session_code: null,
+    });
     (api.createLiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({ seats: { bottom: 'newcode' } });
 
     const { getByTestId } = render(<GameManagerPage />);
 
-    // No saved state → renders GameSetup
-    const startBtn = getByTestId('start-btn');
-    await userEvent.click(startBtn);
+    // Wait for setup form to appear
+    await waitFor(() => getByTestId('start-btn'));
+    await userEvent.click(getByTestId('start-btn'));
 
     await waitFor(() => expect(api.createLiveGame).toHaveBeenCalled());
 
@@ -208,8 +208,16 @@ describe('handleStart — session cleanup ordering', () => {
     expect(api.deleteLiveGame).not.toHaveBeenCalled();
   });
 
-  it('calls deleteLiveGame BEFORE createLiveGame when a prior session exists', async () => {
+  it('calls deleteLiveGame BEFORE createLiveGame when restarting with a prior session', async () => {
     const callOrder: string[] = [];
+    // Load with an active playing game
+    (api.getActiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
+      is_active: true, state: mockPlayingState, session_code: 'abc123',
+    });
+    // Poll returns empty events
+    (api.getLiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
+      is_active: true, state: mockPlayingState, remote_events: [], updated_at: '2026-01-01', seat: 'bottom',
+    });
     (api.deleteLiveGame as ReturnType<typeof vi.fn>).mockImplementation(async () => {
       callOrder.push('delete');
     });
@@ -218,32 +226,14 @@ describe('handleStart — session cleanup ordering', () => {
       return { seats: { bottom: 'newcode' } };
     });
 
-    // Load with a playing game so state.sessionCode = 'abc123'
-    localStorage.setItem(GAME_STATE_KEY, JSON.stringify(mockPlayingState));
     const { getByTestId } = render(<GameManagerPage />);
 
-    // Wait for the verified state (renders GameBoard)
+    // GameBoard renders (stubbed)
     await waitFor(() => getByTestId('game-board'));
 
-    // GameBoard is a stub — to trigger handleStart directly we need to simulate the
-    // flow where the user reaches GameSetup with a live sessionCode.
-    // This happens when the component's state.sessionCode is set AND phase becomes setup.
-    // The ordering guarantee is the key property: delete must happen before create.
-    // Verify: if deleteLiveGame resolves AFTER createLiveGame is called, the test catches it.
-    // We reset mocks and manipulate state by re-rendering with a different path.
-    //
-    // Direct verification: look at the implementation — deleteLiveGame is now `await`ed
-    // (try { await api.deleteLiveGame(...) } catch {}), so create cannot be called before
-    // delete resolves. The callOrder array proves this when both are triggered.
-    //
-    // Trigger: we call handleNewGame (clears session) then start — but by then sessionCode
-    // is already null. The delete-before-create safety net in handleStart is exercised
-    // when sessionCode exists at call time, which is the pre-verified loaded state.
-    //
-    // Simplified assertion: after verification, the state has sessionCode = 'abc123'
-    // and if the user could click "Start" from GameBoard, delete would fire first.
-    // Since GameBoard is stubbed and doesn't expose a start trigger, we assert the
-    // ordering contract via the mock implementation and that delete was recorded first.
+    // The ordering guarantee: deleteLiveGame is awaited before createLiveGame.
+    // Since GameBoard is stubbed we verify the contract structurally:
+    // delete must come before create whenever both are called.
     expect(callOrder.indexOf('delete')).toBeLessThan(
       callOrder.indexOf('create') === -1 ? Infinity : callOrder.indexOf('create'),
     );

@@ -33,7 +33,7 @@ function getActiveOpponents(players: PlayerState[], excludeIdx: number) {
 
 interface GameBoardProps {
   state: GameManagerState;
-  onUpdate: (newState: GameManagerState) => void;
+  onUpdate: (newState: GameManagerState | ((prev: GameManagerState) => GameManagerState)) => void;
   onEndGame: () => void;
   onRestartGame: (players: PlayerState[]) => void;
   onLogGame: () => void;
@@ -136,7 +136,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
         setSoundEnabled(settings.sound_enabled);
         const timerVal = settings.turn_timer_enabled ? settings.turn_timer_seconds : 0;
         if (timerVal !== turnTimerSeconds) {
-          onUpdate({ ...state, turnTimerSeconds: timerVal });
+          onUpdate((prev) => ({ ...prev, turnTimerSeconds: timerVal }));
         }
       })
       .catch(() => {});

@@ -21,6 +21,10 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
+vi.mock('@/components/AuthGuard', () => ({
+  useAuth: () => ({ user: { id: 'test-user-uuid', username: 'tester', display_name: 'Tester', role: 'admin' }, logout: vi.fn() }),
+}));
+
 vi.mock('@/lib/api', () => ({
   api: {
     getLiveGame:         vi.fn(),
@@ -28,6 +32,8 @@ vi.mock('@/lib/api', () => ({
     deleteLiveGame:      vi.fn(),
     createLiveGame:      vi.fn(),
     sendLiveGameEvent:   vi.fn(),
+    getActiveGame:       vi.fn(),
+    getGameSettings:     vi.fn(),
   },
   apiFetch: vi.fn(),
   API_BASE: '',
@@ -67,8 +73,6 @@ import { applyEvent } from '@/game-manager/remoteTransforms';
 import type { GameManagerState, LiveGameEvent, PlayerState } from '@/lib/types';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
-
-const GAME_STATE_KEY = 'commander_game_state';
 
 function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
   return {
@@ -184,36 +188,34 @@ describe('applyEvent — event queue core invariants', () => {
 
 describe('host page — event queue consumption', () => {
   beforeEach(() => {
-    localStorage.clear();
     vi.clearAllMocks();
     vi.useFakeTimers();
     (api.updateLiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({ updated_at: '2026-01-01' });
     (api.deleteLiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({});
     (api.createLiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({ seats: { bottom: 'newcode' } });
     (api.sendLiveGameEvent as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true });
+    (api.getGameSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+      highlight_mode: true, sound_enabled: true, turn_timer_enabled: true, turn_timer_seconds: 300,
+    });
   });
 
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
-    localStorage.clear();
   });
 
   it('applies remote events from poll and writes merged state to DB', async () => {
-    // First call: session verification (no events)
-    // Second call: first poll — delivers the life event
-    // Remaining calls: empty events (event already processed)
     const lifeChangeEvent: LiveGameEvent = {
       type: 'life_change', playerIdx: 0, delta: -5, seat: 'top', ts: Date.now(),
     };
+
+    // getActiveGame returns an active playing session
+    (api.getActiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
+      is_active: true, state: mockPlayingState, session_code: 'abc123',
+    });
+
+    // First poll: delivers the life event. Remaining: empty.
     (api.getLiveGame as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce({
-        is_active: true,
-        state: mockPlayingState,
-        remote_events: [],
-        updated_at: '2026-01-01T00:00:00Z',
-        seat: 'bottom',
-      })
       .mockResolvedValueOnce({
         is_active: true,
         state: mockPlayingState,
@@ -229,18 +231,23 @@ describe('host page — event queue consumption', () => {
         seat: 'bottom',
       });
 
-    localStorage.setItem(GAME_STATE_KEY, JSON.stringify(mockPlayingState));
     render(<GameManagerPage />);
 
-    // act() flushes all React state updates triggered by the timer callbacks.
-    // 1100ms: enough for verification (microtask) + exactly one poll (at 1000ms).
+    // Let getActiveGame resolve and state settle
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(1100);
+      await vi.advanceTimersByTimeAsync(100);
     });
 
-    // After advancing: verification resolved (empty events), poll fired (life event),
-    // setState called with life=35, write effect called updateLiveGame.
-    // Direct assertion — avoids waitFor which uses setTimeout internally.
+    // Now advance enough for the poll interval (500ms) to fire
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+
+    // Let state updates + write effect settle
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+
     expect(api.updateLiveGame).toHaveBeenCalledWith(
       'abc123',
       expect.objectContaining({
@@ -252,6 +259,9 @@ describe('host page — event queue consumption', () => {
   });
 
   it('does NOT call updateLiveGame when poll returns no events', async () => {
+    (api.getActiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
+      is_active: true, state: mockPlayingState, session_code: 'abc123',
+    });
     (api.getLiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
       is_active: true,
       state: mockPlayingState,
@@ -260,22 +270,25 @@ describe('host page — event queue consumption', () => {
       seat: 'bottom',
     });
 
-    localStorage.setItem(GAME_STATE_KEY, JSON.stringify(mockPlayingState));
     render(<GameManagerPage />);
 
-    await vi.advanceTimersByTimeAsync(3000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
 
-    // Only the session-verification write may happen; no event-driven writes
-    const eventDrivenCalls = (api.updateLiveGame as ReturnType<typeof vi.fn>).mock.calls.filter(
+    // All updateLiveGame calls should have unchanged life (no events applied)
+    const calls = (api.updateLiveGame as ReturnType<typeof vi.fn>).mock.calls.filter(
       ([, state]) => state !== undefined,
     );
-    // None of the calls should be for applying events (all would be the initial verified write)
-    eventDrivenCalls.forEach(([, state]) => {
-      expect(state.players[0].life).toBe(40); // life unchanged
+    calls.forEach(([, state]) => {
+      expect(state.players[0].life).toBe(40);
     });
   });
 
   it('host never calls sendLiveGameEvent', async () => {
+    (api.getActiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
+      is_active: true, state: mockPlayingState, session_code: 'abc123',
+    });
     (api.getLiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
       is_active: true,
       state: mockPlayingState,
@@ -284,10 +297,11 @@ describe('host page — event queue consumption', () => {
       seat: 'bottom',
     });
 
-    localStorage.setItem(GAME_STATE_KEY, JSON.stringify(mockPlayingState));
     render(<GameManagerPage />);
 
-    await vi.advanceTimersByTimeAsync(3000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
 
     expect(api.sendLiveGameEvent).not.toHaveBeenCalled();
   });

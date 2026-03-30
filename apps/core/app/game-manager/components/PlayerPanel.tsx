@@ -1833,11 +1833,11 @@ export function PlayerPanel({
         >
           <Box
             sx={{
-              width: '90%', maxWidth: 220,
+              width: '90%', maxWidth: 220, maxHeight: '80%',
               bgcolor: (theme) => theme.palette.mode === 'dark' ? '#1E1510' : '#FFFAF5',
               border: (theme) => `1px solid ${theme.palette.divider}`,
               borderRadius: 2, '& .MuiTouchRipple-root': { borderRadius: 2 },
-              overflow: 'hidden',
+              overflowY: 'auto', overflowX: 'hidden',
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1964,7 +1964,7 @@ export function PlayerPanel({
           alignItems: 'center',
           rowGap: remoteMode ? 0.5 : 0.1,
           overflowY: 'auto',
-          overflow: 'hidden',
+          overflowX: 'hidden',
           position: 'relative',
           transition: 'padding 0.2s ease, row-gap 0.2s ease',
         }}>
@@ -1999,16 +1999,19 @@ export function PlayerPanel({
           </Stack>
           {opponents.flatMap(({ player: source, idx: sourceIdx }) => {
             const dmg = commanderDamage[playerIdx]?.[sourceIdx] ?? [0, 0];
+            const dealt = commanderDamage[sourceIdx]?.[playerIdx] ?? [0, 0];
+            const dealtTotal = dealt[0] + dealt[1];
             const sourceEliminated = source.isEliminated;
             const rows = [
-              <Box key={`${sourceIdx}-name`} sx={{ overflow: 'hidden', pt: 0 }}>
-                <Stack direction="row" alignItems="center" spacing={0.5} sx={{ overflow: 'hidden', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setOpenSnapshotKey(k => k === `${sourceIdx}-snap` ? null : `${sourceIdx}-snap`); }}>
+              <Box key={`${sourceIdx}-name`} sx={{ minWidth: 0, pt: 0 }}>
+                <Stack direction="row" alignItems="center" spacing={0.5} sx={{ cursor: 'pointer', minWidth: 0 }} onClick={(e) => { e.stopPropagation(); setOpenSnapshotKey(k => k === `${sourceIdx}-snap` ? null : `${sourceIdx}-snap`); }}>
                   {activePlayerIdx === sourceIdx && (
                     <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0, boxShadow: '0 0 4px 1px rgba(var(--mui-palette-primary-mainChannel) / 0.7)' }} />
                   )}
-                  <Typography sx={{ fontSize: fsSourceName, color: sourceEliminated ? 'text.disabled' : activePlayerIdx === sourceIdx ? 'primary.main' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', fontWeight: activePlayerIdx === sourceIdx ? 700 : 400 }}>
+                  <Typography sx={{ fontSize: fsSourceName, color: sourceEliminated ? 'text.disabled' : activePlayerIdx === sourceIdx ? 'primary.main' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', fontWeight: activePlayerIdx === sourceIdx ? 700 : 400, flex: 1, minWidth: 0 }}>
                     {cmdDmgShowPlayer ? source.playerName : source.commander.name}
                   </Typography>
+                  <Tooltip title={`Dealt ${source.partner ? `${dealt[0]}/${dealt[1]}` : dealtTotal} commander damage to ${source.playerName}`} placement="top" slotProps={ttSlotProps} arrow><Typography sx={{ fontSize: fsSourceName, fontWeight: 900, color: dealtTotal >= 21 ? 'error.main' : dealtTotal > 0 ? '#e67e22' : 'text.disabled', lineHeight: 1, flexShrink: 0 }}>⚔{source.partner ? `${dealt[0]}/${dealt[1]}` : dealtTotal}</Typography></Tooltip>
                 </Stack>
                 <Stack direction="row" spacing={0.5} sx={{ mt: 0.15, flexWrap: 'wrap', alignItems: 'center' }}>
                   {source.isMonarch && <Tooltip title="Monarch" placement="top" slotProps={ttSlotProps} arrow><CrownIcon sx={{
@@ -2091,7 +2094,7 @@ export function PlayerPanel({
                 sx={{
                   position: 'absolute', inset: 0, zIndex: 20,
                   bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(20,12,4,0.96)' : 'rgba(255,248,240,0.97)',
-                  overflow: 'hidden',
+                  overflow: 'auto',
                   display: 'flex', flexDirection: 'column',
                 }}
               >
@@ -2101,9 +2104,7 @@ export function PlayerPanel({
                 <Box onClick={(e) => e.stopPropagation()} sx={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', p: 1, gap: 0.5, overflowY: 'auto' }}>
                   {/* Header row — name + life total + close */}
                   <Stack direction="row" alignItems="center" spacing={0.75}>
-                    {src.commander.artCropUrl && (
-                      <Box component="img" src={src.commander.artCropUrl} alt="" onClick={() => setOpenSnapshotKey(null)} sx={{ height: artHeight, width: 'auto', borderRadius: 0.5, flexShrink: 0, cursor: 'pointer' }} />
-                    )}
+                    {/* Commander art removed from snapshot header — art still shown as background overlay */}
                     <Box sx={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                       <Stack direction="row" alignItems="center" spacing={0.5}>
                         <Typography sx={{ fontSize: fsSourceName, fontWeight: 800, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{src.playerName}</Typography>
@@ -2116,7 +2117,7 @@ export function PlayerPanel({
                     <Typography sx={{ fontSize: 'clamp(28px, 8dvmax, 56px)', fontWeight: 900, lineHeight: 1, color: srcLifeColor || 'primary.main', textDecoration: src.isEliminated ? 'line-through' : 'none', flexShrink: 0 }}>{src.life}</Typography>
                     <Stack direction="column" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
                       <IconButton size="small" onClick={() => setOpenSnapshotKey(null)} sx={{ p: 0.25 }}>
-                        <CloseIcon sx={{ fontSize: fsSectionLabel }} />
+                        <CloseIcon sx={{ fontSize: fsSourceName }} />
                       </IconButton>
                       {onSwitchToPlayer && !src.isEliminated && srcIdx !== playerIdx && (
                         <Tooltip title="View panel" placement="left" slotProps={ttSlotProps} arrow>
