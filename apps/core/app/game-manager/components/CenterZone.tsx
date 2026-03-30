@@ -85,6 +85,9 @@ interface CenterZoneProps {
   onToggleSound: () => void;
   commanderDamage: CommanderDamageMap;
   settingsLoaded?: boolean;
+  timerLoading?: boolean;
+  highlightLoading?: boolean;
+  soundLoading?: boolean;
 }
 
 function rollDie(sides: number): number {
@@ -120,6 +123,9 @@ export function CenterZone({
   onToggleSound,
   commanderDamage,
   settingsLoaded = true,
+  timerLoading = false,
+  highlightLoading = false,
+  soundLoading = false,
 }: CenterZoneProps) {
   type RollEntry = { label: string; rolls: (number | string)[]; total: number | null; color: string };
   const [history, setHistory] = useState<RollEntry[]>([]);
@@ -698,7 +704,7 @@ export function CenterZone({
                 control={
                   <Switch
                     size="small"
-                    disabled={!settingsLoaded}
+                    disabled={!settingsLoaded || timerLoading}
                     checked={turnTimerSeconds > 0}
                     onChange={(e) => {
                       if (e.target.checked) {
@@ -714,12 +720,12 @@ export function CenterZone({
                 sx={{ mx: 0 }}
               />
               <FormControlLabel
-                control={<Switch size="small" disabled={!settingsLoaded} checked={highlightMode} onChange={onToggleHighlightMode} />}
+                control={<Switch size="small" disabled={!settingsLoaded || highlightLoading} checked={highlightMode} onChange={onToggleHighlightMode} />}
                 label={<Typography sx={{ fontSize: 12 }}>Highlight</Typography>}
                 sx={{ mx: 0 }}
               />
               <FormControlLabel
-                control={<Switch size="small" disabled={!settingsLoaded} checked={soundEnabled} onChange={onToggleSound} />}
+                control={<Switch size="small" disabled={!settingsLoaded || soundLoading} checked={soundEnabled} onChange={onToggleSound} />}
                 label={<Typography sx={{ fontSize: 12 }}>Sound</Typography>}
                 sx={{ mx: 0 }}
               />

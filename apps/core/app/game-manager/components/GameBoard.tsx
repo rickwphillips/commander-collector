@@ -57,6 +57,9 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   const [highlightMode, setHighlightMode] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [highlightLoading, setHighlightLoading] = useState(false);
+  const [soundLoading, setSoundLoading] = useState(false);
+  const [timerLoading, setTimerLoading] = useState(false);
   const [posOverrides, setPosOverrides] = useState<Record<number, PlayerState['position']>>({});
   const [viewingPlayerIdx, setViewingPlayerIdx] = useState<number | null>(null);
   const settingsLoadedRef = useRef(false);
@@ -561,11 +564,12 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
           elapsedSeconds={elapsedSeconds}
           turnTimerSeconds={turnTimerSeconds}
           onTimerChange={(s) => {
+            setTimerLoading(true);
             updateState({ turnTimerSeconds: s });
             api.updateGameSettings({
               turn_timer_enabled: s > 0,
               turn_timer_seconds: s > 0 ? s : 300,
-            }).catch(() => {});
+            }).finally(() => setTimerLoading(false));
           }}
           isFullscreen={isFullscreen}
           onToggleFullscreen={toggleFullscreen}
@@ -573,17 +577,22 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
           onNotesChange={(n) => updateState({ notes: n })}
           highlightMode={highlightMode}
           onToggleHighlightMode={() => {
+            setHighlightLoading(true);
             const newVal = !highlightMode;
             setHighlightMode(newVal);
-            api.updateGameSettings({ highlight_mode: newVal }).catch(() => {});
+            api.updateGameSettings({ highlight_mode: newVal }).finally(() => setHighlightLoading(false));
           }}
           soundEnabled={soundEnabled}
           onToggleSound={() => {
+            setSoundLoading(true);
             const newVal = !soundEnabled;
             setSoundEnabled(newVal);
-            api.updateGameSettings({ sound_enabled: newVal }).catch(() => {});
+            api.updateGameSettings({ sound_enabled: newVal }).finally(() => setSoundLoading(false));
           }}
           settingsLoaded={settingsLoaded}
+          timerLoading={timerLoading}
+          highlightLoading={highlightLoading}
+          soundLoading={soundLoading}
           commanderDamage={commanderDamage}
         />
       </Box>
