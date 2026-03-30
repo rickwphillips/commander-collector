@@ -55,6 +55,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   const [monarchTransfer, setMonarchTransfer] = useState<{ fromPos: string | null; toPos: string | null }>({ fromPos: null, toPos: null });
   const [highlightMode, setHighlightMode] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [posOverrides, setPosOverrides] = useState<Record<number, PlayerState['position']>>({});
   const [viewingPlayerIdx, setViewingPlayerIdx] = useState<number | null>(null);
 
@@ -115,6 +116,26 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
     document.addEventListener('fullscreenchange', handler);
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
+
+  // Load game settings from DB on mount
+  useEffect(() => {
+    api.getGameSettings()
+      .then((settings) => {
+        setHighlightMode(settings.highlight_mode);
+        setSoundEnabled(settings.sound_enabled);
+        if (settings.turn_timer_enabled) {
+          onUpdate({ turnTimerSeconds: settings.turn_timer_seconds });
+        } else {
+          onUpdate({ turnTimerSeconds: 0 });
+        }
+        setSettingsLoaded(true);
+      })
+      .catch(() => {
+        // On error, use defaults and proceed
+        setSettingsLoaded(true);
+      });
+  }, [onUpdate]);
+
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const rollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tickTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -512,15 +533,30 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
           onRestartGame={handleRestartGame}
           elapsedSeconds={elapsedSeconds}
           turnTimerSeconds={turnTimerSeconds}
-          onTimerChange={(s) => updateState({ turnTimerSeconds: s })}
+          onTimerChange={(s) => {
+            updateState({ turnTimerSeconds: s });
+            api.updateGameSettings({
+              turn_timer_enabled: s > 0,
+              turn_timer_seconds: s > 0 ? s : 300,
+            }).catch(() => {});
+          }}
           isFullscreen={isFullscreen}
           onToggleFullscreen={toggleFullscreen}
           notes={state.notes}
           onNotesChange={(n) => updateState({ notes: n })}
           highlightMode={highlightMode}
-          onToggleHighlightMode={() => setHighlightMode(m => !m)}
+          onToggleHighlightMode={() => {
+            const newVal = !highlightMode;
+            setHighlightMode(newVal);
+            api.updateGameSettings({ highlight_mode: newVal }).catch(() => {});
+          }}
           soundEnabled={soundEnabled}
-          onToggleSound={() => setSoundEnabled(s => !s)}
+          onToggleSound={() => {
+            const newVal = !soundEnabled;
+            setSoundEnabled(newVal);
+            api.updateGameSettings({ sound_enabled: newVal }).catch(() => {});
+          }}
+          settingsLoaded={settingsLoaded}
           commanderDamage={commanderDamage}
         />
       </Box>

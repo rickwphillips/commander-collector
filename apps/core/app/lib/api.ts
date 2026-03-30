@@ -268,6 +268,25 @@ export const api = {
     const params = buildComparisonParams(config);
     return apiFetch<import('./types').ComparisonResult>(`/comparison?${params}`);
   },
+
+  // Game Settings (user preferences)
+  getGameSettings: () =>
+    apiFetch<{
+      sound_enabled: boolean;
+      highlight_mode: boolean;
+      turn_timer_enabled: boolean;
+      turn_timer_seconds: number;
+    }>('/game-settings'),
+  updateGameSettings: (settings: {
+    sound_enabled?: boolean;
+    highlight_mode?: boolean;
+    turn_timer_enabled?: boolean;
+    turn_timer_seconds?: number;
+  }) =>
+    apiFetch<{ success: boolean; sound_enabled: boolean; highlight_mode: boolean; turn_timer_enabled: boolean; turn_timer_seconds: number }>(
+      '/game-settings',
+      { method: 'POST', body: JSON.stringify(settings) }
+    ),
 };
 
 function buildComparisonParams(config: import('./types').ComparisonConfig): string {
