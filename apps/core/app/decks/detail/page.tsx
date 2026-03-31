@@ -32,6 +32,7 @@ import { ColorIdentityChips } from '@/components/ColorIdentityChips';
 import { ManaSymbol } from '@/components/ManaSymbol';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { EmptyState } from '@/components/EmptyState';
+import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import { api } from '@/lib/api';
 import { getOrdinalSuffix, MTG_COLORS_WITH_C } from '@/lib/utils';
 import type { DeckDetail as DeckDetailType, GameWithResults, DeckCard } from '@/lib/types';
@@ -185,7 +186,7 @@ export default function DeckDetailPage() {
   return (
     <PageContainer
       title={deck.name}
-      subtitle={deck.commander}
+      subtitle={<CardTooltip name={deck.commander} style={{ borderBottom: '1px dotted currentColor' }}>{deck.commander}</CardTooltip>}
       backHref="/decks"
       backLabel="Back to Decks"
       actions={

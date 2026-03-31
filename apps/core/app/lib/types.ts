@@ -598,6 +598,136 @@ export interface GameManagerState {
   viewerMap?: Record<string, { targetIdx: number; viewerName: string; ts: number; firstSeenTs: number }> | null; // seat → entry
 }
 
+// My Collection types
+export interface CollectionSummary {
+  total_games: number;
+  wins: number;
+  win_rate: number | null;
+  avg_finish: number | null;
+  total_decks: number;
+  total_lists: number;
+}
+
+export interface CollectionDeck {
+  id: number;
+  name: string;
+  commander: string;
+  colors: string;
+  created_at: string;
+  total_games: number;
+  wins: number;
+  win_rate: number | null;
+  card_count: number;
+}
+
+export interface CollectionGame {
+  game_id: number;
+  played_at: string;
+  winning_turn: number | null;
+  game_type: string;
+  finish_position: number;
+  deck_name: string;
+  commander: string;
+  deck_colors: string;
+  winner_name: string | null;
+  pod_size: number;
+}
+
+export interface CollectionCommander {
+  commander: string;
+  total_games: number;
+  wins: number;
+  win_rate: number | null;
+  avg_finish: number | null;
+  deck_count: number;
+}
+
+export interface CollectionNemesis {
+  opponent_id: number;
+  opponent_name: string;
+  games_together: number;
+  their_wins: number;
+  my_wins: number;
+}
+
+export interface CollectionNemesisCommander {
+  enemy_commander: string;
+  games_against: number;
+  their_wins: number;
+  my_wins: number;
+}
+
+export interface CollectionStreaks {
+  current_type: 'win' | 'loss' | null;
+  current_count: number;
+  best_win_streak: number;
+  worst_loss_streak: number;
+}
+
+export interface CollectionColorStat {
+  colors: string;
+  total_games: number;
+  wins: number;
+  win_rate: number | null;
+}
+
+export interface CollectionPodStat {
+  pod_size: number;
+  total_games: number;
+  wins: number;
+  win_rate: number | null;
+}
+
+export interface CollectionList {
+  id: number;
+  name: string;
+  description: string | null;
+  card_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MyCollectionResponse {
+  player: { id: number; name: string } | null;
+  summary: CollectionSummary | null;
+  decks: CollectionDeck[];
+  lists: CollectionList[];
+  recentGames: CollectionGame[];
+  commanders: CollectionCommander[];
+  nemeses: CollectionNemesis[];
+  nemesisCommanders: CollectionNemesisCommander[];
+  streaks: CollectionStreaks | null;
+  colorStats: CollectionColorStat[];
+  podSizeStats: CollectionPodStat[];
+  coachNotes: CoachNote[];
+}
+
+export interface DeckProfile {
+  deck: { id: number; name: string; commander: string; colors: string; player_name: string };
+  cards: { card_name: string; quantity: number; is_commander: number; is_proxy: number; type_line: string | null; mana_cost: string | null }[];
+  stats: {
+    total_games: number; wins: number; win_rate: number | null;
+    avg_finish: number | null; first_played: string | null; last_played: string | null;
+  };
+  matchups: { opponent_commander: string; games: number; my_wins: number; their_wins: number }[];
+  recentGames: { played_at: string; finish_position: number; pod_size: number; winning_turn: number | null }[];
+  finishDistribution: { finish_position: number; count: number }[];
+}
+
+export interface CoachNote {
+  id: number;
+  topic: string;
+  observation: string;
+  reasoning: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CoachMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 // Form input types
 export interface CreatePlayerInput {
   name: string;

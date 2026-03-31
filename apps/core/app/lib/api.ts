@@ -191,6 +191,8 @@ export const api = {
   // Deck Cards (card list for a deck)
   getDeckCards: (deckId: number) =>
     apiFetch<import('./types').DeckCard[]>(`/deck-cards?deck_id=${deckId}`),
+  getDeckProfile: (deckId: number) =>
+    apiFetch<import('./types').DeckProfile>(`/deck-profile?id=${deckId}`),
   saveDeckCards: (deckId: number, cards: import('./types').CreateDeckCardInput[]) =>
     apiFetch<{ success: boolean; deck_id: number }>('/deck-cards', {
       method: 'POST',
@@ -300,6 +302,38 @@ export const api = {
   // Changelog
   getChangelog: () =>
     apiFetch<Array<{ version: string; date: string; title: string; changes: Array<{ type: string; text: string }> }>>('/changelog'),
+
+  // My Collection
+  getMyCollection: () =>
+    apiFetch<import('./types').MyCollectionResponse>('/my-collection'),
+  getCoachNotes: () =>
+    apiFetch<import('./types').CoachNote[]>('/coach-notes'),
+  deleteCoachNote: (id: number) =>
+    apiFetch<{ success: boolean }>(`/coach-notes?id=${id}`, { method: 'DELETE' }),
+
+  // Coach Chat (polling-based)
+  sendCoachMessage: async (
+    message: string,
+    history: import('./types').CoachMessage[]
+  ): Promise<{ response: string }> => {
+    // Step 1: POST to submit message — returns request_id
+    const submit = await apiFetch<{ status: string; request_id: string }>('/coach-chat', {
+      method: 'POST',
+      body: JSON.stringify({ message, history }),
+    });
+
+    // Step 2: Poll for response (max 120 attempts x 3s = 6 min)
+    for (let i = 0; i < 120; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const poll = await apiFetch<{ status: string; response?: string }>(
+        `/coach-chat?poll=${submit.request_id}`
+      );
+      if (poll.status === 'complete' && poll.response) {
+        return { response: poll.response };
+      }
+    }
+    throw new Error('Coach chat response timed out');
+  },
 };
 
 function buildComparisonParams(config: import('./types').ComparisonConfig): string {

@@ -25,6 +25,7 @@ import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import AddIcon from '@mui/icons-material/Add';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import CollectionsIcon from '@mui/icons-material/Collections';
 import { DarkModeToggle } from './components/DarkModeToggle';
 import { LogoutButton } from './components/LogoutButton';
 import { StatsCard } from './components/StatsCard';
@@ -72,12 +73,18 @@ const navItems = [
     color: '#5B7B5B',
   },
   {
+    title: 'My Collection',
+    description: 'Your decks, stats & coach',
+    href: '/my-collection',
+    icon: <CollectionsIcon sx={{ fontSize: 40 }} />,
+    color: '#7B6B8E',
+  },
+  {
     title: 'Play Game',
     description: 'Log a new Commander match',
     href: '/game-manager',
     icon: <AddCircleIcon sx={{ fontSize: 40 }} />,
     color: '#A0522D',
-    centerRow: true,
   },
   {
     title: 'Rules Guru',
@@ -206,7 +213,7 @@ export default function Dashboard() {
         {/* Navigation Cards */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
           {navItems.map((item, index) => (
-            <Grid key={item.title} size={{ xs: 6, md: 3 }} offset={item.centerRow ? { md: 3, xs: 0 } : undefined}>
+            <Grid key={item.title} size={{ xs: 6, md: 3 }}>
               <Grow in={mounted} timeout={800 + index * 150}>
                 <Card className={styles.navCard}>
                   <CardActionArea component={item.external ? 'a' : Link} href={item.external ? (process.env.NODE_ENV === 'development' ? 'http://localhost:3003/chat' : '/app/projects/commander/rules/chat') : item.href} sx={{ height: '100%' }}>

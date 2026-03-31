@@ -12,6 +12,8 @@ interface Props {
   placement?: 'top' | 'bottom' | 'left' | 'right';
   /** Extra styles applied to the wrapper element */
   style?: React.CSSProperties;
+  /** Click handler — receives the card name */
+  onClick?: (name: string) => void;
 }
 
 /**
@@ -19,7 +21,7 @@ interface Props {
  * Uses the shared cardImageCache — DB-backed, Scryfall fallback, in-memory dedup.
  * Renders children as-is (no wrapper span) when no image is available.
  */
-export function CardTooltip({ name, children, previewWidth = 220, placement = 'top', style }: Props) {
+export function CardTooltip({ name, children, previewWidth = 220, placement = 'top', style, onClick }: Props) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -42,7 +44,12 @@ export function CardTooltip({ name, children, previewWidth = 220, placement = 't
       }
       slotProps={{ tooltip: { sx: { bgcolor: 'transparent', p: 0, boxShadow: 8 } } }}
     >
-      <span style={{ cursor: 'help', ...style }}>{children}</span>
+      <span
+        style={{ cursor: onClick ? 'pointer' : 'help', ...style }}
+        onClick={onClick ? (e) => { e.stopPropagation(); onClick(name); } : undefined}
+      >
+        {children}
+      </span>
     </Tooltip>
   );
 }

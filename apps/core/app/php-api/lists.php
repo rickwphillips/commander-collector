@@ -1,7 +1,7 @@
 <?php
 require_once 'config.php';
 require_once 'auth/middleware.php';
-requireAuth();
+$currentUser = requireAuth();
 
 $method = $_SERVER['REQUEST_METHOD'];
 $db = getDB();
@@ -75,16 +75,20 @@ elseif ($method === 'POST') {
         if (!$deckId)  sendError('deck_id required');
         if (!$name)    sendError('name required');
 
-        // Verify deck exists
-        $chk = $db->prepare('SELECT id FROM decks WHERE id = ?');
+        // Verify deck exists and get owner
+        $chk = $db->prepare('SELECT d.id, p.user_id FROM decks d JOIN players p ON p.id = d.player_id WHERE d.id = ?');
         $chk->execute([$deckId]);
-        if (!$chk->fetch()) sendError('Deck not found', 404);
+        $deckRow = $chk->fetch();
+        if (!$deckRow) sendError('Deck not found', 404);
+
+        // List ownership goes to the deck's owner (may differ from current user)
+        $listOwner = $deckRow['user_id'] ?? $currentUser['sub'];
 
         $db->beginTransaction();
         try {
             // Create list
-            $ins = $db->prepare('INSERT INTO lists (name) VALUES (?)');
-            $ins->execute([$name]);
+            $ins = $db->prepare('INSERT INTO lists (name, user_id) VALUES (?, ?)');
+            $ins->execute([$name, $listOwner]);
             $listId = (int) $db->lastInsertId();
 
             // Copy deck_cards → list_cards
@@ -152,8 +156,8 @@ elseif ($method === 'POST') {
 
     $db->beginTransaction();
     try {
-        $ins = $db->prepare('INSERT INTO lists (name, description) VALUES (?, ?)');
-        $ins->execute([$name, $description ?: null]);
+        $ins = $db->prepare('INSERT INTO lists (name, description, user_id) VALUES (?, ?, ?)');
+        $ins->execute([$name, $description ?: null, $currentUser['sub']]);
         $listId = (int) $db->lastInsertId();
 
         if (!empty($cards)) {

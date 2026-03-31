@@ -27,6 +27,7 @@ import { PageContainer } from '@/components/PageContainer';
 import { DeckBreakdown } from '@/components/DeckBreakdown';
 import { DeckFilters, EMPTY_FILTERS, TYPE_CATEGORIES, getTypeCategory, hasActiveFilters, matchesFilters } from '@/components/DeckFilters';
 import type { DeckFilterState, TypeCategory } from '@/components/DeckFilters';
+import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import { api } from '@/lib/api';
 import type { DeckDetail, DeckCard } from '@/lib/types';
 
@@ -170,7 +171,7 @@ function DecklistPageInner() {
   return (
     <PageContainer
       title={deck.name}
-      subtitle={`Commander: ${deck.commander}`}
+      subtitle={<>Commander: <CardTooltip name={deck.commander} style={{ borderBottom: '1px dotted currentColor' }}>{deck.commander}</CardTooltip></>}
       backHref={`/decks/detail?id=${deckId}`}
       backLabel="Back to Deck"
       actions={
@@ -285,7 +286,10 @@ function DecklistPageInner() {
               <Stack spacing={0.5}>
                 {cardsWithoutImages.map((card, i) => (
                   <Typography key={`${card.card_name}-${i}`} variant="body2">
-                    {card.quantity > 1 ? `${card.quantity}× ` : ''}{card.card_name}
+                    {card.quantity > 1 ? `${card.quantity}× ` : ''}
+                    <CardTooltip name={card.card_name} style={{ borderBottom: '1px dotted currentColor' }}>
+                      {card.card_name}
+                    </CardTooltip>
                   </Typography>
                 ))}
               </Stack>

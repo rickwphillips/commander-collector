@@ -9,7 +9,7 @@ import { LogoutButton } from './LogoutButton';
 
 interface PageContainerProps {
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   backHref?: string;
   backLabel?: string;
   children: ReactNode;
