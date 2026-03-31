@@ -296,6 +296,10 @@ export const api = {
       '/game-settings',
       { method: 'POST', body: JSON.stringify(settings) }
     ),
+
+  // Changelog
+  getChangelog: () =>
+    apiFetch<Array<{ version: string; date: string; title: string; changes: Array<{ type: string; text: string }> }>>('/changelog'),
 };
 
 function buildComparisonParams(config: import('./types').ComparisonConfig): string {
