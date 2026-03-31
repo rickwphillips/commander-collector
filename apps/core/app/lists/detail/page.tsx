@@ -157,12 +157,14 @@ function ListDetailInner() {
                       placement="top"
                       title={
                         card.image_uri ? (
-                          <Box
-                            component="img"
-                            src={card.image_uri}
-                            alt={card.card_name}
-                            sx={{ width: 220, borderRadius: 1.5, display: 'block' }}
-                          />
+                          <Stack direction="row" spacing={0.5}>
+                            <Box component="img" src={card.image_uri} alt={card.card_name}
+                              sx={{ width: 220, borderRadius: 1.5, display: 'block' }} />
+                            {card.back_image_uri && (
+                              <Box component="img" src={card.back_image_uri} alt={`${card.card_name} (back)`}
+                                sx={{ width: 220, borderRadius: 1.5, display: 'block' }} />
+                            )}
+                          </Stack>
                         ) : card.card_name
                       }
                       slotProps={{ tooltip: { sx: { bgcolor: 'transparent', p: 0, boxShadow: 8 } } }}
@@ -193,12 +195,14 @@ function ListDetailInner() {
                   placement="top"
                   title={
                     card.image_uri ? (
-                      <Box
-                        component="img"
-                        src={card.image_uri}
-                        alt={card.card_name}
-                        sx={{ width: 220, borderRadius: 1.5, display: 'block' }}
-                      />
+                      <Stack direction="row" spacing={0.5}>
+                        <Box component="img" src={card.image_uri} alt={card.card_name}
+                          sx={{ width: 220, borderRadius: 1.5, display: 'block' }} />
+                        {card.back_image_uri && (
+                          <Box component="img" src={card.back_image_uri} alt={`${card.card_name} (back)`}
+                            sx={{ width: 220, borderRadius: 1.5, display: 'block' }} />
+                        )}
+                      </Stack>
                     ) : card.card_name
                   }
                   slotProps={{ tooltip: { sx: { bgcolor: 'transparent', p: 0, boxShadow: 8 } } }}

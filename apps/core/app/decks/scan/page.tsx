@@ -43,6 +43,7 @@ import StarIcon from '@mui/icons-material/Star';
 import DownloadIcon from '@mui/icons-material/Download';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import FlipIcon from '@mui/icons-material/SyncAlt';
 import StyleIcon from '@mui/icons-material/Style';
 import { PageContainer } from '@/components/PageContainer';
 import { ManaSymbol } from '@/components/ManaSymbol';
@@ -98,6 +99,7 @@ function cardFromScryfall(name: string, data: ScryfallCachedCard | null, proxy =
     card_name: data?.name ?? name,
     scryfall_id: data?.scryfall_id ?? null,
     image_uri: data?.image_uri ?? null,
+    back_image_uri: data?.back_image_uri ?? null,
     color_identity: data?.color_identity ?? '',
     type_line: data?.type_line ?? null,
     mana_cost: data?.mana_cost ?? null,
@@ -130,6 +132,7 @@ function ScanDeckPageInner() {
 
   const [scanResults, setScanResults] = useState<ScannedCard[] | null>(null);
   const [cropMap, setCropMap] = useState<Record<string, string>>({}); // card id → cropped data URL
+  const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set()); // card ids currently showing back face
 
   // Edit-mode: loading existing deck cards
   const [editLoading, setEditLoading] = useState(!!editDeckId);
@@ -163,7 +166,7 @@ function ScanDeckPageInner() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [playersLoaded, setPlayersLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saveMode, setSaveMode] = useState<'new' | 'existing'>('new');
+  const [saveMode, setSaveMode] = useState<'new' | 'existing' | 'list'>('new');
   const [allDecks, setAllDecks] = useState<DeckWithPlayer[]>([]);
   const [existingDeckId, setExistingDeckId] = useState<number | ''>('');
 
@@ -172,6 +175,10 @@ function ScanDeckPageInner() {
   const [editRotation, setEditRotation] = useState(0);
   const [editBrightness, setEditBrightness] = useState(100);
   const [editContrast, setEditContrast] = useState(100);
+  const [editZoom, setEditZoom] = useState(1);
+  const [editPanX, setEditPanX] = useState(0);
+  const [editPanY, setEditPanY] = useState(0);
+  const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
 
   // Discard confirmation
   const [discardOpen, setDiscardOpen] = useState(false);
@@ -200,6 +207,26 @@ function ScanDeckPageInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Enrich DFCs missing back_image_uri ──────────────────────────────────────
+  useEffect(() => {
+    if (cards.length === 0) return;
+    const dfcsMissingBack = cards.filter((c) => c.card_name.includes('//') && !c.back_image_uri && c.scryfall_id);
+    if (dfcsMissingBack.length === 0) return;
+    const names = dfcsMissingBack.map((c) => c.card_name);
+    api.bulkLookupCards(names).then(({ results }) => {
+      const backMap = new Map<string, string>();
+      for (const r of results) {
+        if (r.back_image_uri) backMap.set(r.name, r.back_image_uri);
+      }
+      if (backMap.size === 0) return;
+      setCards((prev) => prev.map((c) => {
+        const back = backMap.get(c.card_name);
+        return back ? { ...c, back_image_uri: back } : c;
+      }));
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cards.length]);
+
   // ── Load existing deck in edit mode ────────────────────────────────────────
 
   useEffect(() => {
@@ -219,6 +246,7 @@ function ScanDeckPageInner() {
             card_name: c.card_name,
             scryfall_id: c.scryfall_id,
             image_uri: c.image_uri ?? null,
+            back_image_uri: c.back_image_uri ?? null,
             color_identity: c.color_identity ?? '',
             type_line: c.type_line ?? null,
             mana_cost: c.mana_cost ?? null,
@@ -340,6 +368,7 @@ function ScanDeckPageInner() {
               card.card_name = hit.data.name ?? card.card_name;
               card.scryfall_id = hit.data.scryfall_id;
               card.image_uri = hit.data.image_uri ?? null;
+              card.back_image_uri = hit.data.back_image_uri ?? null;
               card.color_identity = hit.data.color_identity ?? '';
               card.type_line = hit.data.type_line ?? null;
               card.mana_cost = hit.data.mana_cost ?? null;
@@ -378,6 +407,9 @@ function ScanDeckPageInner() {
     setEditRotation(0);
     setEditBrightness(100);
     setEditContrast(100);
+    setEditZoom(1);
+    setEditPanX(0);
+    setEditPanY(0);
     setPendingFile(file);
     // Reset inputs so the same file can be re-selected
     if (cameraInputRef.current) cameraInputRef.current.value = '';
@@ -421,6 +453,9 @@ function ScanDeckPageInner() {
     rotation: number,
     brightness: number,
     contrast: number,
+    zoom: number = 1,
+    panX: number = 0,
+    panY: number = 0,
   ): Promise<{ base64: string; mimeType: string; canvas: HTMLCanvasElement }> {
     const MAX_PX = 3000;
 
@@ -453,7 +488,12 @@ function ScanDeckPageInner() {
       ctx.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
       ctx.translate(outW / 2, outH / 2);
       ctx.rotate((rotation * Math.PI) / 180);
-      ctx.drawImage(bitmap, -sw / 2, -sh / 2, sw, sh);
+      // Apply zoom and pan — panX/panY are percentages of image size
+      const drawW = sw * zoom;
+      const drawH = sh * zoom;
+      const offsetX = (panX / 100) * sw;
+      const offsetY = (panY / 100) * sh;
+      ctx.drawImage(bitmap, -drawW / 2 + offsetX, -drawH / 2 + offsetY, drawW, drawH);
       bitmap.close();
 
       const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
@@ -480,7 +520,7 @@ function ScanDeckPageInner() {
     scanStartCardCount.current = cards.length;
 
     try {
-      const { base64, mimeType, canvas } = await fileToBase64(fileToRestore, editRotation, editBrightness, editContrast);
+      const { base64, mimeType, canvas } = await fileToBase64(fileToRestore, editRotation, editBrightness, editContrast, editZoom, editPanX, editPanY);
       setPreviewUrl(`data:${mimeType};base64,${base64}`);
 
       // Split into 3×3 = 9 tiles + 1 full-image pass = 10 total scans
@@ -599,6 +639,7 @@ function ScanDeckPageInner() {
               card.card_name = hit.data.name ?? card.card_name;
               card.scryfall_id = hit.data.scryfall_id;
               card.image_uri = hit.data.image_uri ?? null;
+              card.back_image_uri = hit.data.back_image_uri ?? null;
               card.color_identity = hit.data.color_identity ?? '';
               card.type_line = hit.data.type_line ?? null;
               card.mana_cost = hit.data.mana_cost ?? null;
@@ -739,11 +780,7 @@ function ScanDeckPageInner() {
     const commanderCard = cards.find((c) => c.is_commander);
 
     if (editDeckId) {
-      // Edit mode: only update the card list
-      if (!commanderCard) {
-        setError('Please mark one card as the commander');
-        return;
-      }
+      // Edit mode: update the card list
       setSaving(true);
       setError(null);
       try {
@@ -754,9 +791,38 @@ function ScanDeckPageInner() {
           is_commander: c.is_commander,
           is_proxy: c.is_proxy,
         })));
+        // Sync deck commander name if it changed
+        if (commanderCard) {
+          await api.updateDeck(editDeckId, { commander: commanderCard.card_name }).catch(() => {});
+        }
         router.push(`/decks/detail?id=${editDeckId}`);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to save cards');
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    if (saveMode === 'list') {
+      if (!deckName.trim()) {
+        setError('Please enter a list name');
+        return;
+      }
+      setSaving(true);
+      setError(null);
+      try {
+        const res = await api.createList(deckName.trim(), undefined, cards.map((c) => ({
+          card_name: c.card_name,
+          scryfall_id: c.scryfall_id,
+          quantity: c.quantity,
+          is_commander: c.is_commander,
+          is_proxy: c.is_proxy,
+        })));
+        api.clearScanDraft().catch(() => {});
+        router.push(`/lists/detail?id=${res.list_id}`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to save list');
       } finally {
         setSaving(false);
       }
@@ -778,6 +844,10 @@ function ScanDeckPageInner() {
           is_commander: c.is_commander,
           is_proxy: c.is_proxy,
         })));
+        // Sync deck commander name if it changed
+        if (commanderCard) {
+          await api.updateDeck(existingDeckId as number, { commander: commanderCard.card_name }).catch(() => {});
+        }
         api.clearScanDraft().catch(() => {});
         router.push(`/decks/detail?id=${existingDeckId}`);
       } catch (err) {
@@ -793,18 +863,13 @@ function ScanDeckPageInner() {
       return;
     }
 
-    if (!commanderCard) {
-      setError('Please mark one card as the commander');
-      return;
-    }
-
     setSaving(true);
     setError(null);
     try {
       const deck = await api.createDeck({
         player_id: playerId as number,
         name: deckName.trim(),
-        commander: commanderCard.card_name,
+        commander: commanderCard?.card_name ?? '',
         colors: colors.length > 0 ? colors.join('') : 'C',
       });
 
@@ -850,7 +915,7 @@ function ScanDeckPageInner() {
     setCards((prev) =>
       prev.map((c) =>
         c.id === versionCard.id
-          ? { ...c, scryfall_id: print.scryfall_id, image_uri: print.image_uri }
+          ? { ...c, scryfall_id: print.scryfall_id, image_uri: print.image_uri, back_image_uri: print.back_image_uri ?? null }
           : c
       )
     );
@@ -1054,12 +1119,71 @@ function ScanDeckPageInner() {
                   }}
                 >
                   {card.image_uri ? (
-                    <CardMedia
-                      component="img"
-                      image={card.image_uri}
-                      alt={card.card_name}
-                      sx={{ aspectRatio: '488/680' }}
-                    />
+                    <Box sx={{ position: 'relative', aspectRatio: '488/680', perspective: '600px' }}>
+                      <Box
+                        sx={{
+                          width: '100%',
+                          height: '100%',
+                          position: 'relative',
+                          transformStyle: 'preserve-3d',
+                          transition: 'transform 0.5s ease',
+                          transform: flippedCards.has(card.id) ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                        }}
+                      >
+                        {/* Front face */}
+                        <Box
+                          component="img"
+                          src={card.image_uri}
+                          alt={card.card_name}
+                          sx={{
+                            position: 'absolute',
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            backfaceVisibility: 'hidden',
+                          }}
+                        />
+                        {/* Back face */}
+                        {card.back_image_uri && (
+                          <Box
+                            component="img"
+                            src={card.back_image_uri}
+                            alt={`${card.card_name} (back)`}
+                            sx={{
+                              position: 'absolute',
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              backfaceVisibility: 'hidden',
+                              transform: 'rotateY(180deg)',
+                            }}
+                          />
+                        )}
+                      </Box>
+                      {/* Flip button — only for DFCs */}
+                      {card.back_image_uri && (
+                        <IconButton
+                          size="small"
+                          onClick={() => setFlippedCards((prev) => {
+                            const next = new Set(prev);
+                            next.has(card.id) ? next.delete(card.id) : next.add(card.id);
+                            return next;
+                          })}
+                          sx={{
+                            position: 'absolute',
+                            bottom: 4,
+                            right: 4,
+                            bgcolor: 'rgba(0,0,0,0.6)',
+                            color: '#fff',
+                            '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' },
+                            width: 28,
+                            height: 28,
+                          }}
+                        >
+                          <FlipIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      )}
+                    </Box>
                   ) : card.notFound && cropMap[card.id] ? (
                     <Box
                       component="img"
@@ -1170,7 +1294,7 @@ function ScanDeckPageInner() {
               <Button
                 variant="contained"
                 size="large"
-                disabled={cards.length === 0 || commanderCount === 0 || saving}
+                disabled={cards.length === 0 || saving}
                 onClick={handleSave}
               >
                 {saving ? 'Saving...' : 'Save Cards'}
@@ -1179,8 +1303,12 @@ function ScanDeckPageInner() {
               <Button
                 variant="contained"
                 size="large"
-                disabled={cards.length === 0 || commanderCount === 0}
-                onClick={() => { loadPlayers(); setStep(2); }}
+                disabled={cards.length === 0}
+                onClick={() => {
+                  loadPlayers();
+                  if (commanderCount === 0) setSaveMode('list');
+                  setStep(2);
+                }}
               >
                 Continue to Save
               </Button>
@@ -1194,33 +1322,57 @@ function ScanDeckPageInner() {
         const playerDecks = allDecks.filter((d) => d.player_id === playerId);
         const selectedExistingDeck = allDecks.find((d) => d.id === existingDeckId);
         const existingHasCards = (selectedExistingDeck?.card_count ?? 0) > 0;
-        const canSave = saveMode === 'existing'
-          ? !!existingDeckId
-          : !!playerId && !!deckName.trim();
+        const hasCommander = commanderCount > 0;
+        const canSave = saveMode === 'list'
+          ? !!deckName.trim()
+          : saveMode === 'existing'
+            ? !!existingDeckId
+            : !!playerId && !!deckName.trim();
 
         return (
           <Card>
             <CardContent sx={{ p: 4 }}>
               <Stack spacing={3}>
-                <Typography variant="h6">Save as Deck</Typography>
+                <Typography variant="h6">Save Cards</Typography>
 
-                {/* New vs Existing toggle */}
+                {/* Save mode toggle */}
                 <Stack direction="row" spacing={1}>
+                  <Button
+                    variant={saveMode === 'list' ? 'contained' : 'outlined'}
+                    onClick={() => setSaveMode('list')}
+                  >
+                    Save as List
+                  </Button>
                   <Button
                     variant={saveMode === 'new' ? 'contained' : 'outlined'}
                     onClick={() => setSaveMode('new')}
+                    disabled={!hasCommander}
+                    title={!hasCommander ? 'Mark a card as commander to save as a deck' : undefined}
                   >
                     New Deck
                   </Button>
                   <Button
                     variant={saveMode === 'existing' ? 'contained' : 'outlined'}
                     onClick={() => setSaveMode('existing')}
+                    disabled={!hasCommander}
+                    title={!hasCommander ? 'Mark a card as commander to attach to a deck' : undefined}
                   >
                     Existing Deck
                   </Button>
                 </Stack>
 
-                {saveMode === 'new' ? (
+
+                {saveMode === 'list' ? (
+                  <TextField
+                    label="List Name"
+                    value={deckName}
+                    onChange={(e) => setDeckName(e.target.value)}
+                    required
+                    fullWidth
+                    placeholder="e.g., Trade Binder"
+                    helperText="Save as a standalone card list — attach to a deck later by marking a commander"
+                  />
+                ) : saveMode === 'new' ? (
                   <>
                     <TextField
                       select
@@ -1353,7 +1505,7 @@ function ScanDeckPageInner() {
                       disabled={saving || !canSave}
                       onClick={handleSave}
                     >
-                      {saving ? 'Saving...' : saveMode === 'existing' ? 'Replace Card List' : 'Save Deck'}
+                      {saving ? 'Saving...' : saveMode === 'list' ? 'Save List' : saveMode === 'existing' ? 'Replace Card List' : 'Save Deck'}
                     </Button>
                   </Stack>
                 </Stack>
@@ -1455,24 +1607,102 @@ function ScanDeckPageInner() {
         </DialogTitle>
         <DialogContent>
           <Stack spacing={3}>
-            {/* Preview */}
-            <Box sx={{ textAlign: 'center', overflow: 'hidden', borderRadius: 1, bgcolor: 'action.hover', p: 1 }}>
+            {/* Tip */}
+            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+              Arrange cards in piles that fit inside the grid cells for best results. 10 piles (one per cell + full image) yields the highest accuracy. Avoid placing cards in the amber overlap zones — these areas are scanned by adjacent tiles and can produce duplicates.
+            </Typography>
+
+            {/* Preview with grid overlay — drag to pan, scroll to zoom */}
+            <Box
+              sx={{ textAlign: 'center', overflow: 'hidden', borderRadius: 1, bgcolor: 'action.hover', p: 1, cursor: 'grab', userSelect: 'none', touchAction: 'none', '&:active': { cursor: 'grabbing' } }}
+              onWheel={(e) => {
+                e.preventDefault();
+                setEditZoom((z) => Math.min(3, Math.max(0.5, z + (e.deltaY > 0 ? -0.1 : 0.1))));
+              }}
+              onPointerDown={(e) => {
+                (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                panStartRef.current = { x: e.clientX, y: e.clientY, panX: editPanX, panY: editPanY };
+              }}
+              onPointerMove={(e) => {
+                if (!panStartRef.current) return;
+                const dx = e.clientX - panStartRef.current.x;
+                const dy = e.clientY - panStartRef.current.y;
+                // Convert pixel drag to percentage of preview size (scale by zoom)
+                const sensitivity = 0.15 / editZoom;
+                setEditPanX(panStartRef.current.panX + dx * sensitivity);
+                setEditPanY(panStartRef.current.panY + dy * sensitivity);
+              }}
+              onPointerUp={() => { panStartRef.current = null; }}
+              onPointerCancel={() => { panStartRef.current = null; }}
+            >
               {previewUrl && (
-                <Box
-                  component="img"
-                  src={previewUrl}
-                  alt="Preview"
-                  sx={{
-                    maxWidth: '100%',
-                    maxHeight: 400,
-                    objectFit: 'contain',
-                    transform: `rotate(${editRotation}deg)`,
-                    filter: `brightness(${editBrightness}%) contrast(${editContrast}%)`,
-                    transition: 'transform 0.2s',
-                  }}
-                />
+                <Box sx={{ position: 'relative', display: 'inline-block', overflow: 'hidden' }}>
+                  <Box
+                    component="img"
+                    src={previewUrl}
+                    alt="Preview"
+                    draggable={false}
+                    sx={{
+                      maxWidth: '100%',
+                      maxHeight: 400,
+                      objectFit: 'contain',
+                      transform: `rotate(${editRotation}deg) scale(${editZoom}) translate(${editPanX}%, ${editPanY}%)`,
+                      filter: `brightness(${editBrightness}%) contrast(${editContrast}%)`,
+                      transition: 'filter 0.2s',
+                      display: 'block',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                  {/* 3×3 grid overlay with 8% overlap zones */}
+                  <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+                    {/* Overlap zones — 8% amber strips centered on each grid line */}
+                    {/* Vertical lines at 33.3% and 66.6% */}
+                    <Box sx={{ position: 'absolute', top: 0, bottom: 0, left: 'calc(33.33% - 2.67%)', width: '5.33%', bgcolor: 'rgba(255,160,0,0.18)' }} />
+                    <Box sx={{ position: 'absolute', top: 0, bottom: 0, left: 'calc(66.66% - 2.67%)', width: '5.33%', bgcolor: 'rgba(255,160,0,0.18)' }} />
+                    {/* Horizontal lines at 33.3% and 66.6% */}
+                    <Box sx={{ position: 'absolute', left: 0, right: 0, top: 'calc(33.33% - 2.67%)', height: '5.33%', bgcolor: 'rgba(255,160,0,0.18)' }} />
+                    <Box sx={{ position: 'absolute', left: 0, right: 0, top: 'calc(66.66% - 2.67%)', height: '5.33%', bgcolor: 'rgba(255,160,0,0.18)' }} />
+                    {/* Grid lines */}
+                    <Box sx={{
+                      position: 'absolute', inset: 0,
+                      display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'repeat(3, 1fr)',
+                    }}>
+                      {Array.from({ length: 9 }).map((_, i) => (
+                        <Box key={i} sx={{ border: '1px solid rgba(255,255,255,0.5)', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.3)' }} />
+                      ))}
+                    </Box>
+                  </Box>
+                </Box>
               )}
             </Box>
+
+            {/* Zoom */}
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Typography variant="body2" sx={{ minWidth: 80 }}>Zoom</Typography>
+              <Slider
+                value={editZoom}
+                onChange={(_, v) => setEditZoom(v as number)}
+                min={0.5} max={3} step={0.1}
+                valueLabelDisplay="auto"
+                valueLabelFormat={(v) => `${Math.round(v * 100)}%`}
+                sx={{ flex: 1 }}
+              />
+              <Button size="small" onClick={() => { setEditZoom(1); setEditPanX(0); setEditPanY(0); }}>Reset</Button>
+            </Stack>
+
+            {/* Retake / Reupload */}
+            <Stack direction="row" spacing={1} justifyContent="center">
+              {cameraInputRef.current && (
+                <Button size="small" variant="outlined" startIcon={<CameraAltIcon />}
+                  onClick={() => { setPendingFile(null); setTimeout(() => cameraInputRef.current?.click(), 50); }}>
+                  Retake
+                </Button>
+              )}
+              <Button size="small" variant="outlined" startIcon={<FileUploadIcon />}
+                onClick={() => { setPendingFile(null); setTimeout(() => uploadInputRef.current?.click(), 50); }}>
+                Reupload
+              </Button>
+            </Stack>
 
             {/* Rotation */}
             <Stack direction="row" spacing={2} alignItems="center">

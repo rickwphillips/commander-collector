@@ -22,6 +22,7 @@ import {
   Typography,
 } from '@mui/material';
 import CallSplitIcon from '@mui/icons-material/CallSplit';
+import EditIcon from '@mui/icons-material/Edit';
 import { PageContainer } from '@/components/PageContainer';
 import { DeckBreakdown } from '@/components/DeckBreakdown';
 import { DeckFilters, EMPTY_FILTERS, TYPE_CATEGORIES, getTypeCategory, hasActiveFilters, matchesFilters } from '@/components/DeckFilters';
@@ -30,19 +31,40 @@ import { api } from '@/lib/api';
 import type { DeckDetail, DeckCard } from '@/lib/types';
 
 function GalleryCard({ card }: { card: DeckCard }) {
+  const [flipped, setFlipped] = useState(false);
+  const isDfc = !!card.back_image_uri;
   return (
     <Tooltip
       disableInteractive
       placement="top"
       title={
-        <Box component="img" src={card.image_uri!} alt={card.card_name}
-          sx={{ width: 220, borderRadius: 1.5, display: 'block' }} />
+        <Stack direction="row" spacing={0.5}>
+          <Box component="img" src={card.image_uri!} alt={card.card_name}
+            sx={{ width: 220, borderRadius: 1.5, display: 'block' }} />
+          {card.back_image_uri && (
+            <Box component="img" src={card.back_image_uri} alt={`${card.card_name} (back)`}
+              sx={{ width: 220, borderRadius: 1.5, display: 'block' }} />
+          )}
+        </Stack>
       }
       slotProps={{ tooltip: { sx: { bgcolor: 'transparent', p: 0, boxShadow: 8 } } }}
     >
-      <Card sx={{ cursor: 'default' }}>
-        <CardMedia component="img" image={card.image_uri!} alt={card.card_name}
-          sx={{ aspectRatio: '488/680' }} />
+      <Card sx={{ cursor: isDfc ? 'pointer' : 'default', perspective: '600px' }}
+        onClick={isDfc ? () => setFlipped((f) => !f) : undefined}>
+        <Box sx={{
+          transformStyle: 'preserve-3d',
+          transition: 'transform 0.5s ease',
+          transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+          position: 'relative',
+          aspectRatio: '488/680',
+        }}>
+          <CardMedia component="img" image={card.image_uri!} alt={card.card_name}
+            sx={{ position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden' }} />
+          {card.back_image_uri && (
+            <CardMedia component="img" image={card.back_image_uri} alt={`${card.card_name} (back)`}
+              sx={{ position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }} />
+          )}
+        </Box>
       </Card>
     </Tooltip>
   );
@@ -153,14 +175,24 @@ function DecklistPageInner() {
       backLabel="Back to Deck"
       actions={
         cards.length > 0 ? (
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<CallSplitIcon />}
-            onClick={() => { setDetachName(deck.name + ' List'); setDetachOpen(true); }}
-          >
-            Detach to List
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<EditIcon />}
+              onClick={() => router.push(`/decks/scan?edit=${deckId}`)}
+            >
+              Edit Cards
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<CallSplitIcon />}
+              onClick={() => { setDetachName(deck.name + ' List'); setDetachOpen(true); }}
+            >
+              Detach to List
+            </Button>
+          </Stack>
         ) : undefined
       }
     >

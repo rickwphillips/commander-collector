@@ -23,6 +23,7 @@ export interface BreakdownCard {
   color_identity?: string | null;
   mana_cost?: string | null;
   image_uri?: string | null;
+  back_image_uri?: string | null;
   scryfall_id?: string | null;
   notFound?: boolean;
 }
@@ -307,12 +308,22 @@ export function DeckBreakdown({ cards, showList = false }: Props) {
                           enterNextDelay={100}
                           title={
                             card.image_uri ? (
-                              <Box
-                                component="img"
-                                src={card.image_uri}
-                                alt={card.card_name}
-                                sx={{ width: 220, borderRadius: 1.5, display: 'block' }}
-                              />
+                              <Stack direction="row" spacing={0.5}>
+                                <Box
+                                  component="img"
+                                  src={card.image_uri}
+                                  alt={card.card_name}
+                                  sx={{ width: 220, borderRadius: 1.5, display: 'block' }}
+                                />
+                                {card.back_image_uri && (
+                                  <Box
+                                    component="img"
+                                    src={card.back_image_uri}
+                                    alt={`${card.card_name} (back)`}
+                                    sx={{ width: 220, borderRadius: 1.5, display: 'block' }}
+                                  />
+                                )}
+                              </Stack>
                             ) : ''
                           }
                           slotProps={{ tooltip: { sx: { bgcolor: 'transparent', p: 0, boxShadow: 10 } } }}

@@ -17,6 +17,7 @@ export interface DeckFilterState {
   useColorIdentity: boolean;
   proxyOnly: boolean;
   commanderOnly: boolean;
+  dfcOnly: boolean;
 }
 
 export const EMPTY_FILTERS: DeckFilterState = {
@@ -26,10 +27,11 @@ export const EMPTY_FILTERS: DeckFilterState = {
   useColorIdentity: false,
   proxyOnly: false,
   commanderOnly: false,
+  dfcOnly: false,
 };
 
 export function hasActiveFilters(f: DeckFilterState) {
-  return !!(f.nameFilter || f.typeFilter.length || f.colorFilter.length || f.proxyOnly || f.commanderOnly);
+  return !!(f.nameFilter || f.typeFilter.length || f.colorFilter.length || f.proxyOnly || f.commanderOnly || f.dfcOnly);
 }
 
 export function getTypeCategory(typeLine: string | null | undefined): TypeCategory | 'Other' {
@@ -46,7 +48,7 @@ export function getTypeCategory(typeLine: string | null | undefined): TypeCatego
 }
 
 export function matchesFilters(
-  card: { card_name: string; type_line?: string | null; colors?: string | null; color_identity?: string | null; is_proxy?: number | boolean; is_commander?: number | boolean },
+  card: { card_name: string; type_line?: string | null; colors?: string | null; color_identity?: string | null; is_proxy?: number | boolean; is_commander?: number | boolean; back_image_uri?: string | null },
   f: DeckFilterState,
 ): boolean {
   if (f.nameFilter && !card.card_name.toLowerCase().includes(f.nameFilter.toLowerCase())) return false;
@@ -70,6 +72,7 @@ export function matchesFilters(
   }
   if (f.proxyOnly && !card.is_proxy) return false;
   if (f.commanderOnly && !card.is_commander) return false;
+  if (f.dfcOnly && !card.back_image_uri) return false;
   return true;
 }
 
@@ -79,11 +82,11 @@ interface Props {
   resultCount?: number;
   totalCount?: number;
   /** Cards in the current view — used to show only relevant filter chips */
-  cards?: { type_line?: string | null; colors?: string | null; color_identity?: string | null; is_proxy?: number | boolean; is_commander?: number | boolean; }[];
+  cards?: { type_line?: string | null; colors?: string | null; color_identity?: string | null; is_proxy?: number | boolean; is_commander?: number | boolean; back_image_uri?: string | null; }[];
 }
 
 export function DeckFilters({ filters, onChange, resultCount, totalCount, cards = [] }: Props) {
-  const { nameFilter, typeFilter, colorFilter, useColorIdentity, proxyOnly, commanderOnly } = filters;
+  const { nameFilter, typeFilter, colorFilter, useColorIdentity, proxyOnly, commanderOnly, dfcOnly } = filters;
 
   // Derive which filters are actually relevant to the current card list
   const presentTypes = useMemo(() => {
@@ -107,6 +110,7 @@ export function DeckFilters({ filters, onChange, resultCount, totalCount, cards 
 
   const hasProxies     = useMemo(() => cards.some(c => c.is_proxy), [cards]);
   const hasCommanders  = useMemo(() => cards.some(c => c.is_commander), [cards]);
+  const hasDfcs        = useMemo(() => cards.some(c => c.back_image_uri), [cards]);
 
   const set = (patch: Partial<DeckFilterState>) => onChange({ ...filters, ...patch });
 
@@ -204,6 +208,16 @@ export function DeckFilters({ filters, onChange, resultCount, totalCount, cards 
             variant={commanderOnly ? 'filled' : 'outlined'}
             color={commanderOnly ? 'secondary' : 'default'}
             onClick={() => set({ commanderOnly: !commanderOnly })}
+            sx={{ height: 24, fontSize: '0.7rem' }}
+          />
+        )}
+        {hasDfcs && (
+          <Chip
+            label="DFC"
+            size="small"
+            variant={dfcOnly ? 'filled' : 'outlined'}
+            color={dfcOnly ? 'info' : 'default'}
+            onClick={() => set({ dfcOnly: !dfcOnly })}
             sx={{ height: 24, fontSize: '0.7rem' }}
           />
         )}

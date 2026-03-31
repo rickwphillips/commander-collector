@@ -33,10 +33,17 @@ function normaliseCard(array $card): array {
         ?? $card['card_faces'][0]['image_uris']['normal']
         ?? null;
 
+    // Double-faced cards: grab the back face image
+    $backImageUri = null;
+    if (isset($card['card_faces'][1]['image_uris']['normal'])) {
+        $backImageUri = $card['card_faces'][1]['image_uris']['normal'];
+    }
+
     return [
         'scryfall_id'    => $card['id'],
         'name'           => $card['name'],
         'image_uri'      => $imageUri,
+        'back_image_uri' => $backImageUri,
         'colors'         => implode('', $card['colors'] ?? []),
         'color_identity' => implode('', $card['color_identity'] ?? []),
         'type_line'      => $card['type_line'] ?? null,
@@ -48,11 +55,12 @@ function normaliseCard(array $card): array {
 function cacheCard(PDO $db, array $row): void {
     $stmt = $db->prepare(
         'INSERT INTO scryfall_card_cache
-            (scryfall_id, name, image_uri, colors, color_identity, type_line, mana_cost)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
+            (scryfall_id, name, image_uri, back_image_uri, colors, color_identity, type_line, mana_cost)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
             name = VALUES(name),
             image_uri = VALUES(image_uri),
+            back_image_uri = VALUES(back_image_uri),
             colors = VALUES(colors),
             color_identity = VALUES(color_identity),
             type_line = VALUES(type_line),
@@ -63,6 +71,7 @@ function cacheCard(PDO $db, array $row): void {
         $row['scryfall_id'],
         $row['name'],
         $row['image_uri'],
+        $row['back_image_uri'] ?? null,
         $row['colors'],
         $row['color_identity'],
         $row['type_line'],
@@ -81,7 +90,12 @@ if ($method === 'GET') {
     $cached = $stmt->fetch();
 
     if ($cached) {
-        sendJSON($cached);
+        // Re-fetch DFCs missing back_image_uri (cached before DFC support)
+        $isDfc = str_contains($cached['name'], '//');
+        if (!$isDfc || $cached['back_image_uri']) {
+            sendJSON($cached);
+        }
+        // Fall through to re-fetch from Scryfall
     }
 
     $card = scryfallFetch($name);
@@ -115,7 +129,13 @@ elseif ($method === 'POST') {
         $cached = $stmt->fetch();
 
         if ($cached) {
-            $results[$name] = $cached;
+            // Re-fetch DFCs missing back_image_uri (cached before DFC support)
+            $isDfc = str_contains($cached['name'], '//');
+            if ($isDfc && !$cached['back_image_uri']) {
+                $uncached[] = $name;
+            } else {
+                $results[$name] = $cached;
+            }
         } else {
             $uncached[] = $name;
         }

@@ -7,6 +7,7 @@ export interface ScannedCard {
   card_name: string;
   scryfall_id: string | null;
   image_uri: string | null;
+  back_image_uri?: string | null;
   color_identity: string;
   type_line: string | null;
   mana_cost: string | null;
@@ -30,6 +31,7 @@ export interface ScryfallCachedCard {
   scryfall_id: string;
   name: string;
   image_uri: string | null;
+  back_image_uri?: string | null;
   colors: string;
   color_identity: string;
   type_line: string | null;
@@ -48,6 +50,7 @@ export interface DeckCard {
   is_proxy: number;     // 0 or 1
   // Joined from scryfall_card_cache
   image_uri?: string | null;
+  back_image_uri?: string | null;
   colors?: string;
   color_identity?: string;
   type_line?: string | null;
@@ -85,6 +88,7 @@ export interface ListCard {
   is_commander: number;
   is_proxy: number;
   image_uri?: string | null;
+  back_image_uri?: string | null;
   colors?: string;
   color_identity?: string;
   type_line?: string | null;
@@ -98,6 +102,7 @@ export interface CardPrint {
   set_code: string;
   collector_number: string;
   image_uri: string | null;
+  back_image_uri?: string | null;
   released_at: string;
   image_cached: boolean;
 }

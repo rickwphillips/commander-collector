@@ -15,7 +15,7 @@ if ($method === 'GET') {
     $db   = getDB();
     $stmt = $db->prepare(
         'SELECT dc.id, dc.deck_id, dc.scryfall_id, dc.card_name, dc.quantity, dc.is_commander, dc.is_proxy,
-                sc.image_uri, sc.colors, sc.color_identity, sc.type_line, sc.mana_cost
+                sc.image_uri, sc.back_image_uri, sc.colors, sc.color_identity, sc.type_line, sc.mana_cost
          FROM deck_cards dc
          LEFT JOIN scryfall_card_cache sc ON dc.scryfall_id = sc.scryfall_id
          WHERE dc.deck_id = ?
