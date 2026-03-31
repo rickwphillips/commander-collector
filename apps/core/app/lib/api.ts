@@ -185,6 +185,7 @@ export const api = {
       is_active: boolean;
       state: import('./types').GameManagerState | null;
       session_code: string | null;
+      session_seats: Record<string, string> | null;
     }>('/active-game'),
 
   // Deck Cards (card list for a deck)

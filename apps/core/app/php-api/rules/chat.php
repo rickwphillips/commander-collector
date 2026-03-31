@@ -3,11 +3,52 @@ require_once dirname(__DIR__) . '/config.php';
 require_once dirname(__DIR__) . '/auth/middleware.php';
 requireAuth();
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+$method = $_SERVER['REQUEST_METHOD'];
+
+// ── GET: poll for assistant response by user_message_id ──────────────────
+if ($method === 'GET') {
+    $userMsgId = isset($_GET['poll']) ? (int)$_GET['poll'] : 0;
+    if (!$userMsgId) sendError('poll parameter required');
+
+    $db = getDB();
+    // Find the assistant message that follows this user message in the same conversation
+    $stmt = $db->prepare("
+        SELECT m.id, m.content, m.pending_pattern, m.conversation_id
+        FROM rules_messages m
+        WHERE m.conversation_id = (SELECT conversation_id FROM rules_messages WHERE id = ?)
+          AND m.id > ?
+          AND m.role = 'assistant'
+        ORDER BY m.id ASC
+        LIMIT 1
+    ");
+    $stmt->execute([$userMsgId, $userMsgId]);
+    $row = $stmt->fetch();
+
+    if (!$row) {
+        sendJSON(['status' => 'processing']);
+    }
+
+    // Also fetch the qa_log_id
+    $qaStmt = $db->prepare("SELECT id FROM rules_qa_log WHERE assistant_message_id = ? LIMIT 1");
+    $qaStmt->execute([$row['id']]);
+    $qaLogId = $qaStmt->fetchColumn();
+
+    sendJSON([
+        'status'           => 'complete',
+        'conversation_id'  => (int)$row['conversation_id'],
+        'message_id'       => (int)$row['id'],
+        'qa_log_id'        => $qaLogId ? (int)$qaLogId : null,
+        'response'         => $row['content'],
+        'pending_pattern'  => $row['pending_pattern'] ? json_decode($row['pending_pattern'], true) : null,
+    ]);
+}
+
+if ($method !== 'POST') {
     sendError('Method not allowed', 405);
 }
 
 set_time_limit(300);
+ignore_user_abort(true);
 
 $apiKey = defined('ANTHROPIC_API_KEY') ? ANTHROPIC_API_KEY : null;
 if (!$apiKey) sendError('Anthropic API key not configured', 500);
@@ -35,6 +76,26 @@ if (!$conversationId) {
 $stmt = $db->prepare("INSERT INTO rules_messages (conversation_id, role, content) VALUES (?, 'user', ?)");
 $stmt->execute([$conversationId, $userMessage]);
 $userMessageId = (int)$db->lastInsertId();
+
+// ── Return immediately — client will poll for result ─────────────────────
+$earlyResponse = json_encode([
+    'status'          => 'processing',
+    'conversation_id' => $conversationId,
+    'user_message_id' => $userMessageId,
+]);
+header('Content-Type: application/json');
+header('Content-Length: ' . strlen($earlyResponse));
+header('Connection: close');
+http_response_code(202);
+echo $earlyResponse;
+if (function_exists('fastcgi_finish_request')) {
+    fastcgi_finish_request();
+} else {
+    ob_end_flush();
+    flush();
+}
+
+// ── Continue processing in background ────────────────────────────────────
 
 // Load recent conversation history (last 8 messages to stay within token budget)
 $stmt = $db->prepare("
@@ -94,11 +155,15 @@ If the user corrects a pattern application:
 
 Lead with the ruling ("Yes, this works" / "No, this is illegal" / "The result is X"), cite CR numbers, explain the mechanic, reference the matched pattern, and flag common misconceptions.
 
-## Step 4: Propose New Patterns
+## Step 4: Self-Correct When Wrong
+
+If you realize during this conversation that a previous answer was incorrect — wrong CR citation, misapplied rule, bad ruling — use the `log_correction` tool immediately. Don't wait for the user to catch it. Be specific about what was wrong and what the correct answer is. You MUST also state what assumptions you made without looking them up first — e.g. assumed a card had an ability it doesn't, assumed a CR rule worked a certain way without checking, assumed an interaction based on similar cards. Your correction is saved to the `rules_ai_corrections` table with: `severity` (1–4), `correction` (what was wrong and the correct answer), `assumptions` (your unchecked assumptions), and a link back to the `rules_qa_log` entry. This data is used to track accuracy patterns and improve future answers.
+
+## Step 5: Propose New Patterns
 
 After answering — if the question reveals a novel interaction not covered by any existing pattern — use the `propose_pattern` tool with a fully formed pattern definition. This flags the pattern for the user to review and optionally save. Do not propose patterns that are already covered.
 
-## Step 5: Card Reference Manifest
+## Step 6: Card Reference Manifest
 
 At the very end of EVERY response, after all other content, append exactly one line in this format:
 
@@ -439,6 +504,29 @@ $tools = [
             'required' => ['pattern_id', 'name', 'category', 'content'],
         ],
     ],
+    [
+        'name'        => 'log_correction',
+        'description' => 'Log a self-correction when you realize a previous answer in this conversation was wrong or misleading. Use this proactively whenever you catch an error in your own earlier reasoning — incorrect CR citation, wrong ruling, misapplied pattern, etc. This helps track accuracy and improve future answers.',
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => [
+                'correction' => [
+                    'type'        => 'string',
+                    'description' => 'What was wrong and what the correct answer is. Be specific: cite the incorrect claim, then the correct ruling with CR refs.',
+                ],
+                'severity' => [
+                    'type'        => 'integer',
+                    'description' => 'How wrong the original answer was: 1=completely wrong ruling, 2=mostly wrong, 3=partially correct but misleading, 4=minor inaccuracy',
+                    'enum'        => [1, 2, 3, 4],
+                ],
+                'assumptions' => [
+                    'type'        => 'string',
+                    'description' => 'What assumptions you made without verifying first that led to the error — e.g. assumed a card had a keyword it doesn\'t, assumed a CR rule worked a certain way without looking it up, assumed an interaction based on similar cards.',
+                ],
+            ],
+            'required' => ['correction', 'severity', 'assumptions'],
+        ],
+    ],
 ];
 
 // ── Build messages array ───────────────────────────────────────────────────
@@ -615,6 +703,32 @@ function executeTool(string $name, array $input): string {
         return json_encode(['proposed' => true, 'pattern' => $input]);
     }
 
+    if ($name === 'log_correction') {
+        global $db, $conversationId;
+        $correctionNote = trim($input['correction'] ?? '');
+        $assumptions    = trim($input['assumptions'] ?? '');
+        $severity = (int)($input['severity'] ?? 2);
+        if ($severity < 1 || $severity > 4) $severity = 2;
+        if (!$correctionNote) return json_encode(['error' => 'correction text is required']);
+
+        // Link to the most recent QA log entry in this conversation if one exists
+        $stmt = $db->prepare("
+            SELECT id FROM rules_qa_log
+            WHERE conversation_id = ?
+            ORDER BY id DESC LIMIT 1
+        ");
+        $stmt->execute([$conversationId]);
+        $qaId = $stmt->fetchColumn() ?: null;
+
+        $stmt = $db->prepare("
+            INSERT INTO rules_ai_corrections (conversation_id, qa_log_id, severity, correction, assumptions, model)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([$conversationId, $qaId, $severity, $correctionNote, $assumptions, 'claude-haiku-4-5-20251001']);
+
+        return json_encode(['logged' => true, 'correction_id' => (int)$db->lastInsertId(), 'qa_log_id' => $qaId]);
+    }
+
     return json_encode(['error' => "Unknown tool: $name"]);
 }
 
@@ -765,10 +879,4 @@ if ($newTitle) {
     $db->prepare("UPDATE rules_conversations SET title = ? WHERE id = ? AND title IS NULL")->execute([$newTitle, $conversationId]);
 }
 
-sendJSON([
-    'conversation_id' => $conversationId,
-    'message_id'      => $messageId,
-    'qa_log_id'       => isset($qaStmt) ? (int)$db->lastInsertId() : null,
-    'response'        => $assistantContent,
-    'pending_pattern' => $pendingPattern,
-]);
+// Response already sent to client via early return — processing complete.

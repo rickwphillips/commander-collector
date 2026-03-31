@@ -1086,9 +1086,9 @@ function ScanDeckPageInner() {
                     <Typography variant="caption" noWrap display="block" title={card.card_name}>
                       {card.card_name}
                     </Typography>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" mt={0.5}>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', mt: 0.5, gap: 0.25 }}>
                       {/* Quantity */}
-                      <Stack direction="row" alignItems="center" spacing={0.5}>
+                      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0 }}>
                         <IconButton size="small" onClick={() => changeQuantity(card.id, -1)}>
                           <Typography variant="caption" lineHeight={1}>−</Typography>
                         </IconButton>
@@ -1098,7 +1098,7 @@ function ScanDeckPageInner() {
                         </IconButton>
                       </Stack>
                       {/* Actions */}
-                      <Stack direction="row">
+                      <Stack direction="row" sx={{ flexWrap: 'wrap' }}>
                         <IconButton
                           size="small"
                           title={card.is_proxy ? 'Mark as real' : 'Mark as proxy'}
@@ -1136,7 +1136,7 @@ function ScanDeckPageInner() {
                           <DeleteIcon fontSize="inherit" />
                         </IconButton>
                       </Stack>
-                    </Stack>
+                    </Box>
                   </CardContent>
                 </Card>
               </Grid>

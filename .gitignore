@@ -16,3 +16,6 @@ tsconfig.tsbuildinfo
 # Local env
 .env.local
 .env*.local
+
+# Synced pattern files (source of truth is mtg-rules repo)
+apps/core/app/php-api/rules/p[0-9]*.md

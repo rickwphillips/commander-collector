@@ -1,4 +1,4 @@
-import type { ActiveGameContext, ChatResponse, RulesConversation, RulesMessage, RulesPattern } from './types';
+import type { ActiveGameContext, ChatResponse, ChatProcessingResponse, ChatPollResponse, RulesConversation, RulesMessage, RulesPattern } from './types';
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ||
@@ -78,19 +78,36 @@ export const rulesApi = {
       body: JSON.stringify(payload),
     }),
 
-  // Chat — long timeout to match PHP set_time_limit(300)
-  sendMessage: (payload: {
+  // Chat — async: POST returns immediately with user_message_id, then poll for result
+  sendMessage: async (payload: {
     message: string;
     conversation_id?: number;
     new_conversation_title?: string;
     game_context?: ActiveGameContext | null;
-  }) => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 300_000);
-    return apiFetch<ChatResponse>('/rules/chat.php', {
+  }): Promise<ChatResponse> => {
+    // Step 1: submit — returns { status: 'processing', conversation_id, user_message_id }
+    const submit = await apiFetch<ChatProcessingResponse>('/rules/chat.php', {
       method: 'POST',
       body: JSON.stringify(payload),
-      signal: controller.signal,
-    }).finally(() => clearTimeout(timer));
+    });
+
+    // Step 2: poll until assistant response is ready (max ~5 min)
+    const maxAttempts = 100; // 100 × 3s = 5 min
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      const poll = await apiFetch<ChatPollResponse>(
+        `/rules/chat.php?poll=${submit.user_message_id}`
+      );
+      if (poll.status === 'complete') {
+        return {
+          conversation_id: poll.conversation_id!,
+          message_id: poll.message_id!,
+          qa_log_id: poll.qa_log_id ?? null,
+          response: poll.response!,
+          pending_pattern: poll.pending_pattern ?? null,
+        };
+      }
+    }
+    throw new Error('Chat response timed out');
   },
 };

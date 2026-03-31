@@ -37,7 +37,7 @@ export function GameEndSummary({
     players.map(() => '')
   );
   const [eliminatedTurns, setEliminatedTurns] = useState<(number | '')[]>(
-    players.map((p) => (p.eliminatedTurn ?? ''))
+    players.map((p) => (p.eliminatedTurn ?? turnNumber))
   );
 
   const handleLogGame = () => {

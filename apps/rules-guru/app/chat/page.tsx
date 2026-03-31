@@ -163,28 +163,80 @@ export default function ChatPage() {
   const [flaggedIndices, setFlaggedIndices] = useState<Set<number>>(new Set());
 
   const [thinkingText, setThinkingText] = useState('Consulting the rules…');
+  const thinkingRef = useRef<HTMLSpanElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const retryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const THINKING_MESSAGES = [
-    'Consulting the rules...',
-    'Checking the Comprehensive Rules...',
-    'Resolving triggered abilities...',
-    'Checking state-based actions...',
-    'Passing priority...',
-    'Searching the pattern library...',
-    'Cross-referencing CR 117...',
-    'Untapping, upkeep, draw...',
-    'Looking up Oracle text...',
-    'Verifying with Gatherer rulings...',
-    'Checking the stack...',
-    'Declaring attackers...',
+    // Core rules flow
+    'Consulting the Comprehensive Rules…',
+    'Checking state-based actions (CR 704)…',
+    'Resolving triggered abilities…',
+    'Passing priority around the table…',
+    'Searching the pattern library…',
+    'Looking up Oracle text…',
+    'Verifying with Gatherer rulings…',
+    'Untap, upkeep, draw…',
+    // Stack & priority
+    'Checking the stack for responses…',
+    'Holding priority (CR 117.3c)…',
+    'Resolving top of stack…',
+    'Checking for split second (CR 702.61)…',
+    'Determining APNAP order (CR 101.4)…',
+    // Combat
+    'Declaring attackers (CR 508)…',
+    'Assigning combat damage (CR 510)…',
+    'Checking first strike damage step…',
+    'Evaluating trample assignment (CR 702.19)…',
+    'Processing combat triggers…',
+    // Layers & continuous effects
+    'Applying layer 7 — P/T effects (CR 613.4)…',
+    'Resolving dependency in layers (CR 613.8)…',
+    'Checking timestamps on continuous effects…',
+    'Evaluating characteristic-defining abilities…',
+    // Casting & costs
+    'Checking casting restrictions (CR 601)…',
+    'Calculating total cost after modifications…',
+    'Verifying alternative cost legality…',
+    'Checking X value determination (CR 107.3)…',
+    // Zones & movement
+    'Tracking zone changes (CR 400.7)…',
+    'Checking replacement effects on entry…',
+    'Verifying last-known information (CR 113.7a)…',
+    'Checking if tokens cease to exist (CR 111.8)…',
+    // Commander-specific
+    'Checking commander tax (CR 903.8)…',
+    'Tracking commander damage (CR 903.10a)…',
+    'Evaluating color identity (CR 903.4)…',
+    'Checking command zone replacement (CR 903.9a)…',
+    // Keywords & abilities
+    'Resolving ward trigger (CR 702.21)…',
+    'Checking protection scope (CR 702.16)…',
+    'Evaluating hexproof limitations…',
+    'Verifying indestructible vs. sacrifice…',
+    'Checking deathtouch assignment (CR 702.2)…',
+    // Copies & tokens
+    'Determining copiable values (CR 707.2)…',
+    'Checking copy of a copy chain…',
+    'Evaluating token characteristics…',
+    // Misc rules deep cuts
+    'Reviewing the golden rules (CR 101.1)…',
+    'Checking "as though" permissions (CR 609.4)…',
+    'Verifying mana abilities (CR 605)…',
+    'Checking for applicable replacement effects…',
+    'Evaluating intervening if clause…',
+    'Determining timestamp order…',
+    'Cross-referencing interaction patterns…',
+    'Reviewing relevant errata and rulings…',
+    'Scanning Scryfall for card data…',
+    'Checking modal spell restrictions (CR 700.2)…',
+    'Verifying target legality on resolution…',
   ];
 
   useEffect(() => {
     if (!loading) {
-      setThinkingText('');
+      if (thinkingRef.current) thinkingRef.current.textContent = '';
       return;
     }
 
@@ -193,38 +245,47 @@ export default function ChatPage() {
     let charIdx = 0;
     type Phase = 'typing' | 'hold' | 'erasing' | 'gap';
     let phase: Phase = 'typing';
-    let tid: ReturnType<typeof setTimeout>;
+    let raf: number;
+    let phaseStart = 0;
+    const TYPE_SPEED = 0.04;    // chars per ms
+    const ERASE_SPEED = 0.06;   // chars per ms
+    const HOLD_TIME = 2500;
+    const GAP_TIME = 200;
 
-    setThinkingText('');
-
-    function tick() {
+    function tick(now: number) {
       if (cancelled) return;
+      const el = thinkingRef.current;
+      if (!el) { raf = requestAnimationFrame(tick); return; }
       const msg = THINKING_MESSAGES[msgIdx];
+      const elapsed = now - phaseStart;
+
       if (phase === 'typing') {
-        charIdx++;
-        setThinkingText(msg.slice(0, charIdx));
-        if (charIdx >= msg.length) { phase = 'hold'; tid = setTimeout(tick, 1000); return; }
-        tid = setTimeout(tick, 95);
+        charIdx = Math.min(Math.floor(elapsed * TYPE_SPEED), msg.length);
+        el.textContent = msg.slice(0, charIdx);
+        if (charIdx >= msg.length) { phase = 'hold'; phaseStart = now; }
       } else if (phase === 'hold') {
-        phase = 'erasing';
-        tid = setTimeout(tick, 55);
+        if (elapsed >= HOLD_TIME) { phase = 'erasing'; phaseStart = now; }
       } else if (phase === 'erasing') {
-        charIdx--;
-        setThinkingText(msg.slice(0, charIdx));
-        if (charIdx <= 0) { phase = 'gap'; tid = setTimeout(tick, 500); }
-        else { tid = setTimeout(tick, 55); }
+        const erased = Math.floor(elapsed * ERASE_SPEED);
+        charIdx = Math.max(msg.length - erased, 0);
+        el.textContent = msg.slice(0, charIdx);
+        if (charIdx <= 0) { phase = 'gap'; phaseStart = now; }
       } else {
-        let next = Math.floor(Math.random() * THINKING_MESSAGES.length);
-        if (next === msgIdx) next = (next + 1) % THINKING_MESSAGES.length;
-        msgIdx = next;
-        charIdx = 0;
-        phase = 'typing';
-        tid = setTimeout(tick, 30);
+        if (elapsed >= GAP_TIME) {
+          let next = Math.floor(Math.random() * THINKING_MESSAGES.length);
+          if (next === msgIdx) next = (next + 1) % THINKING_MESSAGES.length;
+          msgIdx = next;
+          charIdx = 0;
+          phase = 'typing';
+          phaseStart = now;
+        }
       }
+
+      raf = requestAnimationFrame(tick);
     }
 
-    tid = setTimeout(tick, 30);
-    return () => { cancelled = true; clearTimeout(tid); };
+    raf = requestAnimationFrame((now) => { phaseStart = now; tick(now); });
+    return () => { cancelled = true; cancelAnimationFrame(raf); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
@@ -1034,7 +1095,7 @@ export default function ChatPage() {
                     color="text.secondary"
                     sx={{ minWidth: 220, fontFamily: 'monospace', fontSize: '0.8rem' }}
                   >
-                    {thinkingText}
+                    <span ref={thinkingRef} />
                     <Box
                       component="span"
                       sx={{

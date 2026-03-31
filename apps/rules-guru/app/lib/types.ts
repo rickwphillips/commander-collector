@@ -56,3 +56,18 @@ export interface ChatResponse {
   response: string;
   pending_pattern: RulesPattern | null;
 }
+
+export interface ChatProcessingResponse {
+  status: 'processing';
+  conversation_id: number;
+  user_message_id: number;
+}
+
+export interface ChatPollResponse {
+  status: 'processing' | 'complete';
+  conversation_id?: number;
+  message_id?: number;
+  qa_log_id?: number | null;
+  response?: string;
+  pending_pattern?: RulesPattern | null;
+}

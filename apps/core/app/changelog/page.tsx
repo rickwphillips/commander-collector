@@ -38,6 +38,20 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '3.9.0',
+    date: '2026-03-31',
+    title: 'Rules Guru AI Self-Correction & Migration Audit System',
+    changes: [
+      { type: 'added', text: 'Rules Guru AI can now self-log mistakes with severity, correction details, and unchecked assumptions' },
+      { type: 'added', text: 'Deploy script audits all migration files and applies any that were missed, regardless of version naming' },
+      { type: 'improved', text: 'Rules Guru chat uses async processing with polling to prevent timeout on long responses' },
+      { type: 'improved', text: 'Thinking/flavor messages expanded to 55 unique entries with smoother typewriter animation' },
+      { type: 'fixed', text: 'Rules Guru chat no longer receives game context when no active game exists' },
+      { type: 'fixed', text: 'Deck edit card action buttons no longer overflow on mobile' },
+      { type: 'changed', text: 'Pattern files moved out of web-accessible PHP directory to secure server location' },
+    ],
+  },
+  {
     version: '3.8.0',
     date: '2026-03-30',
     title: 'Commander Damage Dealt Indicator & Snapshot Panel Improvements',
@@ -46,6 +60,9 @@ const releases: Release[] = [
       { type: 'improved', text: 'Snapshot overlay panel now scrollable when content overflows' },
       { type: 'changed', text: 'Removed commander art image from snapshot overlay header for cleaner layout' },
       { type: 'improved', text: 'Larger close button on snapshot overlay panel' },
+      { type: 'fixed', text: 'QR codes and seat codes now persist across page refreshes' },
+      { type: 'fixed', text: 'Settings load no longer overwrites live session data' },
+      { type: 'improved', text: 'Plus menu scrolls when items overflow the player panel' },
     ],
   },
   {

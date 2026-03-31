@@ -1,20 +1,21 @@
 <?php
 require_once dirname(__DIR__) . '/config.php';
 require_once dirname(__DIR__) . '/auth/middleware.php';
-requireAuth();
+$user = requireAuth();
+$userId = $user['sub'] ?? null;
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     sendError('Method not allowed', 405);
 }
-
 $db = getDB();
 
-// Find the most recent active live session
-$stmt = $db->query("
+// Find the current user's active live session
+$stmt = $db->prepare("
     SELECT state FROM live_game_sessions
-    WHERE is_active = 1 AND expires_at > NOW()
+    WHERE user_id = ? AND is_active = 1 AND expires_at > NOW()
     ORDER BY id DESC LIMIT 1
 ");
+$stmt->execute([$userId]);
 $session = $stmt->fetch();
 
 if (!$session) {

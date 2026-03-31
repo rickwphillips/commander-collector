@@ -17,6 +17,16 @@ require_once $phpApiDir . '/config.php';
 
 $dryRun = in_array('--dry-run', $argv ?? []);
 
+// Allow --source <dir> to read patterns from a different directory
+$sourceDir = null;
+$args = $argv ?? [];
+for ($i = 0; $i < count($args); $i++) {
+    if ($args[$i] === '--source' && isset($args[$i + 1])) {
+        $sourceDir = $args[$i + 1];
+        break;
+    }
+}
+
 function parseFrontmatter(string $content): array {
     if (!str_starts_with($content, '---')) {
         return ['meta' => [], 'body' => $content];
@@ -38,7 +48,7 @@ function parseFrontmatter(string $content): array {
     return ['meta' => $meta, 'body' => $body];
 }
 
-$dir   = __DIR__;
+$dir   = $sourceDir ?? __DIR__;
 $files = glob($dir . '/p[0-9][0-9][0-9]*.md');
 sort($files);
 

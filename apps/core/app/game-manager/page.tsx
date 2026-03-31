@@ -118,7 +118,7 @@ export default function GameManagerPage() {
             loadedGame = {
               ...res.state,
               sessionCode: res.session_code,
-              sessionSeats: null
+              sessionSeats: res.session_seats ?? null
             };
           } else {
             // Bad state or ended game — delete corrupted session
@@ -301,6 +301,21 @@ export default function GameManagerPage() {
     );
   }
 
-  // All else fails: show setup form (covers bad state, ended games, new games)
+  // Show end game summary when game has ended and a turn was actually played
+  if (state.phase === 'ended' && state.players.length > 0 && state.firstPlayerIdx != null) {
+    return (
+      <GameEndSummary
+        players={state.players}
+        turnNumber={state.turnNumber}
+        startingLife={state.startingLife}
+        commanderDamage={state.commanderDamage}
+        onLogGame={handleLogGame}
+        onNewGame={() => setState(DEFAULT_STATE)}
+        onDiscard={() => setState(DEFAULT_STATE)}
+      />
+    );
+  }
+
+  // All else: show setup form (covers bad state, new games)
   return <GameSetup onStart={handleStart} prefillPlayers={setupPrefill ?? undefined} />;
 }
