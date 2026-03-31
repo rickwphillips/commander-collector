@@ -38,6 +38,15 @@ const changeTypeConfig: Record<
 
 const releases: Release[] = [
   {
+    version: '3.9.1',
+    date: '2026-03-31',
+    title: 'Card Name Tooltips in Rules Guru Chat',
+    changes: [
+      { type: 'improved', text: 'Card names in Rules Guru chat responses now show image previews on hover' },
+      { type: 'changed', text: 'AI instructed to bold card names for consistent tooltip rendering' },
+    ],
+  },
+  {
     version: '3.9.0',
     date: '2026-03-31',
     title: 'Rules Guru AI Self-Correction & Migration Audit System',

@@ -107,7 +107,8 @@ function parseCardManifest(content: string): { cleaned: string; cards: string[] 
   const cards = bracketMatches
     ? bracketMatches.map(s => s.replace(/^\[\[|\]\]$/g, '').trim()).filter(Boolean)
     : match[1].split(',').map(s => s.trim()).filter(Boolean);
-  const cleaned = content.replace(/\nCARDS:\s*.+$/m, '').trimEnd();
+  // Convert [[Card Name]] to **Card Name** so mdComponents.strong wraps them with CardTooltip
+  const cleaned = content.replace(/\nCARDS:\s*.+$/m, '').replace(/\[\[([^\]]+)\]\]/g, '**$1**').trimEnd();
   return { cleaned, cards };
 }
 
