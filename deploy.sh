@@ -250,6 +250,36 @@ if [ "$STATIC_ONLY" = false ] && [ "$DECKS_ONLY" = false ] && [ "$GURU_ONLY" = f
   echo "═══════════════════════════════════════════"
   ssh "$REMOTE_HOST" "php ${REMOTE_PHP}rules/seed.php --source ~/rules-data"
   echo ""
+
+  echo "═══════════════════════════════════════════"
+  echo "  Syncing changelog to prod DB..."
+  echo "═══════════════════════════════════════════"
+
+  # Generate changelog SQL from local DB (INSERT IGNORE = safe to re-run)
+  CHANGELOG_SQL=$(mysql -u root commander_collector -sNe "
+    SELECT CONCAT(
+      'INSERT IGNORE INTO changelog_releases (version, date, title, sort_order) VALUES (',
+      QUOTE(version), ', ', QUOTE(date), ', ', QUOTE(title), ', ', sort_order, ');'
+    ) FROM changelog_releases ORDER BY id;
+  " && mysql -u root commander_collector -sNe "
+    SELECT CONCAT(
+      'INSERT IGNORE INTO changelog_changes (release_id, type, text, sort_order) ',
+      'SELECT id, ', QUOTE(cc.type), ', ', QUOTE(cc.text), ', ', cc.sort_order,
+      ' FROM changelog_releases WHERE version = ', QUOTE(cr.version), ';'
+    )
+    FROM changelog_changes cc
+    JOIN changelog_releases cr ON cc.release_id = cr.id
+    ORDER BY cr.id, cc.sort_order;
+  ")
+
+  if [ -z "$CHANGELOG_SQL" ]; then
+    echo "  No local changelog data found — skipping."
+  else
+    echo "$CHANGELOG_SQL" | ssh "$REMOTE_HOST" \
+      "mysql -h localhost \$(php -r \"include getenv('HOME').'/auth_secrets.php'; echo '-u '.DB_USER.' -p'.DB_PASS.' '.DB_NAME;\")"
+    echo "  Changelog sync complete."
+  fi
+  echo ""
 fi
 
 # ── Step 5: Restore .htaccess files (ALWAYS — lftp mirror excludes dotfiles) ──
