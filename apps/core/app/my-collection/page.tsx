@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   Box,
+  Button,
+  Tooltip,
   Grid,
   Card,
   CardContent,
@@ -22,12 +24,15 @@ import {
   Collapse,
   IconButton,
   CircularProgress,
+  Snackbar,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import WhatshotIcon from '@mui/icons-material/Whatshot';
 import AcUnitIcon from '@mui/icons-material/AcUnit';
@@ -35,21 +40,36 @@ import { PageContainer } from '@/components/PageContainer';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ColorIdentityChips } from '@/components/ColorIdentityChips';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
-import { getTypeCategory, TYPE_CATEGORIES } from '@/components/DeckFilters';
+import { CardListDisplay } from '@/components/CardListDisplay';
+import type { CardListEntry } from '@/components/CardListDisplay';
 import { api } from '@/lib/api';
 import type { MyCollectionResponse } from '@/lib/types';
 import { CoachChat, COACH_DRAWER_WIDTH } from './CoachChat';
-import type { CoachChatHandle } from './CoachChat';
+import type { CoachChatHandle, ActiveListContext } from './CoachChat';
 
 export default function MyCollectionPage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [data, setData] = useState<MyCollectionResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [coachOpen, setCoachOpen] = useState(false);
   const [expandedDeckId, setExpandedDeckId] = useState<number | null>(null);
+  const [expandedListId, setExpandedListId] = useState<number | null>(null);
+  const [refreshed, setRefreshed] = useState(false);
   const coachRef = useRef<CoachChatHandle>(null);
+
+  // Collapse other section when one expands
+  const handleDeckToggle = useCallback((id: number | null) => {
+    setExpandedDeckId(id);
+    if (id !== null) setExpandedListId(null);
+  }, []);
+
+  const handleListToggle = useCallback((id: number | null) => {
+    setExpandedListId(id);
+    if (id !== null) setExpandedDeckId(null);
+  }, []);
 
   const handleCardClick = useCallback((name: string) => {
     if (coachOpen && coachRef.current) {
@@ -57,6 +77,7 @@ export default function MyCollectionPage() {
     }
   }, [coachOpen]);
 
+  // Initial load — uses loading state (triggers early-return spinner)
   useEffect(() => {
     api
       .getMyCollection()
@@ -64,6 +85,20 @@ export default function MyCollectionPage() {
       .catch(() => setError('Failed to load your collection data.'))
       .finally(() => setLoading(false));
   }, []);
+
+  // Refresh — only updates decks and lists so the coach is not disrupted
+  const handleRefresh = useCallback(() => {
+    if (refreshing) return;
+    setRefreshing(true);
+    api
+      .getMyCollection()
+      .then((fresh) => {
+        setData((prev) => prev ? { ...prev, decks: fresh.decks, lists: fresh.lists } : fresh);
+        setRefreshed(true);
+      })
+      .catch(() => setError('Failed to refresh decks and lists.'))
+      .finally(() => setRefreshing(false));
+  }, [refreshing]);
 
   // Content push style for persistent drawer on desktop
   const contentSx = {
@@ -121,7 +156,17 @@ export default function MyCollectionPage() {
 
   return (
     <Box sx={contentSx}>
-    <PageContainer title="My Collection" subtitle={`${data.player.name}'s personal command post`}>
+    <PageContainer
+      title="My Collection"
+      subtitle={`${data.player.name}'s personal command post`}
+      actions={
+        <Tooltip title="Refresh decks and lists">
+          <IconButton size="small" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshIcon fontSize="small" sx={{ transition: 'transform 0.6s', transform: refreshing ? 'rotate(360deg)' : 'none' }} />
+          </IconButton>
+        </Tooltip>
+      }
+    >
       {/* Summary Cards */}
       {summary && (
         <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -182,7 +227,47 @@ export default function MyCollectionPage() {
                 </TableHead>
                 <TableBody>
                   {decks.map((d) => (
-                    <DeckRow key={d.id} deck={d} expanded={expandedDeckId === d.id} onToggle={setExpandedDeckId} onCardClick={handleCardClick} coachRef={coachRef} />
+                    <DeckRow key={d.id} deck={d} expanded={expandedDeckId === d.id} onToggle={handleDeckToggle} onCardClick={handleCardClick} coachRef={coachRef} />
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </AccordionDetails>
+      </Accordion>
+
+      {/* My Lists */}
+      <Accordion>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            My Lists
+          </Typography>
+          <Chip label={lists.length} size="small" sx={{ ml: 1 }} />
+        </AccordionSummary>
+        <AccordionDetails>
+          {lists.length === 0 ? (
+            <Typography color="text.secondary">No card lists yet.</Typography>
+          ) : (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ width: 40 }} />
+                    <TableCell>Name</TableCell>
+                    <TableCell align="right">Cards</TableCell>
+                    <TableCell align="right">Updated</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {lists.map((l) => (
+                    <ListRow
+                      key={l.id}
+                      list={l}
+                      expanded={expandedListId === l.id}
+                      onToggle={handleListToggle}
+                      onCardClick={handleCardClick}
+                      coachRef={coachRef}
+                    />
                   ))}
                 </TableBody>
               </Table>
@@ -295,51 +380,6 @@ export default function MyCollectionPage() {
                 );
               })}
             </Stack>
-          )}
-        </AccordionDetails>
-      </Accordion>
-
-      {/* My Lists */}
-      <Accordion>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            My Lists
-          </Typography>
-          <Chip label={lists.length} size="small" sx={{ ml: 1 }} />
-        </AccordionSummary>
-        <AccordionDetails>
-          {lists.length === 0 ? (
-            <Typography color="text.secondary">No card lists yet.</Typography>
-          ) : (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell align="right">Size</TableCell>
-                    <TableCell align="right">Updated</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {lists.map((l) => (
-                    <TableRow
-                      key={l.id}
-                      onClick={() => window.open(`/lists/detail?id=${l.id}`, '_blank')}
-                      sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
-                    >
-                      <TableCell>{l.name}</TableCell>
-                      <TableCell align="right">{l.card_count}</TableCell>
-                      <TableCell align="right">
-                        <Chip label={`${l.card_count} cards`} size="small" variant="outlined" />
-                      </TableCell>
-                      <TableCell align="right">
-                        {new Date(l.updated_at).toLocaleDateString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
           )}
         </AccordionDetails>
       </Accordion>
@@ -515,6 +555,14 @@ export default function MyCollectionPage() {
 
       {/* Coach Chat — side drawer with FAB toggle */}
       <CoachChat ref={coachRef} notes={coachNotes} open={coachOpen} onToggle={setCoachOpen} />
+
+      <Snackbar
+        open={refreshed}
+        autoHideDuration={2500}
+        onClose={() => setRefreshed(false)}
+        message="Decks and lists refreshed"
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
     </PageContainer>
     </Box>
   );
@@ -556,42 +604,6 @@ function WinRateChip({ rate, games }: { rate: number | null; games: number }) {
   return <Chip label={`${rate}%`} size="small" color={color} variant="outlined" />;
 }
 
-function buildDeckContextString(profile: import('@/lib/types').DeckProfile): string {
-  const { deck, cards, stats, matchups, recentGames, finishDistribution } = profile;
-  const lines: string[] = [];
-
-  const losses = stats.total_games - stats.wins;
-  lines.push(`Commander: ${deck.commander} | Colors: ${deck.colors}`);
-  lines.push(`Record: ${stats.total_games} games, ${stats.wins}W-${losses}L (${stats.win_rate ?? 0}%) | Avg Finish: ${stats.avg_finish ?? '-'}`);
-  if (stats.first_played) lines.push(`Active: ${stats.first_played} to ${stats.last_played}`);
-
-  if (finishDistribution.length > 0) {
-    lines.push(`Finish distribution: ${finishDistribution.map((f) => `${f.finish_position}${f.finish_position === 1 ? 'st' : f.finish_position === 2 ? 'nd' : f.finish_position === 3 ? 'rd' : 'th'}: ${f.count}`).join(', ')}`);
-  }
-
-  if (matchups.length > 0) {
-    lines.push('');
-    lines.push('Matchups vs commanders:');
-    for (const m of matchups) {
-      lines.push(`  vs ${m.opponent_commander}: ${m.games}g, ${m.my_wins}W-${m.their_wins}L`);
-    }
-  }
-
-  if (recentGames.length > 0) {
-    lines.push('');
-    lines.push('Recent results:');
-    for (const g of recentGames) {
-      const result = g.finish_position === 1 ? 'WIN' : `#${g.finish_position}`;
-      lines.push(`  ${g.played_at}: ${result} (${g.pod_size}p${g.winning_turn ? `, T${g.winning_turn}` : ''})`);
-    }
-  }
-
-  lines.push('');
-  lines.push(`Cards (${cards.length}):`);
-  lines.push(cards.map((c) => `${c.quantity}x ${c.card_name}${c.is_commander ? ' (commander)' : ''}`).join(', '));
-
-  return lines.join('\n');
-}
 
 function DeckRow({
   deck,
@@ -626,10 +638,11 @@ function DeckRow({
           deckId: deck.id,
           deckName: deck.name,
           cardCount: fetched.cards.length,
-          contextString: buildDeckContextString(fetched),
+          commander: deck.commander,
+          colors: deck.colors,
         });
       } catch {
-        setProfile({ deck: { id: deck.id, name: deck.name, commander: deck.commander, colors: deck.colors, player_name: '' }, cards: [], stats: { total_games: 0, wins: 0, win_rate: null, avg_finish: null, first_played: null, last_played: null }, matchups: [], recentGames: [], finishDistribution: [] });
+        setProfile({ cards: [] });
       } finally {
         setLoadingCards(false);
       }
@@ -638,7 +651,8 @@ function DeckRow({
         deckId: deck.id,
         deckName: deck.name,
         cardCount: profile.cards.length,
-        contextString: buildDeckContextString(profile),
+        commander: deck.commander,
+        colors: deck.colors,
       });
     }
   };
@@ -647,16 +661,17 @@ function DeckRow({
 
   return (
     <>
-      <TableRow sx={{ '& > *': { borderBottom: expanded ? 'unset' : undefined } }}>
+      <TableRow
+        onClick={deck.card_count > 0 ? handleToggle : undefined}
+        sx={{ '& > *': { borderBottom: expanded ? 'unset' : undefined }, cursor: deck.card_count > 0 ? 'pointer' : 'default', '&:hover': { bgcolor: deck.card_count > 0 ? 'action.hover' : undefined } }}
+      >
         <TableCell sx={{ p: 0.5 }}>
           {deck.card_count > 0 && (
-            <IconButton size="small" onClick={handleToggle}>
-              {expanded ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
-            </IconButton>
+            <KeyboardArrowRightIcon fontSize="small" sx={{ display: 'block', color: 'text.secondary', transform: expanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
           )}
         </TableCell>
         <TableCell>{deck.name}</TableCell>
-        <TableCell>
+        <TableCell onClick={(e) => e.stopPropagation()}>
           <CardTooltip name={deck.commander} onClick={onCardClick}><span>{deck.commander}</span></CardTooltip>
         </TableCell>
         <TableCell align="center">
@@ -675,13 +690,27 @@ function DeckRow({
               rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }}>
               <Box sx={{ py: 1, pl: 2 }}>
+                <Box sx={{ mb: 1 }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    endIcon={<OpenInNewIcon fontSize="inherit" />}
+                    href={`/decks/decklist?id=${deck.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    component="a"
+                    sx={{ fontSize: '0.7rem', py: 0.25, px: 1 }}
+                  >
+                    Edit Deck
+                  </Button>
+                </Box>
                 {loadingCards ? (
                   <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 1 }}>
                     <CircularProgress size={14} />
                     <Typography variant="caption" color="text.secondary">Loading deck profile...</Typography>
                   </Stack>
                 ) : cards && cards.length > 0 ? (
-                  <DeckCardList cards={cards} onCardClick={onCardClick} />
+                  <CardListDisplay cards={cards} onCardClick={onCardClick} />
                 ) : (
                   <Typography variant="caption" color="text.secondary">No cards loaded.</Typography>
                 )}
@@ -694,80 +723,101 @@ function DeckRow({
   );
 }
 
-type ProfileCard = import('@/lib/types').DeckProfile['cards'][number];
+// CardListEntry (from CardListDisplay) is the shared shape for both DeckRow and ListRow
+type ExpandableCard = CardListEntry;
 
-function DeckCardList({ cards, onCardClick }: { cards: ProfileCard[]; onCardClick: (name: string) => void }) {
-  const { commanders, groups } = useMemo(() => {
-    const cmdr: ProfileCard[] = [];
-    const map: Record<string, ProfileCard[]> = {};
-    for (const c of cards) {
-      if (c.is_commander) { cmdr.push(c); continue; }
-      const cat = getTypeCategory(c.type_line);
-      if (!map[cat]) map[cat] = [];
-      map[cat].push(c);
-    }
-    const order = [...TYPE_CATEGORIES, 'Other'] as string[];
-    return {
-      commanders: cmdr,
-      groups: order.filter((t) => map[t]?.length).map((t) => ({ type: t, cards: map[t] })),
-    };
-  }, [cards]);
+function ListRow({
+  list,
+  expanded,
+  onToggle,
+  onCardClick,
+  coachRef,
+}: {
+  list: import('@/lib/types').CollectionList;
+  expanded: boolean;
+  onToggle: (id: number | null) => void;
+  onCardClick: (name: string) => void;
+  coachRef: React.RefObject<CoachChatHandle | null>;
+}) {
+  const [cards, setCards] = useState<ExpandableCard[] | null>(null);
+  const [loadingCards, setLoadingCards] = useState(false);
+  const rowRef = useRef<HTMLTableRowElement>(null);
 
-  const CardLine = ({ c, isCommander }: { c: ProfileCard; isCommander?: boolean }) => (
-    <Box sx={{ lineHeight: 1.6 }}>
-      {c.quantity > 1 && <Typography variant="caption" component="span">{c.quantity}x </Typography>}
-      <CardTooltip name={c.card_name} onClick={onCardClick}>
-        <Typography
-          variant="caption"
-          component="span"
-          sx={{
-            borderBottom: '1px dotted',
-            borderColor: 'text.disabled',
-            cursor: 'pointer',
-            fontWeight: isCommander ? 700 : 400,
-            color: isCommander ? 'warning.main' : 'text.primary',
-          }}
-        >
-          {c.card_name}
-        </Typography>
-      </CardTooltip>
-    </Box>
-  );
-
-  // Build all sections: commanders prepended to creatures
-  const sections = useMemo(() => {
-    const result: { type: string; cards: ProfileCard[]; isCommander?: boolean }[] = [];
-    if (commanders.length > 0) {
-      result.push({ type: 'Commander', cards: commanders, isCommander: true });
+  const handleToggle = async () => {
+    if (expanded) {
+      onToggle(null);
+      coachRef.current?.setActiveList(null);
+      return;
     }
-    for (const g of groups) {
-      result.push(g);
+    onToggle(list.id);
+    const ctx: ActiveListContext = { listId: list.id, listName: list.name, cardCount: list.card_count };
+    if (cards === null && list.card_count > 0) {
+      setLoadingCards(true);
+      try {
+        const detail = await api.getList(list.id);
+        setCards(detail.cards);
+        coachRef.current?.setActiveList({ ...ctx, cardCount: detail.cards.reduce((s, c) => s + c.quantity, 0) });
+      } catch {
+        setCards([]);
+      } finally {
+        setLoadingCards(false);
+      }
+    } else {
+      coachRef.current?.setActiveList(ctx);
     }
-    return result;
-  }, [commanders, groups]);
+  };
 
   return (
-    <Box sx={{ py: 1, columnCount: { xs: 2, sm: 3, md: 4 }, columnGap: 3 }}>
-      {sections.map(({ type, cards: group, isCommander }) => (
-        <Box key={type} sx={{ breakInside: 'avoid', mb: 1.5 }}>
-          <Typography
-            variant="caption"
-            sx={{
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: 0.5,
-              color: isCommander ? 'warning.main' : 'text.secondary',
-              display: 'block',
-              mb: 0.5,
-            }}
-          >
-            {type} ({group.reduce((s, c) => s + c.quantity, 0)})
-          </Typography>
-          {group.map((c, i) => (
-            <CardLine key={`${c.card_name}-${i}`} c={c} isCommander={isCommander} />
-          ))}
-        </Box>
-      ))}
-    </Box>
+    <>
+      <TableRow
+        onClick={list.card_count > 0 ? handleToggle : undefined}
+        sx={{ '& > *': { borderBottom: expanded ? 'unset' : undefined }, cursor: list.card_count > 0 ? 'pointer' : 'default', '&:hover': { bgcolor: list.card_count > 0 ? 'action.hover' : undefined } }}
+      >
+        <TableCell sx={{ p: 0.5 }}>
+          {list.card_count > 0 && (
+            <KeyboardArrowRightIcon fontSize="small" sx={{ display: 'block', color: 'text.secondary', transform: expanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
+          )}
+        </TableCell>
+        <TableCell>{list.name}</TableCell>
+        <TableCell align="right">{list.card_count}</TableCell>
+        <TableCell align="right">{new Date(list.updated_at).toLocaleDateString()}</TableCell>
+      </TableRow>
+      {list.card_count > 0 && (
+        <TableRow ref={rowRef}>
+          <TableCell sx={{ py: 0, borderBottom: expanded ? undefined : 'none' }} colSpan={4}>
+            <Collapse in={expanded} timeout="auto" unmountOnExit onEntered={() => {
+              rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }}>
+              <Box sx={{ py: 1, pl: 2 }}>
+                <Box sx={{ mb: 1 }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    endIcon={<OpenInNewIcon fontSize="inherit" />}
+                    href={`/lists/detail?id=${list.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    component="a"
+                    sx={{ fontSize: '0.7rem', py: 0.25, px: 1 }}
+                  >
+                    Edit List
+                  </Button>
+                </Box>
+                {loadingCards ? (
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 1 }}>
+                    <CircularProgress size={14} />
+                    <Typography variant="caption" color="text.secondary">Loading list...</Typography>
+                  </Stack>
+                ) : cards && cards.length > 0 ? (
+                  <CardListDisplay cards={cards} onCardClick={onCardClick} />
+                ) : (
+                  <Typography variant="caption" color="text.secondary">No cards in list.</Typography>
+                )}
+              </Box>
+            </Collapse>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
   );
 }

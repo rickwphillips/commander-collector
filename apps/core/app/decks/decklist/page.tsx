@@ -22,14 +22,38 @@ import {
   Typography,
 } from '@mui/material';
 import CallSplitIcon from '@mui/icons-material/CallSplit';
+import CancelIcon from '@mui/icons-material/Cancel';
 import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
 import { PageContainer } from '@/components/PageContainer';
 import { DeckBreakdown } from '@/components/DeckBreakdown';
-import { DeckFilters, EMPTY_FILTERS, TYPE_CATEGORIES, getTypeCategory, hasActiveFilters, matchesFilters } from '@/components/DeckFilters';
+import { DeckFilters, EMPTY_FILTERS, TYPE_CATEGORIES, getTypeCategory, hasActiveFilters, matchesFilters, sortCards } from '@/components/DeckFilters';
 import type { DeckFilterState, TypeCategory } from '@/components/DeckFilters';
+import { CardGridEditor } from '@/components/CardGridEditor';
+import type { EditableCard } from '@/components/CardGridEditor';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import { api } from '@/lib/api';
 import type { DeckDetail, DeckCard } from '@/lib/types';
+
+// ── Converter ─────────────────────────────────────────────────────────────────
+
+function deckCardToEditable(c: DeckCard): EditableCard {
+  return {
+    _key:           `${c.id ?? 'new'}-${Math.random().toString(36).slice(2)}`,
+    card_name:      c.card_name,
+    scryfall_id:    c.scryfall_id,
+    image_uri:      c.image_uri      ?? null,
+    back_image_uri: c.back_image_uri ?? null,
+    type_line:      c.type_line      ?? null,
+    mana_cost:      c.mana_cost      ?? null,
+    color_identity: c.color_identity ?? '',
+    quantity:       c.quantity,
+    is_commander:   !!c.is_commander,
+    is_proxy:       !!c.is_proxy,
+  };
+}
+
+// ── Gallery card (view mode) ──────────────────────────────────────────────────
 
 function GalleryCard({ card }: { card: DeckCard }) {
   const [flipped, setFlipped] = useState(false);
@@ -71,36 +95,31 @@ function GalleryCard({ card }: { card: DeckCard }) {
   );
 }
 
+// ── Main component ────────────────────────────────────────────────────────────
+
 function DecklistPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const deckId = Number(searchParams.get('id'));
 
-  const [deck, setDeck] = useState<DeckDetail | null>(null);
-  const [cards, setCards] = useState<DeckCard[]>([]);
+  const [deck, setDeck]     = useState<DeckDetail | null>(null);
+  const [cards, setCards]   = useState<DeckCard[]>([]);
   const [loading, setLoading] = useState(!!deckId);
-  const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState(0);
+  const [error, setError]   = useState<string | null>(null);
+  const [tab, setTab]       = useState(0);
   const [filters, setFilters] = useState<DeckFilterState>(EMPTY_FILTERS);
+
+  // ── Edit state ─────────────────────────────────────────────────────────────
+  const [editMode, setEditMode]     = useState(false);
+  const [draftCards, setDraftCards] = useState<EditableCard[]>([]);
+  const [saving, setSaving]         = useState(false);
 
   // Detach to List
   const [detachOpen, setDetachOpen] = useState(false);
   const [detachName, setDetachName] = useState('');
-  const [detaching, setDetaching] = useState(false);
+  const [detaching, setDetaching]   = useState(false);
 
-  const handleDetach = async () => {
-    if (!deck || !detachName.trim()) return;
-    setDetaching(true);
-    try {
-      const res = await api.detachDeckToList(deck.id, detachName.trim());
-      setCards([]);
-      setDetachOpen(false);
-      router.push(`/lists/detail?id=${res.list_id}`);
-    } catch {
-      setError('Failed to detach list');
-      setDetaching(false);
-    }
-  };
+  // ── Load ───────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!deckId) return;
@@ -120,18 +139,77 @@ function DecklistPageInner() {
     })();
   }, [deckId]);
 
-  // Gallery: expand by quantity, then filter
+  // ── Edit mode ──────────────────────────────────────────────────────────────
+
+  const handleEditStart = () => {
+    setDraftCards(cards.map(deckCardToEditable));
+    setEditMode(true);
+  };
+
+  const handleEditCancel = () => {
+    setEditMode(false);
+  };
+
+  const handleSave = async () => {
+    if (!deck) return;
+    setSaving(true);
+    try {
+      await api.saveDeckCards(deckId, draftCards.map(c => ({
+        card_name:    c.card_name,
+        scryfall_id:  c.scryfall_id,
+        quantity:     c.quantity,
+        is_commander: c.is_commander,
+        is_proxy:     c.is_proxy,
+      })));
+      // Sync commander name if it changed
+      const commanderCard = draftCards.find(c => c.is_commander);
+      if (commanderCard && commanderCard.card_name !== deck.commander) {
+        await api.updateDeck(deckId, { commander: commanderCard.card_name }).catch(() => {});
+      }
+      // Reload
+      const [freshDeck, freshCards] = await Promise.all([
+        api.getDeck(deckId),
+        api.getDeckCards(deckId),
+      ]);
+      setDeck(freshDeck);
+      setCards(freshCards);
+      setEditMode(false);
+    } catch {
+      setError('Failed to save deck cards');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Detach to list ─────────────────────────────────────────────────────────
+
+  const handleDetach = async () => {
+    if (!deck || !detachName.trim()) return;
+    setDetaching(true);
+    try {
+      const res = await api.detachDeckToList(deck.id, detachName.trim());
+      setCards([]);
+      setDetachOpen(false);
+      router.push(`/lists/detail?id=${res.list_id}`);
+    } catch {
+      setError('Failed to detach list');
+      setDetaching(false);
+    }
+  };
+
+  // ── View mode derived data ─────────────────────────────────────────────────
+
+  const commanderCard = useMemo(() => cards.find(c => c.is_commander), [cards]);
+
   const galleryCards = useMemo(() =>
     cards.flatMap(c => Array.from({ length: c.quantity }, (_, i) => ({ ...c, _key: `${c.id}-${i}` } as DeckCard & { _key: string }))),
     [cards]
   );
-  const cardsWithImages = useMemo(() => galleryCards.filter(c => c.image_uri), [galleryCards]);
+  const cardsWithImages    = useMemo(() => galleryCards.filter(c => c.image_uri), [galleryCards]);
   const cardsWithoutImages = useMemo(() => galleryCards.filter(c => !c.image_uri), [galleryCards]);
-
-  const filteredGallery = useMemo(() => cardsWithImages.filter(c => matchesFilters(c, filters)), [cardsWithImages, filters]);
-  const filteredBreakdown = useMemo(() => cards.filter(c => matchesFilters(c, filters)), [cards, filters]);
-
-  const active = hasActiveFilters(filters);
+  const filteredGallery    = useMemo(() => sortCards(cardsWithImages.filter(c => matchesFilters(c, filters)), filters.sortOrder, filters.sortDirection), [cardsWithImages, filters]);
+  const filteredBreakdown  = useMemo(() => sortCards(cards.filter(c => matchesFilters(c, filters)), filters.sortOrder, filters.sortDirection), [cards, filters]);
+  const active             = hasActiveFilters(filters);
 
   // Gallery grouped by type (only when filters active)
   const galleryByType = useMemo(() => {
@@ -145,6 +223,8 @@ function DecklistPageInner() {
     const order: (TypeCategory | 'Other')[] = [...TYPE_CATEGORIES, 'Other'];
     return order.filter(t => groups[t]?.length).map(t => ({ type: t, cards: groups[t]! }));
   }, [filteredGallery, active]);
+
+  // ── Guards ────────────────────────────────────────────────────────────────
 
   if (!deckId) {
     return (
@@ -168,33 +248,49 @@ function DecklistPageInner() {
     );
   }
 
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
     <PageContainer
-      title={deck.name}
-      subtitle={<>Commander: <CardTooltip name={deck.commander} style={{ borderBottom: '1px dotted currentColor' }}>{deck.commander}</CardTooltip></>}
+      title={editMode ? `Editing: ${deck.name}` : deck.name}
+      subtitle={editMode
+        ? undefined
+        : <>Commander: <CardTooltip name={deck.commander} style={{ borderBottom: '1px dotted currentColor' }}>{deck.commander}</CardTooltip></>
+      }
       backHref={`/decks/detail?id=${deckId}`}
       backLabel="Back to Deck"
       actions={
-        cards.length > 0 ? (
+        editMode ? (
           <Stack direction="row" spacing={1}>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<EditIcon />}
-              onClick={() => router.push(`/decks/scan?edit=${deckId}`)}
-            >
-              Edit Cards
+            <Button startIcon={<CancelIcon />} onClick={handleEditCancel} disabled={saving}>
+              Cancel
             </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<CallSplitIcon />}
-              onClick={() => { setDetachName(deck.name + ' List'); setDetachOpen(true); }}
-            >
-              Detach to List
+            <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving…' : 'Save'}
             </Button>
           </Stack>
-        ) : undefined
+        ) : (
+          cards.length > 0 ? (
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<EditIcon />}
+                onClick={handleEditStart}
+              >
+                Edit Cards
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<CallSplitIcon />}
+                onClick={() => { setDetachName(deck.name + ' List'); setDetachOpen(true); }}
+              >
+                Detach to List
+              </Button>
+            </Stack>
+          ) : undefined
+        )
       }
     >
       {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
@@ -224,76 +320,109 @@ function DecklistPageInner() {
         </DialogActions>
       </Dialog>
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
-        <Tab label="Breakdown" />
-        <Tab label={`Gallery (${cardsWithImages.length})`} />
-      </Tabs>
-
-      {/* Shared filter bar — persists across tabs */}
-      <DeckFilters
-        filters={filters}
-        onChange={setFilters}
-        cards={tab === 0 ? cards : cardsWithImages}
-        resultCount={tab === 0 ? filteredBreakdown.length : filteredGallery.length}
-        totalCount={tab === 0 ? cards.length : cardsWithImages.length}
-      />
-
-      {tab === 0 && (
-        <DeckBreakdown cards={active ? filteredBreakdown : cards} showList />
-      )}
-
-      {tab === 1 && (
+      {/* ── Edit Mode ──────────────────────────────────────────────────────── */}
+      {editMode ? (
+        <CardGridEditor cards={draftCards} onChange={setDraftCards} />
+      ) : (
+        /* ── View Mode ─────────────────────────────────────────────────────── */
         <>
-          {galleryByType ? (
-            galleryByType.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 4, textAlign: 'center' }}>
-                No cards match the current filters.
-              </Typography>
-            ) : (
-              <Stack spacing={3}>
-                {galleryByType.map(({ type, cards: group }) => (
-                  <Box key={type}>
-                    <Typography variant="subtitle2" color="text.secondary"
-                      sx={{ mb: 1, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: 1 }}>
-                      {type} ({group.length})
-                    </Typography>
-                    <Grid container spacing={1}>
-                      {group.map((card, i) => (
-                        <Grid key={`${card.card_name}-${i}`} size={{ xs: 4, sm: 3, md: 2 }}>
-                          <GalleryCard card={card} />
-                        </Grid>
-                      ))}
-                    </Grid>
-                  </Box>
-                ))}
-              </Stack>
-            )
-          ) : (
-            <Grid container spacing={1}>
-              {cardsWithImages.map((card, i) => (
-                <Grid key={`${card.card_name}-${i}`} size={{ xs: 4, sm: 3, md: 2 }}>
-                  <GalleryCard card={card} />
-                </Grid>
-              ))}
-            </Grid>
+          {/* Commander hero */}
+          {commanderCard?.image_uri && (
+            <Box sx={{ display: 'flex', flexDirection: 'row', gap: 3, mb: 3, alignItems: 'flex-start' }}>
+              <Box sx={{ flexShrink: 0, width: { xs: 90, sm: 110, md: 130 } }}>
+                <Box
+                  component="img"
+                  src={commanderCard.image_uri}
+                  alt={commanderCard.card_name}
+                  sx={{ width: '100%', borderRadius: 2, display: 'block', boxShadow: 4 }}
+                />
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="h5" fontWeight={700} sx={{ mb: 0.5 }}>
+                  {deck.name}
+                </Typography>
+                <Typography variant="body1" color="text.secondary">
+                  Commander:{' '}
+                  <CardTooltip name={deck.commander} style={{ borderBottom: '1px dotted currentColor' }}>
+                    {deck.commander}
+                  </CardTooltip>
+                </Typography>
+              </Box>
+            </Box>
           )}
 
-          {cardsWithoutImages.length > 0 && (
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                No image available ({cardsWithoutImages.length})
-              </Typography>
-              <Stack spacing={0.5}>
-                {cardsWithoutImages.map((card, i) => (
-                  <Typography key={`${card.card_name}-${i}`} variant="body2">
-                    {card.quantity > 1 ? `${card.quantity}× ` : ''}
-                    <CardTooltip name={card.card_name} style={{ borderBottom: '1px dotted currentColor' }}>
-                      {card.card_name}
-                    </CardTooltip>
+          <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+            <Tab label="Breakdown" />
+            <Tab label={`Gallery (${cardsWithImages.length})`} />
+          </Tabs>
+
+          {/* Shared filter bar */}
+          <DeckFilters
+            filters={filters}
+            onChange={setFilters}
+            cards={tab === 0 ? cards : cardsWithImages}
+            resultCount={tab === 0 ? filteredBreakdown.length : filteredGallery.length}
+            totalCount={tab === 0 ? cards.length : cardsWithImages.length}
+          />
+
+          {tab === 0 && (
+            <DeckBreakdown cards={active ? filteredBreakdown : cards} showList sortOrder={filters.sortOrder} sortDirection={filters.sortDirection} />
+          )}
+
+          {tab === 1 && (
+            <>
+              {galleryByType ? (
+                galleryByType.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 4, textAlign: 'center' }}>
+                    No cards match the current filters.
                   </Typography>
-                ))}
-              </Stack>
-            </Box>
+                ) : (
+                  <Stack spacing={3}>
+                    {galleryByType.map(({ type, cards: group }) => (
+                      <Box key={type}>
+                        <Typography variant="subtitle2" color="text.secondary"
+                          sx={{ mb: 1, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: 1 }}>
+                          {type} ({group.length})
+                        </Typography>
+                        <Grid container spacing={1}>
+                          {group.map((card, i) => (
+                            <Grid key={`${card.card_name}-${i}`} size={{ xs: 4, sm: 3, md: 2 }}>
+                              <GalleryCard card={card} />
+                            </Grid>
+                          ))}
+                        </Grid>
+                      </Box>
+                    ))}
+                  </Stack>
+                )
+              ) : (
+                <Grid container spacing={1}>
+                  {filteredGallery.map((card, i) => (
+                    <Grid key={`${card.card_name}-${i}`} size={{ xs: 4, sm: 3, md: 2 }}>
+                      <GalleryCard card={card} />
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
+
+              {cardsWithoutImages.length > 0 && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                    No image available ({cardsWithoutImages.length})
+                  </Typography>
+                  <Stack spacing={0.5}>
+                    {cardsWithoutImages.map((card, i) => (
+                      <Typography key={`${card.card_name}-${i}`} variant="body2">
+                        {card.quantity > 1 ? `${card.quantity}× ` : ''}
+                        <CardTooltip name={card.card_name} style={{ borderBottom: '1px dotted currentColor' }}>
+                          {card.card_name}
+                        </CardTooltip>
+                      </Typography>
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+            </>
           )}
         </>
       )}

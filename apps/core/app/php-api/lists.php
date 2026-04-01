@@ -43,7 +43,7 @@ if ($method === 'GET') {
     // All lists
     $stmt = $db->query(
         'SELECT l.id, l.name, l.description, l.created_at, l.updated_at,
-                COUNT(lc.id) AS card_count
+                COALESCE(SUM(lc.quantity), 0) AS card_count
          FROM lists l
          LEFT JOIN list_cards lc ON lc.list_id = l.id
          GROUP BY l.id

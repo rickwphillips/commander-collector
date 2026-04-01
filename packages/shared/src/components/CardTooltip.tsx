@@ -16,6 +16,10 @@ interface Props {
   onClick?: (name: string) => void;
 }
 
+// SVG card shape used as the hover cursor (14×20px, hotspot centered)
+const CARD_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="20"><rect x="1" y="1" width="12" height="18" rx="2" fill="%231e3a5f" stroke="%2399aacc" stroke-width="1"/><rect x="3" y="3" width="8" height="14" rx="1" fill="none" stroke="%236699ff" stroke-width="0.75"/></svg>`;
+const CARD_CURSOR = `url("data:image/svg+xml,${CARD_SVG}") 7 10, zoom-in`;
+
 /**
  * Wraps children in a MUI Tooltip showing a card image preview on hover.
  * Uses the shared cardImageCache — DB-backed, Scryfall fallback, in-memory dedup.
@@ -45,7 +49,7 @@ export function CardTooltip({ name, children, previewWidth = 220, placement = 't
       slotProps={{ tooltip: { sx: { bgcolor: 'transparent', p: 0, boxShadow: 8 } } }}
     >
       <span
-        style={{ cursor: onClick ? 'pointer' : 'help', ...style }}
+        style={{ cursor: onClick ? 'pointer' : CARD_CURSOR, ...style }}
         onClick={onClick ? (e) => { e.stopPropagation(); onClick(name); } : undefined}
       >
         {children}

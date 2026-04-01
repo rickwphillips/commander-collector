@@ -53,7 +53,7 @@ export function ManaSymbol({
         justifyContent: 'center',
         flexShrink: 0,
         outline: active ? '2px solid' : '2px solid transparent',
-        outlineColor: active ? 'primary.main' : 'transparent',
+        outlineColor: active ? 'warning.main' : 'transparent',
         outlineOffset: '2px',
         opacity: dimmed && !active ? 0.4 : 1,
         transform: active && isInteractive ? 'scale(1.1)' : 'scale(1)',

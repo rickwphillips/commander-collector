@@ -1,6 +1,6 @@
 'use client';
 
-import { Container, Box, Typography, Fade, Button } from '@mui/material';
+import { Container, Box, Typography, Fade, Button, Tooltip } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Link from 'next/link';
 import { useEffect, useState, ReactNode } from 'react';
@@ -10,6 +10,8 @@ import { LogoutButton } from './LogoutButton';
 interface PageContainerProps {
   title: string;
   subtitle?: ReactNode;
+  /** Optional card image shown to the left of the title/subtitle block */
+  titleImage?: string | null;
   backHref?: string;
   backLabel?: string;
   children: ReactNode;
@@ -19,6 +21,7 @@ interface PageContainerProps {
 export function PageContainer({
   title,
   subtitle,
+  titleImage,
   backHref = '/',
   backLabel = 'Back',
   children,
@@ -36,21 +39,37 @@ export function PageContainer({
       <LogoutButton />
       <DarkModeToggle />
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Button component={Link} href={backHref} startIcon={<ArrowBackIcon />} sx={{ mb: 3 }}>
-          {backLabel}
-        </Button>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, pr: { xs: '120px', md: 0 } }}>
+          <Button component={Link} href={backHref} startIcon={<ArrowBackIcon />}>
+            {backLabel}
+          </Button>
+          {actions && <Box>{actions}</Box>}
+        </Box>
 
         <Fade in={mounted} timeout={800}>
           <Box sx={{ mb: 4 }}>
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                flexWrap: 'wrap',
-                gap: 2,
-              }}
-            >
+            <Box sx={{ display: 'flex', flexDirection: 'row', gap: 2, alignItems: 'flex-start' }}>
+              {titleImage && (
+                <Tooltip
+                  placement="right"
+                  title={
+                    <Box
+                      component="img"
+                      src={titleImage}
+                      alt={title}
+                      sx={{ width: 220, borderRadius: 1.5, display: 'block' }}
+                    />
+                  }
+                  slotProps={{ tooltip: { sx: { bgcolor: 'transparent', p: 0, boxShadow: 8 } } }}
+                >
+                  <Box
+                    component="img"
+                    src={titleImage}
+                    alt={title}
+                    sx={{ width: { xs: 70, sm: 90, md: 110 }, borderRadius: 2, boxShadow: 4, flexShrink: 0, display: 'block', cursor: 'default' }}
+                  />
+                </Tooltip>
+              )}
               <Box>
                 <Typography
                   variant="h3"
@@ -74,7 +93,6 @@ export function PageContainer({
                   </Typography>
                 )}
               </Box>
-              {actions && <Box>{actions}</Box>}
             </Box>
           </Box>
         </Fade>

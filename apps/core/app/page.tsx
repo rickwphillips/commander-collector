@@ -26,11 +26,13 @@ import AddCircleIcon from '@mui/icons-material/AddCircle';
 import AddIcon from '@mui/icons-material/Add';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import CollectionsIcon from '@mui/icons-material/Collections';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import { DarkModeToggle } from './components/DarkModeToggle';
 import { LogoutButton } from './components/LogoutButton';
 import { StatsCard } from './components/StatsCard';
 import { ColorIdentityChips } from './components/ColorIdentityChips';
 import { LoadingSpinner } from './components/LoadingSpinner';
+import { useAuth } from './components/AuthGuard';
 import { api } from './lib/api';
 import { APP_VERSION } from './lib/version';
 import type { StatsResponse, RecentGame } from './lib/types';
@@ -97,6 +99,7 @@ const navItems = [
 ];
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -212,7 +215,13 @@ export default function Dashboard() {
 
         {/* Navigation Cards */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
-          {navItems.map((item, index) => (
+          {[...navItems, ...(user?.role === 'admin' ? [{
+            title: 'Admin',
+            description: 'Coach notes and management tools',
+            href: '/admin',
+            icon: <AdminPanelSettingsIcon sx={{ fontSize: 40 }} />,
+            color: '#8B4513',
+          }] : [])].map((item, index) => (
             <Grid key={item.title} size={{ xs: 6, md: 3 }}>
               <Grow in={mounted} timeout={800 + index * 150}>
                 <Card className={styles.navCard}>

@@ -185,12 +185,15 @@ export function applyCommanderDamageChange(
 }
 
 export function applyEliminate(state: GameManagerState, idx: number): GameManagerState {
+  const target = state.players[idx];
+  const note = `${target.playerName} conceded (turn ${state.turnNumber})`;
+  const newNotes = state.notes ? `${state.notes}\n${note}` : note;
   const newPlayers = state.players.map((p, i) =>
     i === idx
       ? { ...p, isEliminated: true, isConceded: true, eliminatedTurn: state.turnNumber }
       : p,
   );
-  return { ...state, players: newPlayers };
+  return { ...state, players: newPlayers, notes: newNotes };
 }
 
 export function applyUndoEliminate(state: GameManagerState, idx: number): GameManagerState {

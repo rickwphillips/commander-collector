@@ -703,15 +703,7 @@ export interface MyCollectionResponse {
 }
 
 export interface DeckProfile {
-  deck: { id: number; name: string; commander: string; colors: string; player_name: string };
   cards: { card_name: string; quantity: number; is_commander: number; is_proxy: number; type_line: string | null; mana_cost: string | null }[];
-  stats: {
-    total_games: number; wins: number; win_rate: number | null;
-    avg_finish: number | null; first_played: string | null; last_played: string | null;
-  };
-  matchups: { opponent_commander: string; games: number; my_wins: number; their_wins: number }[];
-  recentGames: { played_at: string; finish_position: number; pod_size: number; winning_turn: number | null }[];
-  finishDistribution: { finish_position: number; count: number }[];
 }
 
 export interface CoachNote {
@@ -723,9 +715,15 @@ export interface CoachNote {
   updated_at: string;
 }
 
+export interface CoachToolCall {
+  name: string;
+  input: Record<string, unknown>;
+}
+
 export interface CoachMessage {
   role: 'user' | 'assistant';
   content: string;
+  toolsUsed?: CoachToolCall[];
 }
 
 // Form input types

@@ -1,18 +1,22 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Box,
   Card,
   CardContent,
   Chip,
-  Divider,
+  Collapse,
   Grid,
+  IconButton,
   Stack,
   Tooltip,
   Typography,
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { ManaSymbol } from '@/components/ManaSymbol';
+import { CardListDisplay } from '@/components/CardListDisplay';
+import type { SortDirection, SortOrder } from '@/components/DeckFilters';
 
 export interface BreakdownCard {
   card_name: string;
@@ -32,6 +36,11 @@ interface Props {
   cards: BreakdownCard[];
   /** When true, renders grouped card lists under each type category */
   showList?: boolean;
+  /** Sort order and direction applied within each type group in the list view */
+  sortOrder?: SortOrder;
+  sortDirection?: SortDirection;
+  /** When true, shows color identity pips instead of mana cost in the list */
+  useColorIdentity?: boolean;
 }
 
 const TYPE_ORDER = [
@@ -76,14 +85,14 @@ const MTG_COLORS = ['W', 'U', 'B', 'R', 'G'] as const;
 function getCategory(card: BreakdownCard): TypeCategory {
   if (card.is_commander) return 'Commander';
   const tl = card.type_line ?? '';
-  if (tl.includes('Creature')) return 'Creature';
+  if (tl.includes('Creature'))     return 'Creature';
   if (tl.includes('Planeswalker')) return 'Planeswalker';
-  if (tl.includes('Battle')) return 'Battle';
-  if (tl.includes('Instant')) return 'Instant';
-  if (tl.includes('Sorcery')) return 'Sorcery';
-  if (tl.includes('Enchantment')) return 'Enchantment';
-  if (tl.includes('Artifact')) return 'Artifact';
-  if (tl.includes('Land')) return 'Land';
+  if (tl.includes('Battle'))       return 'Battle';
+  if (tl.includes('Land'))         return 'Land';
+  if (tl.includes('Instant'))      return 'Instant';
+  if (tl.includes('Sorcery'))      return 'Sorcery';
+  if (tl.includes('Enchantment'))  return 'Enchantment';
+  if (tl.includes('Artifact'))     return 'Artifact';
   return 'Unknown';
 }
 
@@ -162,7 +171,9 @@ function ChartLegend({ data }: { data: PieSlice[] }) {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function DeckBreakdown({ cards, showList = false }: Props) {
+export function DeckBreakdown({ cards, showList = false, sortOrder, sortDirection, useColorIdentity = false }: Props) {
+  const [colorExpanded, setColorExpanded] = useState(false);
+
   const { byType, colorCounts, total, proxyCount } = useMemo(() => {
     const byType: Partial<Record<TypeCategory, BreakdownCard[]>> = {};
     const colorCounts: Record<string, number> = {};
@@ -223,201 +234,111 @@ export function DeckBreakdown({ cards, showList = false }: Props) {
         )}
       </Stack>
 
-      {/* Type count summary */}
+      {/* Combined breakdown card */}
       <Card variant="outlined">
-        <CardContent sx={{ pb: '12px !important', pt: 1.5 }}>
-          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-            Card Types
-          </Typography>
-          <Grid container spacing={0.5}>
-            {presentTypes.map((type) => {
-              const qty = byType[type]!.reduce((s, c) => s + (c.quantity ?? 1), 0);
-              return (
-                <Grid key={type} size={{ xs: 6, sm: 4 }}>
-                  <Stack direction="row" justifyContent="space-between" sx={{ pr: 1 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      {type}
-                    </Typography>
-                    <Typography variant="body2" fontWeight={600}>
-                      {qty}
-                    </Typography>
+        <CardContent sx={{ pb: colorExpanded ? '16px !important' : '12px !important', pt: 1.5 }}>
+          {/* Header: type counts left, color pips right, expand toggle far right */}
+          <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
+            <Grid container spacing={0.5} sx={{ flex: 1 }}>
+              {presentTypes.map((type) => {
+                const qty = byType[type]!.reduce((s, c) => s + (c.quantity ?? 1), 0);
+                return (
+                  <Grid key={type} size={{ xs: 6, sm: 4 }}>
+                    <Stack direction="row" justifyContent="space-between" sx={{ pr: 1 }}>
+                      <Typography variant="body2" color="text.secondary">{type}</Typography>
+                      <Typography variant="body2" fontWeight={600}>{qty}</Typography>
+                    </Stack>
+                  </Grid>
+                );
+              })}
+            </Grid>
+
+            <Box sx={{
+              alignSelf: 'stretch',
+              width: '1px',
+              mx: 0.5,
+              flexShrink: 0,
+              background: (theme) =>
+                `linear-gradient(to bottom, transparent, ${theme.palette.divider} 25%, ${theme.palette.divider} 75%, transparent)`,
+            }} />
+
+            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0 }}>
+              {Object.keys(colorCounts).length > 0 && (
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+                  {MTG_COLORS.filter((c) => colorCounts[c]).map((c) => (
+                    <Stack key={c} direction="row" alignItems="center" spacing={0.5}>
+                      <ManaSymbol color={c} size={20} active />
+                      <Typography variant="body2" fontWeight={600}>{colorCounts[c]}</Typography>
+                    </Stack>
+                  ))}
+                  {colorCounts['C'] ? (
+                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                      <ManaSymbol color="C" size={20} active />
+                      <Typography variant="body2" fontWeight={600}>{colorCounts['C']}</Typography>
+                    </Stack>
+                  ) : null}
+                </Stack>
+              )}
+              {(typePieData.length > 1 || colorPieData.length > 1) && (
+                <IconButton
+                  size="small"
+                  onClick={() => setColorExpanded(x => !x)}
+                  sx={{ transform: colorExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+                >
+                  <ExpandMoreIcon fontSize="small" />
+                </IconButton>
+              )}
+            </Stack>
+          </Stack>
+
+          {/* Collapsible pie charts */}
+          <Collapse in={colorExpanded}>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              {typePieData.length > 1 && (
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                    By Type
+                  </Typography>
+                  <Stack direction="row" alignItems="center" spacing={2}>
+                    <DonutChart data={typePieData} size={120} />
+                    <ChartLegend data={typePieData} />
                   </Stack>
                 </Grid>
-              );
-            })}
-          </Grid>
+              )}
+              {colorPieData.length > 1 && (
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                    By Color Identity
+                  </Typography>
+                  <Stack direction="row" alignItems="center" spacing={2}>
+                    <DonutChart data={colorPieData} size={120} />
+                    <Stack spacing={0.4} sx={{ minWidth: 110 }}>
+                      {colorPieData.map((d) => {
+                        const ttl = colorPieData.reduce((s, x) => s + x.value, 0);
+                        return (
+                          <Stack key={d.label} direction="row" alignItems="center" spacing={0.75}>
+                            <ManaSymbol color={d.label as 'W' | 'U' | 'B' | 'R' | 'G' | 'C'} size={16} active />
+                            <Typography variant="caption" fontWeight={600} sx={{ minWidth: 22 }}>
+                              {d.value}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {Math.round((d.value / ttl) * 100)}%
+                            </Typography>
+                          </Stack>
+                        );
+                      })}
+                    </Stack>
+                  </Stack>
+                </Grid>
+              )}
+            </Grid>
+          </Collapse>
         </CardContent>
       </Card>
 
-      {/* Color distribution */}
-      {Object.keys(colorCounts).length > 0 && (
-        <Card variant="outlined">
-          <CardContent sx={{ pb: '12px !important', pt: 1.5 }}>
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-              Color Distribution
-            </Typography>
-            <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-              {MTG_COLORS.filter((c) => colorCounts[c]).map((c) => (
-                <Stack key={c} direction="row" alignItems="center" spacing={0.5}>
-                  <ManaSymbol color={c} size={20} active />
-                  <Typography variant="body2" fontWeight={600}>
-                    {colorCounts[c]}
-                  </Typography>
-                </Stack>
-              ))}
-              {colorCounts['C'] ? (
-                <Stack direction="row" alignItems="center" spacing={0.5}>
-                  <ManaSymbol color="C" size={20} active />
-                  <Typography variant="body2" fontWeight={600}>
-                    {colorCounts['C']}
-                  </Typography>
-                </Stack>
-              ) : null}
-            </Stack>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Grouped card list — 2-column layout */}
+      {/* Grouped card list */}
       {showList && (
-        <>
-          <Grid container spacing={2}>
-            {presentTypes.map((type) => (
-              <Grid key={type} size={{ xs: 12, sm: 6 }}>
-                <Typography
-                  variant="subtitle2"
-                  color="text.secondary"
-                  sx={{ mb: 0.5, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: 1 }}
-                >
-                  {type} ({byType[type]!.reduce((s, c) => s + (c.quantity ?? 1), 0)})
-                </Typography>
-                <Divider sx={{ mb: 0.5 }} />
-                <Stack spacing={0.25}>
-                  {byType[type]!
-                    .sort((a, b) => a.card_name.localeCompare(b.card_name))
-                    .map((card, i) => (
-                      <Stack
-                        key={`${card.card_name}-${i}`}
-                        direction="row"
-                        alignItems="center"
-                        spacing={1}
-                      >
-                        <Tooltip
-                          placement="right"
-                          enterDelay={200}
-                          enterNextDelay={100}
-                          title={
-                            card.image_uri ? (
-                              <Stack direction="row" spacing={0.5}>
-                                <Box
-                                  component="img"
-                                  src={card.image_uri}
-                                  alt={card.card_name}
-                                  sx={{ width: 220, borderRadius: 1.5, display: 'block' }}
-                                />
-                                {card.back_image_uri && (
-                                  <Box
-                                    component="img"
-                                    src={card.back_image_uri}
-                                    alt={`${card.card_name} (back)`}
-                                    sx={{ width: 220, borderRadius: 1.5, display: 'block' }}
-                                  />
-                                )}
-                              </Stack>
-                            ) : ''
-                          }
-                          slotProps={{ tooltip: { sx: { bgcolor: 'transparent', p: 0, boxShadow: 10 } } }}
-                        >
-                          <Box
-                            sx={{
-                              width: 32,
-                              height: 44,
-                              flexShrink: 0,
-                              borderRadius: 0.5,
-                              overflow: 'hidden',
-                              bgcolor: 'action.hover',
-                              cursor: card.image_uri ? 'zoom-in' : 'default',
-                            }}
-                          >
-                            {card.image_uri && (
-                              <Box
-                                component="img"
-                                src={card.image_uri}
-                                alt={card.card_name}
-                                sx={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }}
-                              />
-                            )}
-                          </Box>
-                        </Tooltip>
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{ minWidth: 16, textAlign: 'right' }}
-                        >
-                          {card.quantity}
-                        </Typography>
-                        <Typography variant="body2" sx={{ flex: 1 }}>
-                          {card.card_name}
-                        </Typography>
-                        {card.is_proxy ? (
-                          <Chip label="proxy" size="small" color="warning" sx={{ height: 16, fontSize: '0.6rem' }} />
-                        ) : null}
-                      </Stack>
-                    ))}
-                </Stack>
-              </Grid>
-            ))}
-          </Grid>
-
-          {/* Pie charts */}
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            {typePieData.length > 1 && (
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Card variant="outlined">
-                  <CardContent sx={{ pb: '12px !important', pt: 1.5 }}>
-                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1.5 }}>
-                      By Type
-                    </Typography>
-                    <Stack direction="row" alignItems="center" spacing={2}>
-                      <DonutChart data={typePieData} size={130} />
-                      <ChartLegend data={typePieData} />
-                    </Stack>
-                  </CardContent>
-                </Card>
-              </Grid>
-            )}
-            {colorPieData.length > 1 && (
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Card variant="outlined">
-                  <CardContent sx={{ pb: '12px !important', pt: 1.5 }}>
-                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1.5 }}>
-                      By Color Identity
-                    </Typography>
-                    <Stack direction="row" alignItems="center" spacing={2}>
-                      <DonutChart data={colorPieData} size={130} />
-                      <Stack spacing={0.4} sx={{ minWidth: 110 }}>
-                        {colorPieData.map((d) => {
-                          const ttl = colorPieData.reduce((s, x) => s + x.value, 0);
-                          return (
-                            <Stack key={d.label} direction="row" alignItems="center" spacing={0.75}>
-                              <ManaSymbol color={d.label as 'W' | 'U' | 'B' | 'R' | 'G' | 'C'} size={16} active />
-                              <Typography variant="caption" fontWeight={600} sx={{ minWidth: 22 }}>
-                                {d.value}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {Math.round((d.value / ttl) * 100)}%
-                              </Typography>
-                            </Stack>
-                          );
-                        })}
-                      </Stack>
-                    </Stack>
-                  </CardContent>
-                </Card>
-              </Grid>
-            )}
-          </Grid>
-        </>
+        <CardListDisplay cards={cards} sortOrder={sortOrder} sortDirection={sortDirection} useColorIdentity={useColorIdentity} />
       )}
     </Stack>
   );

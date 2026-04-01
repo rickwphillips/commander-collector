@@ -73,7 +73,7 @@ $stmt = $db->prepare("
             COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 /
             NULLIF(COUNT(gr.id), 0), 1
         ) AS win_rate,
-        (SELECT COUNT(*) FROM deck_cards dc WHERE dc.deck_id = d.id) AS card_count
+        (SELECT COALESCE(SUM(dc.quantity), 0) FROM deck_cards dc WHERE dc.deck_id = d.id) AS card_count
     FROM decks d
     LEFT JOIN game_results gr ON gr.deck_id = d.id
     WHERE d.player_id = ?
@@ -86,7 +86,7 @@ $decks = $stmt->fetchAll();
 // ── Lists ─────────────────────────────────────────────────────────────────
 $stmt = $db->prepare("
     SELECT l.id, l.name, l.description, l.created_at, l.updated_at,
-           COUNT(lc.id) AS card_count
+           COALESCE(SUM(lc.quantity), 0) AS card_count
     FROM lists l
     LEFT JOIN list_cards lc ON lc.list_id = l.id
     WHERE l.user_id = ?

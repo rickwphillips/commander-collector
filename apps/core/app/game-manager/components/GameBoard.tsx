@@ -343,12 +343,15 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   };
 
   const handleEliminate = (idx: number) => {
+    const target = players[idx];
+    const note = `${target.playerName} conceded (turn ${state.turnNumber})`;
+    const newNotes = state.notes ? `${state.notes}\n${note}` : note;
     const newPlayers = players.map((p, i) =>
       i === idx
         ? { ...p, isEliminated: true, isConceded: true, eliminatedTurn: state.turnNumber }
         : p
     );
-    updateState({ players: newPlayers });
+    updateState({ players: newPlayers, notes: newNotes });
     const remaining = newPlayers.filter((p) => !p.isEliminated);
     if (remaining.length === 1) setWinner(remaining[0]);
   };

@@ -86,7 +86,7 @@ switch ($method) {
                         NULLIF(COUNT(DISTINCT gr.game_id), 0),
                         1
                     ) as win_rate,
-                    (SELECT COUNT(*) FROM deck_cards dc WHERE dc.deck_id = d.id) as card_count
+                    (SELECT COALESCE(SUM(dc.quantity), 0) FROM deck_cards dc WHERE dc.deck_id = d.id) as card_count
                 FROM decks d
                 JOIN players p ON d.player_id = p.id
                 LEFT JOIN game_results gr ON gr.deck_id = d.id

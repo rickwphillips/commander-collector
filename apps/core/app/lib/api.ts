@@ -226,6 +226,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ list_id: listId, deck_id: deckId }),
     }),
+  auditListImages: (listId: number) =>
+    apiFetch<{ updated: import('./types').ListCard[] }>('/list-audit', {
+      method: 'POST',
+      body: JSON.stringify({ list_id: listId }),
+    }),
 
   // Scryfall card cache
   lookupCard: (name: string) =>
@@ -308,30 +313,59 @@ export const api = {
     apiFetch<import('./types').MyCollectionResponse>('/my-collection'),
   getCoachNotes: () =>
     apiFetch<import('./types').CoachNote[]>('/coach-notes'),
+  getAllCoachNotes: () =>
+    apiFetch<(import('./types').CoachNote & { player_id: number; player_name: string })[]>('/coach-notes?all=1'),
+  updateCoachNote: (id: number, data: { topic?: string; observation?: string; reasoning?: string }) =>
+    apiFetch<{ success: boolean }>(`/coach-notes?id=${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteCoachNote: (id: number) =>
     apiFetch<{ success: boolean }>(`/coach-notes?id=${id}`, { method: 'DELETE' }),
 
   // Coach Chat (polling-based)
   sendCoachMessage: async (
     message: string,
-    history: import('./types').CoachMessage[]
-  ): Promise<{ response: string }> => {
+    history: import('./types').CoachMessage[],
+    activeDeck?: { deckId: number; deckName: string; commander: string; cardCount: number; colors: string },
+    activeList?: { listId: number; listName: string; cardCount: number },
+    onPartial?: (text: string) => void,
+  ): Promise<{ response: string; toolsUsed: { name: string; input: Record<string, unknown> }[] }> => {
+    const body: Record<string, unknown> = { message, history };
+    if (activeDeck) {
+      body.active_deck = {
+        id: activeDeck.deckId,
+        name: activeDeck.deckName,
+        commander: activeDeck.commander,
+        card_count: activeDeck.cardCount,
+        colors: activeDeck.colors,
+      };
+    }
+    if (activeList) {
+      body.active_list = {
+        id: activeList.listId,
+        name: activeList.listName,
+        card_count: activeList.cardCount,
+      };
+    }
     // Step 1: POST to submit message — returns request_id
     const submit = await apiFetch<{ status: string; request_id: string }>('/coach-chat', {
       method: 'POST',
-      body: JSON.stringify({ message, history }),
+      body: JSON.stringify(body),
     });
 
-    // Step 2: Poll for response (max 120 attempts x 3s = 6 min)
+    // Step 2: Poll with progressive backoff: 1s, 1.5s, 2s, 2.5s, 3s (cap at 3s)
+    const pollDelay = (attempt: number) => Math.min(1000 + attempt * 500, 3000);
     for (let i = 0; i < 120; i++) {
-      await new Promise((r) => setTimeout(r, 3000));
-      const poll = await apiFetch<{ status: string; response?: string }>(
+      await new Promise((r) => setTimeout(r, pollDelay(i)));
+      const poll = await apiFetch<{ status: string; response?: string; partial?: string; tools_used?: { name: string; input: Record<string, unknown> }[]; _debug?: Record<string, unknown>; _php_output?: string }>(
         `/coach-chat?poll=${submit.request_id}`
       );
-      if (poll.status === 'complete' && poll.response) {
-        return { response: poll.response };
+      if (poll.status === 'complete') {
+        if (poll._debug) console.log('[coach] complete debug:', poll._debug);
+        return { response: poll.response ?? '', toolsUsed: poll.tools_used ?? [] };
       }
+      if (poll._php_output) console.warn('[coach] PHP output leaked:', poll._php_output);
+      if (poll.partial && onPartial) onPartial(poll.partial);
     }
+    console.error('[coach] timed out after 120 polls');
     throw new Error('Coach chat response timed out');
   },
 };
