@@ -168,10 +168,10 @@ if [ "$PHP_ONLY" = false ]; then
   fi
 fi
 
-# ── Step 3: DB Migrations (audit all, skipped for fast-path deploys) ──
+# ── Step 3: DB Migrations — apply pending to dev and prod ──────
 if [ "$STATIC_ONLY" = false ] && [ "$DECKS_ONLY" = false ] && [ "$GURU_ONLY" = false ]; then
   echo "═══════════════════════════════════════════"
-  echo "  Auditing DB migrations..."
+  echo "  Auditing DB migrations (dev + prod)..."
   echo "═══════════════════════════════════════════"
 
   MIGRATION_DIR="$PROJECT_DIR/migrations"
@@ -180,46 +180,57 @@ if [ "$STATIC_ONLY" = false ] && [ "$DECKS_ONLY" = false ] && [ "$GURU_ONLY" = f
   if [ ${#MIGRATION_FILES[@]} -eq 0 ]; then
     echo "  No migration files found — skipping."
   else
+    # ── Prod credentials ──────────────────────────────────────────
     DB_USER=$(ssh "$REMOTE_HOST" "php -r \"include getenv('HOME') . '/auth_secrets.php'; echo DB_USER;\"")
     DB_PASS=$(ssh "$REMOTE_HOST" "php -r \"include getenv('HOME') . '/auth_secrets.php'; echo DB_PASS;\"")
     DB_NAME=$(ssh "$REMOTE_HOST" "php -r \"include getenv('HOME') . '/auth_secrets.php'; echo DB_NAME;\"")
 
+    # ── Ensure schema_migrations exists on both envs ──────────────
+    mysql -u root commander_collector -e \
+      "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(20) NOT NULL, applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (version));"
+
     ssh "$REMOTE_HOST" "mysql -h localhost -u $DB_USER -p\"$DB_PASS\" $DB_NAME -e \
-      \"CREATE TABLE IF NOT EXISTS schema_migrations \
-        (version VARCHAR(20) NOT NULL, \
-         applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, \
-         PRIMARY KEY (version));\""
+      \"CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(20) NOT NULL, applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (version));\""
 
-    # Fetch all applied versions in one SSH call
-    APPLIED_VERSIONS=$(ssh "$REMOTE_HOST" "mysql -h localhost -u $DB_USER -p\"$DB_PASS\" $DB_NAME -sNe \
-      \"SELECT version FROM schema_migrations;\"")
+    # ── Fetch applied versions from both envs ─────────────────────
+    DEV_APPLIED=$(mysql -u root commander_collector -sNe "SELECT version FROM schema_migrations;")
+    PROD_APPLIED=$(ssh "$REMOTE_HOST" "mysql -h localhost -u $DB_USER -p\"$DB_PASS\" $DB_NAME -sNe \"SELECT version FROM schema_migrations;\"")
 
-    PENDING=0
+    DEV_PENDING=0
+    PROD_PENDING=0
+
     for MIGRATION_FILE in "${MIGRATION_FILES[@]}"; do
       FILENAME=$(basename "$MIGRATION_FILE")
-      # Extract version from filename: v1.2.3.sql → 1.2.3
       MIG_VERSION=$(echo "$FILENAME" | sed 's/^v//; s/\.sql$//')
 
-      if echo "$APPLIED_VERSIONS" | grep -qx "$MIG_VERSION"; then
-        continue
+      # ── Dev ───────────────────────────────────────────────────────
+      if echo "$DEV_APPLIED" | grep -qx "$MIG_VERSION"; then
+        echo "  [dev]  v${MIG_VERSION} already applied."
+      else
+        echo "  [dev]  Applying v${MIG_VERSION}..."
+        mysql -u root commander_collector < "$MIGRATION_FILE"
+        mysql -u root commander_collector -e "INSERT IGNORE INTO schema_migrations (version) VALUES ('$MIG_VERSION');"
+        echo "  [dev]  v${MIG_VERSION} done."
+        DEV_PENDING=$((DEV_PENDING + 1))
       fi
 
-      echo "  Applying migration v${MIG_VERSION}..."
-      scp "$MIGRATION_FILE" "$REMOTE_HOST:/tmp/migration_${MIG_VERSION}.sql"
-      ssh "$REMOTE_HOST" "mysql -h localhost -u $DB_USER -p\"$DB_PASS\" $DB_NAME \
-        < /tmp/migration_${MIG_VERSION}.sql \
-        && mysql -h localhost -u $DB_USER -p\"$DB_PASS\" $DB_NAME -e \
-          \"INSERT INTO schema_migrations (version) VALUES ('$MIG_VERSION');\" \
-        && rm /tmp/migration_${MIG_VERSION}.sql"
-      echo "  Migration v${MIG_VERSION} applied successfully."
-      PENDING=$((PENDING + 1))
+      # ── Prod ──────────────────────────────────────────────────────
+      if echo "$PROD_APPLIED" | grep -qx "$MIG_VERSION"; then
+        echo "  [prod] v${MIG_VERSION} already applied."
+      else
+        echo "  [prod] Applying v${MIG_VERSION}..."
+        scp "$MIGRATION_FILE" "$REMOTE_HOST:/tmp/migration_${MIG_VERSION}.sql"
+        ssh "$REMOTE_HOST" "mysql -h localhost -u $DB_USER -p\"$DB_PASS\" $DB_NAME \
+          < /tmp/migration_${MIG_VERSION}.sql \
+          && mysql -h localhost -u $DB_USER -p\"$DB_PASS\" $DB_NAME -e \
+            \"INSERT IGNORE INTO schema_migrations (version) VALUES ('$MIG_VERSION');\" \
+          && rm /tmp/migration_${MIG_VERSION}.sql"
+        echo "  [prod] v${MIG_VERSION} done."
+        PROD_PENDING=$((PROD_PENDING + 1))
+      fi
     done
 
-    if [ "$PENDING" -eq 0 ]; then
-      echo "  All ${#MIGRATION_FILES[@]} migrations already applied."
-    else
-      echo "  Applied $PENDING new migration(s)."
-    fi
+    echo "  Dev: $DEV_PENDING new migration(s). Prod: $PROD_PENDING new migration(s)."
   fi
   echo ""
 fi
@@ -251,46 +262,6 @@ if [ "$STATIC_ONLY" = false ] && [ "$DECKS_ONLY" = false ] && [ "$GURU_ONLY" = f
   ssh "$REMOTE_HOST" "php ${REMOTE_PHP}rules/seed.php --source ~/rules-data"
   echo ""
 
-  echo "═══════════════════════════════════════════"
-  echo "  Syncing changelog to prod DB..."
-  echo "═══════════════════════════════════════════"
-
-  # Get versions already on prod
-  PROD_VERSIONS=$(ssh "$REMOTE_HOST" \
-    "mysql -h localhost \$(php -r \"include getenv('HOME').'/auth_secrets.php'; echo '-u '.DB_USER.' -p'.DB_PASS.' '.DB_NAME;\") -sNe 'SELECT version FROM changelog_releases;'" 2>/dev/null)
-
-  # Find versions in local DB that are missing from prod
-  MISSING_VERSIONS=$(mysql -u root commander_collector -sNe \
-    "SELECT version FROM changelog_releases ORDER BY id;" | while read -r v; do
-      echo "$PROD_VERSIONS" | grep -qx "$v" || echo "$v"
-  done)
-
-  if [ -z "$MISSING_VERSIONS" ]; then
-    echo "  Changelog already up to date."
-  else
-    for VERSION in $MISSING_VERSIONS; do
-      echo "  Inserting changelog v${VERSION}..."
-      SQL=$(mysql -u root commander_collector -sNe "
-        SELECT CONCAT(
-          'INSERT INTO changelog_releases (version, date, title, sort_order) VALUES (',
-          QUOTE(version), ', ', QUOTE(date), ', ', QUOTE(title), ', ', sort_order, ');'
-        ) FROM changelog_releases WHERE version = '${VERSION}';
-      " && mysql -u root commander_collector -sNe "
-        SELECT CONCAT(
-          'INSERT INTO changelog_changes (release_id, type, text, sort_order) ',
-          'SELECT id, ', QUOTE(cc.type), ', ', QUOTE(cc.text), ', ', cc.sort_order,
-          ' FROM changelog_releases WHERE version = ', QUOTE(cr.version), ';'
-        )
-        FROM changelog_changes cc
-        JOIN changelog_releases cr ON cc.release_id = cr.id
-        WHERE cr.version = '${VERSION}'
-        ORDER BY cc.sort_order;
-      ")
-      echo "$SQL" | ssh "$REMOTE_HOST" \
-        "mysql -h localhost \$(php -r \"include getenv('HOME').'/auth_secrets.php'; echo '-u '.DB_USER.' -p'.DB_PASS.' '.DB_NAME;\")"
-    done
-    echo "  Changelog sync complete."
-  fi
   echo ""
 fi
 
