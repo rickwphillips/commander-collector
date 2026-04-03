@@ -377,15 +377,31 @@ When the player asks general questions like "what should I improve?" or "any sug
 - **Metagame adaptation**: If one opponent dominates, what tech choices could help?
 - **Deckbuilding advice**: Card suggestions for specific decks based on their commander and color identity
 
-## CRITICAL: Always Look Up Cards First
+## CRITICAL: Always Look Up Cards First — No Exceptions, Ever
 
-**NEVER discuss, recommend, evaluate, or suggest cutting a card without first calling `lookup_card` to verify its Oracle text.** Your assumptions about what a card does are frequently wrong. This is non-negotiable:
+**This is the single most important rule. You must call `lookup_card` before saying ANYTHING about ANY card, every single time, no exceptions.**
 
-- Before recommending cards: batch them all into a single `lookup_card` call with a `names` array
+Your training data about MTG cards is unreliable. Cards get errata. Oracle text changes. You misremember costs, types, and effects. Every time you speak about a card without looking it up, you risk giving wrong information to a player who is going to act on it. This is unacceptable.
+
+**The rule is absolute:**
+- Never mention a card's mana cost without having looked it up this conversation
+- Never describe what a card does without having looked it up this conversation
+- Never say a card is "good" or "bad" for a deck without having looked it up this conversation
+- Never suggest adding, cutting, or keeping a card without having looked it up this conversation
+- Never discuss a synergy between cards without having looked up every card involved this conversation
+- Never answer a rules question about a specific card without having looked it up this conversation
+
+**There is no exception for "well-known" cards.** Sol Ring, Command Tower, Cyclonic Rift — look them all up. You have been wrong about famous staples before. The lookup is instant. There is no cost to doing it. There is a real cost to not doing it.
+
+**Batching is mandatory for multiple cards:**
+- Before recommending cards: put ALL names in one `lookup_card` call with a `names` array
 - Before suggesting cuts: batch-look up all candidates at once
 - Before discussing synergies: look up every card involved in one call
-- **Always batch**: if you need to look up N cards, use one `lookup_card` call with all N names — never call it N times
-- If you catch yourself making claims about a card without having looked it up this conversation: stop, look it up (batched with any others), then correct yourself if needed
+- Never call `lookup_card` N times for N cards — one call with all N names
+
+**If you realize mid-response that you mentioned a card without looking it up: stop immediately, call `lookup_card`, and correct yourself.** Do not continue until you have verified the Oracle text.
+
+The player is trusting your advice. Guessing is a betrayal of that trust.
 
 ## CRITICAL: Never Fabricate Deck Data
 
@@ -523,7 +539,19 @@ if ($activeDeck) {
     $systemPrompt .= "\n\n## Currently Viewed Deck\n\n";
     $systemPrompt .= "The player currently has **{$activeDeck['name']}** (deck_id: {$activeDeck['id']}) open on the page. ";
     $systemPrompt .= "Commander: {$activeDeck['commander']} | Colors: {$activeDeck['colors']} | Cards: {$activeDeck['card_count']}\n\n";
-    $systemPrompt .= "Deck data tools available for this deck: `check_card_in_deck`, `search_deck_cards`, `get_deck_stats` (includes match history, matchups, recent games), `lookup_decklist` (full card list — use only when you need everything). Prefer the targeted tools over the full list to minimize token usage.";
+    $systemPrompt .= "Deck data tools available for this deck: `check_card_in_deck`, `search_deck_cards`, `get_deck_stats` (includes match history, matchups, recent games), `lookup_decklist` (full card list — use only when you need everything). Prefer the targeted tools over the full list to minimize token usage.\n\n";
+    if (!empty($activeDeck['commander'])) {
+        $systemPrompt .= "## STOP STATE: Commander Card Lookup Required\n\n";
+        $systemPrompt .= "**Before doing anything else with this deck — before reading stats, before answering any question, before any analysis — you must call `lookup_card` for the commander: {$activeDeck['commander']}.**\n\n";
+        $systemPrompt .= "If `lookup_card` returns an error or cannot find **{$activeDeck['commander']}**, you must STOP immediately and tell the player:\n";
+        $systemPrompt .= "- That the commander card could not be found\n";
+        $systemPrompt .= "- That you cannot reliably analyze this deck without verified Oracle text for the commander\n";
+        $systemPrompt .= "- Ask them to confirm the correct card name before you proceed\n\n";
+        $systemPrompt .= "Do NOT proceed with any deck analysis until either:\n";
+        $systemPrompt .= "- The commander lookup succeeds, OR\n";
+        $systemPrompt .= "- The player explicitly defers (e.g. \"skip it\", \"don't worry about it\", \"just continue\", \"proceed anyway\") — in which case you may proceed but must note that commander analysis will be based on unverified data.\n\n";
+        $systemPrompt .= "This is a hard stop — do not work around it, do not guess the commander's abilities, do not analyze the deck using your training data about the commander until one of those two conditions is met.";
+    }
 }
 
 // Inject active list hint if provided
@@ -827,10 +855,37 @@ function executeTool(string $name, array $input): string {
         $names = array_values(array_filter(array_map('trim', $names)));
         if (empty($names)) return json_encode(['error' => 'No card names provided']);
 
+        $extractCard = function(array $card): array {
+            return [
+                'name'        => $card['name'] ?? '',
+                'mana_cost'   => $card['mana_cost'] ?? '',
+                'type_line'   => $card['type_line'] ?? '',
+                'oracle_text' => $card['oracle_text'] ?? '',
+                'power'       => $card['power'] ?? null,
+                'toughness'   => $card['toughness'] ?? null,
+                'keywords'    => $card['keywords'] ?? [],
+            ];
+        };
+
+        // Single card — use /cards/named?fuzzy= for typo tolerance
+        if (count($names) === 1) {
+            $ch = curl_init('https://api.scryfall.com/cards/named?fuzzy=' . urlencode($names[0]));
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 15,
+                CURLOPT_USERAGENT      => 'CommanderCollector/3.11 (coach-chat)',
+            ]);
+            $body   = curl_exec($ch);
+            $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $data   = json_decode($body, true);
+            if ($status === 200 && $data) return json_encode($extractCard($data));
+            // Pass Scryfall's error (ambiguous name, not found, etc.) back to the model
+            return json_encode(['error' => $data['details'] ?? "Card not found: {$names[0]}"]);
+        }
+
         $results = [];
 
-        // Split evenly across the minimum number of batches (max 75 per Scryfall request).
-        // e.g. 128 cards → ceil(128/75)=2 batches → chunk size ceil(128/2)=64 each.
+        // Multiple cards — batch via /cards/collection (max 75 per request)
         $total     = count($names);
         $numChunks = (int) ceil($total / 75);
         $chunkSize = (int) ceil($total / $numChunks);
@@ -853,23 +908,14 @@ function executeTool(string $name, array $input): string {
             }
             $data = json_decode($body, true);
             foreach ($data['data'] ?? [] as $card) {
-                $results[] = [
-                    'name'        => $card['name'] ?? '',
-                    'mana_cost'   => $card['mana_cost'] ?? '',
-                    'type_line'   => $card['type_line'] ?? '',
-                    'oracle_text' => $card['oracle_text'] ?? '',
-                    'power'       => $card['power'] ?? null,
-                    'toughness'   => $card['toughness'] ?? null,
-                    'keywords'    => $card['keywords'] ?? [],
-                ];
+                $results[] = $extractCard($card);
             }
-            // Report cards Scryfall couldn't match
             foreach ($data['not_found'] ?? [] as $nf) {
                 $results[] = ['error' => 'Not found: ' . ($nf['name'] ?? json_encode($nf))];
             }
         }
 
-        return json_encode(count($results) === 1 ? $results[0] : $results);
+        return json_encode($results);
     }
 
     if ($name === 'get_pattern') {
@@ -1459,15 +1505,18 @@ function executeTool(string $name, array $input): string {
 
 // ── Build messages array ──────────────────────────────────────────────────
 $messages = [];
-// Include conversation history from client (last 10 messages max)
-$historySlice = array_slice($history, -10);
+// Include conversation history from client (last 60 messages = 30 exchanges)
+$historySlice = array_slice($history, -60);
 foreach ($historySlice as $msg) {
-    if (!empty($msg['role']) && !empty($msg['content'])) {
-        $messages[] = ['role' => $msg['role'], 'content' => $msg['content']];
-    }
+    $role    = $msg['role'] ?? '';
+    $content = $msg['content'] ?? '';
+    if (!in_array($role, ['user', 'assistant'], true)) continue;
+    // Never drop a message — empty content breaks alternating role pairs
+    $messages[] = ['role' => $role, 'content' => $content ?: '...'];
 }
-// Add current user message
-$messages[] = ['role' => 'user', 'content' => $userMessage];
+// Add current user message with a mandatory card-lookup reminder appended
+$CARD_LOOKUP_REMINDER = "\n\n[SYSTEM REMINDER: Before mentioning ANY card by name in your response, you MUST call lookup_card first. No exceptions — not for staples, not for obvious cards, not for cards you are certain about. Look it up or do not mention it.]";
+$messages[] = ['role' => 'user', 'content' => $userMessage . $CARD_LOOKUP_REMINDER];
 
 // ── Claude API tool-use loop ──────────────────────────────────────────────
 $maxIter           = 12;

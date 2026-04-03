@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense, useMemo } from 'react';
+import { useEffect, useState, Suspense, useMemo, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Alert,
@@ -20,10 +20,12 @@ import {
   TextField,
   Tooltip,
   Typography,
+  Zoom,
 } from '@mui/material';
 import CallSplitIcon from '@mui/icons-material/CallSplit';
 import CancelIcon from '@mui/icons-material/Cancel';
 import EditIcon from '@mui/icons-material/Edit';
+import FlipIcon from '@mui/icons-material/SyncAlt';
 import SaveIcon from '@mui/icons-material/Save';
 import { PageContainer } from '@/components/PageContainer';
 import { DeckBreakdown } from '@/components/DeckBreakdown';
@@ -74,7 +76,7 @@ function GalleryCard({ card }: { card: DeckCard }) {
       }
       slotProps={{ tooltip: { sx: { bgcolor: 'transparent', p: 0, boxShadow: 8 } } }}
     >
-      <Card sx={{ cursor: isDfc ? 'pointer' : 'default', perspective: '600px' }}
+      <Card sx={{ cursor: isDfc ? 'pointer' : 'default', perspective: '600px', position: 'relative' }}
         onClick={isDfc ? () => setFlipped((f) => !f) : undefined}>
         <Box sx={{
           transformStyle: 'preserve-3d',
@@ -90,6 +92,26 @@ function GalleryCard({ card }: { card: DeckCard }) {
               sx={{ position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }} />
           )}
         </Box>
+        {isDfc && (
+          <Box
+            onClick={(e) => { e.stopPropagation(); setFlipped((f) => !f); }}
+            sx={{
+              position: 'absolute', inset: 0, zIndex: 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              opacity: 0, transition: 'opacity 0.2s',
+              '&:hover': { opacity: 1 },
+              cursor: 'pointer',
+            }}
+          >
+            <Box sx={{
+              bgcolor: 'rgba(0,0,0,0.45)', borderRadius: '50%',
+              width: 44, height: 44,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <FlipIcon sx={{ fontSize: 26, color: '#fff' }} />
+            </Box>
+          </Box>
+        )}
       </Card>
     </Tooltip>
   );
@@ -113,6 +135,8 @@ function DecklistPageInner() {
   const [editMode, setEditMode]     = useState(false);
   const [draftCards, setDraftCards] = useState<EditableCard[]>([]);
   const [saving, setSaving]         = useState(false);
+  const [isDirty, setIsDirty]       = useState(false);
+  const savedCardsRef               = useRef<EditableCard[]>([]);
 
   // Detach to List
   const [detachOpen, setDetachOpen] = useState(false);
@@ -142,15 +166,24 @@ function DecklistPageInner() {
   // ── Edit mode ──────────────────────────────────────────────────────────────
 
   const handleEditStart = () => {
-    setDraftCards(cards.map(deckCardToEditable));
+    const editable = cards.map(deckCardToEditable);
+    savedCardsRef.current = editable;
+    setDraftCards(editable);
+    setIsDirty(false);
     setEditMode(true);
   };
 
   const handleEditCancel = () => {
+    setIsDirty(false);
     setEditMode(false);
   };
 
-  const handleSave = async () => {
+  const handleDraftChange = (updated: EditableCard[]) => {
+    setDraftCards(updated);
+    setIsDirty(true);
+  };
+
+  const doSave = async (exitEdit: boolean) => {
     if (!deck) return;
     setSaving(true);
     try {
@@ -161,25 +194,33 @@ function DecklistPageInner() {
         is_commander: c.is_commander,
         is_proxy:     c.is_proxy,
       })));
-      // Sync commander name if it changed
       const commanderCard = draftCards.find(c => c.is_commander);
       if (commanderCard && commanderCard.card_name !== deck.commander) {
         await api.updateDeck(deckId, { commander: commanderCard.card_name }).catch(() => {});
       }
-      // Reload
       const [freshDeck, freshCards] = await Promise.all([
         api.getDeck(deckId),
         api.getDeckCards(deckId),
       ]);
       setDeck(freshDeck);
       setCards(freshCards);
-      setEditMode(false);
+      if (exitEdit) {
+        setEditMode(false);
+      } else {
+        const editable = freshCards.map(deckCardToEditable);
+        savedCardsRef.current = editable;
+        setDraftCards(editable);
+        setIsDirty(false);
+      }
     } catch {
       setError('Failed to save deck cards');
     } finally {
       setSaving(false);
     }
   };
+
+  const handleSave            = () => doSave(true);
+  const handleSaveAndContinue = () => doSave(false);
 
   // ── Detach to list ─────────────────────────────────────────────────────────
 
@@ -265,6 +306,9 @@ function DecklistPageInner() {
             <Button startIcon={<CancelIcon />} onClick={handleEditCancel} disabled={saving}>
               Cancel
             </Button>
+            <Button variant="outlined" startIcon={<SaveIcon />} onClick={handleSaveAndContinue} disabled={saving}>
+              {saving ? 'Saving…' : 'Save & Continue'}
+            </Button>
             <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSave} disabled={saving}>
               {saving ? 'Saving…' : 'Save'}
             </Button>
@@ -322,7 +366,23 @@ function DecklistPageInner() {
 
       {/* ── Edit Mode ──────────────────────────────────────────────────────── */}
       {editMode ? (
-        <CardGridEditor cards={draftCards} onChange={setDraftCards} />
+        <>
+          <CardGridEditor cards={draftCards} onChange={handleDraftChange} />
+          <Zoom in={isDirty && !saving}>
+            <Box sx={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 1100 }}>
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<SaveIcon />}
+                onClick={handleSaveAndContinue}
+                disabled={saving}
+                sx={{ borderRadius: 3, px: 3, boxShadow: 6 }}
+              >
+                Save
+              </Button>
+            </Box>
+          </Zoom>
+        </>
       ) : (
         /* ── View Mode ─────────────────────────────────────────────────────── */
         <>

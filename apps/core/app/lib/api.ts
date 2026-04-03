@@ -327,6 +327,7 @@ export const api = {
     activeDeck?: { deckId: number; deckName: string; commander: string; cardCount: number; colors: string },
     activeList?: { listId: number; listName: string; cardCount: number },
     onPartial?: (text: string) => void,
+    signal?: AbortSignal,
   ): Promise<{ response: string; toolsUsed: { name: string; input: Record<string, unknown> }[] }> => {
     const body: Record<string, unknown> = { message, history };
     if (activeDeck) {
@@ -349,14 +350,21 @@ export const api = {
     const submit = await apiFetch<{ status: string; request_id: string }>('/coach-chat', {
       method: 'POST',
       body: JSON.stringify(body),
+      signal,
+    });
+
+    // Abort-aware delay
+    const wait = (ms: number) => new Promise<void>((resolve, reject) => {
+      const t = setTimeout(resolve, ms);
+      signal?.addEventListener('abort', () => { clearTimeout(t); reject(new DOMException('Aborted', 'AbortError')); }, { once: true });
     });
 
     // Step 2: Poll with progressive backoff: 1s, 1.5s, 2s, 2.5s, 3s (cap at 3s)
     const pollDelay = (attempt: number) => Math.min(1000 + attempt * 500, 3000);
     for (let i = 0; i < 120; i++) {
-      await new Promise((r) => setTimeout(r, pollDelay(i)));
+      await wait(pollDelay(i));
       const poll = await apiFetch<{ status: string; response?: string; partial?: string; tools_used?: { name: string; input: Record<string, unknown> }[]; _debug?: Record<string, unknown>; _php_output?: string }>(
-        `/coach-chat?poll=${submit.request_id}`
+        `/coach-chat?poll=${submit.request_id}`, { signal }
       );
       if (poll.status === 'complete') {
         if (poll._debug) console.log('[coach] complete debug:', poll._debug);

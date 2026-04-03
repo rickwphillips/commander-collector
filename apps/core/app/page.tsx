@@ -27,8 +27,7 @@ import AddIcon from '@mui/icons-material/Add';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import CollectionsIcon from '@mui/icons-material/Collections';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import { DarkModeToggle } from './components/DarkModeToggle';
-import { LogoutButton } from './components/LogoutButton';
+import { SettingsTab } from './components/SettingsTab';
 import { StatsCard } from './components/StatsCard';
 import { ColorIdentityChips } from './components/ColorIdentityChips';
 import { LoadingSpinner } from './components/LoadingSpinner';
@@ -124,8 +123,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <LogoutButton />
-      <DarkModeToggle />
+      <SettingsTab />
       <Container maxWidth="lg" sx={{ py: 4 }}>
         {/* Hero Section */}
         <Fade in={mounted} timeout={800}>

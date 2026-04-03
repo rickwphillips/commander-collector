@@ -27,6 +27,7 @@ import {
 import Link from 'next/link';
 import AddIcon from '@mui/icons-material/Add';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
+import EditIcon from '@mui/icons-material/Edit';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
@@ -377,8 +378,20 @@ export default function DecksPage() {
                           </Typography>
                         </Box>
                         <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0, ml: -30 }}>
+                          <Tooltip title="Edit cards">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                router.push(`/decks/decklist?id=${deck.id}`);
+                              }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                           {deck.card_count > 0 && (
-                            <Tooltip title={`${deck.card_count} cards — edit list`}>
+                            <Tooltip title={`${deck.card_count} cards — scan art`}>
                               <IconButton
                                 size="small"
                                 color="primary"

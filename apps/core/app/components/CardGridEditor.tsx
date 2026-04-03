@@ -333,18 +333,24 @@ export function CardGridEditor({
                         )}
                       </Box>
                       {card.back_image_uri && (
-                        <IconButton
-                          size="small"
+                        <Box
                           onClick={() => toggleFlip(card._key)}
                           sx={{
-                            position: 'absolute', bottom: 4, right: 4,
-                            bgcolor: 'rgba(0,0,0,0.6)', color: '#fff',
-                            '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' },
-                            width: 28, height: 28,
+                            position: 'absolute', inset: 0, zIndex: 1,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            opacity: 0, transition: 'opacity 0.2s',
+                            '&:hover': { opacity: 1 },
+                            cursor: 'pointer',
                           }}
                         >
-                          <FlipIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
+                          <Box sx={{
+                            bgcolor: 'rgba(0,0,0,0.45)', borderRadius: '50%',
+                            width: 44, height: 44,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            <FlipIcon sx={{ fontSize: 26, color: '#fff' }} />
+                          </Box>
+                        </Box>
                       )}
                     </Box>
                   ) : (

@@ -36,6 +36,7 @@ import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import WhatshotIcon from '@mui/icons-material/Whatshot';
 import AcUnitIcon from '@mui/icons-material/AcUnit';
+import Link from 'next/link';
 import { PageContainer } from '@/components/PageContainer';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ColorIdentityChips } from '@/components/ColorIdentityChips';
@@ -698,7 +699,7 @@ function DeckRow({
                     href={`/decks/decklist?id=${deck.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    component="a"
+                    component={Link}
                     sx={{ fontSize: '0.7rem', py: 0.25, px: 1 }}
                   >
                     Edit Deck
@@ -797,7 +798,7 @@ function ListRow({
                     href={`/lists/detail?id=${list.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    component="a"
+                    component={Link}
                     sx={{ fontSize: '0.7rem', py: 0.25, px: 1 }}
                   >
                     Edit List

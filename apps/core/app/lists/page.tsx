@@ -25,6 +25,7 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import StyleIcon from '@mui/icons-material/Style';
@@ -194,16 +195,25 @@ export default function ListsPage() {
                             </Typography>
                           )}
                         </Box>
-                        <Tooltip title="Delete list">
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={(e) => { e.stopPropagation(); setDeleteTarget(list); }}
-                            sx={{ flexShrink: 0, ml: 1 }}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
+                        <Stack direction="row" sx={{ flexShrink: 0, ml: 1 }}>
+                          <Tooltip title="Edit cards">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => { e.stopPropagation(); router.push(`/lists/detail?id=${list.id}&edit=1`); }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete list">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={(e) => { e.stopPropagation(); setDeleteTarget(list); }}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
                       </Stack>
 
                       <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>

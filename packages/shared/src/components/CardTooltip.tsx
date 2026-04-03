@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Box, Tooltip } from '@mui/material';
-import { getCardImageByName } from '../lib/cardImageCache';
+import { getCardImageByName, getCardBackImageByName } from '../lib/cardImageCache';
 
 interface Props {
   name: string;
@@ -26,10 +26,12 @@ const CARD_CURSOR = `url("data:image/svg+xml,${CARD_SVG}") 7 10, zoom-in`;
  * Renders children as-is (no wrapper span) when no image is available.
  */
 export function CardTooltip({ name, children, previewWidth = 220, placement = 'top', style, onClick }: Props) {
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageUrl, setImageUrl]     = useState<string | null>(null);
+  const [backImageUrl, setBackImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     getCardImageByName(name).then((url) => setImageUrl(url));
+    getCardBackImageByName(name).then((url) => setBackImageUrl(url));
   }, [name]);
 
   if (!imageUrl) return <>{children}</>;
@@ -39,12 +41,21 @@ export function CardTooltip({ name, children, previewWidth = 220, placement = 't
       placement={placement}
       enterDelay={150}
       title={
-        <Box
-          component="img"
-          src={imageUrl}
-          alt={name}
-          sx={{ width: previewWidth, borderRadius: 1.5, display: 'block' }}
-        />
+        backImageUrl ? (
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            <Box component="img" src={imageUrl} alt={name}
+              sx={{ width: previewWidth, borderRadius: 1.5, display: 'block' }} />
+            <Box component="img" src={backImageUrl} alt={`${name} (back)`}
+              sx={{ width: previewWidth, borderRadius: 1.5, display: 'block' }} />
+          </Box>
+        ) : (
+          <Box
+            component="img"
+            src={imageUrl}
+            alt={name}
+            sx={{ width: previewWidth, borderRadius: 1.5, display: 'block' }}
+          />
+        )
       }
       slotProps={{ tooltip: { sx: { bgcolor: 'transparent', p: 0, boxShadow: 8 } } }}
     >

@@ -514,12 +514,28 @@ export function DeckFilters({ filters, onChange, resultCount, totalCount, cards 
           );
         })()}
 
-        {(allTypes.length > 0 || anyCommanders || allCmcs.length > 0 || anyProxies || anyDfcs) && <VDivider />}
+        {(resultCount !== undefined && totalCount !== undefined) || active ? (
+          <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            {active && (
+              <Tooltip title="Clear filters">
+                <IconButton size="small" onClick={clearFilters} sx={{ color: 'warning.main' }}>
+                  <FilterAltOffIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            {resultCount !== undefined && totalCount !== undefined && (
+              <Typography variant="caption" color="text.secondary">
+                {resultCount} / {totalCount}
+              </Typography>
+            )}
+          </Box>
+        ) : null}
+      </Stack>
 
-        {/* Type + CMC chips */}
-        {(allTypes.length > 0 || anyCommanders || allCmcs.length > 0) && (
-          <Stack direction="column" spacing={0.5}>
-            {(allTypes.length > 0 || anyCommanders) && (
+      {/* Type + CMC + Proxy + DFC chips — always full-width row below controls */}
+      {(allTypes.length > 0 || anyCommanders || allCmcs.length > 0 || anyProxies || anyDfcs) && (
+        <Stack direction="column" spacing={0.5}>
+            {(allTypes.length > 0 || anyCommanders || anyProxies || anyDfcs) && (
               <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap justifyContent="flex-start">
                 {allTypes.map(t => {
                   const disabled = !presentTypes.has(t) && !typeFilter.includes(t);
@@ -549,6 +565,32 @@ export function DeckFilters({ filters, onChange, resultCount, totalCount, cards 
                     />
                   );
                 })()}
+                {anyProxies && (() => {
+                  const disabled = !hasProxies && !proxyOnly;
+                  return (
+                    <Chip
+                      label="Proxy"
+                      size="small"
+                      variant={proxyOnly ? 'filled' : 'outlined'}
+                      color={proxyOnly ? 'warning' : 'default'}
+                      onClick={disabled ? undefined : () => set({ proxyOnly: !proxyOnly })}
+                      sx={{ height: 24, fontSize: '0.7rem', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.2 : 1, transition: 'opacity 0.2s' }}
+                    />
+                  );
+                })()}
+                {anyDfcs && (() => {
+                  const disabled = !hasDfcs && !dfcOnly;
+                  return (
+                    <Chip
+                      label="DFC"
+                      size="small"
+                      variant={dfcOnly ? 'filled' : 'outlined'}
+                      color={dfcOnly ? 'info' : 'default'}
+                      onClick={disabled ? undefined : () => set({ dfcOnly: !dfcOnly })}
+                      sx={{ height: 24, fontSize: '0.7rem', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.2 : 1, transition: 'opacity 0.2s' }}
+                    />
+                  );
+                })()}
               </Stack>
             )}
             {allCmcs.length > 0 && (
@@ -573,50 +615,6 @@ export function DeckFilters({ filters, onChange, resultCount, totalCount, cards 
           </Stack>
         )}
 
-        {anyProxies && (() => {
-          const disabled = !hasProxies && !proxyOnly;
-          return (
-            <Chip
-              label="Proxy"
-              size="small"
-              variant={proxyOnly ? 'filled' : 'outlined'}
-              color={proxyOnly ? 'warning' : 'default'}
-              onClick={disabled ? undefined : () => set({ proxyOnly: !proxyOnly })}
-              sx={{ height: 24, fontSize: '0.7rem', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.2 : 1, transition: 'opacity 0.2s' }}
-            />
-          );
-        })()}
-        {anyDfcs && (() => {
-          const disabled = !hasDfcs && !dfcOnly;
-          return (
-            <Chip
-              label="DFC"
-              size="small"
-              variant={dfcOnly ? 'filled' : 'outlined'}
-              color={dfcOnly ? 'info' : 'default'}
-              onClick={disabled ? undefined : () => set({ dfcOnly: !dfcOnly })}
-              sx={{ height: 24, fontSize: '0.7rem', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.2 : 1, transition: 'opacity 0.2s' }}
-            />
-          );
-        })()}
-
-        {(resultCount !== undefined && totalCount !== undefined) || active ? (
-          <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            {active && (
-              <Tooltip title="Clear filters">
-                <IconButton size="small" onClick={clearFilters} sx={{ color: 'warning.main' }}>
-                  <FilterAltOffIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
-            {resultCount !== undefined && totalCount !== undefined && (
-              <Typography variant="caption" color="text.secondary">
-                {resultCount} / {totalCount}
-              </Typography>
-            )}
-          </Box>
-        ) : null}
-      </Stack>
     </Stack>
   );
 }

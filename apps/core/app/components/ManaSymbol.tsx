@@ -5,7 +5,28 @@ import Image from 'next/image';
 import { ASSET_BASE } from '@/lib/api';
 
 const COLOR_NAME: Record<string, string> = {
+  // Basic
   W: 'White', U: 'Blue', B: 'Black', R: 'Red', G: 'Green', C: 'Colorless',
+  // Hybrid
+  WU: 'White/Blue Hybrid', WB: 'White/Black Hybrid',
+  UB: 'Blue/Black Hybrid',  UR: 'Blue/Red Hybrid',
+  BR: 'Black/Red Hybrid',   BG: 'Black/Green Hybrid',
+  RG: 'Red/Green Hybrid',   RW: 'Red/White Hybrid',
+  GW: 'Green/White Hybrid', GU: 'Green/Blue Hybrid',
+  // 2-cost hybrid
+  '2W': '2/White Hybrid', '2U': '2/Blue Hybrid', '2B': '2/Black Hybrid',
+  '2R': '2/Red Hybrid',   '2G': '2/Green Hybrid',
+  CW: 'Colorless/White', CU: 'Colorless/Blue', CB: 'Colorless/Black',
+  CR: 'Colorless/Red',   CG: 'Colorless/Green',
+  // Phyrexian
+  WP: 'Phyrexian White', UP: 'Phyrexian Blue',   BP: 'Phyrexian Black',
+  RP: 'Phyrexian Red',   GP: 'Phyrexian Green',  CP: 'Phyrexian Colorless',
+  // Phyrexian hybrid
+  WUP: 'Phyrexian White/Blue', WBP: 'Phyrexian White/Black',
+  UBP: 'Phyrexian Blue/Black', URP: 'Phyrexian Blue/Red',
+  BRP: 'Phyrexian Black/Red',  BGP: 'Phyrexian Black/Green',
+  RGP: 'Phyrexian Red/Green',  RWP: 'Phyrexian Red/White',
+  GUP: 'Phyrexian Green/Blue', GWP: 'Phyrexian Green/White',
 };
 
 // ── ManaSymbol ───────────────────────────────────────────────────

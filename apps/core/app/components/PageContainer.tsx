@@ -4,8 +4,7 @@ import { Container, Box, Typography, Fade, Button, Tooltip } from '@mui/material
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Link from 'next/link';
 import { useEffect, useState, ReactNode } from 'react';
-import { DarkModeToggle } from './DarkModeToggle';
-import { LogoutButton } from './LogoutButton';
+import { SettingsTab } from './SettingsTab';
 
 interface PageContainerProps {
   title: string;
@@ -36,10 +35,9 @@ export function PageContainer({
 
   return (
     <>
-      <LogoutButton />
-      <DarkModeToggle />
+      <SettingsTab />
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, pr: { xs: '120px', md: 0 } }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
           <Button component={Link} href={backHref} startIcon={<ArrowBackIcon />}>
             {backLabel}
           </Button>

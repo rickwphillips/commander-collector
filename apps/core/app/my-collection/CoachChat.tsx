@@ -19,6 +19,7 @@ import {
   useTheme,
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
+import StopCircleIcon from '@mui/icons-material/StopCircle';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import CloseIcon from '@mui/icons-material/Close';
 import AddCommentIcon from '@mui/icons-material/AddComment';
@@ -199,6 +200,7 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
   const thinkingInterval = useRef<ReturnType<typeof setInterval>>(null);
   const thinkingMessagesRef = useRef<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const abortCtrlRef = useRef<AbortController | null>(null);
 
   useImperativeHandle(ref, () => ({
     appendToInput: (text: string) => {
@@ -278,10 +280,14 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
   };
 
   const handleNewChat = () => {
+    abortCtrlRef.current?.abort();
+    abortCtrlRef.current = null;
     sessionIdRef.current = Date.now().toString();
     setMessages([]);
     setError(null);
     setInput('');
+    setLoading(false);
+    setPartialResponse('');
     setActiveDeck(null);
     setActiveList(null);
     setShowHistory(false);
@@ -302,12 +308,25 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
     setHistory(updated);
   };
 
+  const handleStop = () => {
+    abortCtrlRef.current?.abort();
+    abortCtrlRef.current = null;
+    setLoading(false);
+    setPartialResponse('');
+  };
+
   const handleSend = async () => {
     const text = input.trim();
-    if (!text || loading) return;
+    if (!text) return;
+
+    // Abort any in-flight request so new message takes over
+    abortCtrlRef.current?.abort();
+    const ctrl = new AbortController();
+    abortCtrlRef.current = ctrl;
 
     setInput('');
     setError(null);
+    setPartialResponse('');
 
     // Build context-aware thinking messages before triggering loading state
     thinkingMessagesRef.current = buildThinkingMessages(
@@ -323,18 +342,24 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
     try {
       const { response, toolsUsed } = await api.sendCoachMessage(
         text, messages, activeDeck ?? undefined, activeList ?? undefined,
-        (partial) => setPartialResponse(partial),
+        (partial) => { if (!ctrl.signal.aborted) setPartialResponse(partial); },
+        ctrl.signal,
       );
+      if (ctrl.signal.aborted) return;
       console.log('[coach] response received', { len: response.length, tools: toolsUsed.length, empty: response === '' });
       setPartialResponse('');
       const assistantMsg: CoachMessage = { role: 'assistant', content: response, toolsUsed };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (err) {
+      if (ctrl.signal.aborted) return;
       console.error('[coach] sendCoachMessage threw:', err);
       setPartialResponse('');
       setError(err instanceof Error ? err.message : 'Failed to get response');
     } finally {
-      setLoading(false);
+      if (!ctrl.signal.aborted) {
+        setLoading(false);
+        abortCtrlRef.current = null;
+      }
     }
   };
 
@@ -365,14 +390,13 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
             <IconButton
               size="small"
               onClick={() => setShowHistory(v => !v)}
-              disabled={loading}
               sx={{ color: showHistory ? 'primary.main' : 'inherit' }}
             >
               <HistoryIcon fontSize="small" />
             </IconButton>
           </Tooltip>
           <Tooltip title="New chat">
-            <IconButton size="small" onClick={handleNewChat} disabled={loading}>
+            <IconButton size="small" onClick={handleNewChat}>
               <AddCommentIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -540,26 +564,42 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
           )}
 
           {/* Input */}
-          <Stack direction="row" spacing={1} sx={{ p: 1.5, flexShrink: 0 }}>
+          {loading && (
+            <Typography variant="caption" color="text.secondary" sx={{ px: 1.5, fontStyle: 'italic' }}>
+              Type to interrupt the coach...
+            </Typography>
+          )}
+          <Stack direction="row" spacing={1} sx={{ p: 1.5, pt: loading ? 0.5 : 1.5, flexShrink: 0 }}>
             <TextField
               fullWidth
               size="small"
-              placeholder="Ask the coach..."
+              placeholder={loading ? 'Add more details...' : 'Ask the coach...'}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={loading}
               multiline
               maxRows={3}
               inputRef={inputRef}
             />
-            <IconButton
-              onClick={handleSend}
-              disabled={!input.trim() || loading}
-              color="primary"
-            >
-              <SendIcon />
-            </IconButton>
+            {loading && !input.trim() ? (
+              <Tooltip title="Stop">
+                <IconButton onClick={handleStop} color="default">
+                  <StopCircleIcon />
+                </IconButton>
+              </Tooltip>
+            ) : (
+              <Tooltip title={loading ? 'Interrupt and send' : 'Send'}>
+                <span>
+                  <IconButton
+                    onClick={handleSend}
+                    disabled={!input.trim()}
+                    color={loading ? 'warning' : 'primary'}
+                  >
+                    <SendIcon />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            )}
           </Stack>
         </>
       )}
@@ -648,7 +688,13 @@ const TOOL_LABELS: Record<string, string> = {
 
 function toolLabel(tool: CoachToolCall): string {
   const base = TOOL_LABELS[tool.name] ?? tool.name;
-  if (tool.name === 'lookup_card' && tool.input.name) return `${base}: ${tool.input.name}`;
+  if (tool.name === 'lookup_card') {
+    const names = Array.isArray(tool.input.names) ? tool.input.names as string[]
+                : tool.input.name ? [tool.input.name as string]
+                : [];
+    if (names.length === 1) return `${base}: ${names[0]}`;
+    if (names.length > 1)   return `${base}: ${names.slice(0, 3).join(', ')}${names.length > 3 ? ` +${names.length - 3}` : ''}`;
+  }
   if (tool.name === 'check_card_in_deck' && tool.input.card_name) return `${base}: ${tool.input.card_name}`;
   if (tool.name === 'search_deck_cards' && (tool.input.query || tool.input.type_category)) {
     const q = [tool.input.type_category, tool.input.query].filter(Boolean).join(' / ');

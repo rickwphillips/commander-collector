@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback, useTransition, Suspense } from 'react';
+import { useEffect, useState, useMemo, useCallback, useTransition, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Accordion,
@@ -29,10 +29,12 @@ import {
   TextField,
   Tooltip,
   Typography,
+  Zoom,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CancelIcon from '@mui/icons-material/Cancel';
 import EditIcon from '@mui/icons-material/Edit';
+import FlipIcon from '@mui/icons-material/SyncAlt';
 import LinkIcon from '@mui/icons-material/Link';
 import SaveIcon from '@mui/icons-material/Save';
 import { PageContainer } from '@/components/PageContainer';
@@ -104,9 +106,29 @@ function GalleryCard({ card }: { card: ListCard & { _key?: string } }) {
               sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }} />
           )}
         </Box>
+        {isDfc && (
+          <Box
+            onClick={(e) => { e.stopPropagation(); setFlipped(f => !f); }}
+            sx={{
+              position: 'absolute', inset: 0, zIndex: 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              opacity: 0, transition: 'opacity 0.2s',
+              '&:hover': { opacity: 1 },
+              cursor: 'pointer',
+            }}
+          >
+            <Box sx={{
+              bgcolor: 'rgba(0,0,0,0.45)', borderRadius: '50%',
+              width: 44, height: 44,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <FlipIcon sx={{ fontSize: 26, color: '#fff' }} />
+            </Box>
+          </Box>
+        )}
         {card.quantity > 1 && (
           <Box sx={{
-            position: 'absolute', bottom: 4, right: 4,
+            position: 'absolute', bottom: 4, left: 4,
             bgcolor: 'rgba(0,0,0,0.7)', color: 'white',
             borderRadius: '50%', width: 22, height: 22,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -126,6 +148,7 @@ function ListDetailInner() {
   const searchParams = useSearchParams();
   const router       = useRouter();
   const id           = Number(searchParams.get('id'));
+  const autoEdit     = searchParams.get('edit') === '1';
 
   const [list, setList]       = useState<CardListDetail | null>(null);
   const [decks, setDecks]     = useState<DeckWithPlayer[]>([]);
@@ -142,6 +165,8 @@ function ListDetailInner() {
   const [draftDesc, setDraftDesc]   = useState('');
   const [draftCards, setDraftCards] = useState<EditableCard[]>([]);
   const [saving, setSaving]         = useState(false);
+  const [isDirty, setIsDirty]       = useState(false);
+  const savedCardsRef               = useRef<EditableCard[]>([]);
 
   // Attach to deck state
   const [attachOpen, setAttachOpen]         = useState(false);
@@ -161,6 +186,14 @@ function ListDetailInner() {
         setList(listData);
         setDecks(decksData as DeckWithPlayer[]);
         runAudit(listData);
+        if (autoEdit) {
+          const editable = listData.cards.map(listCardToEditable);
+          savedCardsRef.current = editable;
+          setDraftName(listData.name);
+          setDraftDesc(listData.description ?? '');
+          setDraftCards(editable);
+          setEditMode(true);
+        }
       } catch {
         setError('Failed to load list');
       } finally {
@@ -193,17 +226,26 @@ function ListDetailInner() {
 
   const handleEditStart = () => {
     if (!list) return;
+    const editable = list.cards.map(listCardToEditable);
+    savedCardsRef.current = editable;
     setDraftName(list.name);
     setDraftDesc(list.description ?? '');
-    setDraftCards(list.cards.map(listCardToEditable));
+    setDraftCards(editable);
+    setIsDirty(false);
     setEditMode(true);
   };
 
   const handleEditCancel = () => {
+    setIsDirty(false);
     setEditMode(false);
   };
 
-  const handleSave = async () => {
+  const handleDraftChange = (updated: EditableCard[]) => {
+    setDraftCards(updated);
+    setIsDirty(true);
+  };
+
+  const doSave = async (exitEdit: boolean) => {
     setSaving(true);
     try {
       await api.updateList(id, {
@@ -219,14 +261,24 @@ function ListDetailInner() {
       });
       const fresh = await api.getList(id);
       setList(fresh);
-      setEditMode(false);
       runAudit(fresh);
+      if (exitEdit) {
+        setEditMode(false);
+      } else {
+        const editable = fresh.cards.map(listCardToEditable);
+        savedCardsRef.current = editable;
+        setDraftCards(editable);
+        setIsDirty(false);
+      }
     } catch {
       setError('Failed to save');
     } finally {
       setSaving(false);
     }
   };
+
+  const handleSave            = () => doSave(true);
+  const handleSaveAndContinue = () => doSave(false);
 
   // Attach to deck
   const handleAttach = async () => {
@@ -306,6 +358,9 @@ function ListDetailInner() {
             <Button startIcon={<CancelIcon />} onClick={handleEditCancel} disabled={saving}>
               Cancel
             </Button>
+            <Button variant="outlined" startIcon={<SaveIcon />} onClick={handleSaveAndContinue} disabled={saving}>
+              {saving ? 'Saving…' : 'Save & Continue'}
+            </Button>
             <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSave} disabled={saving}>
               {saving ? 'Saving…' : 'Save'}
             </Button>
@@ -367,7 +422,21 @@ function ListDetailInner() {
             </Accordion>
           </Card>
 
-          <CardGridEditor cards={draftCards} onChange={setDraftCards} />
+          <CardGridEditor cards={draftCards} onChange={handleDraftChange} />
+          <Zoom in={isDirty && !saving}>
+            <Box sx={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 1100 }}>
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<SaveIcon />}
+                onClick={handleSaveAndContinue}
+                disabled={saving}
+                sx={{ borderRadius: 3, px: 3, boxShadow: 6 }}
+              >
+                Save
+              </Button>
+            </Box>
+          </Zoom>
         </>
       ) : (
         /* ── View Mode ─────────────────────────────────────────────────────── */
