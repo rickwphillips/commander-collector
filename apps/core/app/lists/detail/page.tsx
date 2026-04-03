@@ -32,11 +32,10 @@ import {
   Zoom,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import CancelIcon from '@mui/icons-material/Cancel';
 import EditIcon from '@mui/icons-material/Edit';
 import FlipIcon from '@mui/icons-material/SyncAlt';
-import LinkIcon from '@mui/icons-material/Link';
 import SaveIcon from '@mui/icons-material/Save';
+import { DeckActions } from '@/components/DeckActions';
 import { PageContainer } from '@/components/PageContainer';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { DeckBreakdown } from '@/components/DeckBreakdown';
@@ -153,7 +152,8 @@ function ListDetailInner() {
   const [list, setList]       = useState<CardListDetail | null>(null);
   const [decks, setDecks]     = useState<DeckWithPlayer[]>([]);
   const [loading, setLoading]   = useState(!!id);
-  const [auditing, setAuditing] = useState(false);
+  const [auditing, setAuditing]   = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError]     = useState<string | null>(null);
   const [tab, setTab]                   = useState(0);
   const [filters, setFilters]           = useState<DeckFilterState>(EMPTY_FILTERS);
@@ -165,6 +165,7 @@ function ListDetailInner() {
   const [draftDesc, setDraftDesc]   = useState('');
   const [draftCards, setDraftCards] = useState<EditableCard[]>([]);
   const [saving, setSaving]         = useState(false);
+  const [ttsBusy, setTtsBusy]       = useState(false);
   const [isDirty, setIsDirty]       = useState(false);
   const savedCardsRef               = useRef<EditableCard[]>([]);
 
@@ -295,6 +296,84 @@ function ListDetailInner() {
     }
   };
 
+  // ── Scryfall refresh ───────────────────────────────────────────────────────
+
+  const handleRefreshViewCards = async () => {
+    if (!list) return;
+    setRefreshing(true);
+    try {
+      const { results } = await api.bulkLookupCards(list.cards.map(c => c.card_name));
+      const hit = new Map(results.filter(r => !r.error).map(r => [r.name.toLowerCase(), r]));
+      await api.updateList(id, {
+        name: list.name,
+        cards: list.cards.map(c => ({
+          card_name:    c.card_name,
+          scryfall_id:  hit.get(c.card_name.toLowerCase())?.scryfall_id ?? c.scryfall_id ?? undefined,
+          quantity:     c.quantity,
+          is_commander: !!c.is_commander,
+          is_proxy:     !!c.is_proxy,
+        })),
+      });
+      const fresh = await api.getList(id);
+      setList(fresh);
+    } catch {
+      setError('Failed to refresh card data');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleRefreshDraftCards = async () => {
+    setRefreshing(true);
+    try {
+      const { results } = await api.bulkLookupCards(draftCards.map(c => c.card_name));
+      const hit = new Map(results.filter(r => !r.error).map(r => [r.name.toLowerCase(), r]));
+      setDraftCards(prev => prev.map(c => {
+        const found = hit.get(c.card_name.toLowerCase());
+        if (!found) return c;
+        return { ...c, scryfall_id: found.scryfall_id, image_uri: found.image_uri, back_image_uri: found.back_image_uri ?? null, type_line: found.type_line, mana_cost: found.mana_cost, color_identity: found.color_identity, notFound: false };
+      }));
+      setIsDirty(true);
+    } catch {
+      setError('Failed to refresh card data');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // ── Exports ────────────────────────────────────────────────────────────────
+
+  const handleExportTCGPlayer = () => {
+    if (!list || list.cards.length === 0) return;
+    const content = list.cards.map((c) => `${c.quantity} ${c.card_name}`).join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${list.name.replace(/[^a-z0-9]/gi, '_')}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportTTS = async () => {
+    if (!list || list.cards.length === 0 || ttsBusy) return;
+    setTtsBusy(true);
+    try {
+      const ttsData = await api.exportTTS({ listId: id });
+      const blob = new Blob([JSON.stringify(ttsData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${list.name.replace(/[^a-z0-9]/gi, '_')}_TTS.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'TTS export failed');
+    } finally {
+      setTtsBusy(false);
+    }
+  };
+
   // ── Derived display data ──────────────────────────────────────────────────
 
   const viewCards     = list?.cards ?? [];
@@ -354,29 +433,25 @@ function ListDetailInner() {
       backLabel="Lists"
       actions={
         editMode ? (
-          <Stack direction="row" spacing={1}>
-            <Button startIcon={<CancelIcon />} onClick={handleEditCancel} disabled={saving}>
-              Cancel
-            </Button>
-            <Button variant="outlined" startIcon={<SaveIcon />} onClick={handleSaveAndContinue} disabled={saving}>
-              {saving ? 'Saving…' : 'Save & Continue'}
-            </Button>
-            <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
-            </Button>
-          </Stack>
+          <DeckActions
+            onCancel={handleEditCancel}
+            onRefresh={handleRefreshDraftCards}
+            onSaveAndContinue={handleSaveAndContinue}
+            onSave={handleSave}
+            saving={saving}
+            refreshing={refreshing}
+          />
         ) : (
-          <Stack direction="row" spacing={1}>
-            <Button startIcon={<EditIcon />} onClick={handleEditStart}>Edit</Button>
-            <Button
-              variant="contained"
-              startIcon={<LinkIcon />}
-              onClick={() => setAttachOpen(true)}
-              disabled={list.cards.length === 0}
-            >
-              Attach to Deck
-            </Button>
-          </Stack>
+          <DeckActions
+            onExport={handleExportTCGPlayer}
+            onTTS={handleExportTTS}
+            ttsBusy={ttsBusy}
+            onRefresh={handleRefreshViewCards}
+            onEdit={handleEditStart}
+            onAttach={() => setAttachOpen(true)}
+            hasCards={list.cards.length > 0}
+            refreshing={refreshing}
+          />
         )
       }
     >

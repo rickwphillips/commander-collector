@@ -21,11 +21,8 @@ import {
   DialogActions,
 } from '@mui/material';
 import Link from 'next/link';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import DownloadIcon from '@mui/icons-material/Download';
-import ListAltIcon from '@mui/icons-material/ListAlt';
+import { DeckActions } from '@/components/DeckActions';
 import { PageContainer } from '@/components/PageContainer';
 import { StatsCard } from '@/components/StatsCard';
 import { ColorIdentityChips } from '@/components/ColorIdentityChips';
@@ -60,6 +57,9 @@ export default function DeckDetailPage() {
   // Delete state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // TTS export
+  const [ttsBusy, setTtsBusy] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -159,6 +159,25 @@ export default function DeckDetailPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleExportTTS = async () => {
+    if (!deck || deckCards.length === 0 || ttsBusy) return;
+    setTtsBusy(true);
+    try {
+      const ttsData = await api.exportTTS({ deckId });
+      const blob = new Blob([JSON.stringify(ttsData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${deck.name.replace(/[^a-z0-9]/gi, '_')}_TTS.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'TTS export failed');
+    } finally {
+      setTtsBusy(false);
+    }
+  };
+
   if (!deckId) {
     return (
       <PageContainer title="Deck Not Found" backHref="/decks" backLabel="Back to Decks">
@@ -190,33 +209,15 @@ export default function DeckDetailPage() {
       backHref="/decks"
       backLabel="Back to Decks"
       actions={
-        <Stack direction="row" spacing={1}>
-          <Button
-            startIcon={<DownloadIcon />}
-            onClick={handleExportTCGPlayer}
-            disabled={deckCards.length === 0}
-          >
-            Export
-          </Button>
-          <Button
-            component={Link}
-            href={`/decks/decklist?id=${deckId}`}
-            startIcon={<ListAltIcon />}
-            disabled={deckCards.length === 0}
-          >
-            Decklist
-          </Button>
-          <Button startIcon={<EditIcon />} onClick={handleEdit}>
-            Edit
-          </Button>
-          <Button
-            color="error"
-            startIcon={<DeleteIcon />}
-            onClick={() => setDeleteDialogOpen(true)}
-          >
-            Delete
-          </Button>
-        </Stack>
+        <DeckActions
+          onExport={handleExportTCGPlayer}
+          onTTS={handleExportTTS}
+          ttsBusy={ttsBusy}
+          decklistHref={`/decks/decklist?id=${deckId}`}
+          onEdit={handleEdit}
+          onDelete={() => setDeleteDialogOpen(true)}
+          hasCards={deckCards.length > 0}
+        />
       }
     >
       {error && (

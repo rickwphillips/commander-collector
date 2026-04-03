@@ -7,6 +7,7 @@ export interface ScryfallCachedCard {
   scryfall_id: string;
   name: string;
   image_uri: string | null;
+  back_image_uri?: string | null;
   colors: string;
   color_identity: string;
   type_line: string | null;

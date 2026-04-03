@@ -22,11 +22,9 @@ import {
   Typography,
   Zoom,
 } from '@mui/material';
-import CallSplitIcon from '@mui/icons-material/CallSplit';
-import CancelIcon from '@mui/icons-material/Cancel';
-import EditIcon from '@mui/icons-material/Edit';
 import FlipIcon from '@mui/icons-material/SyncAlt';
 import SaveIcon from '@mui/icons-material/Save';
+import { DeckActions } from '@/components/DeckActions';
 import { PageContainer } from '@/components/PageContainer';
 import { DeckBreakdown } from '@/components/DeckBreakdown';
 import { DeckFilters, EMPTY_FILTERS, TYPE_CATEGORIES, getTypeCategory, hasActiveFilters, matchesFilters, sortCards } from '@/components/DeckFilters';
@@ -138,6 +136,8 @@ function DecklistPageInner() {
   const [isDirty, setIsDirty]       = useState(false);
   const savedCardsRef               = useRef<EditableCard[]>([]);
 
+  const [refreshing, setRefreshing] = useState(false);
+
   // Detach to List
   const [detachOpen, setDetachOpen] = useState(false);
   const [detachName, setDetachName] = useState('');
@@ -238,6 +238,80 @@ function DecklistPageInner() {
     }
   };
 
+  // ── Scryfall refresh ───────────────────────────────────────────────────────
+
+  const handleRefreshViewCards = async () => {
+    setRefreshing(true);
+    try {
+      const { results } = await api.bulkLookupCards(cards.map(c => c.card_name));
+      const hit = new Map(results.filter(r => !r.error).map(r => [r.name.toLowerCase(), r]));
+      await api.saveDeckCards(deckId, cards.map(c => ({
+        card_name:    c.card_name,
+        scryfall_id:  hit.get(c.card_name.toLowerCase())?.scryfall_id ?? c.scryfall_id,
+        quantity:     c.quantity,
+        is_commander: !!c.is_commander,
+        is_proxy:     !!c.is_proxy,
+      })));
+      setCards(await api.getDeckCards(deckId));
+    } catch {
+      setError('Failed to refresh card data');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleRefreshDraftCards = async () => {
+    setRefreshing(true);
+    try {
+      const { results } = await api.bulkLookupCards(draftCards.map(c => c.card_name));
+      const hit = new Map(results.filter(r => !r.error).map(r => [r.name.toLowerCase(), r]));
+      setDraftCards(prev => prev.map(c => {
+        const found = hit.get(c.card_name.toLowerCase());
+        if (!found) return c;
+        return { ...c, scryfall_id: found.scryfall_id, image_uri: found.image_uri, back_image_uri: found.back_image_uri ?? null, type_line: found.type_line, mana_cost: found.mana_cost, color_identity: found.color_identity, notFound: false };
+      }));
+      setIsDirty(true);
+    } catch {
+      setError('Failed to refresh card data');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // ── Exports ────────────────────────────────────────────────────────────────
+
+  const [ttsBusy, setTtsBusy] = useState(false);
+
+  const handleExportTCGPlayer = () => {
+    if (!deck || cards.length === 0) return;
+    const blob = new Blob([cards.map(c => `${c.quantity} ${c.card_name}`).join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${deck.name.replace(/[^a-z0-9]/gi, '_')}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportTTS = async () => {
+    if (!deck || cards.length === 0 || ttsBusy) return;
+    setTtsBusy(true);
+    try {
+      const ttsData = await api.exportTTS({ deckId });
+      const blob = new Blob([JSON.stringify(ttsData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${deck.name.replace(/[^a-z0-9]/gi, '_')}_TTS.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'TTS export failed');
+    } finally {
+      setTtsBusy(false);
+    }
+  };
+
   // ── View mode derived data ─────────────────────────────────────────────────
 
   const commanderCard = useMemo(() => cards.find(c => c.is_commander), [cards]);
@@ -302,39 +376,27 @@ function DecklistPageInner() {
       backLabel="Back to Deck"
       actions={
         editMode ? (
-          <Stack direction="row" spacing={1}>
-            <Button startIcon={<CancelIcon />} onClick={handleEditCancel} disabled={saving}>
-              Cancel
-            </Button>
-            <Button variant="outlined" startIcon={<SaveIcon />} onClick={handleSaveAndContinue} disabled={saving}>
-              {saving ? 'Saving…' : 'Save & Continue'}
-            </Button>
-            <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
-            </Button>
-          </Stack>
-        ) : (
-          cards.length > 0 ? (
-            <Stack direction="row" spacing={1}>
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<EditIcon />}
-                onClick={handleEditStart}
-              >
-                Edit Cards
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<CallSplitIcon />}
-                onClick={() => { setDetachName(deck.name + ' List'); setDetachOpen(true); }}
-              >
-                Detach to List
-              </Button>
-            </Stack>
-          ) : undefined
-        )
+          <DeckActions
+            onCancel={handleEditCancel}
+            onRefresh={handleRefreshDraftCards}
+            onSaveAndContinue={handleSaveAndContinue}
+            onSave={handleSave}
+            saving={saving}
+            refreshing={refreshing}
+          />
+        ) : cards.length > 0 ? (
+          <DeckActions
+            onExport={handleExportTCGPlayer}
+            onTTS={handleExportTTS}
+            ttsBusy={ttsBusy}
+            onRefresh={handleRefreshViewCards}
+            onEdit={handleEditStart}
+            editLabel="Edit Cards"
+            onDetach={() => { setDetachName(deck.name + ' List'); setDetachOpen(true); }}
+            hasCards
+            refreshing={refreshing}
+          />
+        ) : undefined
       }
     >
       {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}

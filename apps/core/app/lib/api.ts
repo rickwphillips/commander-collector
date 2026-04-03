@@ -304,6 +304,12 @@ export const api = {
       { method: 'POST', body: JSON.stringify(settings) }
     ),
 
+  // TTS Export — generates sprite-sheet JSON for Tabletop Simulator
+  exportTTS: (params: { deckId?: number; listId?: number }) => {
+    const q = params.deckId ? `deck_id=${params.deckId}` : `list_id=${params.listId}`;
+    return apiFetch<Record<string, unknown>>(`/tts-export?${q}`);
+  },
+
   // Changelog
   getChangelog: () =>
     apiFetch<Array<{ version: string; date: string; title: string; changes: Array<{ type: string; text: string }> }>>('/changelog'),
