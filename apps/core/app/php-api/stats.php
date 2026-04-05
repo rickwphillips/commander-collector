@@ -1,6 +1,7 @@
 <?php
 require_once 'config.php';
 require_once __DIR__ . '/auth/middleware.php';
+require_once __DIR__ . '/lib/sql-helpers.php';
 requireAuth();
 
 $pdo = getDB();
@@ -13,25 +14,29 @@ if ($method !== 'GET') {
 $playerId = isset($_GET['player_id']) ? (int)$_GET['player_id'] : null;
 $deckId = isset($_GET['deck_id']) ? (int)$_GET['deck_id'] : null;
 
+$_totalGamesD = totalGamesDistinct();
+$_totalGamesR = totalGames();
+$_wins        = winsExpr();
+$_wrDistinct  = winRateDistinct();
+$_wrRows      = winRateRows();
+$_avgFinish   = avgFinishExpr();
+$_deckCount   = deckCountExpr('decks_using');
+
 // Player-specific stats
 if ($playerId) {
-    $stmt = $pdo->prepare('
+    $stmt = $pdo->prepare("
         SELECT
             p.id as player_id,
             p.name as player_name,
-            COUNT(DISTINCT gr.game_id) as total_games,
-            COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
-            ROUND(
-                COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 /
-                NULLIF(COUNT(DISTINCT gr.game_id), 0),
-                1
-            ) as win_rate,
-            ROUND(AVG(gr.finish_position), 2) as avg_finish_position
+            $_totalGamesD,
+            $_wins,
+            $_wrDistinct,
+            $_avgFinish
         FROM players p
         LEFT JOIN game_results gr ON gr.player_id = p.id
         WHERE p.id = ?
         GROUP BY p.id
-    ');
+    ");
     $stmt->execute([$playerId]);
     $stats = $stmt->fetch();
 
@@ -44,27 +49,23 @@ if ($playerId) {
 
 // Deck-specific stats
 if ($deckId) {
-    $stmt = $pdo->prepare('
+    $stmt = $pdo->prepare("
         SELECT
             d.id as deck_id,
             d.name as deck_name,
             d.commander,
             d.colors,
             p.name as player_name,
-            COUNT(gr.id) as total_games,
-            COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
-            ROUND(
-                COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 /
-                NULLIF(COUNT(gr.id), 0),
-                1
-            ) as win_rate,
-            ROUND(AVG(gr.finish_position), 2) as avg_finish_position
+            $_totalGamesR,
+            $_wins,
+            $_wrRows,
+            $_avgFinish
         FROM decks d
         JOIN players p ON d.player_id = p.id
         LEFT JOIN game_results gr ON gr.deck_id = d.id
         WHERE d.id = ?
         GROUP BY d.id
-    ');
+    ");
     $stmt->execute([$deckId]);
     $stats = $stmt->fetch();
 
@@ -85,40 +86,32 @@ $overall = $pdo->query('
 ')->fetch();
 
 // Top players by win rate (min 3 games)
-$topPlayers = $pdo->query('
+$topPlayers = $pdo->query("
     SELECT
         p.id as player_id,
         p.name as player_name,
-        COUNT(DISTINCT gr.game_id) as total_games,
-        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
-        ROUND(
-            COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 /
-            NULLIF(COUNT(DISTINCT gr.game_id), 0),
-            1
-        ) as win_rate
+        $_totalGamesD,
+        $_wins,
+        $_wrDistinct
     FROM players p
     JOIN game_results gr ON gr.player_id = p.id
     GROUP BY p.id
     HAVING COUNT(DISTINCT gr.game_id) >= 3
     ORDER BY win_rate DESC, wins DESC
     LIMIT 5
-')->fetchAll();
+")->fetchAll();
 
 // Top decks by win rate (min 3 games)
-$topDecks = $pdo->query('
+$topDecks = $pdo->query("
     SELECT
         d.id as deck_id,
         d.name as deck_name,
         d.commander,
         d.colors,
         p.name as player_name,
-        COUNT(gr.id) as total_games,
-        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
-        ROUND(
-            COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 /
-            NULLIF(COUNT(gr.id), 0),
-            1
-        ) as win_rate
+        $_totalGamesR,
+        $_wins,
+        $_wrRows
     FROM decks d
     JOIN players p ON d.player_id = p.id
     JOIN game_results gr ON gr.deck_id = d.id
@@ -126,27 +119,23 @@ $topDecks = $pdo->query('
     HAVING COUNT(gr.id) >= 3
     ORDER BY win_rate DESC, wins DESC
     LIMIT 5
-')->fetchAll();
+")->fetchAll();
 
 // Top commanders by win rate (min 3 games)
-$topCommanders = $pdo->query('
+$topCommanders = $pdo->query("
     SELECT
         d.commander,
-        COUNT(gr.id) as total_games,
-        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
-        ROUND(
-            COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 /
-            NULLIF(COUNT(gr.id), 0),
-            1
-        ) as win_rate,
-        COUNT(DISTINCT d.id) as decks_using
+        $_totalGamesR,
+        $_wins,
+        $_wrRows,
+        $_deckCount
     FROM decks d
     JOIN game_results gr ON gr.deck_id = d.id
     GROUP BY d.commander
     HAVING COUNT(gr.id) >= 3
     ORDER BY win_rate DESC, wins DESC
     LIMIT 10
-')->fetchAll();
+")->fetchAll();
 
 // Recent games (GROUP_CONCAT handles 2HG multi-winner)
 $recentGames = $pdo->query('

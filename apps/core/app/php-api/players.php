@@ -1,6 +1,7 @@
 <?php
 require_once 'config.php';
 require_once __DIR__ . '/auth/middleware.php';
+require_once __DIR__ . '/lib/sql-helpers.php';
 requireAuth();
 
 $pdo = getDB();
@@ -21,21 +22,20 @@ switch ($method) {
             sendJSON($player);
         } else {
             // Get all players with stats
-            $stmt = $pdo->query('
+            $_tg = totalGamesDistinct();
+            $_w  = winsExpr();
+            $_wr = winRateDistinct();
+            $stmt = $pdo->query("
                 SELECT
                     p.*,
-                    COUNT(DISTINCT gr.game_id) as total_games,
-                    COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
-                    ROUND(
-                        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 /
-                        NULLIF(COUNT(DISTINCT gr.game_id), 0),
-                        1
-                    ) as win_rate
+                    $_tg,
+                    $_w,
+                    $_wr
                 FROM players p
                 LEFT JOIN game_results gr ON gr.player_id = p.id
                 GROUP BY p.id
                 ORDER BY p.name ASC
-            ');
+            ");
             sendJSON($stmt->fetchAll());
         }
         break;

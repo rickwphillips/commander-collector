@@ -1,6 +1,7 @@
 <?php
 require_once 'config.php';
 require_once __DIR__ . '/auth/middleware.php';
+require_once __DIR__ . '/lib/sql-helpers.php';
 requireAuth();
 
 $pdo = getDB();
@@ -11,50 +12,47 @@ if ($method !== 'GET') {
 }
 
 // A) Color Meta Analysis
-$colorMeta = $pdo->query('
+$_dc = deckCountExpr();
+$_tg = totalGames();
+$_w  = winsExpr();
+$_wr = winRateRows();
+$_af = avgFinishExpr();
+
+$colorMeta = $pdo->query("
     SELECT
         d.colors,
-        LENGTH(REPLACE(d.colors, "C", "")) as color_count,
-        COUNT(DISTINCT d.id) as deck_count,
-        COUNT(gr.id) as total_games,
-        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
-        ROUND(
-            COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 /
-            NULLIF(COUNT(gr.id), 0),
-            1
-        ) as win_rate,
-        ROUND(AVG(gr.finish_position), 2) as avg_finish_position
+        LENGTH(REPLACE(d.colors, 'C', '')) as color_count,
+        $_dc,
+        $_tg,
+        $_w,
+        $_wr,
+        $_af
     FROM decks d
     JOIN game_results gr ON gr.deck_id = d.id
     GROUP BY d.colors
     ORDER BY total_games DESC
-')->fetchAll();
+")->fetchAll();
 
 // B) Performance by Game Size (pod size)
-$gameSizeRaw = $pdo->query('
+$_tgD = totalGamesDistinct();
+$_pod = podSizeSubquery();
+
+$gameSizeRaw = $pdo->query("
     SELECT
         pod.pod_size,
-        COUNT(DISTINCT gr.game_id) as total_games,
+        $_tgD,
         gr.player_id,
         p.name as player_name,
         COUNT(gr.id) as games_played,
-        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
-        ROUND(
-            COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 /
-            NULLIF(COUNT(gr.id), 0),
-            1
-        ) as win_rate,
-        ROUND(AVG(gr.finish_position), 2) as avg_finish_position
+        $_w,
+        $_wr,
+        $_af
     FROM game_results gr
     JOIN players p ON gr.player_id = p.id
-    JOIN (
-        SELECT game_id, COUNT(*) as pod_size
-        FROM game_results
-        GROUP BY game_id
-    ) pod ON pod.game_id = gr.game_id
+    JOIN $_pod ON pod.game_id = gr.game_id
     GROUP BY pod.pod_size, gr.player_id
     ORDER BY pod.pod_size, wins DESC
-')->fetchAll();
+")->fetchAll();
 
 // Group by pod size
 $gameSizeStats = [];
@@ -118,24 +116,21 @@ $deckStreaks = computeStreaks($deckResults, 'deck');
 // D) Two-Headed Giant Stats
 
 // D1) Individual player 2HG records
-$twoHgPlayers = $pdo->query('
+$_wrD = winRateDistinct();
+$twoHgPlayers = $pdo->query("
     SELECT
         gr.player_id,
         p.name as player_name,
-        COUNT(DISTINCT gr.game_id) as total_games,
-        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
-        ROUND(
-            COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 /
-            NULLIF(COUNT(DISTINCT gr.game_id), 0),
-            1
-        ) as win_rate
+        $_tgD,
+        $_w,
+        $_wrD
     FROM game_results gr
     JOIN players p ON gr.player_id = p.id
     JOIN games g ON gr.game_id = g.id
-    WHERE g.game_type = "2hg"
+    WHERE g.game_type = '2hg'
     GROUP BY gr.player_id
     ORDER BY wins DESC, win_rate DESC
-')->fetchAll();
+")->fetchAll();
 
 // D2) Team pairings — find all unique partner combos and their records
 $twoHgTeamRows = $pdo->query('
@@ -221,66 +216,27 @@ $twoHgStats = [
 ];
 
 // E) Color Presence Breakdown — stats for all decks containing each individual color
-$colorPresence = $pdo->query('
-    SELECT "W" as color_key,
-        COUNT(DISTINCT d.id) as deck_count,
-        COUNT(gr.id) as total_games,
-        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
-        ROUND(COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 / NULLIF(COUNT(gr.id), 0), 1) as win_rate,
-        ROUND(AVG(gr.finish_position), 2) as avg_finish_position
-    FROM decks d JOIN game_results gr ON gr.deck_id = d.id WHERE d.has_w = 1
-    UNION ALL
-    SELECT "U" as color_key,
-        COUNT(DISTINCT d.id) as deck_count,
-        COUNT(gr.id) as total_games,
-        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
-        ROUND(COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 / NULLIF(COUNT(gr.id), 0), 1) as win_rate,
-        ROUND(AVG(gr.finish_position), 2) as avg_finish_position
-    FROM decks d JOIN game_results gr ON gr.deck_id = d.id WHERE d.has_u = 1
-    UNION ALL
-    SELECT "B" as color_key,
-        COUNT(DISTINCT d.id) as deck_count,
-        COUNT(gr.id) as total_games,
-        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
-        ROUND(COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 / NULLIF(COUNT(gr.id), 0), 1) as win_rate,
-        ROUND(AVG(gr.finish_position), 2) as avg_finish_position
-    FROM decks d JOIN game_results gr ON gr.deck_id = d.id WHERE d.has_b = 1
-    UNION ALL
-    SELECT "R" as color_key,
-        COUNT(DISTINCT d.id) as deck_count,
-        COUNT(gr.id) as total_games,
-        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
-        ROUND(COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 / NULLIF(COUNT(gr.id), 0), 1) as win_rate,
-        ROUND(AVG(gr.finish_position), 2) as avg_finish_position
-    FROM decks d JOIN game_results gr ON gr.deck_id = d.id WHERE d.has_r = 1
-    UNION ALL
-    SELECT "G" as color_key,
-        COUNT(DISTINCT d.id) as deck_count,
-        COUNT(gr.id) as total_games,
-        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
-        ROUND(COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 / NULLIF(COUNT(gr.id), 0), 1) as win_rate,
-        ROUND(AVG(gr.finish_position), 2) as avg_finish_position
-    FROM decks d JOIN game_results gr ON gr.deck_id = d.id WHERE d.has_g = 1
-')->fetchAll();
+$colorUnions = [];
+foreach (['W' => 'has_w', 'U' => 'has_u', 'B' => 'has_b', 'R' => 'has_r', 'G' => 'has_g'] as $color => $col) {
+    $colorUnions[] = "SELECT '$color' as color_key, $_dc, $_tg, $_w, $_wr, $_af
+    FROM decks d JOIN game_results gr ON gr.deck_id = d.id WHERE d.$col = 1";
+}
+$colorPresence = $pdo->query(implode("\n    UNION ALL\n    ", $colorUnions))->fetchAll();
 
 // F) Color Count Breakdown — stats grouped by number of colors in a deck
-$colorCount = $pdo->query('
+$colorCount = $pdo->query("
     SELECT
         (d.has_w + d.has_u + d.has_b + d.has_r + d.has_g) as color_count,
-        COUNT(DISTINCT d.id) as deck_count,
-        COUNT(gr.id) as total_games,
-        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
-        ROUND(
-            COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 /
-            NULLIF(COUNT(gr.id), 0),
-            1
-        ) as win_rate,
-        ROUND(AVG(gr.finish_position), 2) as avg_finish_position
+        $_dc,
+        $_tg,
+        $_w,
+        $_wr,
+        $_af
     FROM decks d
     JOIN game_results gr ON gr.deck_id = d.id
     GROUP BY color_count
     ORDER BY color_count
-')->fetchAll();
+")->fetchAll();
 
 sendJSON([
     'colorMeta' => $colorMeta,

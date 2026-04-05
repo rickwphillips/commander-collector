@@ -233,7 +233,7 @@ function podSizeSubquery() {
 | 6 | GameForm — delete stale shared copy (DONE) | Medium | Low | ~300 |
 | 5 | API query cache (DEFERRED) | Medium | Medium | 0 (perf) |
 | 7 | ScanDeckPage decomposition | Medium | High | 0 (readability) |
-| 8 | PHP SQL helper functions | Medium | Low | ~60 |
+| 8 | PHP SQL helper functions (DONE) | Medium | Low | ~60 |
 | 9 | Consolidate color name constants | Low | Low | ~15 |
 | 10 | Standardize mana symbol paths | Low | Low | ~5 |
 

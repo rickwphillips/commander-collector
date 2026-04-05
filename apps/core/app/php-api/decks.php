@@ -1,6 +1,7 @@
 <?php
 require_once 'config.php';
 require_once __DIR__ . '/auth/middleware.php';
+require_once __DIR__ . '/lib/sql-helpers.php';
 requireAuth();
 
 function colorsToFields(string $colors): array {
@@ -29,26 +30,27 @@ $playerId = isset($_GET['player_id']) ? (int)$_GET['player_id'] : null;
 
 switch ($method) {
     case 'GET':
+        $_tgD = totalGamesDistinct();
+        $_w   = winsExpr();
+        $_wrD = winRateDistinct();
+        $_af  = avgFinishExpr();
+
         if ($id) {
             // Get single deck with player info and stats
-            $stmt = $pdo->prepare('
+            $stmt = $pdo->prepare("
                 SELECT
                     d.*,
                     p.name as player_name,
-                    COUNT(DISTINCT gr.game_id) as total_games,
-                    COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
-                    ROUND(
-                        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 /
-                        NULLIF(COUNT(DISTINCT gr.game_id), 0),
-                        1
-                    ) as win_rate,
-                    ROUND(AVG(gr.finish_position), 2) as avg_finish_position
+                    $_tgD,
+                    $_w,
+                    $_wrD,
+                    $_af
                 FROM decks d
                 JOIN players p ON d.player_id = p.id
                 LEFT JOIN game_results gr ON gr.deck_id = d.id
                 WHERE d.id = ?
                 GROUP BY d.id
-            ');
+            ");
             $stmt->execute([$id]);
             $deck = $stmt->fetch();
 
@@ -58,41 +60,37 @@ switch ($method) {
             sendJSON($deck);
         } elseif ($playerId) {
             // Get all decks for a player
-            $stmt = $pdo->prepare('
+            $stmt = $pdo->prepare("
                 SELECT
                     d.*,
                     p.name as player_name,
-                    COUNT(DISTINCT gr.game_id) as total_games,
-                    COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins
+                    $_tgD,
+                    $_w
                 FROM decks d
                 JOIN players p ON d.player_id = p.id
                 LEFT JOIN game_results gr ON gr.deck_id = d.id
                 WHERE d.player_id = ?
                 GROUP BY d.id
                 ORDER BY d.name ASC
-            ');
+            ");
             $stmt->execute([$playerId]);
             sendJSON($stmt->fetchAll());
         } else {
             // Get all decks with player info
-            $stmt = $pdo->query('
+            $stmt = $pdo->query("
                 SELECT
                     d.*,
                     p.name as player_name,
-                    COUNT(DISTINCT gr.game_id) as total_games,
-                    COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) as wins,
-                    ROUND(
-                        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 /
-                        NULLIF(COUNT(DISTINCT gr.game_id), 0),
-                        1
-                    ) as win_rate,
+                    $_tgD,
+                    $_w,
+                    $_wrD,
                     (SELECT COALESCE(SUM(dc.quantity), 0) FROM deck_cards dc WHERE dc.deck_id = d.id) as card_count
                 FROM decks d
                 JOIN players p ON d.player_id = p.id
                 LEFT JOIN game_results gr ON gr.deck_id = d.id
                 GROUP BY d.id
                 ORDER BY d.name ASC
-            ');
+            ");
             sendJSON($stmt->fetchAll());
         }
         break;

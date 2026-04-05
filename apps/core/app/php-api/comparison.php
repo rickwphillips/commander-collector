@@ -1,6 +1,7 @@
 <?php
 require_once 'config.php';
 require_once __DIR__ . '/auth/middleware.php';
+require_once __DIR__ . '/lib/sql-helpers.php';
 $user = requireAuth();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -239,21 +240,9 @@ foreach ($excludePlayerIds as $pid) {
     $params[] = $pid;
 }
 
-// --- Metric expressions ---
+// --- Metric expressions (delegated to lib/sql-helpers.php) ---
 function metricExpression(string $metric): string {
-    switch ($metric) {
-        case 'win_rate':            return 'ROUND(SUM(gr.finish_position = 1) / COUNT(gr.id) * 100, 1)';
-        case 'total_games':         return 'COUNT(gr.id)';
-        case 'wins':                return 'SUM(gr.finish_position = 1)';
-        case 'avg_finish_position': return 'ROUND(AVG(gr.finish_position), 2)';
-        case 'avg_survival_turns':  return 'ROUND(AVG(CASE WHEN gr.finish_position > 1 THEN gr.eliminated_turn END), 1)';
-        case 'avg_turns_to_win':    return 'ROUND(AVG(CASE WHEN gr.finish_position = 1 THEN g.winning_turn END), 1)';
-        case 'top2_rate':                  return 'ROUND(SUM(gr.finish_position <= 2) / COUNT(gr.id) * 100, 1)';
-        case 'elimination_rate':           return 'ROUND(SUM(gr.finish_position > 1) / COUNT(gr.id) * 100, 1)';
-        case 'std_dev_finish_position':    return 'ROUND(STDDEV_POP(gr.finish_position), 2)';
-        case 'first_elimination_rate':     return 'ROUND(SUM(gr.finish_position = pod.pod_size) / COUNT(gr.id) * 100, 1)';
-        default: return 'NULL';
-    }
+    return comparisonMetricExpr($metric);
 }
 
 // --- Build GROUP BY specific query ---
@@ -269,7 +258,7 @@ function buildQuery(
     ?int $topN = null,
     ?int $perspectivePlayerId = null
 ): string {
-    $podSubquery = '(SELECT game_id, COUNT(*) AS pod_size FROM game_results GROUP BY game_id) pod';
+    $podSubquery = podSizeSubquery();
 
     // Determine SELECT, GROUP BY, ORDER BY, and entity filter for each groupBy
     switch ($groupBy) {
@@ -583,7 +572,7 @@ function computeRecentWinRate(
                 continue 2;
         }
 
-        $podSub = '(SELECT game_id, COUNT(*) AS pod_size FROM game_results GROUP BY game_id) pod';
+        $podSub = podSizeSubquery();
         $joins = 'JOIN decks d ON gr.deck_id = d.id JOIN players p ON gr.player_id = p.id'
             . " JOIN $podSub ON pod.game_id = g.id";
 
