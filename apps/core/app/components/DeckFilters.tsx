@@ -13,6 +13,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import SortByAlphaIcon from '@mui/icons-material/SortByAlpha';
 import { ManaSymbol } from '@/components/ManaSymbol';
 import { ASSET_BASE } from '@/lib/api';
+import { COLOR_NAMES } from '@/lib/utils';
 
 export const TYPE_CATEGORIES = ['Creature', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Planeswalker', 'Battle', 'Land'] as const;
 export type TypeCategory = typeof TYPE_CATEGORIES[number];
@@ -33,10 +34,7 @@ const OTHER_HYBRID_ORDER = ['2W', '2U', '2B', '2R', '2G', 'CW', 'CU', 'CB', 'CR'
 /** Phyrexian symbols in WUBRG order — always in their own row */
 const PHYREXIAN_ORDER = ['WP', 'UP', 'BP', 'RP', 'GP', 'CP', 'WUP', 'WBP', 'UBP', 'URP', 'BRP', 'BGP', 'RGP', 'RWP', 'GUP', 'GWP'] as const;
 
-/** Mana symbol codes (slash removed) that can appear in mana costs and are filter-worthy */
-const COLOR_NAMES: Record<string, string> = {
-  W: 'White', U: 'Blue', B: 'Black', R: 'Red', G: 'Green', C: 'Colorless',
-};
+/** Extended symbol names for hybrid/Phyrexian mana (basic colors imported from utils) */
 
 const SYMBOL_NAMES: Record<string, string> = {
   WU: 'White/Blue Hybrid', WB: 'White/Black Hybrid',

@@ -3,10 +3,7 @@
 import { Box, Tooltip } from '@mui/material';
 import Image from 'next/image';
 import { ASSET_BASE } from '../lib/api';
-
-const COLOR_NAME: Record<string, string> = {
-  W: 'White', U: 'Blue', B: 'Black', R: 'Red', G: 'Green', C: 'Colorless',
-};
+import { COLOR_NAMES } from '../lib/utils';
 
 // ── ManaSymbol ───────────────────────────────────────────────────
 
@@ -33,7 +30,7 @@ export function ManaSymbol({
   onClick,
   tooltip = true,
 }: ManaSymbolProps) {
-  const label = COLOR_NAME[color] ?? color;
+  const label = COLOR_NAMES[color] ?? color;
   const isInteractive = !!onClick;
 
   const inner = (

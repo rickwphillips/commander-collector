@@ -10,7 +10,7 @@ import type {
   Player,
   DeckWithPlayer,
 } from '@/lib/types';
-import { sortColors, GUILD_NAMES, SHARD_NAMES, WEDGE_NAMES } from '@/lib/utils';
+import { sortColors, GUILD_NAMES, SHARD_NAMES, WEDGE_NAMES, COLOR_NAMES_LOWER } from '@/lib/utils';
 
 // ---- Helpers ----
 
@@ -52,9 +52,7 @@ const METRIC_LABEL: Record<ComparisonMetric, string> = {
   first_elimination_rate: '1st Elim. Rate',
 };
 
-const COLOR_NAME: Record<string, string> = {
-  W: 'white', U: 'blue', B: 'black', R: 'red', G: 'green', C: 'colorless',
-};
+const COLOR_NAME = COLOR_NAMES_LOWER;
 
 // ---- Guild / Shard / Wedge nickname flags ----
 

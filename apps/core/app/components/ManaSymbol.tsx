@@ -3,10 +3,10 @@
 import { Box, Tooltip } from '@mui/material';
 import Image from 'next/image';
 import { ASSET_BASE } from '@/lib/api';
+import { COLOR_NAMES } from '@/lib/utils';
 
 const COLOR_NAME: Record<string, string> = {
-  // Basic
-  W: 'White', U: 'Blue', B: 'Black', R: 'Red', G: 'Green', C: 'Colorless',
+  ...COLOR_NAMES,
   // Hybrid
   WU: 'White/Blue Hybrid', WB: 'White/Black Hybrid',
   UB: 'Blue/Black Hybrid',  UR: 'Blue/Red Hybrid',

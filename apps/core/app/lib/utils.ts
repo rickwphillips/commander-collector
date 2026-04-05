@@ -9,6 +9,18 @@ export function getOrdinalSuffix(n: number): string {
   return s[(v - 20) % 10] || s[v] || s[0];
 }
 
+// ── Single color names ────────────────────────────────────────────
+
+/** Capitalized color names: W → 'White', etc. */
+export const COLOR_NAMES: Record<string, string> = {
+  W: 'White', U: 'Blue', B: 'Black', R: 'Red', G: 'Green', C: 'Colorless',
+};
+
+/** Lowercase color names for natural language: W → 'white', etc. */
+export const COLOR_NAMES_LOWER: Record<string, string> = {
+  W: 'white', U: 'blue', B: 'black', R: 'red', G: 'green', C: 'colorless',
+};
+
 // ── MTG color combination names ───────────────────────────────────
 
 const COLOR_ORDER = 'WUBRG';

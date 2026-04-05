@@ -131,9 +131,9 @@ describe('CardReviewGrid', () => {
     const plainNotFound = makeCard({ id: 'plain-nf', card_name: 'Plain Not Found', image_uri: null, notFound: true });
     const { container } = render(
       <CardReviewGrid
+        {...defaultProps}
         cards={[plainNotFound]}
         cropMap={{}}
-        {...defaultProps}
       />
     );
     // Plain not-found shows the text fallback
