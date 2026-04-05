@@ -235,7 +235,7 @@ function podSizeSubquery() {
 | 7 | ScanDeckPage decomposition | Medium | High | 0 (readability) |
 | 8 | PHP SQL helper functions (DONE) | Medium | Low | ~60 |
 | 9 | Consolidate color name constants | Low | Low | ~15 |
-| 10 | Standardize mana symbol paths | Low | Low | ~5 |
+| 10 | Standardize mana symbol paths (N/A — already consistent) | Low | Low | 0 |
 
 **Total estimated lines eliminated**: ~3,800+
 **Total components consolidated**: 6 new shared utilities/components
