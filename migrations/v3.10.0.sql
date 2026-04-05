@@ -18,5 +18,9 @@ CREATE TABLE IF NOT EXISTS changelog_changes (
   CONSTRAINT fk_changelog_release FOREIGN KEY (release_id) REFERENCES changelog_releases(id) ON DELETE CASCADE
 );
 
+-- Idempotent: drop + recreate to avoid "duplicate key name" on re-run
+DROP INDEX IF EXISTS idx_changelog_releases_sort ON changelog_releases;
 CREATE INDEX idx_changelog_releases_sort ON changelog_releases (sort_order DESC);
+
+DROP INDEX IF EXISTS idx_changelog_changes_release ON changelog_changes;
 CREATE INDEX idx_changelog_changes_release ON changelog_changes (release_id, sort_order);
