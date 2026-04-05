@@ -8,20 +8,15 @@ import {
   Button,
   Card,
   CardContent,
-  CardMedia,
   Chip,
   CircularProgress,
   FormControlLabel,
-  LinearProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
-  Grid,
-  IconButton,
   MenuItem,
-  Slider,
   Stack,
   Step,
   StepLabel,
@@ -32,26 +27,26 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
-import RotateLeftIcon from '@mui/icons-material/RotateLeft';
-import RotateRightIcon from '@mui/icons-material/RotateRight';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CloseIcon from '@mui/icons-material/Close';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import StarIcon from '@mui/icons-material/Star';
 import DownloadIcon from '@mui/icons-material/Download';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
+import StarIcon from '@mui/icons-material/Star';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import FlipIcon from '@mui/icons-material/SyncAlt';
-import StyleIcon from '@mui/icons-material/Style';
 import { PageContainer } from '@/components/PageContainer';
 import { ManaSymbol } from '@/components/ManaSymbol';
 import { DeckBreakdown } from '@/components/DeckBreakdown';
 import { api } from '@/lib/api';
 import { MTG_COLORS_WITH_C } from '@/lib/utils';
-import { scryfallAutocomplete } from '@/lib/scryfall';
-import type { ScryfallCachedCard, Player, DeckWithPlayer, ScannedCard, ScanDraft } from '@/lib/types';
+import type { ScryfallCachedCard, Player, DeckWithPlayer, ScannedCard } from '@/lib/types';
+import { CardEditDialog } from './components/CardEditDialog';
+import { CardAddDialog } from './components/CardAddDialog';
+import { VersionPickerDialog } from './components/VersionPickerDialog';
+import { ImageEditorDialog } from './components/ImageEditorDialog';
+import type { ImageEditorState } from './components/ImageEditorDialog';
+import { ScanProgressDialog } from './components/ScanProgressDialog';
+import { ScanResultsDialog } from './components/ScanResultsDialog';
+import { CardReviewGrid } from './components/CardReviewGrid';
 
 // ─── Steps ────────────────────────────────────────────────────────────────────
 
@@ -132,8 +127,6 @@ function ScanDeckPageInner() {
 
   const [scanResults, setScanResults] = useState<ScannedCard[] | null>(null);
   const [cropMap, setCropMap] = useState<Record<string, string>>({}); // card id → cropped data URL
-  const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set()); // card ids currently showing back face
-
   // Edit-mode: loading existing deck cards
   const [editLoading, setEditLoading] = useState(!!editDeckId);
   const [importing, setImporting] = useState(false);
@@ -152,15 +145,9 @@ function ScanDeckPageInner() {
 
   // Edit dialog
   const [editCard, setEditCard] = useState<ScannedCard | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editSuggestions, setEditSuggestions] = useState<string[]>([]);
-  const [editLooking, setEditLooking] = useState(false);
 
   // Add card dialog
   const [addOpen, setAddOpen] = useState(false);
-  const [addName, setAddName] = useState('');
-  const [addSuggestions, setAddSuggestions] = useState<string[]>([]);
-  const [addLooking, setAddLooking] = useState(false);
 
   // Step 3
   const [players, setPlayers] = useState<Player[]>([]);
@@ -172,13 +159,9 @@ function ScanDeckPageInner() {
 
   // Pre-scan image editor
   const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [editRotation, setEditRotation] = useState(0);
-  const [editBrightness, setEditBrightness] = useState(100);
-  const [editContrast, setEditContrast] = useState(100);
-  const [editZoom, setEditZoom] = useState(1);
-  const [editPanX, setEditPanX] = useState(0);
-  const [editPanY, setEditPanY] = useState(0);
-  const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
+  const [imageEditorState, setImageEditorState] = useState<ImageEditorState>({
+    rotation: 0, brightness: 100, contrast: 100, zoom: 1, panX: 0, panY: 0,
+  });
 
   // Discard confirmation
   const [discardOpen, setDiscardOpen] = useState(false);
@@ -188,8 +171,6 @@ function ScanDeckPageInner() {
 
   // Version picker dialog
   const [versionCard, setVersionCard] = useState<ScannedCard | null>(null);
-  const [prints, setPrints] = useState<import('@/lib/types').CardPrint[]>([]);
-  const [loadingPrints, setLoadingPrints] = useState(false);
 
   // ── Load server draft on mount (new deck mode only) ──────────────────────
 
@@ -404,12 +385,7 @@ function ScanDeckPageInner() {
     if (!file) return;
     setError(null);
     setPreviewUrl(URL.createObjectURL(file));
-    setEditRotation(0);
-    setEditBrightness(100);
-    setEditContrast(100);
-    setEditZoom(1);
-    setEditPanX(0);
-    setEditPanY(0);
+    setImageEditorState({ rotation: 0, brightness: 100, contrast: 100, zoom: 1, panX: 0, panY: 0 });
     setPendingFile(file);
     // Reset inputs so the same file can be re-selected
     if (cameraInputRef.current) cameraInputRef.current.value = '';
@@ -520,7 +496,8 @@ function ScanDeckPageInner() {
     scanStartCardCount.current = cards.length;
 
     try {
-      const { base64, mimeType, canvas } = await fileToBase64(fileToRestore, editRotation, editBrightness, editContrast, editZoom, editPanX, editPanY);
+      const { rotation, brightness, contrast, zoom, panX, panY } = imageEditorState;
+      const { base64, mimeType, canvas } = await fileToBase64(fileToRestore, rotation, brightness, contrast, zoom, panX, panY);
       setPreviewUrl(`data:${mimeType};base64,${base64}`);
 
       // Split into 3×3 = 9 tiles + 1 full-image pass = 10 total scans
@@ -662,39 +639,6 @@ function ScanDeckPageInner() {
 
   // ── Card editing ──────────────────────────────────────────────────────────
 
-  function openEdit(card: ScannedCard) {
-    setEditCard(card);
-    setEditName(card.card_name);
-    setEditSuggestions([]);
-  }
-
-  async function handleEditNameChange(value: string) {
-    setEditName(value);
-    if (value.length >= 2) {
-      const suggestions = await scryfallAutocomplete(value);
-      setEditSuggestions(suggestions.slice(0, 6));
-    } else {
-      setEditSuggestions([]);
-    }
-  }
-
-  async function confirmEdit(nameOverride?: string) {
-    if (!editCard) return;
-    const name = nameOverride ?? editName;
-    setEditLooking(true);
-    try {
-      const data = await api.lookupCard(name);
-      const updated = cardFromScryfall(name, data);
-      updated.id = editCard.id;
-      updated.quantity = editCard.quantity;
-      updated.is_commander = editCard.is_commander;
-      setCards((prev) => prev.map((c) => (c.id === editCard.id ? updated : c)));
-    } finally {
-      setEditLooking(false);
-      setEditCard(null);
-    }
-  }
-
   function removeCard(id: string) {
     setCards((prev) => prev.filter((c) => c.id !== id));
   }
@@ -720,34 +664,6 @@ function ScanDeckPageInner() {
         c.id === id ? { ...c, quantity: Math.max(1, c.quantity + delta) } : c
       )
     );
-  }
-
-  // ── Add card ──────────────────────────────────────────────────────────────
-
-  async function handleAddNameChange(value: string) {
-    setAddName(value);
-    if (value.length >= 2) {
-      const suggestions = await scryfallAutocomplete(value);
-      setAddSuggestions(suggestions.slice(0, 6));
-    } else {
-      setAddSuggestions([]);
-    }
-  }
-
-  async function confirmAdd(nameOverride?: string) {
-    const name = nameOverride ?? addName;
-    if (!name.trim()) return;
-    setAddLooking(true);
-    try {
-      const data = await api.lookupCard(name);
-      const card = cardFromScryfall(name, data);
-      setCards((prev) => [...prev, card]);
-    } finally {
-      setAddLooking(false);
-      setAddOpen(false);
-      setAddName('');
-      setAddSuggestions([]);
-    }
   }
 
   // ── Step 3: save ──────────────────────────────────────────────────────────
@@ -888,38 +804,6 @@ function ScanDeckPageInner() {
     } finally {
       setSaving(false);
     }
-  }
-
-  // ── Version picker ────────────────────────────────────────────────────────
-
-  async function openVersionPicker(card: ScannedCard) {
-    setVersionCard(card);
-    setPrints([]);
-    setLoadingPrints(true);
-    try {
-      const { prints: data } = await api.getCardPrints(card.card_name);
-      setPrints(data);
-    } catch {
-      // show empty state in dialog
-    } finally {
-      setLoadingPrints(false);
-    }
-  }
-
-  async function selectVersion(print: import('@/lib/types').CardPrint) {
-    if (!versionCard) return;
-    // Pre-fetch and cache the image in the background
-    if (print.image_uri) {
-      api.getCardImage(print.scryfall_id, print.image_uri).catch(() => {/* ignore */});
-    }
-    setCards((prev) =>
-      prev.map((c) =>
-        c.id === versionCard.id
-          ? { ...c, scryfall_id: print.scryfall_id, image_uri: print.image_uri, back_image_uri: print.back_image_uri ?? null }
-          : c
-      )
-    );
-    setVersionCard(null);
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -1107,166 +991,16 @@ function ScanDeckPageInner() {
             </Stack>
           )}
 
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            {cards.map((card) => (
-              <Grid key={card.id} size={{ xs: 6, sm: 4, md: 3, lg: 2 }}>
-                <Card
-                  sx={{
-                    height: '100%',
-                    outline: card.is_commander ? '2px solid' : card.is_proxy ? '2px dashed' : undefined,
-                    outlineColor: card.is_commander ? 'warning.main' : card.is_proxy ? 'error.main' : undefined,
-                    opacity: card.notFound ? 0.7 : 1,
-                  }}
-                >
-                  {card.image_uri ? (
-                    <Box sx={{ position: 'relative', aspectRatio: '488/680', perspective: '600px' }}>
-                      <Box
-                        sx={{
-                          width: '100%',
-                          height: '100%',
-                          position: 'relative',
-                          transformStyle: 'preserve-3d',
-                          transition: 'transform 0.5s ease',
-                          transform: flippedCards.has(card.id) ? 'rotateY(180deg)' : 'rotateY(0deg)',
-                        }}
-                      >
-                        {/* Front face */}
-                        <Box
-                          component="img"
-                          src={card.image_uri}
-                          alt={card.card_name}
-                          sx={{
-                            position: 'absolute',
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                            backfaceVisibility: 'hidden',
-                          }}
-                        />
-                        {/* Back face */}
-                        {card.back_image_uri && (
-                          <Box
-                            component="img"
-                            src={card.back_image_uri}
-                            alt={`${card.card_name} (back)`}
-                            sx={{
-                              position: 'absolute',
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover',
-                              backfaceVisibility: 'hidden',
-                              transform: 'rotateY(180deg)',
-                            }}
-                          />
-                        )}
-                      </Box>
-                      {/* Flip button — only for DFCs */}
-                      {card.back_image_uri && (
-                        <IconButton
-                          size="small"
-                          onClick={() => setFlippedCards((prev) => {
-                            const next = new Set(prev);
-                            next.has(card.id) ? next.delete(card.id) : next.add(card.id);
-                            return next;
-                          })}
-                          sx={{
-                            position: 'absolute',
-                            bottom: 4,
-                            right: 4,
-                            bgcolor: 'rgba(0,0,0,0.6)',
-                            color: '#fff',
-                            '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' },
-                            width: 28,
-                            height: 28,
-                          }}
-                        >
-                          <FlipIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      )}
-                    </Box>
-                  ) : card.notFound && cropMap[card.id] ? (
-                    <Box
-                      component="img"
-                      src={cropMap[card.id]}
-                      alt={card.card_name}
-                      sx={{ aspectRatio: '488/680', width: '100%', objectFit: 'contain', bgcolor: 'action.hover' }}
-                    />
-                  ) : (
-                    <Box
-                      sx={{
-                        aspectRatio: '488/680',
-                        bgcolor: 'action.hover',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        p: 1,
-                      }}
-                    >
-                      <Typography variant="caption" textAlign="center" color="text.secondary">
-                        {card.notFound ? 'Not found' : card.card_name}
-                      </Typography>
-                    </Box>
-                  )}
-                  <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
-                    <Typography variant="caption" noWrap display="block" title={card.card_name}>
-                      {card.card_name}
-                    </Typography>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" mt={0.5}>
-                      {/* Quantity */}
-                      <Stack direction="row" alignItems="center" spacing={0.5}>
-                        <IconButton size="small" onClick={() => changeQuantity(card.id, -1)}>
-                          <Typography variant="caption" lineHeight={1}>−</Typography>
-                        </IconButton>
-                        <Typography variant="caption">{card.quantity}</Typography>
-                        <IconButton size="small" onClick={() => changeQuantity(card.id, 1)}>
-                          <Typography variant="caption" lineHeight={1}>+</Typography>
-                        </IconButton>
-                      </Stack>
-                      {/* Actions */}
-                      <Stack direction="row">
-                        <IconButton
-                          size="small"
-                          title={card.is_proxy ? 'Mark as real' : 'Mark as proxy'}
-                          onClick={() => toggleProxy(card.id)}
-                          color={card.is_proxy ? 'error' : 'default'}
-                        >
-                          <ContentCopyIcon fontSize="inherit" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          title="Mark as commander"
-                          onClick={() => toggleCommander(card.id)}
-                          color={card.is_commander ? 'warning' : 'default'}
-                        >
-                          <StarIcon fontSize="inherit" />
-                        </IconButton>
-                        {card.scryfall_id && (
-                          <IconButton
-                            size="small"
-                            title="Change version/set"
-                            onClick={() => openVersionPicker(card)}
-                          >
-                            <StyleIcon fontSize="inherit" />
-                          </IconButton>
-                        )}
-                        <IconButton size="small" title="Edit" onClick={() => openEdit(card)}>
-                          <EditIcon fontSize="inherit" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          title="Remove"
-                          color="error"
-                          onClick={() => removeCard(card.id)}
-                        >
-                          <DeleteIcon fontSize="inherit" />
-                        </IconButton>
-                      </Stack>
-                    </Stack>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
+          <CardReviewGrid
+            cards={cards}
+            cropMap={cropMap}
+            onChangeQuantity={changeQuantity}
+            onToggleProxy={toggleProxy}
+            onToggleCommander={toggleCommander}
+            onOpenVersionPicker={(card) => setVersionCard(card)}
+            onOpenEdit={(card) => setEditCard(card)}
+            onRemove={removeCard}
+          />
 
           {/* Deck breakdown summary */}
           {cards.length > 0 && (
@@ -1516,61 +1250,15 @@ function ScanDeckPageInner() {
       })()}
 
       {/* ── Edit Card Dialog ── */}
-      <Dialog open={!!editCard} onClose={() => setEditCard(null)} fullWidth maxWidth="xs">
-        <DialogTitle>
-          Edit Card
-          <IconButton
-            onClick={() => setEditCard(null)}
-            sx={{ position: 'absolute', right: 8, top: 8 }}
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            fullWidth
-            label="Card Name"
-            value={editName}
-            onChange={(e) => handleEditNameChange(e.target.value)}
-            sx={{ mt: 1 }}
-          />
-          {editSuggestions.length > 0 && (
-            <Stack spacing={0.5} mt={1}>
-              {editSuggestions.map((s) => (
-                <Button
-                  key={s}
-                  variant="text"
-                  size="small"
-                  sx={{ justifyContent: 'flex-start', textTransform: 'none' }}
-                  onClick={() => confirmEdit(s)}
-                >
-                  {s}
-                </Button>
-              ))}
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditCard(null)}>Cancel</Button>
-          <Button
-            variant="contained"
-            disabled={editLooking || !editName.trim()}
-            onClick={() => confirmEdit()}
-          >
-            {editLooking ? <CircularProgress size={18} /> : 'Update'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <CardEditDialog
+        card={editCard}
+        onClose={() => setEditCard(null)}
+        onUpdate={(cardId, updated) => setCards((prev) => prev.map((c) => (c.id === cardId ? updated : c)))}
+      />
 
       {/* ── Scan More Dialog ── */}
       <Dialog open={scanMoreOpen} onClose={() => setScanMoreOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>
-          Scan More Cards
-          <IconButton onClick={() => setScanMoreOpen(false)} sx={{ position: 'absolute', right: 8, top: 8 }}>
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
+        <DialogTitle>Scan More Cards</DialogTitle>
         <DialogContent>
           <Stack spacing={2} py={1}>
             {isMobile && (
@@ -1598,162 +1286,16 @@ function ScanDeckPageInner() {
       </Dialog>
 
       {/* ── Pre-Scan Image Editor ── */}
-      <Dialog open={!!pendingFile} onClose={() => setPendingFile(null)} maxWidth="md" fullWidth>
-        <DialogTitle>
-          Adjust Image Before Scanning
-          <IconButton onClick={() => setPendingFile(null)} sx={{ position: 'absolute', right: 8, top: 8 }}>
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          <Stack spacing={3}>
-            {/* Tip */}
-            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
-              Arrange cards in piles that fit inside the grid cells for best results. 10 piles (one per cell + full image) yields the highest accuracy. Avoid placing cards in the amber overlap zones — these areas are scanned by adjacent tiles and can produce duplicates.
-            </Typography>
-
-            {/* Preview with grid overlay — drag to pan, scroll to zoom */}
-            <Box
-              sx={{ textAlign: 'center', overflow: 'hidden', borderRadius: 1, bgcolor: 'action.hover', p: 1, cursor: 'grab', userSelect: 'none', touchAction: 'none', '&:active': { cursor: 'grabbing' } }}
-              onWheel={(e) => {
-                e.preventDefault();
-                setEditZoom((z) => Math.min(3, Math.max(0.5, z + (e.deltaY > 0 ? -0.1 : 0.1))));
-              }}
-              onPointerDown={(e) => {
-                (e.target as HTMLElement).setPointerCapture(e.pointerId);
-                panStartRef.current = { x: e.clientX, y: e.clientY, panX: editPanX, panY: editPanY };
-              }}
-              onPointerMove={(e) => {
-                if (!panStartRef.current) return;
-                const dx = e.clientX - panStartRef.current.x;
-                const dy = e.clientY - panStartRef.current.y;
-                // Convert pixel drag to percentage of preview size (scale by zoom)
-                const sensitivity = 0.15 / editZoom;
-                setEditPanX(panStartRef.current.panX + dx * sensitivity);
-                setEditPanY(panStartRef.current.panY + dy * sensitivity);
-              }}
-              onPointerUp={() => { panStartRef.current = null; }}
-              onPointerCancel={() => { panStartRef.current = null; }}
-            >
-              {previewUrl && (
-                <Box sx={{ position: 'relative', display: 'inline-block', overflow: 'hidden' }}>
-                  <Box
-                    component="img"
-                    src={previewUrl}
-                    alt="Preview"
-                    draggable={false}
-                    sx={{
-                      maxWidth: '100%',
-                      maxHeight: 400,
-                      objectFit: 'contain',
-                      transform: `rotate(${editRotation}deg) scale(${editZoom}) translate(${editPanX}%, ${editPanY}%)`,
-                      filter: `brightness(${editBrightness}%) contrast(${editContrast}%)`,
-                      transition: 'filter 0.2s',
-                      display: 'block',
-                      pointerEvents: 'none',
-                    }}
-                  />
-                  {/* 3×3 grid overlay with 8% overlap zones */}
-                  <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-                    {/* Overlap zones — 8% amber strips centered on each grid line */}
-                    {/* Vertical lines at 33.3% and 66.6% */}
-                    <Box sx={{ position: 'absolute', top: 0, bottom: 0, left: 'calc(33.33% - 2.67%)', width: '5.33%', bgcolor: 'rgba(255,160,0,0.18)' }} />
-                    <Box sx={{ position: 'absolute', top: 0, bottom: 0, left: 'calc(66.66% - 2.67%)', width: '5.33%', bgcolor: 'rgba(255,160,0,0.18)' }} />
-                    {/* Horizontal lines at 33.3% and 66.6% */}
-                    <Box sx={{ position: 'absolute', left: 0, right: 0, top: 'calc(33.33% - 2.67%)', height: '5.33%', bgcolor: 'rgba(255,160,0,0.18)' }} />
-                    <Box sx={{ position: 'absolute', left: 0, right: 0, top: 'calc(66.66% - 2.67%)', height: '5.33%', bgcolor: 'rgba(255,160,0,0.18)' }} />
-                    {/* Grid lines */}
-                    <Box sx={{
-                      position: 'absolute', inset: 0,
-                      display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'repeat(3, 1fr)',
-                    }}>
-                      {Array.from({ length: 9 }).map((_, i) => (
-                        <Box key={i} sx={{ border: '1px solid rgba(255,255,255,0.5)', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.3)' }} />
-                      ))}
-                    </Box>
-                  </Box>
-                </Box>
-              )}
-            </Box>
-
-            {/* Zoom */}
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Typography variant="body2" sx={{ minWidth: 80 }}>Zoom</Typography>
-              <Slider
-                value={editZoom}
-                onChange={(_, v) => setEditZoom(v as number)}
-                min={0.5} max={3} step={0.1}
-                valueLabelDisplay="auto"
-                valueLabelFormat={(v) => `${Math.round(v * 100)}%`}
-                sx={{ flex: 1 }}
-              />
-              <Button size="small" onClick={() => { setEditZoom(1); setEditPanX(0); setEditPanY(0); }}>Reset</Button>
-            </Stack>
-
-            {/* Retake / Reupload */}
-            <Stack direction="row" spacing={1} justifyContent="center">
-              {cameraInputRef.current && (
-                <Button size="small" variant="outlined" startIcon={<CameraAltIcon />}
-                  onClick={() => { setPendingFile(null); setTimeout(() => cameraInputRef.current?.click(), 50); }}>
-                  Retake
-                </Button>
-              )}
-              <Button size="small" variant="outlined" startIcon={<FileUploadIcon />}
-                onClick={() => { setPendingFile(null); setTimeout(() => uploadInputRef.current?.click(), 50); }}>
-                Reupload
-              </Button>
-            </Stack>
-
-            {/* Rotation */}
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Typography variant="body2" sx={{ minWidth: 80 }}>Rotation</Typography>
-              <IconButton onClick={() => setEditRotation((r) => (r - 90 + 360) % 360)}>
-                <RotateLeftIcon />
-              </IconButton>
-              <Typography variant="body2" sx={{ minWidth: 40, textAlign: 'center' }}>
-                {editRotation}°
-              </Typography>
-              <IconButton onClick={() => setEditRotation((r) => (r + 90) % 360)}>
-                <RotateRightIcon />
-              </IconButton>
-            </Stack>
-
-            {/* Brightness */}
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Typography variant="body2" sx={{ minWidth: 80 }}>Brightness</Typography>
-              <Slider
-                value={editBrightness}
-                onChange={(_, v) => setEditBrightness(v as number)}
-                min={50} max={200} step={5}
-                valueLabelDisplay="auto"
-                valueLabelFormat={(v) => `${v}%`}
-                sx={{ flex: 1 }}
-              />
-              <Button size="small" onClick={() => setEditBrightness(100)}>Reset</Button>
-            </Stack>
-
-            {/* Contrast */}
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Typography variant="body2" sx={{ minWidth: 80 }}>Contrast</Typography>
-              <Slider
-                value={editContrast}
-                onChange={(_, v) => setEditContrast(v as number)}
-                min={50} max={200} step={5}
-                valueLabelDisplay="auto"
-                valueLabelFormat={(v) => `${v}%`}
-                sx={{ flex: 1 }}
-              />
-              <Button size="small" onClick={() => setEditContrast(100)}>Reset</Button>
-            </Stack>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPendingFile(null)}>Cancel</Button>
-          <Button variant="contained" startIcon={<CameraAltIcon />} onClick={processAndScan}>
-            Submit
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ImageEditorDialog
+        open={!!pendingFile}
+        previewUrl={previewUrl}
+        state={imageEditorState}
+        onStateChange={(updates) => setImageEditorState((prev) => ({ ...prev, ...updates }))}
+        onSubmit={processAndScan}
+        onClose={() => setPendingFile(null)}
+        onRetake={isMobile ? () => { setPendingFile(null); setTimeout(() => cameraInputRef.current?.click(), 50); } : undefined}
+        onReupload={() => { setPendingFile(null); setTimeout(() => uploadInputRef.current?.click(), 50); }}
+      />
 
       {/* ── Discard Confirmation Dialog ── */}
       <Dialog open={discardOpen} onClose={() => setDiscardOpen(false)} maxWidth="xs" fullWidth>
@@ -1772,251 +1314,41 @@ function ScanDeckPageInner() {
       </Dialog>
 
       {/* ── Add Card Dialog ── */}
-      <Dialog open={addOpen} onClose={() => setAddOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>
-          Add Card
-          <IconButton
-            onClick={() => setAddOpen(false)}
-            sx={{ position: 'absolute', right: 8, top: 8 }}
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            fullWidth
-            label="Card Name"
-            value={addName}
-            onChange={(e) => handleAddNameChange(e.target.value)}
-            sx={{ mt: 1 }}
-          />
-          {addSuggestions.length > 0 && (
-            <Stack spacing={0.5} mt={1}>
-              {addSuggestions.map((s) => (
-                <Button
-                  key={s}
-                  variant="text"
-                  size="small"
-                  sx={{ justifyContent: 'flex-start', textTransform: 'none' }}
-                  onClick={() => confirmAdd(s)}
-                >
-                  {s}
-                </Button>
-              ))}
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAddOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            disabled={addLooking || !addName.trim()}
-            onClick={() => confirmAdd()}
-          >
-            {addLooking ? <CircularProgress size={18} /> : 'Add'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <CardAddDialog
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onAdd={(card) => setCards((prev) => [...prev, card])}
+      />
 
       {/* ── Version Picker Dialog ── */}
-      <Dialog open={!!versionCard} onClose={() => setVersionCard(null)} maxWidth="md" fullWidth>
-        <DialogTitle>
-          Choose Version — {versionCard?.card_name}
-          <IconButton onClick={() => setVersionCard(null)} sx={{ position: 'absolute', right: 8, top: 8 }}>
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          {loadingPrints ? (
-            <Stack alignItems="center" py={4}>
-              <CircularProgress size={40} />
-              <Typography variant="body2" color="text.secondary" mt={1}>
-                Loading printings...
-              </Typography>
-            </Stack>
-          ) : prints.length === 0 ? (
-            <Typography color="text.secondary" py={2}>
-              No printings found.
-            </Typography>
-          ) : (
-            <Grid container spacing={1.5} sx={{ mt: 0.5 }}>
-              {prints.map((print) => (
-                <Grid key={print.scryfall_id} size={{ xs: 6, sm: 4, md: 3 }}>
-                  <Card
-                    sx={{
-                      cursor: 'pointer',
-                      outline: versionCard?.scryfall_id === print.scryfall_id ? '2px solid' : undefined,
-                      outlineColor: 'primary.main',
-                      '&:hover': { outline: '2px solid', outlineColor: 'primary.light' },
-                    }}
-                    onClick={() => selectVersion(print)}
-                  >
-                    {print.image_uri ? (
-                      <CardMedia
-                        component="img"
-                        image={print.image_uri}
-                        alt={print.name}
-                        sx={{ aspectRatio: '488/680' }}
-                      />
-                    ) : (
-                      <Box
-                        sx={{
-                          aspectRatio: '488/680',
-                          bgcolor: 'action.hover',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <Typography variant="caption" color="text.secondary">
-                          No image
-                        </Typography>
-                      </Box>
-                    )}
-                    <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
-                      <Typography variant="caption" noWrap display="block">
-                        {print.set_name}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        #{print.collector_number} · {print.released_at.slice(0, 4)}
-                        {print.image_cached && (
-                          <Chip label="cached" size="small" color="success" sx={{ ml: 0.5, height: 14, fontSize: '0.55rem' }} />
-                        )}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setVersionCard(null)}>Cancel</Button>
-        </DialogActions>
-      </Dialog>
+      <VersionPickerDialog
+        card={versionCard}
+        onClose={() => setVersionCard(null)}
+        onSelect={(cardId, print) => {
+          setCards((prev) =>
+            prev.map((c) =>
+              c.id === cardId
+                ? { ...c, scryfall_id: print.scryfall_id, image_uri: print.image_uri, back_image_uri: print.back_image_uri ?? null }
+                : c
+            )
+          );
+        }}
+      />
 
       {/* ── Scanning Progress Dialog ── */}
-      {(() => {
-        const SCAN_QUIPS = [
-          'Wibbling…',
-          'Concentrating…',
-          'Tapping out…',
-          'Consulting the oracle…',
-          'Shuffling through the library…',
-          'Reading the name bars…',
-          'Checking for proxies…',
-          'Cross-referencing Scryfall…',
-          'Identifying your commanders…',
-          'Counting the spells…',
-        ];
-        const quipIdx = scanProgress
-          ? Math.floor((scanProgress.current / scanProgress.total) * SCAN_QUIPS.length)
-          : 0;
-        const quip = SCAN_QUIPS[Math.min(quipIdx, SCAN_QUIPS.length - 1)];
-        const newCards = cards.slice(scanStartCardCount.current);
-        const hasResults = newCards.length > 0;
-        return (
-          <Dialog open={scanning} maxWidth="xs" fullWidth>
-            <DialogContent>
-              <Stack alignItems="center" spacing={1.5} py={1}>
-                <Stack direction="row" alignItems="center" spacing={1.5} width="100%">
-                  <CircularProgress size={hasResults ? 20 : 40} sx={{ flexShrink: 0, transition: 'all 0.3s' }} />
-                  <Box flex={1}>
-                    <Typography variant={hasResults ? 'body2' : 'body1'}>
-                      {scanProgress
-                        ? `Tile ${scanProgress.current} of ${scanProgress.total} — ${quip}`
-                        : 'Preparing image…'}
-                    </Typography>
-                    {scanProgress && (
-                      <LinearProgress
-                        variant="determinate"
-                        value={(scanProgress.current / scanProgress.total) * 100}
-                        sx={{ mt: 0.5 }}
-                      />
-                    )}
-                  </Box>
-                </Stack>
-                {hasResults ? (
-                  <Box sx={{ width: '100%', maxHeight: 220, overflowY: 'auto' }}>
-                    {newCards.map((c) => (
-                      <Box key={c.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.25 }}>
-                        {c.image_uri ? (
-                          <Box component="img" src={c.image_uri} alt={c.card_name}
-                            sx={{ width: 24, height: 34, borderRadius: 0.5, objectFit: 'cover', flexShrink: 0 }} />
-                        ) : (
-                          <Box sx={{ width: 24, height: 34, bgcolor: 'action.hover', borderRadius: 0.5, flexShrink: 0 }} />
-                        )}
-                        <Typography variant="caption" noWrap sx={{ flex: 1 }}>{c.card_name}</Typography>
-                        {c.notFound && (
-                          <Typography variant="caption" color="error" sx={{ flexShrink: 0 }}>?</Typography>
-                        )}
-                      </Box>
-                    ))}
-                  </Box>
-                ) : previewUrl && (
-                  <Box
-                    component="img"
-                    src={previewUrl}
-                    alt="Deck photo"
-                    sx={{ maxWidth: '100%', maxHeight: 180, borderRadius: 1, objectFit: 'contain' }}
-                  />
-                )}
-              </Stack>
-            </DialogContent>
-          </Dialog>
-        );
-      })()}
+      <ScanProgressDialog
+        open={scanning}
+        progress={scanProgress}
+        newCards={cards.slice(scanStartCardCount.current)}
+        previewUrl={previewUrl}
+      />
 
       {/* ── Scan Results Dialog (edit mode) ── */}
-      <Dialog open={!!scanResults} onClose={() => { setScanResults(null); setCropMap({}); }} maxWidth="xs" fullWidth>
-        <DialogTitle>
-          Scan Results
-          <IconButton onClick={() => { setScanResults(null); setCropMap({}); }} sx={{ position: 'absolute', right: 8, top: 8 }}>
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          {scanResults && scanResults.length === 0 ? (
-            <Typography color="text.secondary">No new cards were identified.</Typography>
-          ) : (
-            <Stack spacing={1}>
-              <Typography variant="body2" color="text.secondary" mb={1}>
-                {scanResults?.length} card{scanResults?.length !== 1 ? 's' : ''} added to your deck:
-              </Typography>
-              {scanResults?.map((c) => (
-                <Box key={c.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  {c.notFound ? (
-                    cropMap[c.id] ? (
-                      <Box
-                        component="img"
-                        src={cropMap[c.id]}
-                        alt={c.card_name}
-                        sx={{ width: 36, height: 50, borderRadius: 0.5, objectFit: 'cover', flexShrink: 0, opacity: 0.85 }}
-                      />
-                    ) : (
-                      <Box sx={{ width: 36, height: 50, bgcolor: 'action.hover', borderRadius: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <CircularProgress size={16} />
-                      </Box>
-                    )
-                  ) : c.image_uri ? (
-                    <Box component="img" src={c.image_uri} alt={c.card_name} sx={{ width: 36, height: 50, borderRadius: 0.5, objectFit: 'cover', flexShrink: 0 }} />
-                  ) : (
-                    <Box sx={{ width: 36, height: 50, bgcolor: 'action.hover', borderRadius: 0.5, flexShrink: 0 }} />
-                  )}
-                  <Box>
-                    <Typography variant="body2">{c.card_name}</Typography>
-                    {c.notFound && <Typography variant="caption" color="error">Not found on Scryfall</Typography>}
-                  </Box>
-                </Box>
-              ))}
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button variant="contained" onClick={() => { setScanResults(null); setCropMap({}); }}>Done</Button>
-        </DialogActions>
-      </Dialog>
+      <ScanResultsDialog
+        results={scanResults}
+        cropMap={cropMap}
+        onClose={() => { setScanResults(null); setCropMap({}); }}
+      />
     </PageContainer>
   );
 }
