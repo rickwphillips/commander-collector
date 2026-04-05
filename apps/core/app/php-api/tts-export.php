@@ -220,9 +220,10 @@ $proto      = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'http
 $appBase    = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'])), '/');
 $sheetsBase = $proto . '://' . $_SERVER['HTTP_HOST'] . $appBase . '/tts-sheets/';
 
-$frontUrl = $sheetsBase . basename($frontPath);
+$cacheBust = '?v=' . time();
+$frontUrl = $sheetsBase . basename($frontPath) . $cacheBust;
 $backUrl  = ($hasDfc && $backPath && file_exists($backPath))
-          ? $sheetsBase . basename($backPath)
+          ? $sheetsBase . basename($backPath) . $cacheBust
           : TTS_MTG_BACK;
 
 // ── Assemble TTS saved-object JSON ────────────────────────────────────────────

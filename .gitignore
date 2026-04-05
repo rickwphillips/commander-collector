@@ -17,5 +17,8 @@ tsconfig.tsbuildinfo
 .env.local
 .env*.local
 
+# Generated TTS sheets
+apps/core/app/tts-sheets
+
 # Synced pattern files (source of truth is mtg-rules repo)
 apps/core/app/php-api/rules/p[0-9]*.md
