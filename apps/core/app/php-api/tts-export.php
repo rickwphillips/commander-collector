@@ -6,12 +6,9 @@ ini_set('display_errors', '0');
 /**
  * TTS Export — generates a Tabletop Simulator saved-object JSON for a deck or list.
  *
- * All card images are stitched into a 10-column sprite sheet using ImageMagick montage,
- * then saved to PUBLIC_HTML/tts-sheets/ (sibling of php-api/).
- *
- * Custom card images: when dc.custom_image_uri is added to deck_cards / lc.custom_image_uri
- * to list_cards, replace sc.image_uri in the SELECT with:
- *   COALESCE(dc.custom_image_uri, sc.image_uri) AS image_uri
+ * Cards are split across multiple 10x7 sprite sheets (max 69 cards each) to stay
+ * within the TTS 4096x4096 texture limit. Each sheet is stitched with ImageMagick
+ * montage and saved to PUBLIC_HTML/tts-sheets/.
  */
 
 require_once 'config.php';
@@ -33,10 +30,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const TTS_COLS     = 10;
-const TTS_CARD_W   = 488;
-const TTS_CARD_H   = 680;
-const TTS_MTG_BACK = 'https://i.imgur.com/Hg8CwwU.jpeg';
+const TTS_COLS          = 10;   // TTS max columns
+const TTS_MAX_ROWS      = 7;    // TTS max rows per sheet
+const TTS_MAX_PER_SHEET = 69;   // 10*7 - 1 (last slot reserved for hidden card)
+const TTS_CARD_W        = 409;  // 4096 / 10 = 409px — fits within 4096 width
+const TTS_CARD_H        = 585;  // 4096 / 7  = 585px — fits within 4096 height
+const TTS_MTG_BACK      = 'https://i.imgur.com/Hg8CwwU.jpeg';
 
 // ── Input ────────────────────────────────────────────────────────────────────
 $deckId = isset($_GET['deck_id']) ? (int)$_GET['deck_id'] : 0;
@@ -103,25 +102,19 @@ if (empty($cards)) {
 }
 
 // ── Sheet storage directory ───────────────────────────────────────────────────
-// tts-sheets/ lives at PUBLIC_HTML/tts-sheets/ — one level up from php-api/
 $sheetsDir = dirname(__DIR__) . '/tts-sheets/';
 if (!is_dir($sheetsDir) && !mkdir($sheetsDir, 0755, true)) {
     ttsError('Cannot create sheets directory', 500);
 }
 
-
-// ── Cache keys ────────────────────────────────────────────────────────────────
-$hasDfc    = (bool)array_filter($cards, fn($c) => !empty($c['back']));
-$frontSigs = array_map(fn($c) => $c['front_b64'] ? md5($c['front_b64']) : $c['front'], $cards);
-$frontKey  = md5(implode('|', $frontSigs));
-$backKey   = $hasDfc ? md5(implode('|', array_map(fn($c) => $c['back'] ?? TTS_MTG_BACK, $cards))) : null;
-$frontPath = $sheetsDir . $frontKey . '-front.jpg';
-$backPath  = $backKey   ? $sheetsDir . $backKey  . '-back.jpg'  : null;
+// ── Split cards into chunks of TTS_MAX_PER_SHEET ─────────────────────────────
+$chunks = array_chunk($cards, TTS_MAX_PER_SHEET);
+$hasDfc = (bool)array_filter($cards, fn($c) => !empty($c['back']));
 
 // ── Write card images to temp files (cached b64 first, download fallback) ────
 function ttsWriteCardImages(array $cards, string $side = 'front'): array {
     $tmpFiles = [];
-    $needDownload = []; // index => url
+    $needDownload = [];
 
     foreach ($cards as $i => $card) {
         $b64 = ($side === 'front') ? ($card['front_b64'] ?? null) : null;
@@ -136,7 +129,6 @@ function ttsWriteCardImages(array $cards, string $side = 'front'): array {
         }
     }
 
-    // Download any images not in the b64 cache
     if (!empty($needDownload)) {
         $mh = curl_multi_init();
         $handles = [];
@@ -173,7 +165,6 @@ function ttsWriteCardImages(array $cards, string $side = 'front'): array {
 function ttsBuildMontage(array $tmpFiles, string $outputPath): bool {
     if (empty(array_filter($tmpFiles))) return false;
 
-    // Replace failed images with a black placeholder so positions stay aligned
     $placeholder = null;
     foreach ($tmpFiles as $i => $f) {
         if ($f === null) {
@@ -195,78 +186,93 @@ function ttsBuildMontage(array $tmpFiles, string $outputPath): bool {
     return $code === 0 && file_exists($outputPath);
 }
 
-// ── Generate front sheet (cached by content hash) ─────────────────────────────
-if (!file_exists($frontPath)) {
-    $tmps = ttsWriteCardImages($cards, 'front');
-    if (!ttsBuildMontage($tmps, $frontPath)) {
-        foreach ($tmps as $t) if ($t) @unlink($t);
-        ttsError('ImageMagick montage failed for front sheet', 500);
-    }
-    foreach ($tmps as $t) if ($t) @unlink($t);
-}
-
-// ── Generate back sheet for DFC decks ────────────────────────────────────────
-// Each position uses the card's back face, or the standard MTG back for non-DFCs.
-if ($hasDfc && $backPath && !file_exists($backPath)) {
-    $tmps = ttsWriteCardImages($cards, 'back');
-    ttsBuildMontage($tmps, $backPath); // best-effort
-    foreach ($tmps as $t) if ($t) @unlink($t);
-}
-
-// ── Build public URLs for sheets ──────────────────────────────────────────────
-// SCRIPT_NAME e.g. /app/php-api/tts-export.php → dirname twice → /app
-// On local dev SCRIPT_NAME is /php-api/tts-export.php → dirname twice → '/' → strip trailing slash
+// ── Generate sheets for each chunk ───────────────────────────────────────────
 $proto      = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 $appBase    = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'])), '/');
 $sheetsBase = $proto . '://' . $_SERVER['HTTP_HOST'] . $appBase . '/tts-sheets/';
+$cacheBust  = '?v=' . time();
 
-$cacheBust = '?v=' . time();
-$frontUrl = $sheetsBase . basename($frontPath) . $cacheBust;
-$backUrl  = ($hasDfc && $backPath && file_exists($backPath))
-          ? $sheetsBase . basename($backPath) . $cacheBust
-          : TTS_MTG_BACK;
+$customDeck = [];  // TTS CustomDeck map: "1" => sheet1, "2" => sheet2, ...
+$deckIDs    = [];
+$objects    = [];
 
-// ── Assemble TTS saved-object JSON ────────────────────────────────────────────
-// CardID formula: int(DeckKey) * 100 + position_in_sheet
-// Sheet key "1" → base 100; card at position i → CardID 100 + i
-$numCards  = count($cards);
-$numRows   = (int)ceil($numCards / TTS_COLS);
+foreach ($chunks as $chunkIdx => $chunk) {
+    $sheetKey = (string)($chunkIdx + 1);  // TTS keys are 1-based strings
+    $cardBase = ($chunkIdx + 1) * 100;     // Sheet 1 → 100+, Sheet 2 → 200+, ...
+    $numRows  = (int)ceil(count($chunk) / TTS_COLS);
 
-$deckEntry = [
-    'FaceURL'      => $frontUrl,
-    'BackURL'      => $backUrl,
-    'NumWidth'     => TTS_COLS,
-    'NumHeight'    => $numRows,
-    'BackIsHidden' => true,
-    'UniqueBack'   => $hasDfc,
-];
+    // ── Cache key for this chunk ─────────────────────────────────────────────
+    $frontSigs = array_map(fn($c) => $c['front_b64'] ? md5($c['front_b64']) : $c['front'], $chunk);
+    $frontKey  = md5(implode('|', $frontSigs) . '|chunk' . $chunkIdx);
+    $frontPath = $sheetsDir . $frontKey . '-front.jpg';
 
-$deckIDs = [];
-$objects = [];
-foreach ($cards as $i => $card) {
-    $cardID    = 100 + $i;
-    $deckIDs[] = $cardID;
-    $objects[] = [
-        'Name'        => 'Card',
-        'Nickname'    => $card['name'],
-        'CardID'      => $cardID,
-        'CustomDeck'  => ['1' => $deckEntry],
-        'Transform'   => [
-            'posX' => 0.0, 'posY' => 0.0, 'posZ' => 0.0,
-            'rotX' => 0.0, 'rotY' => 180.0, 'rotZ' => 180.0,
-            'scaleX' => 1.0, 'scaleY' => 1.0, 'scaleZ' => 1.0,
-        ],
+    $backKey  = null;
+    $backPath = null;
+    if ($hasDfc) {
+        $backKey  = md5(implode('|', array_map(fn($c) => $c['back'] ?? TTS_MTG_BACK, $chunk)) . '|chunk' . $chunkIdx);
+        $backPath = $sheetsDir . $backKey . '-back.jpg';
+    }
+
+    // ── Generate front sheet ─────────────────────────────────────────────────
+    if (!file_exists($frontPath)) {
+        $tmps = ttsWriteCardImages($chunk, 'front');
+        if (!ttsBuildMontage($tmps, $frontPath)) {
+            foreach ($tmps as $t) if ($t) @unlink($t);
+            ttsError("ImageMagick montage failed for front sheet {$sheetKey}", 500);
+        }
+        foreach ($tmps as $t) if ($t) @unlink($t);
+    }
+
+    // ── Generate back sheet for DFC ──────────────────────────────────────────
+    if ($hasDfc && $backPath && !file_exists($backPath)) {
+        $tmps = ttsWriteCardImages($chunk, 'back');
+        ttsBuildMontage($tmps, $backPath);
+        foreach ($tmps as $t) if ($t) @unlink($t);
+    }
+
+    // ── Build URLs ───────────────────────────────────────────────────────────
+    $frontUrl = $sheetsBase . basename($frontPath) . $cacheBust;
+    $backUrl  = ($hasDfc && $backPath && file_exists($backPath))
+              ? $sheetsBase . basename($backPath) . $cacheBust
+              : TTS_MTG_BACK;
+
+    // ── Sheet entry ──────────────────────────────────────────────────────────
+    $sheetEntry = [
+        'FaceURL'      => $frontUrl,
+        'BackURL'      => $backUrl,
+        'NumWidth'     => TTS_COLS,
+        'NumHeight'    => $numRows,
+        'BackIsHidden' => true,
+        'UniqueBack'   => $hasDfc,
     ];
+    $customDeck[$sheetKey] = $sheetEntry;
+
+    // ── Card entries for this chunk ──────────────────────────────────────────
+    foreach ($chunk as $i => $card) {
+        $cardID    = $cardBase + $i;
+        $deckIDs[] = $cardID;
+        $objects[] = [
+            'Name'        => 'Card',
+            'Nickname'    => $card['name'],
+            'CardID'      => $cardID,
+            'CustomDeck'  => [$sheetKey => $sheetEntry],
+            'Transform'   => [
+                'posX' => 0.0, 'posY' => 0.0, 'posZ' => 0.0,
+                'rotX' => 0.0, 'rotY' => 180.0, 'rotZ' => 180.0,
+                'scaleX' => 1.0, 'scaleY' => 1.0, 'scaleZ' => 1.0,
+            ],
+        ];
+    }
 }
 
-ob_end_clean(); // discard any stray output (notices/warnings) before sending JSON
+ob_end_clean();
 
 sendJSON([
     'ObjectStates' => [[
         'Name'             => 'DeckCustom',
         'Nickname'         => $exportName,
         'DeckIDs'          => $deckIDs,
-        'CustomDeck'       => ['1' => $deckEntry],
+        'CustomDeck'       => $customDeck,
         'ContainedObjects' => $objects,
         'Transform'        => [
             'posX' => 0.0, 'posY' => 1.0, 'posZ' => 0.0,
