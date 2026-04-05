@@ -36,8 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 const TTS_COLS     = 10;
 const TTS_CARD_W   = 488;
 const TTS_CARD_H   = 680;
-const TTS_MTG_BACK = 'https://i.imgur.com/P7itTqT.jpg';
-const TTS_MAX_AGE  = 604800; // 7 days
+const TTS_MTG_BACK = 'https://i.imgur.com/Hg8CwwU.jpeg';
 
 // ── Input ────────────────────────────────────────────────────────────────────
 $deckId = isset($_GET['deck_id']) ? (int)$_GET['deck_id'] : 0;
@@ -56,7 +55,7 @@ if ($deckId) {
 
     $stmt = $db->prepare('
         SELECT dc.card_name, dc.quantity,
-               sc.image_uri,       -- Future: COALESCE(dc.custom_image_uri, sc.image_uri) AS image_uri
+               sc.image_uri, sc.image_b64,
                sc.back_image_uri,
                sc.type_line
         FROM deck_cards dc
@@ -74,7 +73,7 @@ if ($deckId) {
 
     $stmt = $db->prepare('
         SELECT lc.card_name, lc.quantity,
-               sc.image_uri,       -- Future: COALESCE(lc.custom_image_uri, sc.image_uri) AS image_uri
+               sc.image_uri, sc.image_b64,
                sc.back_image_uri,
                sc.type_line
         FROM list_cards lc
@@ -88,14 +87,14 @@ if ($deckId) {
 // Expand by quantity; skip cards without a cached image
 $cards = [];
 foreach ($stmt->fetchAll() as $card) {
-    if (empty($card['image_uri'])) continue;
+    if (empty($card['image_uri']) && empty($card['image_b64'])) continue;
     $qty = max(1, (int)($card['quantity'] ?? 1));
     for ($i = 0; $i < $qty; $i++) {
         $cards[] = [
-            'name'  => $card['card_name'],
-            'type'  => $card['type_line'] ?? '',
-            'front' => $card['image_uri'],
-            'back'  => $card['back_image_uri'] ?? null,
+            'name'      => $card['card_name'],
+            'front'     => $card['image_uri'],
+            'front_b64' => $card['image_b64'] ?? null,
+            'back'      => $card['back_image_uri'] ?? null,
         ];
     }
 }
@@ -110,70 +109,95 @@ if (!is_dir($sheetsDir) && !mkdir($sheetsDir, 0755, true)) {
     ttsError('Cannot create sheets directory', 500);
 }
 
-// Prune sheets older than 7 days
-foreach (glob($sheetsDir . '*.jpg') ?: [] as $f) {
-    if (filemtime($f) < time() - TTS_MAX_AGE) @unlink($f);
-}
 
 // ── Cache keys ────────────────────────────────────────────────────────────────
 $hasDfc    = (bool)array_filter($cards, fn($c) => !empty($c['back']));
-$frontKey  = md5(implode('|', array_column($cards, 'front')));
+$frontSigs = array_map(fn($c) => $c['front_b64'] ? md5($c['front_b64']) : $c['front'], $cards);
+$frontKey  = md5(implode('|', $frontSigs));
 $backKey   = $hasDfc ? md5(implode('|', array_map(fn($c) => $c['back'] ?? TTS_MTG_BACK, $cards))) : null;
 $frontPath = $sheetsDir . $frontKey . '-front.jpg';
 $backPath  = $backKey   ? $sheetsDir . $backKey  . '-back.jpg'  : null;
 
-// ── Download images in parallel ───────────────────────────────────────────────
-function ttsDownloadAll(array $urls): array {
-    $mh = curl_multi_init();
-    $handles = [];
-    foreach ($urls as $i => $url) {
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_TIMEOUT        => 20,
-            CURLOPT_USERAGENT      => 'MTGCommander-TTS/1.0',
-        ]);
-        curl_multi_add_handle($mh, $ch);
-        $handles[$i] = $ch;
-    }
-    do { curl_multi_exec($mh, $active); curl_multi_select($mh); } while ($active);
-
+// ── Write card images to temp files (cached b64 first, download fallback) ────
+function ttsWriteCardImages(array $cards, string $side = 'front'): array {
     $tmpFiles = [];
-    foreach ($handles as $i => $ch) {
-        $data = curl_multi_getcontent($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        if ($data && $code === 200) {
+    $needDownload = []; // index => url
+
+    foreach ($cards as $i => $card) {
+        $b64 = ($side === 'front') ? ($card['front_b64'] ?? null) : null;
+        if ($b64) {
             $tmp = tempnam(sys_get_temp_dir(), 'tts_');
-            file_put_contents($tmp, $data);
+            file_put_contents($tmp, base64_decode($b64));
             $tmpFiles[$i] = $tmp;
         } else {
+            $url = ($side === 'front') ? $card['front'] : ($card['back'] ?? TTS_MTG_BACK);
             $tmpFiles[$i] = null;
+            if ($url) $needDownload[$i] = $url;
         }
-        curl_multi_remove_handle($mh, $ch);
     }
-    curl_multi_close($mh);
+
+    // Download any images not in the b64 cache
+    if (!empty($needDownload)) {
+        $mh = curl_multi_init();
+        $handles = [];
+        foreach ($needDownload as $i => $url) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_TIMEOUT        => 20,
+                CURLOPT_USERAGENT      => 'MTGCommander-TTS/1.0',
+            ]);
+            curl_multi_add_handle($mh, $ch);
+            $handles[$i] = $ch;
+        }
+        do { curl_multi_exec($mh, $active); curl_multi_select($mh); } while ($active);
+
+        foreach ($handles as $i => $ch) {
+            $data = curl_multi_getcontent($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            if ($data && $code === 200) {
+                $tmp = tempnam(sys_get_temp_dir(), 'tts_');
+                file_put_contents($tmp, $data);
+                $tmpFiles[$i] = $tmp;
+            }
+            curl_multi_remove_handle($mh, $ch);
+        }
+        curl_multi_close($mh);
+    }
+
     return $tmpFiles;
 }
 
 // ── Stitch sheet with ImageMagick montage ─────────────────────────────────────
 function ttsBuildMontage(array $tmpFiles, string $outputPath): bool {
-    $files = array_values(array_filter($tmpFiles));
-    if (empty($files)) return false;
+    if (empty(array_filter($tmpFiles))) return false;
+
+    // Replace failed images with a black placeholder so positions stay aligned
+    $placeholder = null;
+    foreach ($tmpFiles as $i => $f) {
+        if ($f === null) {
+            if (!$placeholder) {
+                $placeholder = tempnam(sys_get_temp_dir(), 'tts_ph_');
+                $dim = TTS_CARD_W . 'x' . TTS_CARD_H;
+                exec("convert -size {$dim} xc:black " . escapeshellarg('jpg:' . $placeholder));
+            }
+            $tmpFiles[$i] = $placeholder;
+        }
+    }
 
     $geo  = TTS_CARD_W . 'x' . TTS_CARD_H . '+0+0';
-    // Prefix each input with 'jpg:' so ImageMagick can detect the format
-    // regardless of the temp file having no extension.
-    $args = implode(' ', array_map(fn($f) => escapeshellarg('jpg:' . $f), $files));
+    $args = implode(' ', array_map(fn($f) => escapeshellarg('jpg:' . $f), $tmpFiles));
     $out  = escapeshellarg($outputPath);
     $cmd  = "montage {$args} -geometry {$geo} -tile " . TTS_COLS . "x -background '#000000' {$out} 2>&1";
     exec($cmd, $result, $code);
+    if ($placeholder) @unlink($placeholder);
     return $code === 0 && file_exists($outputPath);
 }
 
 // ── Generate front sheet (cached by content hash) ─────────────────────────────
 if (!file_exists($frontPath)) {
-    $tmps = ttsDownloadAll(array_column($cards, 'front'));
+    $tmps = ttsWriteCardImages($cards, 'front');
     if (!ttsBuildMontage($tmps, $frontPath)) {
         foreach ($tmps as $t) if ($t) @unlink($t);
         ttsError('ImageMagick montage failed for front sheet', 500);
@@ -184,9 +208,8 @@ if (!file_exists($frontPath)) {
 // ── Generate back sheet for DFC decks ────────────────────────────────────────
 // Each position uses the card's back face, or the standard MTG back for non-DFCs.
 if ($hasDfc && $backPath && !file_exists($backPath)) {
-    $backUrls = array_map(fn($c) => $c['back'] ?? TTS_MTG_BACK, $cards);
-    $tmps     = ttsDownloadAll($backUrls);
-    ttsBuildMontage($tmps, $backPath); // best-effort; falls back to MTG back URL if it fails
+    $tmps = ttsWriteCardImages($cards, 'back');
+    ttsBuildMontage($tmps, $backPath); // best-effort
     foreach ($tmps as $t) if ($t) @unlink($t);
 }
 
@@ -225,7 +248,6 @@ foreach ($cards as $i => $card) {
     $objects[] = [
         'Name'        => 'Card',
         'Nickname'    => $card['name'],
-        'Description' => $card['type'],
         'CardID'      => $cardID,
         'CustomDeck'  => ['1' => $deckEntry],
         'Transform'   => [
@@ -240,14 +262,14 @@ ob_end_clean(); // discard any stray output (notices/warnings) before sending JS
 
 sendJSON([
     'ObjectStates' => [[
-        'Name'             => 'Deck',
+        'Name'             => 'DeckCustom',
         'Nickname'         => $exportName,
         'DeckIDs'          => $deckIDs,
         'CustomDeck'       => ['1' => $deckEntry],
         'ContainedObjects' => $objects,
         'Transform'        => [
             'posX' => 0.0, 'posY' => 1.0, 'posZ' => 0.0,
-            'rotX' => 0.0, 'rotY' => 0.0, 'rotZ' => 0.0,
+            'rotX' => 0.0, 'rotY' => 180.0, 'rotZ' => 180.0,
             'scaleX' => 1.0, 'scaleY' => 1.0, 'scaleZ' => 1.0,
         ],
     ]],
