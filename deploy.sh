@@ -19,11 +19,11 @@ set -e
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CORE_DIR="$PROJECT_DIR/apps/core"
-DECKS_DIR="$PROJECT_DIR/apps/decks"
+
 GURU_DIR="$PROJECT_DIR/apps/rules-guru"
 PHP_API_DIR="$CORE_DIR/app/php-api"
 CORE_OUT="$CORE_DIR/out"
-DECKS_OUT="$DECKS_DIR/out"
+
 GURU_OUT="$GURU_DIR/out"
 REMOTE_HOST="rickwphillips"
 REMOTE_COMMANDER="public_html/app/projects/commander/"
@@ -56,7 +56,7 @@ fi
 SKIP_BUILD=false
 PHP_ONLY=false
 STATIC_ONLY=false
-DECKS_ONLY=false
+
 GURU_ONLY=false
 
 # Parse flags
@@ -65,7 +65,7 @@ for arg in "$@"; do
     --skip-build)  SKIP_BUILD=true ;;
     --php-only)    PHP_ONLY=true ;;
     --static-only) STATIC_ONLY=true ;;
-    --decks-only)  DECKS_ONLY=true ;;
+
     --guru-only)   GURU_ONLY=true ;;
     --help|-h)
       echo "Usage: bash deploy.sh [OPTIONS]"
@@ -74,7 +74,7 @@ for arg in "$@"; do
       echo "  --skip-build   Skip npm run build (use existing out/ directories)"
       echo "  --php-only     Only deploy PHP API files (no static build/deploy)"
       echo "  --static-only  Only build and deploy static files (no PHP or DB migration)"
-      echo "  --decks-only   Only build and deploy apps/decks (fast path)"
+
       echo "  --guru-only    Only build and deploy apps/rules-guru (fast path)"
       echo "  -h, --help     Show this help message"
       exit 0
@@ -88,7 +88,7 @@ done
 
 # ── Step 1: Build ──────────────────────────────────────────────
 if [ "$PHP_ONLY" = false ] && [ "$SKIP_BUILD" = false ]; then
-  if [ "$DECKS_ONLY" = false ] && [ "$GURU_ONLY" = false ]; then
+  if [ "$GURU_ONLY" = false ]; then
     echo "═══════════════════════════════════════════"
     echo "  Building apps/core..."
     echo "═══════════════════════════════════════════"
@@ -99,16 +99,6 @@ if [ "$PHP_ONLY" = false ] && [ "$SKIP_BUILD" = false ]; then
   fi
 
   if [ "$GURU_ONLY" = false ]; then
-    echo "═══════════════════════════════════════════"
-    echo "  Building apps/decks..."
-    echo "═══════════════════════════════════════════"
-    (cd "$DECKS_DIR" && npm run build)
-    echo ""
-    echo "apps/decks build complete."
-    echo ""
-  fi
-
-  if [ "$DECKS_ONLY" = false ]; then
     echo "═══════════════════════════════════════════"
     echo "  Building apps/rules-guru..."
     echo "═══════════════════════════════════════════"
@@ -121,7 +111,7 @@ fi
 
 # ── Step 2: Deploy static files via lftp ───────────────────────
 if [ "$PHP_ONLY" = false ]; then
-  if [ "$DECKS_ONLY" = false ] && [ "$GURU_ONLY" = false ]; then
+  if [ "$GURU_ONLY" = false ]; then
     echo "═══════════════════════════════════════════"
     echo "  Deploying apps/core static files (--delete)..."
     echo "═══════════════════════════════════════════"
@@ -141,20 +131,6 @@ if [ "$PHP_ONLY" = false ]; then
 
   if [ "$GURU_ONLY" = false ]; then
     echo "═══════════════════════════════════════════"
-    echo "  Deploying apps/decks static files (merge)..."
-    echo "═══════════════════════════════════════════"
-    lftp -u "$FTP_USER,$FTP_PASS" "$FTP_HOST" -e "
-      set ssl:verify-certificate no
-      mirror -R --verbose --exclude index.html --exclude 404.html $DECKS_OUT/ $REMOTE_COMMANDER
-      bye
-    "
-    echo ""
-    echo "apps/decks static deploy complete."
-    echo ""
-  fi
-
-  if [ "$DECKS_ONLY" = false ]; then
-    echo "═══════════════════════════════════════════"
     echo "  Deploying apps/rules-guru static files..."
     echo "═══════════════════════════════════════════"
     lftp -u "$FTP_USER,$FTP_PASS" "$FTP_HOST" -e "
@@ -169,7 +145,7 @@ if [ "$PHP_ONLY" = false ]; then
 fi
 
 # ── Step 3: DB Migrations — apply pending to dev and prod ──────
-if [ "$STATIC_ONLY" = false ] && [ "$DECKS_ONLY" = false ] && [ "$GURU_ONLY" = false ]; then
+if [ "$STATIC_ONLY" = false ] && [ "$GURU_ONLY" = false ]; then
   echo "═══════════════════════════════════════════"
   echo "  Auditing DB migrations (dev + prod)..."
   echo "═══════════════════════════════════════════"
@@ -237,7 +213,7 @@ fi
 
 # ── Step 4: Deploy PHP API via rsync ──────────────────────────
 # Target: ~/public_html/php-api/ (the REAL directory, not the app/php-api symlink)
-if [ "$STATIC_ONLY" = false ] && [ "$DECKS_ONLY" = false ] && [ "$GURU_ONLY" = false ]; then
+if [ "$STATIC_ONLY" = false ] && [ "$GURU_ONLY" = false ]; then
   echo "═══════════════════════════════════════════"
   echo "  Deploying PHP API via rsync..."
   echo "  Source: $PHP_API_DIR/"
@@ -271,7 +247,7 @@ if [ "$PHP_ONLY" = false ]; then
   echo "  Restoring .htaccess files..."
   echo "═══════════════════════════════════════════"
 
-  if [ "$DECKS_ONLY" = false ] && [ "$GURU_ONLY" = false ]; then
+  if [ "$GURU_ONLY" = false ]; then
     ssh "$REMOTE_HOST" 'cat > ~/public_html/app/.htaccess << '\''HTEOF'\''
 DirectorySlash Off
 
@@ -290,11 +266,9 @@ DirectorySlash On
 HTEOF'
   fi
 
-  if [ "$DECKS_ONLY" = false ]; then
-    ssh "$REMOTE_HOST" 'cat > ~/public_html/app/projects/commander/rules/.htaccess << '\''HTEOF'\''
+  ssh "$REMOTE_HOST" 'cat > ~/public_html/app/projects/commander/rules/.htaccess << '\''HTEOF'\''
 DirectorySlash On
 HTEOF'
-  fi
 
   echo ".htaccess files restored."
   echo ""

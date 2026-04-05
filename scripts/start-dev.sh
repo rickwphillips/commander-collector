@@ -2,8 +2,7 @@
 # Start local dev servers
 # Usage:
 #   ./start-dev.sh          — starts PHP + core (port 3001)
-#   ./start-dev.sh all      — starts PHP + core + decks + rules-guru
-#   ./start-dev.sh decks    — starts PHP + decks only (port 3002)
+#   ./start-dev.sh all      — starts PHP + core + rules-guru
 #   ./start-dev.sh guru     — starts PHP + rules-guru only (port 3003)
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -30,13 +29,6 @@ if [ "$MODE" = "all" ] || [ "$MODE" = "core" ] || [ "$MODE" = "" ]; then
   echo "apps/core PID: $!"
 fi
 
-if [ "$MODE" = "all" ] || [ "$MODE" = "decks" ]; then
-  echo "Starting apps/decks on port 3002..."
-  cd "$PROJECT_DIR/apps/decks"
-  npm run dev > /tmp/nextjs-decks.log 2>&1 &
-  echo "apps/decks PID: $!"
-fi
-
 if [ "$MODE" = "all" ] || [ "$MODE" = "guru" ]; then
   echo "Starting apps/rules-guru on port 3003..."
   cd "$PROJECT_DIR/apps/rules-guru"
@@ -49,7 +41,6 @@ echo ""
 echo "✓ Servers started!"
 echo "  PHP API:     http://localhost:8081/php-api/"
 [ "$MODE" = "all" ] || [ "$MODE" = "core" ]  && echo "  Core:        http://localhost:3001"
-[ "$MODE" = "all" ] || [ "$MODE" = "decks" ] && echo "  Decks:       http://localhost:3002"
 [ "$MODE" = "all" ] || [ "$MODE" = "guru" ]  && echo "  Rules Guru:  http://localhost:3003"
 echo ""
 echo "Logs: tail -f /tmp/php-server.log /tmp/nextjs-*.log"
