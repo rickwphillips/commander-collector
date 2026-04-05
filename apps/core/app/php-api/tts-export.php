@@ -31,10 +31,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const TTS_COLS          = 10;   // TTS max columns
-const TTS_MAX_ROWS      = 7;    // TTS max rows per sheet
-const TTS_MAX_PER_SHEET = 69;   // 10*7 - 1 (last slot reserved for hidden card)
+const TTS_MAX_ROWS      = 4;    // Rows per sheet — 4 rows keeps height ~2340px (proven to render)
+const TTS_MAX_PER_SHEET = 40;   // 10*4 — all slots usable when BackIsHidden=true
 const TTS_CARD_W        = 409;  // 4096 / 10 = 409px — fits within 4096 width
-const TTS_CARD_H        = 585;  // 4096 / 7  = 585px — fits within 4096 height
+const TTS_CARD_H        = 585;  // Card height per slot
 const TTS_MTG_BACK      = 'https://i.imgur.com/Hg8CwwU.jpeg';
 
 // ── Input ────────────────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ if ($deckId) {
     $exportName = $meta['name'];
 
     $stmt = $db->prepare('
-        SELECT dc.card_name, dc.quantity,
+        SELECT dc.card_name, dc.quantity, dc.is_commander,
                sc.image_uri, sc.image_b64,
                sc.back_image_uri,
                sc.type_line
@@ -71,7 +71,7 @@ if ($deckId) {
     $exportName = $meta['name'];
 
     $stmt = $db->prepare('
-        SELECT lc.card_name, lc.quantity,
+        SELECT lc.card_name, lc.quantity, lc.is_commander,
                sc.image_uri, sc.image_b64,
                sc.back_image_uri,
                sc.type_line
@@ -84,17 +84,24 @@ if ($deckId) {
 }
 
 // Expand by quantity; skip cards without a cached image
+// Commanders are separated out and placed as standalone objects
 $cards = [];
+$commanders = [];
 foreach ($stmt->fetchAll() as $card) {
     if (empty($card['image_uri']) && empty($card['image_b64'])) continue;
-    $qty = max(1, (int)($card['quantity'] ?? 1));
-    for ($i = 0; $i < $qty; $i++) {
-        $cards[] = [
-            'name'      => $card['card_name'],
-            'front'     => $card['image_uri'],
-            'front_b64' => $card['image_b64'] ?? null,
-            'back'      => $card['back_image_uri'] ?? null,
-        ];
+    $entry = [
+        'name'      => $card['card_name'],
+        'front'     => $card['image_uri'],
+        'front_b64' => $card['image_b64'] ?? null,
+        'back'      => $card['back_image_uri'] ?? null,
+    ];
+    if (!empty($card['is_commander'])) {
+        $commanders[] = $entry;
+    } else {
+        $qty = max(1, (int)($card['quantity'] ?? 1));
+        for ($i = 0; $i < $qty; $i++) {
+            $cards[] = $entry;
+        }
     }
 }
 if (empty($cards)) {
@@ -180,7 +187,7 @@ function ttsBuildMontage(array $tmpFiles, string $outputPath): bool {
     $geo  = TTS_CARD_W . 'x' . TTS_CARD_H . '+0+0';
     $args = implode(' ', array_map(fn($f) => escapeshellarg('jpg:' . $f), $tmpFiles));
     $out  = escapeshellarg($outputPath);
-    $cmd  = "montage {$args} -geometry {$geo} -tile " . TTS_COLS . "x -background '#000000' {$out} 2>&1";
+    $cmd  = "montage {$args} -geometry {$geo} -tile " . TTS_COLS . "x -background '#000000' -quality 75 {$out} 2>&1";
     exec($cmd, $result, $code);
     if ($placeholder) @unlink($placeholder);
     return $code === 0 && file_exists($outputPath);
@@ -258,26 +265,62 @@ foreach ($chunks as $chunkIdx => $chunk) {
             'CustomDeck'  => [$sheetKey => $sheetEntry],
             'Transform'   => [
                 'posX' => 0.0, 'posY' => 0.0, 'posZ' => 0.0,
-                'rotX' => 0.0, 'rotY' => 180.0, 'rotZ' => 180.0,
-                'scaleX' => 1.0, 'scaleY' => 1.0, 'scaleZ' => 1.0,
+                'rotX' => 0.0, 'rotY' => 270.0, 'rotZ' => 180.0,
+                'scaleX' => 1.75, 'scaleY' => 1.0, 'scaleZ' => 1.75,
             ],
         ];
     }
 }
 
+// ── Build commander standalone objects ────────────────────────────────────────
+$commanderObjects = [];
+foreach ($commanders as $ci => $cmdr) {
+    // Use the card image URL directly — no montage needed for a single card
+    $cmdrFrontUrl = $cmdr['front'];
+    $cmdrBackUrl  = !empty($cmdr['back']) ? $cmdr['back'] : TTS_MTG_BACK;
+
+    $cmdrSheet = [
+        'FaceURL'      => $cmdrFrontUrl,
+        'BackURL'      => $cmdrBackUrl,
+        'NumWidth'     => 1,
+        'NumHeight'    => 1,
+        'BackIsHidden' => true,
+        'UniqueBack'   => !empty($cmdr['back']),
+    ];
+
+    $commanderObjects[] = [
+        'Name'        => 'CardCustom',
+        'Nickname'    => $cmdr['name'],
+        'Description' => 'Commander',
+        'Tags'        => ['Commander'],
+        'CardID'      => ($ci + 90) * 100,
+        'CustomDeck'  => [(string)($ci + 90) => $cmdrSheet],
+        'Transform'   => [
+            'posX' => 0.0, 'posY' => 1.0, 'posZ' => -4.0 - ($ci * 4.0),
+            'rotX' => 0.0, 'rotY' => 270.0, 'rotZ' => 0.0,
+            'scaleX' => 1.75, 'scaleY' => 1.0, 'scaleZ' => 1.75,
+        ],
+    ];
+}
+
 ob_end_clean();
 
-sendJSON([
-    'ObjectStates' => [[
-        'Name'             => 'DeckCustom',
-        'Nickname'         => $exportName,
-        'DeckIDs'          => $deckIDs,
-        'CustomDeck'       => $customDeck,
-        'ContainedObjects' => $objects,
-        'Transform'        => [
-            'posX' => 0.0, 'posY' => 1.0, 'posZ' => 0.0,
-            'rotX' => 0.0, 'rotY' => 180.0, 'rotZ' => 180.0,
-            'scaleX' => 1.0, 'scaleY' => 1.0, 'scaleZ' => 1.0,
-        ],
-    ]],
-]);
+$objectStates = [[
+    'Name'             => 'DeckCustom',
+    'Nickname'         => $exportName,
+    'DeckIDs'          => $deckIDs,
+    'CustomDeck'       => $customDeck,
+    'ContainedObjects' => $objects,
+    'Transform'        => [
+        'posX' => 0.0, 'posY' => 1.0, 'posZ' => 0.0,
+        'rotX' => 0.0, 'rotY' => 270.0, 'rotZ' => 180.0,
+        'scaleX' => 1.75, 'scaleY' => 1.0, 'scaleZ' => 1.75,
+    ],
+]];
+
+// Add commanders as separate objects next to the deck
+foreach ($commanderObjects as $cmdrObj) {
+    $objectStates[] = $cmdrObj;
+}
+
+sendJSON(['ObjectStates' => $objectStates]);
