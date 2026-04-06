@@ -238,9 +238,14 @@ function DecklistPageInner() {
         is_commander: c.is_commander,
         is_proxy:     c.is_proxy,
       })));
-      const commanderCard = draftCards.find(c => c.is_commander);
-      if (commanderCard && commanderCard.card_name !== deck.commander) {
-        await api.updateDeck(deckId, { commander: commanderCard.card_name }).catch(() => {});
+      const commanderCards = draftCards.filter(c => c.is_commander);
+      if (commanderCards.length >= 1 && commanderCards[0].card_name !== deck.commander) {
+        await api.updateDeck(deckId, { commander: commanderCards[0].card_name }).catch(() => {});
+      }
+      if (commanderCards.length >= 2 && commanderCards[1].card_name !== deck.partner) {
+        await api.updateDeck(deckId, { partner: commanderCards[1].card_name }).catch(() => {});
+      } else if (commanderCards.length < 2 && deck.partner) {
+        await api.updateDeck(deckId, { partner: null }).catch(() => {});
       }
       const [freshDeck, freshCards] = await Promise.all([
         api.getDeck(deckId),
@@ -414,7 +419,12 @@ function DecklistPageInner() {
       title={editMode ? `Editing: ${deck.name}` : deck.name}
       subtitle={editMode
         ? undefined
-        : <>Commander: <CardTooltip name={deck.commander} style={{ borderBottom: '1px dotted currentColor' }}>{deck.commander}</CardTooltip></>
+        : <>
+            Commander: <CardTooltip name={deck.commander} style={{ borderBottom: '1px dotted currentColor' }}>{deck.commander}</CardTooltip>
+            {deck.partner && (
+              <> + <CardTooltip name={deck.partner} style={{ borderBottom: '1px dotted currentColor' }}>{deck.partner}</CardTooltip></>
+            )}
+          </>
       }
       backHref={`/decks/detail?id=${deckId}`}
       backLabel="Back to Deck"

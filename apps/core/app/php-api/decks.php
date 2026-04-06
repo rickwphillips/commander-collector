@@ -109,15 +109,17 @@ switch ($method) {
         }
 
         $colorFields = colorsToFields(isset($data['colors']) ? $data['colors'] : '');
+        $partner = isset($data['partner']) && trim($data['partner']) !== '' ? trim($data['partner']) : null;
 
         $stmt = $pdo->prepare('
-            INSERT INTO decks (player_id, name, commander, colors, has_w, has_u, has_b, has_r, has_g)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO decks (player_id, name, commander, partner, colors, has_w, has_u, has_b, has_r, has_g)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ');
         $stmt->execute([
             (int)$data['player_id'],
             trim($data['name']),
             trim($data['commander']),
+            $partner,
             $colorFields['colors'],
             $colorFields['has_w'],
             $colorFields['has_u'],
@@ -131,6 +133,7 @@ switch ($method) {
             'player_id' => (int)$data['player_id'],
             'name' => trim($data['name']),
             'commander' => trim($data['commander']),
+            'partner' => $partner,
             'colors' => $colorFields['colors'],
             'has_w' => $colorFields['has_w'],
             'has_u' => $colorFields['has_u'],
@@ -176,6 +179,10 @@ switch ($method) {
         if (isset($data['player_id'])) {
             $updates[] = 'player_id = ?';
             $params[] = (int)$data['player_id'];
+        }
+        if (array_key_exists('partner', $data)) {
+            $updates[] = 'partner = ?';
+            $params[] = $data['partner'] !== null && trim($data['partner']) !== '' ? trim($data['partner']) : null;
         }
 
         if (empty($updates)) {

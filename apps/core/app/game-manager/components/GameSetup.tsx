@@ -170,6 +170,7 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
     const ownerAlreadyPlaying = slots.some((s, i) => i !== idx && s.playerId === ownerPlayerId);
     const resolvedPlayerId =
       currentPlayerId === '' && !ownerAlreadyPlaying ? ownerPlayerId : currentPlayerId;
+    const partnerName = deck?.partner ?? '';
     updateSlot(idx, {
       deckId,
       playerId: resolvedPlayerId,
@@ -179,9 +180,16 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
         artCropUrl: undefined,
         options: [],
       },
+      hasPartner: !!partnerName,
+      partner: partnerName
+        ? { name: partnerName, artCropUrl: undefined, options: [], loading: false }
+        : { name: '', artCropUrl: undefined, options: [], loading: false },
     });
     if (commanderName) {
       fetchCommanderArt(idx, 'commander', commanderName);
+    }
+    if (partnerName) {
+      fetchCommanderArt(idx, 'partner', partnerName);
     }
   };
 

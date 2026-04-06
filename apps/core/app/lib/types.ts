@@ -120,6 +120,7 @@ export interface Deck {
   player_id: number;
   name: string;
   commander: string;
+  partner: string | null;
   colors: string; // Stored as "WUBRG" format, "C" for colorless
   has_w: number; // 0 or 1
   has_u: number;
@@ -735,6 +736,7 @@ export interface CreateDeckInput {
   player_id: number;
   name: string;
   commander: string;
+  partner?: string | null;
   colors: string;
 }
 

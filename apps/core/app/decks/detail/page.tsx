@@ -2,10 +2,14 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useRef } from 'react';
 import {
+  Autocomplete,
   Card,
   CardContent,
   CardActionArea,
+  Checkbox,
+  FormControlLabel,
   Grid,
   Typography,
   Stack,
@@ -31,6 +35,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { EmptyState } from '@/components/EmptyState';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import { api } from '@/lib/api';
+import { scryfallCommanderSearch, scryfallPartnerSearch, scryfallGetCard, getOracleText } from '@/lib/scryfall';
 import { getOrdinalSuffix, MTG_COLORS_WITH_C } from '@/lib/utils';
 import type { DeckDetail as DeckDetailType, GameWithResults, DeckCard } from '@/lib/types';
 
@@ -51,8 +56,15 @@ export default function DeckDetailPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editCommander, setEditCommander] = useState('');
+  const [editCmdrOptions, setEditCmdrOptions] = useState<string[]>([]);
+  const [editHasPartner, setEditHasPartner] = useState(false);
+  const [editPartner, setEditPartner] = useState('');
+  const [editPartnerOptions, setEditPartnerOptions] = useState<string[]>([]);
+  const [editBgEligible, setEditBgEligible] = useState(false);
   const [editColors, setEditColors] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const editCmdrDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const editPartnerDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Delete state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -93,8 +105,19 @@ export default function DeckDetailPage() {
   const handleEdit = () => {
     setEditName(deck?.name || '');
     setEditCommander(deck?.commander || '');
+    setEditCmdrOptions([]);
+    setEditHasPartner(!!deck?.partner);
+    setEditPartner(deck?.partner || '');
+    setEditPartnerOptions([]);
+    setEditBgEligible(false);
     setEditColors(deck?.colors ? deck.colors.split('') : []);
     setEditDialogOpen(true);
+    // Check background eligibility for current commander
+    if (deck?.commander) {
+      scryfallGetCard(deck.commander).then((card) => {
+        if (card) setEditBgEligible(getOracleText(card).includes('Choose a Background'));
+      });
+    }
   };
 
   const handleColorToggle = (color: string) => {
@@ -114,16 +137,19 @@ export default function DeckDetailPage() {
     setSaving(true);
     try {
       const colorsString = MTG_COLORS_WITH_C.filter((c) => editColors.includes(c)).join('');
+      const partnerValue = editHasPartner && editPartner.trim() ? editPartner.trim() : null;
 
       await api.updateDeck(deckId, {
         name: editName.trim(),
         commander: editCommander.trim(),
+        partner: partnerValue,
         colors: colorsString || 'C',
       });
       setDeck({
         ...deck!,
         name: editName.trim(),
         commander: editCommander.trim(),
+        partner: partnerValue,
         colors: colorsString || 'C',
       });
       setEditDialogOpen(false);
@@ -205,7 +231,14 @@ export default function DeckDetailPage() {
   return (
     <PageContainer
       title={deck.name}
-      subtitle={<CardTooltip name={deck.commander} style={{ borderBottom: '1px dotted currentColor' }}>{deck.commander}</CardTooltip>}
+      subtitle={
+        <>
+          <CardTooltip name={deck.commander} style={{ borderBottom: '1px dotted currentColor' }}>{deck.commander}</CardTooltip>
+          {deck.partner && (
+            <> + <CardTooltip name={deck.partner} style={{ borderBottom: '1px dotted currentColor' }}>{deck.partner}</CardTooltip></>
+          )}
+        </>
+      }
       backHref="/decks"
       backLabel="Back to Decks"
       actions={
@@ -352,12 +385,70 @@ export default function DeckDetailPage() {
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
             />
-            <TextField
-              label="Commander"
-              fullWidth
-              value={editCommander}
-              onChange={(e) => setEditCommander(e.target.value)}
+            <Autocomplete
+              freeSolo
+              options={editCmdrOptions}
+              inputValue={editCommander}
+              onInputChange={(_, value) => {
+                setEditCommander(value);
+                if (editCmdrDebounce.current) clearTimeout(editCmdrDebounce.current);
+                if (value.length < 2) { setEditCmdrOptions([]); return; }
+                editCmdrDebounce.current = setTimeout(async () => {
+                  const results = await scryfallCommanderSearch(value);
+                  setEditCmdrOptions(results.slice(0, 8));
+                }, 300);
+              }}
+              onChange={async (_, value) => {
+                if (typeof value !== 'string') return;
+                setEditCommander(value);
+                const card = await scryfallGetCard(value);
+                if (card) {
+                  const ci = card.color_identity ?? [];
+                  setEditColors(ci.length > 0 ? ci : ['C']);
+                  setEditBgEligible(getOracleText(card).includes('Choose a Background'));
+                }
+              }}
+              filterOptions={(x) => x}
+              renderInput={(params) => (
+                <TextField {...params} label="Commander" fullWidth />
+              )}
             />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={editHasPartner}
+                  onChange={(e) => {
+                    setEditHasPartner(e.target.checked);
+                    if (!e.target.checked) { setEditPartner(''); setEditPartnerOptions([]); }
+                  }}
+                  size="small"
+                />
+              }
+              label="Partner Commander?"
+            />
+            {editHasPartner && (
+              <Autocomplete
+                freeSolo
+                options={editPartnerOptions}
+                inputValue={editPartner}
+                onInputChange={(_, value) => {
+                  setEditPartner(value);
+                  if (editPartnerDebounce.current) clearTimeout(editPartnerDebounce.current);
+                  if (value.length < 2) { setEditPartnerOptions([]); return; }
+                  editPartnerDebounce.current = setTimeout(async () => {
+                    const results = await scryfallPartnerSearch(value, editBgEligible);
+                    setEditPartnerOptions(results.slice(0, 8));
+                  }, 300);
+                }}
+                onChange={(_, value) => { if (typeof value === 'string') setEditPartner(value); }}
+                filterOptions={(x) => x}
+                renderInput={(params) => (
+                  <TextField {...params} label="Partner Commander" fullWidth
+                    placeholder={editBgEligible ? 'Search partners or backgrounds…' : 'Search partner commanders…'}
+                  />
+                )}
+              />
+            )}
             <Box>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
                 Color Identity
