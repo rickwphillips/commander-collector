@@ -249,7 +249,7 @@ function ListDetailInner() {
   };
 
   const handleImport = async (cards: ParsedCard[]) => {
-    const scryfallMap = new Map<string, { scryfall_id: string; image_uri?: string; back_image_uri?: string; type_line?: string; mana_cost?: string; color_identity?: string }>();
+    const scryfallMap = new Map<string, { scryfall_id: string; image_uri?: string | null; back_image_uri?: string | null; type_line?: string | null; mana_cost?: string | null; color_identity?: string | null }>();
     try {
       const { results } = await api.bulkLookupCards(cards.map(c => c.card_name));
       for (const r of results) {
