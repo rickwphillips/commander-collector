@@ -35,7 +35,8 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { EmptyState } from '@/components/EmptyState';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import { api } from '@/lib/api';
-import { scryfallCommanderSearch, scryfallPartnerSearch, scryfallGetCard, getOracleText } from '@/lib/scryfall';
+import { scryfallCommanderSearch, scryfallPartnerSearch, scryfallGetCard, getOracleText, type ScryfallSearchResult } from '@/lib/scryfall';
+import { ManaCost } from '@/components/ManaCost';
 import { getOrdinalSuffix, MTG_COLORS_WITH_C } from '@/lib/utils';
 import type { DeckDetail as DeckDetailType, GameWithResults, DeckCard } from '@/lib/types';
 
@@ -56,10 +57,10 @@ export default function DeckDetailPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editCommander, setEditCommander] = useState('');
-  const [editCmdrOptions, setEditCmdrOptions] = useState<string[]>([]);
+  const [editCmdrOptions, setEditCmdrOptions] = useState<ScryfallSearchResult[]>([]);
   const [editHasPartner, setEditHasPartner] = useState(false);
   const [editPartner, setEditPartner] = useState('');
-  const [editPartnerOptions, setEditPartnerOptions] = useState<string[]>([]);
+  const [editPartnerOptions, setEditPartnerOptions] = useState<ScryfallSearchResult[]>([]);
   const [editBgEligible, setEditBgEligible] = useState(false);
   const [editColors, setEditColors] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -385,7 +386,7 @@ export default function DeckDetailPage() {
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
             />
-            <Autocomplete
+            <Autocomplete<ScryfallSearchResult, false, false, true>
               freeSolo
               options={editCmdrOptions}
               inputValue={editCommander}
@@ -394,21 +395,30 @@ export default function DeckDetailPage() {
                 if (editCmdrDebounce.current) clearTimeout(editCmdrDebounce.current);
                 if (value.length < 2) { setEditCmdrOptions([]); return; }
                 editCmdrDebounce.current = setTimeout(async () => {
-                  const results = await scryfallCommanderSearch(value);
-                  setEditCmdrOptions(results.slice(0, 8));
+                  setEditCmdrOptions((await scryfallCommanderSearch(value)).slice(0, 8));
                 }, 300);
               }}
               onChange={async (_, value) => {
-                if (typeof value !== 'string') return;
-                setEditCommander(value);
-                const card = await scryfallGetCard(value);
+                const name = typeof value === 'string' ? value : value?.name;
+                if (!name) return;
+                setEditCommander(name);
+                const card = await scryfallGetCard(name);
                 if (card) {
                   const ci = card.color_identity ?? [];
                   setEditColors(ci.length > 0 ? ci : ['C']);
                   setEditBgEligible(getOracleText(card).includes('Choose a Background'));
                 }
               }}
+              getOptionLabel={(opt) => typeof opt === 'string' ? opt : opt.name}
               filterOptions={(x) => x}
+              renderOption={(props, opt) => (
+                <li {...props} key={opt.name}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                    <span>{opt.name}</span>
+                    {opt.mana_cost && <ManaCost cost={opt.mana_cost} size={0.7} />}
+                  </Box>
+                </li>
+              )}
               renderInput={(params) => (
                 <TextField {...params} label="Commander" fullWidth />
               )}
@@ -427,7 +437,7 @@ export default function DeckDetailPage() {
               label="Partner Commander?"
             />
             {editHasPartner && (
-              <Autocomplete
+              <Autocomplete<ScryfallSearchResult, false, false, true>
                 freeSolo
                 options={editPartnerOptions}
                 inputValue={editPartner}
@@ -436,12 +446,23 @@ export default function DeckDetailPage() {
                   if (editPartnerDebounce.current) clearTimeout(editPartnerDebounce.current);
                   if (value.length < 2) { setEditPartnerOptions([]); return; }
                   editPartnerDebounce.current = setTimeout(async () => {
-                    const results = await scryfallPartnerSearch(value, editBgEligible);
-                    setEditPartnerOptions(results.slice(0, 8));
+                    setEditPartnerOptions((await scryfallPartnerSearch(value, editBgEligible)).slice(0, 8));
                   }, 300);
                 }}
-                onChange={(_, value) => { if (typeof value === 'string') setEditPartner(value); }}
+                onChange={(_, value) => {
+                  const name = typeof value === 'string' ? value : value?.name;
+                  if (name) setEditPartner(name);
+                }}
+                getOptionLabel={(opt) => typeof opt === 'string' ? opt : opt.name}
                 filterOptions={(x) => x}
+                renderOption={(props, opt) => (
+                  <li {...props} key={opt.name}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                      <span>{opt.name}</span>
+                      {opt.mana_cost && <ManaCost cost={opt.mana_cost} size={0.7} />}
+                    </Box>
+                  </li>
+                )}
                 renderInput={(params) => (
                   <TextField {...params} label="Partner Commander" fullWidth
                     placeholder={editBgEligible ? 'Search partners or backgrounds…' : 'Search partner commanders…'}
