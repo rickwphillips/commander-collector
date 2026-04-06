@@ -1,0 +1,946 @@
+' ══════════════════════════════════════════════════════════
+' 1. HIGH-LEVEL ARCHITECTURE OVERVIEW
+' ══════════════════════════════════════════════════════════
+@startuml component-overview
+!theme plain
+top to bottom direction
+skinparam ranksep 35
+skinparam nodesep 20
+
+title Commander Collector — Architecture Overview (v4.4.0)
+
+package "Layout" as LAY {
+  [layout.tsx → ThemeProvider → AuthGuard] as LAYOUT
+  [SettingsTab · DarkModeToggle · LogoutButton] as SETTINGS
+}
+
+package "Shared UI" as SUI {
+  [Shared Components\nPageContainer · LoadingSpinner · EmptyState\nStatsCard · ManaSymbol · ColorIdentityChips\nManaCost · DeckBreakdown · GameForm\nViewSelector · DeckFilters · DeckActions\nCardListDisplay · CardGridEditor] as SHARED
+  [packages/shared\nCardTooltip · ConfirmDeleteDialog\ncardNameUtils] as PKG
+}
+
+package "Feature Pages" as FEAT {
+  [Dashboard] as DASH
+  [Deck System\n5 pages + 7 scan dialogs] as DECK
+  [Game System\n4 pages] as GAME
+  [Game Manager\nSetup · Board · PlayerPanel\nCenterZone · Remote · EndSummary] as GMGR
+  [Stats System\nStats · Customize\nComparisonBuilder · ComparisonPanel] as STAT
+  [Players\n2 pages] as PLAY
+  [Lists\n2 pages] as LIST
+  [My Collection\n+ CoachChat drawer] as COLL
+  [Admin\n+ Coach Notes] as ADMN
+  [Changelog · Rules Guru] as OTHER
+}
+
+package "API Layer" as APIL {
+  [api.ts · apiFetch()\nscryfall.ts] as API
+  [Shared Lib\ntypes · utils · statsSections · version] as LIB
+}
+
+package "PHP Backend" as PHP {
+  [Core (14 endpoints)\ngames · decks · deck-cards · players\nstats · comparison · advanced-stats\nstat-panels · live-game · scryfall-cache\nscan · head-to-head] as CORE
+  [Features (14 endpoints)\ncoach-chat · coach-notes · tts-export\nlists · list-audit · my-collection\ncard-prints · card-image · scan-draft\nactive-game · game-settings\ndeck-profile · changelog · players-public] as FAPI
+  [Auth (7 endpoints)\nlogin · register · me · change-password\nusers · jwt · invite] as AUTH
+  [Rules Guru (6 endpoints)\nchat · conversations · patterns\nactive-game · qa-log-rate · seed] as RULES
+  [config.php · sql-helpers.php\nauth/middleware.php] as CFG
+}
+
+database "MySQL\nrickwphi_app_commander" as DB
+
+' Tier wiring
+LAYOUT -down-> SHARED
+SETTINGS -down-> SHARED
+
+DASH -down-> API
+DECK -down-> API
+GAME -down-> API
+GMGR -down-> API
+STAT -down-> API
+PLAY -down-> API
+LIST -down-> API
+COLL -down-> API
+ADMN -down-> API
+OTHER -down-> API
+
+DASH --> SHARED
+DECK --> SHARED
+GAME --> SHARED
+GMGR --> SHARED
+STAT --> SHARED
+PLAY --> SHARED
+LIST --> SHARED
+COLL --> SHARED
+ADMN --> SHARED
+OTHER --> SHARED
+
+SHARED --> PKG
+API --> LIB
+
+API -down-> CORE
+API -down-> FAPI
+API -down-> AUTH
+API -down-> RULES
+CORE --> CFG
+FAPI --> CFG
+AUTH --> CFG
+RULES --> CFG
+
+CFG -down-> DB
+
+@enduml
+
+' ══════════════════════════════════════════════════════════
+' 2. SHARED UI — Component Detail
+' ══════════════════════════════════════════════════════════
+@startuml component-shared-ui
+!theme plain
+top to bottom direction
+skinparam ranksep 30
+
+title Shared UI — Component Dependencies
+
+package "Layout Layer" {
+  [layout.tsx] as LYT
+  [ThemeProvider] as TP
+  [AuthGuard] as AG
+  [SettingsTab] as ST
+  [DarkModeToggle] as DMT
+  [LogoutButton] as LB
+}
+
+package "Shared Components (apps/core)" {
+  [PageContainer] as PC
+  [LoadingSpinner] as LS
+  [EmptyState] as ES
+  [StatsCard] as SC
+  [ManaSymbol] as MS
+  [ColorSymbols] as CS
+  [ColorIdentityChips] as CIC
+  [ManaCost] as MC
+  [DeckBreakdown] as DB
+  [GameForm] as GF
+  [ViewSelector] as VS
+  [CardListDisplay] as CLD
+  [DeckActions] as DA
+  [CardGridEditor] as CGE
+  [DeckFilters] as DF
+}
+
+package "Shared Package (packages/shared)" {
+  [CardTooltip] as CTT
+  [ConfirmDeleteDialog] as CDD
+  [cardNameUtils] as CNU
+}
+
+package "Shared Lib" {
+  [types.ts] as TYP
+  [utils.ts] as UTL
+  [statsSections.ts] as SSC
+  [version.ts] as VER
+}
+
+' Represents feature pages that consume these shared components
+' (detail wiring shown in per-system diagrams)
+rectangle "Feature Pages\n(see detail diagrams)" as FP
+
+' Layout chain
+LYT -down-> TP
+TP -down-> AG
+AG -down-> PC
+ST --> DMT
+ST --> LB
+
+' Color component chain
+CIC --> CS
+CS --> MS
+MC --> MS
+DB --> MC
+DB --> MS
+
+' Card display components
+CLD --> MC
+CLD --> CTT
+CLD --> DF
+CGE --> CTT
+DA --> CDD
+
+' Leaf components (consumed by feature pages)
+FP --> PC
+FP --> LS
+FP --> ES
+FP --> SC
+FP --> GF
+FP --> VS
+FP --> VER
+FP --> CNU
+
+' Shared lib
+UTL --> TYP
+SSC --> TYP
+
+@enduml
+
+' ══════════════════════════════════════════════════════════
+' 3. DECK SYSTEM — Component Detail
+' ══════════════════════════════════════════════════════════
+@startuml component-deck-system
+!theme plain
+top to bottom direction
+skinparam ranksep 30
+
+title Deck System — Component Detail
+
+package "Deck Pages" {
+  [DecksListPage] as DLP
+  [DeckDetailPage] as DDP
+  [NewDeckPage] as NDP
+  [DecklistPage] as DKL
+  [ScanDeckPage] as SDP
+}
+
+package "Scan Sub-Components" {
+  [CardReviewGrid] as CRG
+  [ScanProgressDialog] as SPD
+  [ScanResultsDialog] as SRD
+  [CardAddDialog] as CAD
+  [CardEditDialog] as CED
+  [VersionPickerDialog] as VPD
+  [ImageEditorDialog] as IED
+
+  note bottom of CRG
+    ScanDeckPage: 1368 lines
+    (decomposed from 2036)
+  end note
+}
+
+package "Shared Components" <<Rectangle>> {
+  [PageContainer] as PC
+  [LoadingSpinner] as LS
+  [EmptyState] as ES
+  [StatsCard] as SC
+  [ManaSymbol] as MS
+  [ColorIdentityChips] as CIC
+  [DeckBreakdown] as DB
+  [DeckActions] as DA
+  [DeckFilters] as DF
+  [CardListDisplay] as CLD
+  [CardGridEditor] as CGE
+  [ConfirmDeleteDialog] as CDD
+}
+
+package "API Layer" <<Rectangle>> {
+  [api.ts] as API
+  [scryfall.ts] as SCR
+}
+
+' Deck pages → shared
+DLP --> PC
+DLP --> CIC
+DLP --> MS
+DLP --> LS
+DLP --> ES
+NDP --> PC
+NDP --> MS
+DDP --> PC
+DDP --> SC
+DDP --> CIC
+DDP --> DB
+DDP --> DA
+DA --> CDD
+DKL --> DB
+DKL --> CLD
+DKL --> CGE
+DKL --> DF
+
+' Scan sub-components
+SDP --> MS
+SDP --> DB
+SDP --> CRG
+SDP --> SPD
+SDP --> SRD
+SDP --> CAD
+SDP --> CED
+SDP --> VPD
+SDP --> IED
+
+' API wiring
+DLP -down-> API
+NDP -down-> API
+DDP -down-> API
+DKL -down-> API
+SDP -down-> API
+SDP --> SCR
+
+@enduml
+
+' ══════════════════════════════════════════════════════════
+' 4. GAME & GAME MANAGER — Component Detail
+' ══════════════════════════════════════════════════════════
+@startuml component-game-system
+!theme plain
+top to bottom direction
+skinparam ranksep 30
+
+title Game System & Game Manager — Component Detail
+
+package "Game Pages" {
+  [GamesListPage] as GLP
+  [GameDetailPage] as GDP
+  [NewGamePage] as NGP
+  [EditGamePage] as EGP
+}
+
+package "Game Manager (Live Play)" {
+  [GameSetup] as GS
+  [GameBoard] as GB
+  [PlayerPanel] as PP
+  [CenterZone] as CZ
+  [GameEndSummary] as GES
+  [ControlFocusModal] as CFM
+  [RemoteGamePage] as RP
+  [useSounds] as SND
+  [usePoisonSound] as PSN
+  [remoteTransforms] as RT
+
+  note right of PP
+    150KB — largest component
+    Life, poison, cmdr tax,
+    monarch/initiative, mana
+  end note
+
+  note right of RP
+    game-manager/remote/page.tsx
+    Separate page route
+  end note
+}
+
+package "Shared Components" <<Rectangle>> {
+  [PageContainer] as PC
+  [LoadingSpinner] as LS
+  [StatsCard] as SC
+  [ManaSymbol] as MS
+  [ColorIdentityChips] as CIC
+  [GameForm] as GF
+}
+
+package "API Layer" <<Rectangle>> {
+  [api.ts] as API
+}
+
+' Game pages → shared
+GLP --> PC
+GLP --> CIC
+GLP --> LS
+GDP --> PC
+GDP --> SC
+GDP --> CIC
+NGP --> GF
+EGP --> GF
+GF -down-> API
+
+' Game Manager internal wiring
+GB --> PP
+GB --> CZ
+GB --> RT
+PP --> CFM
+PP --> SND
+PP --> PSN
+GES --> GF
+RP --> RT
+GS --> MS
+
+' API wiring
+GLP -down-> API
+GDP -down-> API
+GS -down-> API
+GB -down-> API
+RP -down-> API
+
+@enduml
+
+' ══════════════════════════════════════════════════════════
+' 5. STATS, PLAYERS, LISTS, COLLECTION — Component Detail
+' ══════════════════════════════════════════════════════════
+@startuml component-stats-and-secondary
+!theme plain
+top to bottom direction
+skinparam ranksep 30
+
+title Stats, Players, Lists & Collection — Component Detail
+
+package "Stats System" {
+  [StatsPage] as SP
+  [CustomizePage] as CP
+  [ComparisonBuilder] as CB
+  [ComparisonPanel] as CPL
+  [QuerySentence] as QS
+  [ConditionColorPicker] as CCP
+  [PanelCard] as PKC
+  [DeletePanelDialog] as DPD
+  [useHiddenStats] as UHS
+}
+
+package "Players" {
+  [PlayersListPage] as PLP
+  [PlayerDetailPage] as PDP
+}
+
+package "Lists" {
+  [ListsPage] as LSP
+  [ListDetailPage] as LDP
+}
+
+package "My Collection" {
+  [MyCollectionPage] as MCP
+  [CoachChat] as CCH
+}
+
+package "Admin" {
+  [AdminPage] as ADP
+  [CoachNotesPage] as CNP
+}
+
+package "Other Pages" {
+  [ChangelogPage] as CLP
+  [RulesMainPage] as RMP
+  [RulesChatPage] as RCP
+}
+
+package "Shared Components" <<Rectangle>> {
+  [PageContainer] as PC
+  [LoadingSpinner] as LS
+  [EmptyState] as ES
+  [StatsCard] as SC
+  [ManaSymbol] as MS
+  [ColorIdentityChips] as CIC
+  [ViewSelector] as VS
+  [CardListDisplay] as CLD
+  [CardGridEditor] as CGE
+  [DeckFilters] as DF
+  [cardNameUtils] as CNU
+  [utils.ts] as UTL
+}
+
+package "API Layer" <<Rectangle>> {
+  [api.ts] as API
+}
+
+' Stats internal
+SP --> SC
+SP --> CIC
+SP --> CPL
+SP --> VS
+SP --> UHS
+CP --> CB
+CP --> PKC
+CP --> DPD
+CP --> CPL
+CB --> CCP
+CB --> QS
+CCP --> MS
+QS --> UTL
+
+' Players
+PLP --> PC
+PLP --> LS
+PDP --> SC
+PDP --> CIC
+
+' Lists
+LSP --> PC
+LSP --> LS
+LSP --> ES
+LDP --> CLD
+LDP --> CGE
+LDP --> DF
+
+' My Collection
+MCP --> SC
+MCP --> CIC
+MCP --> CCH
+CCH --> CNU
+
+' Dashboard + Other
+CLP --> PC
+ADP --> PC
+CNP --> PC
+RMP --> PC
+
+' API wiring
+SP -down-> API
+CP -down-> API
+PLP -down-> API
+PDP -down-> API
+LSP -down-> API
+LDP -down-> API
+MCP -down-> API
+CCH -down-> API
+CNP -down-> API
+CLP -down-> API
+RCP -down-> API
+
+@enduml
+
+' ============================================================
+
+@startuml sequence-deck-create
+!theme plain
+title Deck System — Create Deck via Scan
+
+actor User
+participant "ScanDeckPage" as Scan
+participant "VersionPickerDialog" as VPick
+participant "ImageEditorDialog" as IEdit
+participant "CardReviewGrid" as Review
+participant "ManaSymbol\n(Color Picker)" as Color
+participant "DeckBreakdown" as Breakdown
+participant "api.ts" as API
+participant "scan.php" as ScanAPI
+participant "scan-draft.php" as DraftAPI
+participant "scryfall-cache.php" as Scryfall
+participant "card-prints.php" as Prints
+participant "decks.php" as DecksAPI
+participant "deck-cards.php" as CardsAPI
+database "MySQL" as DB
+
+== Step 0: Capture ==
+User -> Scan : Upload photo / take picture
+Scan -> Scan : fileToBase64()\nrotate, brightness, contrast
+
+opt Image adjustment needed
+  Scan -> IEdit : Open image editor
+  User -> IEdit : Crop, rotate, adjust
+  IEdit --> Scan : Edited image
+end
+
+Scan -> Scan : splitCanvasToTiles()\n3x3 + full = 10 tiles
+
+== Step 1: Review ==
+loop Batch of 3 tiles
+  Scan -> API : api.scanDeck(base64, mime)
+  API -> ScanAPI : POST /scan
+  ScanAPI --> API : card names[]
+  API --> Scan : ScannedCard[]
+  Scan -> Scan : Deduplicate by name
+  Scan -> API : api.bulkLookupCards(names)
+  API -> Scryfall : POST /scryfall-cache
+  Scryfall --> API : ScryfallCachedCard[]
+  API --> Scan : Merge scryfall data
+end
+
+Scan -> Review : Display card grid for review
+
+opt Cards not found
+  Scan -> API : api.findCardCrop(image, name)
+  API -> ScanAPI : POST /scan {find_card}
+  ScanAPI --> API : crop coordinates
+  API --> Scan : crop data URL
+end
+
+opt Select specific printing
+  User -> Review : Click card version
+  Review -> VPick : Open version picker
+  VPick -> API : api.getCardPrints(name)
+  API -> Prints : GET /card-prints
+  Prints --> API : PrintVersion[]
+  API --> VPick : Show available printings
+  User -> VPick : Select printing
+  VPick --> Scan : Updated card with set/art
+end
+
+Scan -> API : Auto-save draft (debounced 1.5s)
+API -> DraftAPI : POST /scan-draft
+DraftAPI -> DB : Persist cross-device draft
+User -> Scan : Adjust quantities, toggle commander/proxy
+Scan -> Breakdown : Render type/color breakdown
+User -> Scan : Click "Save Deck"
+
+== Step 2: Save ==
+User -> Color : Select color identity (WUBRG/C)
+User -> Scan : Enter deck name, select player
+Scan -> API : api.createDeck({player_id, name, commander, colors})
+API -> DecksAPI : POST /decks
+DecksAPI -> DB : INSERT INTO decks
+DB --> DecksAPI : deck.id
+DecksAPI --> API : {id}
+API --> Scan : deck created
+
+Scan -> API : api.saveDeckCards(deckId, cards[])
+API -> CardsAPI : POST /deck-cards
+CardsAPI -> DB : DELETE old + INSERT new cards
+DB --> CardsAPI : ok
+CardsAPI --> API : ok
+API --> Scan : saved
+Scan -> Scan : router.push(/decks/detail)
+
+@enduml
+
+' ============================================================
+
+@startuml sequence-game-lifecycle
+!theme plain
+title Game System — Full Game Lifecycle
+
+actor User
+participant "GameSetup" as Setup
+participant "GameBoard" as Board
+participant "PlayerPanel" as Panel
+participant "CenterZone" as Center
+participant "ControlFocusModal" as Focus
+participant "remoteTransforms" as RT
+participant "GameEndSummary" as End
+participant "GameForm" as Form
+participant "api.ts" as API
+participant "live-game.php" as Live
+participant "game-settings.php" as Settings
+participant "games.php" as Games
+database "MySQL" as DB
+
+== Setup Phase ==
+User -> Setup : Select players, decks, commanders
+Setup -> API : api.getPlayers(), api.getDecks()
+API --> Setup : Player[], DeckWithPlayer[]
+Setup -> API : api.getGameSettings()
+API -> Settings : GET /game-settings
+Settings --> API : {starting_life, timer_duration, ...}
+API --> Setup : User preferences loaded
+User -> Setup : Click "Start Game"
+Setup -> Setup : Build GameManagerState\n(life=40, poison=0, phase='playing')
+Setup -> API : api.createLiveGame(state, seats)
+API -> Live : POST /live-game
+Live -> DB : INSERT session + seat codes
+DB --> Live : session_id, seat codes
+Live --> API : {session_id, seats: {bottom: code, ...}}
+API --> Setup : sessionCode stored in state
+
+== Playing Phase ==
+Board -> Center : Display turn number, active player,\ntimer (default 300s)
+
+loop Each game action
+  User -> Panel : Tap life/poison/cmdr/monarch buttons
+  Panel -> Board : Bubble up state change
+  Board -> RT : applyLifeChange / applyPoisonChange /\napplyCommanderDamage / etc.
+  RT --> Board : New GameManagerState
+  Board -> API : api.updateLiveGame(code, state)
+  API -> Live : PUT /live-game?code=X
+  Live -> DB : UPDATE state JSON
+end
+
+opt Control/Focus stack interaction
+  User -> Board : Trigger stack event
+  Board -> Focus : Open ControlFocusModal
+  User -> Focus : Resolve stack items
+  Focus --> Board : Updated state
+end
+
+opt Remote Panel (multi-device)
+  Board -> API : api.sendLiveGameEvent(code, event)
+  API -> Live : POST /live-game?code=X&action=event
+  Live -> DB : Append to events queue (locked txn)
+
+  note right of Live
+    Remote panels poll every 500ms
+    GET /live-game?code=X&consume=1
+    Atomically returns + clears events
+  end note
+end
+
+opt Player eliminated
+  Board -> RT : applyEliminate(state, playerIdx)
+  RT --> Board : Mark isEliminated, set eliminatedTurn
+  Board -> Board : Check if 1 player remaining
+end
+
+== End Phase ==
+Board -> Board : Last player standing detected
+Board -> Board : 15s countdown timer
+Board -> End : Show GameEndSummary
+
+User -> End : Confirm finish positions
+End -> End : Build GameManagerPrefill\nStore in localStorage
+
+User -> End : Click "Log Game"
+End -> Form : Navigate to /games/new
+
+== Log Phase ==
+Form -> Form : Read localStorage prefill\nAuto-populate results
+User -> Form : Review/adjust, click Save
+Form -> API : api.createGame({played_at, results[]})
+API -> Games : POST /games
+Games -> DB : INSERT game + game_results (txn)
+Games -> DB : Derive winning_turn = MAX(eliminated_turn)
+DB --> Games : game.id
+Games --> API : {id}
+API --> Form : Success
+Form -> Form : router.push(/games)
+
+@enduml
+
+' ============================================================
+
+@startuml sequence-stats-comparison
+!theme plain
+title Stats System — Comparison Builder Flow
+
+actor User
+participant "CustomizePage" as Page
+participant "ComparisonBuilder" as Builder
+participant "QuerySentence" as QS
+participant "ConditionColorPicker" as CCP
+participant "ComparisonPanel" as Panel
+participant "DeletePanelDialog" as Del
+participant "api.ts\nbuildComparisonParams()" as API
+participant "comparison.php" as PHP
+database "MySQL" as DB
+
+User -> Page : Navigate to /stats/customize
+Page -> API : api.getStatPanels()
+Page -> API : api.getPlayers()
+Page -> API : api.getDecks()
+API --> Page : panels[], players[], decks[]
+
+User -> Page : Click "New Panel"
+Page -> Builder : Show config form
+
+== Section A: Conditions ==
+User -> Builder : Set game_type, pod_size, game_length
+User -> CCP : Pick must_include_colors (W, U)
+CCP -> CCP : Toggle exclusive C logic
+CCP --> Builder : colors[], colorMode
+User -> Builder : Toggle my_games_only, set date range
+
+== Section B: Group By ==
+User -> Builder : Select "deck" group-by
+
+== Section C: Narrow To ==
+Builder -> Builder : Show entity filter for "deck"
+User -> Builder : Filter by player, select specific decks
+
+== Section D: Metrics ==
+User -> Builder : Check win_rate, total_games, avg_finish_position
+User -> Builder : Set top_n = 10
+
+== Live Preview ==
+Builder -> QS : Render natural language
+QS -> QS : "Show me my top 10 Azorius decks\nin my Commander games\nranked by Win Rate"
+
+User -> Page : Click "Preview"
+Page -> API : api.getComparison(config)
+API -> API : buildComparisonParams(config)\nSerialize to query string
+API -> PHP : GET /comparison?group_by=deck&metrics=win_rate,...
+PHP -> PHP : Build WHERE clauses\n(game_type, colors, my_games, dates)
+PHP -> PHP : Build GROUP BY + SELECT\n(pod subquery, metric expressions)
+PHP -> DB : Complex aggregation query
+DB --> PHP : Grouped results[]
+PHP --> API : {groupBy, metrics, conditions, entities[]}
+API --> Page : ComparisonResult
+
+Page -> Panel : Render results
+Panel -> Panel : Horizontal layout (<=8 entities)\nTrophy icons on best values\nColor chips, sublabels
+
+== Save ==
+User -> Page : Name panel, click Save
+Page -> API : api.createStatPanel({name, config, panel_type})
+API --> Page : Panel created with ID
+
+opt Share
+  User -> Page : Toggle "Share"
+  Page -> API : api.updateStatPanel(id, {is_shared: true})
+  API --> Page : {share_code: "a1b2c3d4e5f6g7h8"}
+end
+
+opt Delete Panel
+  User -> Page : Click delete on panel
+  Page -> Del : Show confirmation
+  User -> Del : Confirm
+  Del -> API : api.deleteStatPanel(id)
+  API --> Page : Panel removed
+end
+
+@enduml
+
+' ============================================================
+
+@startuml sequence-coach-chat
+!theme plain
+title Coach Chat — AI Coaching Flow
+
+actor User
+participant "MyCollectionPage" as Collection
+participant "CoachChat\n(Drawer)" as Chat
+participant "api.ts" as API
+participant "coach-chat.php" as CoachAPI
+participant "my-collection.php" as CollAPI
+participant "coach-notes.php" as NotesAPI
+database "MySQL" as DB
+
+== Load My Collection ==
+User -> Collection : Navigate to /my-collection
+Collection -> API : api.getMyCollection()
+API -> CollAPI : GET /my-collection
+CollAPI -> DB : SELECT decks, stats\nWHERE user_id = ?
+DB --> CollAPI : User decks + aggregated stats
+CollAPI --> API : {decks[], stats{}}
+API --> Collection : Render personal dashboard
+
+== Open Coach ==
+User -> Collection : Open Coach Chat drawer
+Collection -> Chat : Mount CoachChat component
+Chat -> API : api.getCoachConversations()
+API -> CoachAPI : GET /coach-chat?action=conversations
+CoachAPI -> DB : SELECT conversations
+DB --> CoachAPI : Conversation[]
+CoachAPI --> API : conversation history
+API --> Chat : Display prior conversations
+
+== New Chat ==
+User -> Chat : Type question about strategy
+Chat -> API : api.sendCoachMessage(conversationId, message)
+API -> CoachAPI : POST /coach-chat
+CoachAPI -> CoachAPI : Build context:\n- Player stats from DB\n- Deck performance\n- Recent game results\n- Prior coach notes
+CoachAPI -> CoachAPI : Call AI assistant API\nwith player context
+CoachAPI -> DB : INSERT user message\nINSERT assistant response
+DB --> CoachAPI : ok
+CoachAPI --> API : {response, conversationId}
+API --> Chat : Display AI coaching response
+
+opt Rate Response
+  User -> Chat : Rate advice (thumbs up/down)
+  Chat -> API : api.rateCoachMessage(id, rating)
+  API -> CoachAPI : PUT /coach-chat?action=rate
+  CoachAPI -> DB : UPDATE rating
+end
+
+== Admin: Coach Notes ==
+User -> API : Navigate to /admin/coach-notes
+API -> NotesAPI : GET /coach-notes
+NotesAPI -> DB : SELECT notes\nWHERE player_id = ?
+DB --> NotesAPI : CoachNote[]
+NotesAPI --> API : notes[]
+API --> User : Display AI-generated observations
+
+opt Edit Note
+  User -> API : Update coach note
+  API -> NotesAPI : PUT /coach-notes
+  NotesAPI -> DB : UPDATE note content
+end
+
+note over NotesAPI
+  Notes persist across conversations
+  and inform future coaching context
+end note
+
+@enduml
+
+' ============================================================
+
+@startuml sequence-tts-export
+!theme plain
+title TTS Export — Tabletop Simulator Deck Export
+
+actor User
+participant "DeckDetailPage" as Detail
+participant "DeckActions" as Actions
+participant "api.ts" as API
+participant "tts-export.php" as TTS
+participant "scryfall-cache.php" as Scryfall
+database "MySQL" as DB
+
+User -> Detail : View deck detail
+User -> Actions : Click "Export to TTS"
+
+Actions -> API : api.exportToTTS(deckId)
+API -> TTS : GET /tts-export?deck_id=X
+
+TTS -> DB : SELECT cards + quantities\nFROM deck_cards\nWHERE deck_id = ?
+DB --> TTS : DeckCard[] with scryfall data
+
+loop Each card in deck
+  TTS -> Scryfall : Lookup cached card data\n(image URLs, DFC status)
+  Scryfall --> TTS : Card image URL, back face URL
+
+  opt Double-Faced Card
+    TTS -> TTS : Track front + back faces\nseparately for montage
+  end
+end
+
+TTS -> TTS : Build multi-sheet montage\n(10x7 grid per sheet)\nCalculate orientation per card
+TTS -> TTS : Generate TTS JSON object:\n- DeckIDs[]\n- CustomDeck{} with sheet URLs\n- ContainedObjects[] per card\n- Transform positions
+
+TTS --> API : {tts_object JSON}
+API --> Actions : Download TTS save file
+
+note right of TTS
+  Output is a TTS Saved Object JSON
+  Import via Tabletop Simulator
+  Saved Objects folder
+  Supports 70 cards per sheet
+  Handles DFCs with separate back sheet
+end note
+
+@enduml
+
+' ============================================================
+
+@startuml sequence-rules-guru
+!theme plain
+title Rules Guru — AI Rules Chat Flow
+
+actor User
+participant "RulesChatPage" as Chat
+participant "api.ts" as API
+participant "rules/chat.php" as RulesChat
+participant "rules/patterns.php" as Patterns
+participant "rules/active-game.php" as ActiveGame
+participant "rules/conversations.php" as Convos
+database "MySQL" as DB
+
+== Context-Aware Entry ==
+opt From active game
+  User -> Chat : Open Rules Guru during live game
+  Chat -> API : api.getRulesActiveGame(sessionCode)
+  API -> ActiveGame : GET /rules/active-game?code=X
+  ActiveGame -> DB : SELECT current game state\n(commanders, board state)
+  DB --> ActiveGame : GameContext
+  ActiveGame --> API : {players[], commanders[], phase}
+  API --> Chat : Pre-load game context
+end
+
+== Ask a Question ==
+User -> Chat : "Can I respond to a board wipe\nwith my Teferi's Protection?"
+Chat -> API : api.sendRulesQuestion(convId, question, context)
+API -> RulesChat : POST /rules/chat
+
+RulesChat -> DB : Load conversation history
+DB --> RulesChat : Prior messages[]
+
+RulesChat -> RulesChat : Build context:\n- MTG Comprehensive Rules\n- Relevant pattern knowledge\n- Active game state (if any)\n- Conversation history
+
+RulesChat -> Patterns : Lookup matching patterns
+Patterns -> DB : SELECT patterns\nWHERE keywords MATCH
+DB --> Patterns : RelevantPattern[]
+Patterns --> RulesChat : Pattern context
+
+RulesChat -> RulesChat : Call AI with full context\nGenerate rules-accurate answer
+RulesChat -> DB : INSERT question + answer
+DB --> RulesChat : ok
+RulesChat --> API : {answer, rules_refs[], confidence}
+API --> Chat : Display answer with rule citations
+
+opt Rate Answer
+  User -> Chat : Rate answer quality
+  Chat -> API : api.rateRulesAnswer(id, rating)
+  API -> RulesChat : PUT /rules/qa-log-rate
+  RulesChat -> DB : UPDATE rating
+end
+
+== Conversation History ==
+User -> Chat : View past conversations
+Chat -> API : api.getRulesConversations()
+API -> Convos : GET /rules/conversations
+Convos -> DB : SELECT conversations\nORDER BY updated_at DESC
+DB --> Convos : Conversation[]
+Convos --> API : conversation list
+API --> Chat : Display conversation history
+
+@enduml

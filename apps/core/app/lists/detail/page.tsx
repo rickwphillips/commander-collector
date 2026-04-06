@@ -36,6 +36,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import FlipIcon from '@mui/icons-material/SyncAlt';
 import SaveIcon from '@mui/icons-material/Save';
 import { DeckActions } from '@/components/DeckActions';
+import { CardListImport } from '@/components/CardListImport';
 import { PageContainer } from '@/components/PageContainer';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { DeckBreakdown } from '@/components/DeckBreakdown';
@@ -45,6 +46,7 @@ import { CardGridEditor } from '@/components/CardGridEditor';
 import type { EditableCard } from '@/components/CardGridEditor';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import { api } from '@/lib/api';
+import type { ParsedCard } from '@/lib/parseImport';
 import type { CardListDetail, ListCard, DeckWithPlayer } from '@/lib/types';
 
 // ── Converters ────────────────────────────────────────────────────────────────
@@ -242,6 +244,42 @@ function ListDetailInner() {
   };
 
   const handleDraftChange = (updated: EditableCard[]) => {
+    setDraftCards(updated);
+    setIsDirty(true);
+  };
+
+  const handleImport = async (cards: ParsedCard[]) => {
+    const scryfallMap = new Map<string, { scryfall_id: string; image_uri?: string; back_image_uri?: string; type_line?: string; mana_cost?: string; color_identity?: string }>();
+    try {
+      const { results } = await api.bulkLookupCards(cards.map(c => c.card_name));
+      for (const r of results) {
+        if (!r.error) scryfallMap.set(r.name.toLowerCase(), r);
+      }
+    } catch { /* non-fatal */ }
+
+    const updated = [...draftCards];
+    for (const parsed of cards) {
+      const existing = updated.find(c => c.card_name.toLowerCase() === parsed.card_name.toLowerCase());
+      if (existing) {
+        existing.quantity += parsed.quantity;
+        if (parsed.is_commander) existing.is_commander = true;
+      } else {
+        const sf = scryfallMap.get(parsed.card_name.toLowerCase());
+        updated.push({
+          _key:           `import-${Math.random().toString(36).slice(2)}`,
+          card_name:      parsed.card_name,
+          scryfall_id:    sf?.scryfall_id ?? null,
+          image_uri:      sf?.image_uri ?? null,
+          back_image_uri: sf?.back_image_uri ?? null,
+          type_line:      sf?.type_line ?? null,
+          mana_cost:      sf?.mana_cost ?? null,
+          color_identity: sf?.color_identity ?? '',
+          quantity:       parsed.quantity,
+          is_commander:   parsed.is_commander,
+          is_proxy:       parsed.is_proxy,
+        });
+      }
+    }
     setDraftCards(updated);
     setIsDirty(true);
   };
@@ -497,6 +535,14 @@ function ListDetailInner() {
             </Accordion>
           </Card>
 
+          <Accordion disableGutters elevation={0} sx={{ mb: 3, border: '1px solid', borderColor: 'divider', borderRadius: 1, '&:before': { display: 'none' } }}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="subtitle2">Import Card List</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <CardListImport onImport={handleImport} />
+            </AccordionDetails>
+          </Accordion>
           <CardGridEditor cards={draftCards} onChange={handleDraftChange} />
           <Zoom in={isDirty && !saving}>
             <Box sx={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 1100 }}>

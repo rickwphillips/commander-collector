@@ -28,13 +28,31 @@ const CARD_CURSOR = `url("data:image/svg+xml,${CARD_SVG}") 7 10, zoom-in`;
 export function CardTooltip({ name, children, previewWidth = 220, placement = 'top', style, onClick }: Props) {
   const [imageUrl, setImageUrl]     = useState<string | null>(null);
   const [backImageUrl, setBackImageUrl] = useState<string | null>(null);
+  const [hovered, setHovered] = useState(false);
 
+  // Load on mount
   useEffect(() => {
     getCardImageByName(name).then((url) => setImageUrl(url));
     getCardBackImageByName(name).then((url) => setBackImageUrl(url));
   }, [name]);
 
-  if (!imageUrl) return <>{children}</>;
+  // Retry on hover if initial load failed (cache no longer blocks retries)
+  useEffect(() => {
+    if (hovered && !imageUrl) {
+      getCardImageByName(name).then((url) => setImageUrl(url));
+      getCardBackImageByName(name).then((url) => setBackImageUrl(url));
+    }
+  }, [hovered, imageUrl, name]);
+
+  if (!imageUrl) return (
+    <span
+      style={style}
+      onMouseEnter={() => setHovered(true)}
+      onClick={onClick ? (e) => { e.stopPropagation(); onClick(name); } : undefined}
+    >
+      {children}
+    </span>
+  );
 
   return (
     <Tooltip
@@ -61,6 +79,7 @@ export function CardTooltip({ name, children, previewWidth = 220, placement = 't
     >
       <span
         style={{ cursor: onClick ? 'pointer' : CARD_CURSOR, ...style }}
+        onMouseEnter={() => setHovered(true)}
         onClick={onClick ? (e) => { e.stopPropagation(); onClick(name); } : undefined}
       >
         {children}

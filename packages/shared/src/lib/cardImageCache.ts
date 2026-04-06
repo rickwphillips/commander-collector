@@ -4,6 +4,27 @@ const cache = new Map<string, string | null>();
 const inFlight = new Map<string, Promise<string | null>>();
 const backCache = new Map<string, string | null>();
 
+/** Concurrency limiter — prevents overwhelming the server with parallel requests */
+const MAX_CONCURRENT = 4;
+let activeCount = 0;
+const queue: Array<() => void> = [];
+
+function enqueue<T>(fn: () => Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const run = () => {
+      activeCount++;
+      fn()
+        .then(resolve, reject)
+        .finally(() => {
+          activeCount--;
+          if (queue.length > 0) queue.shift()!();
+        });
+    };
+    if (activeCount < MAX_CONCURRENT) run();
+    else queue.push(run);
+  });
+}
+
 /**
  * Resolves a card name to a cached image data URI.
  *
@@ -13,27 +34,31 @@ const backCache = new Map<string, string | null>();
  *   3. card-image.php → fetch image bytes, store as base64 in scryfall_card_cache, return data URI
  *
  * Subsequent calls for the same name (anywhere in the app) return from memory.
+ * Failed lookups are NOT cached — they will retry on next request.
  */
 export async function getCardImageByName(name: string): Promise<string | null> {
   if (cache.has(name)) return cache.get(name)!;
   if (inFlight.has(name)) return inFlight.get(name)!;
 
-  const promise = api
-    .lookupCard(name)
+  const promise = enqueue(() => api.lookupCard(name))
     .then(async (meta) => {
       backCache.set(name, meta?.back_image_uri ?? null);
-      if (!meta?.scryfall_id) return null;
-      const img = await api.getCardImage(meta.scryfall_id, meta.image_uri ?? undefined);
+      if (!meta?.scryfall_id) {
+        // Card genuinely not found — safe to cache as null
+        cache.set(name, null);
+        return null;
+      }
+      const img = await enqueue(() => api.getCardImage(meta.scryfall_id, meta.image_uri ?? undefined));
       return img?.data_uri ?? meta.image_uri ?? null;
     })
     .then((url) => {
-      cache.set(name, url);
+      if (url !== null) cache.set(name, url);
       inFlight.delete(name);
       return url;
     })
     .catch(() => {
-      cache.set(name, null);
-      backCache.set(name, null);
+      // Don't cache failures — allow retry on next request
+      backCache.delete(name);
       inFlight.delete(name);
       return null;
     });
