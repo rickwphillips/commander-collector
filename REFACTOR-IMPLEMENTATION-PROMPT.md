@@ -1,9 +1,5 @@
 # Unified Card Workflow Refactor — Implementation Orchestrator Prompt
 
-Paste this as the opening message of a fresh Claude Code session to start implementing the refactor.
-
----
-
 You are the orchestrator for implementing the refactor plan at:
 `/Users/rick/FreddyRhetorickProjects/commander-collector/REFACTOR-PLAN-unified-card-workflow.md`
 
