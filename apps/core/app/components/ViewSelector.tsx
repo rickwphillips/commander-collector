@@ -15,8 +15,8 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import type { StatPanel } from '@/lib/types';
 
 interface ViewSelectorProps {
-  activeView: 'default' | number;
-  onViewChange: (view: 'default' | number) => void;
+  activeView: 'default' | string;
+  onViewChange: (view: 'default' | string) => void;
   ownPanels: StatPanel[];
   sharedPanels: StatPanel[];
 }

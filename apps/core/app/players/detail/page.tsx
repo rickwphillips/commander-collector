@@ -42,7 +42,7 @@ interface DeckWithStats extends Deck {
 }
 
 interface UserOption {
-  id: number;
+  id: string;
   username: string;
   display_name: string;
   role: string;
@@ -52,7 +52,7 @@ export default function PlayerDetailPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user: currentUser } = useAuth();
-  const playerId = Number(searchParams.get('id'));
+  const playerId = searchParams.get('id') ?? '';
 
   const [player, setPlayer] = useState<Player | null>(null);
   const [stats, setStats] = useState<PlayerStats | null>(null);
@@ -63,7 +63,7 @@ export default function PlayerDetailPage() {
   // Edit state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editName, setEditName] = useState('');
-  const [editUserId, setEditUserId] = useState<number | null>(null);
+  const [editUserId, setEditUserId] = useState<string | null>(null);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -113,7 +113,7 @@ export default function PlayerDetailPage() {
 
     setSaving(true);
     try {
-      const updateData: { name: string; user_id?: number | null } = { name: editName.trim() };
+      const updateData: { name: string; user_id?: string | null } = { name: editName.trim() };
       if (currentUser?.role === 'admin') {
         updateData.user_id = editUserId;
       }

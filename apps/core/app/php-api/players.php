@@ -6,7 +6,7 @@ requireAuth();
 
 $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
-$id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+$id = isset($_GET['id']) ? (string)$_GET['id'] : null;
 
 switch ($method) {
     case 'GET':
@@ -47,11 +47,12 @@ switch ($method) {
             sendError('Name is required');
         }
 
-        $stmt = $pdo->prepare('INSERT INTO players (name) VALUES (?)');
-        $stmt->execute([trim($data['name'])]);
+        $newId = $pdo->query("SELECT UUID()")->fetchColumn();
+        $stmt = $pdo->prepare('INSERT INTO players (id, name) VALUES (?, ?)');
+        $stmt->execute([$newId, trim($data['name'])]);
 
         sendJSON([
-            'id' => (int)$pdo->lastInsertId(),
+            'id' => $newId,
             'name' => trim($data['name']),
             'created_at' => date('Y-m-d H:i:s')
         ], 201);
@@ -73,7 +74,7 @@ switch ($method) {
 
         if (array_key_exists('user_id', $data)) {
             $fields[] = 'user_id = ?';
-            $params[] = $data['user_id'] !== null ? (int)$data['user_id'] : null;
+            $params[] = $data['user_id'] !== null ? (string)$data['user_id'] : null;
         }
 
         $params[] = $id;

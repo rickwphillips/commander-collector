@@ -7,7 +7,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 // ── GET: poll for assistant response by user_message_id ──────────────────
 if ($method === 'GET') {
-    $userMsgId = isset($_GET['poll']) ? (int)$_GET['poll'] : 0;
+    $userMsgId = (string)($_GET['poll'] ?? '');
     if (!$userMsgId) sendError('poll parameter required');
 
     $db = getDB();
@@ -35,9 +35,9 @@ if ($method === 'GET') {
 
     sendJSON([
         'status'           => 'complete',
-        'conversation_id'  => (int)$row['conversation_id'],
-        'message_id'       => (int)$row['id'],
-        'qa_log_id'        => $qaLogId ? (int)$qaLogId : null,
+        'conversation_id'  => (string)$row['conversation_id'],
+        'message_id'       => (string)$row['id'],
+        'qa_log_id'        => $qaLogId ? (string)$qaLogId : null,
         'response'         => $row['content'],
         'pending_pattern'  => $row['pending_pattern'] ? json_decode($row['pending_pattern'], true) : null,
     ]);
@@ -55,7 +55,7 @@ if (!$apiKey) sendError('Anthropic API key not configured', 500);
 
 $input          = getJSONInput();
 $userMessage    = trim($input['message'] ?? '');
-$conversationId = isset($input['conversation_id']) ? (int)$input['conversation_id'] : null;
+$conversationId = isset($input['conversation_id']) ? (string)$input['conversation_id'] : null;
 $newTitle       = trim($input['new_conversation_title'] ?? '');
 $gameContext    = $input['game_context'] ?? null;
 $focusPlayer    = isset($gameContext['focusPlayerName']) ? trim($gameContext['focusPlayerName']) : null;
@@ -67,15 +67,15 @@ $db = getDB();
 // ── Conversation management ────────────────────────────────────────────────
 if (!$conversationId) {
     $title = $newTitle ?: null;
-    $stmt  = $db->prepare("INSERT INTO rules_conversations (title) VALUES (?)");
-    $stmt->execute([$title]);
-    $conversationId = (int)$db->lastInsertId();
+    $conversationId = $db->query("SELECT UUID()")->fetchColumn();
+    $stmt  = $db->prepare("INSERT INTO rules_conversations (id, title) VALUES (?, ?)");
+    $stmt->execute([$conversationId, $title]);
 }
 
 // Save user message
-$stmt = $db->prepare("INSERT INTO rules_messages (conversation_id, role, content) VALUES (?, 'user', ?)");
-$stmt->execute([$conversationId, $userMessage]);
-$userMessageId = (int)$db->lastInsertId();
+$userMessageId = $db->query("SELECT UUID()")->fetchColumn();
+$stmt = $db->prepare("INSERT INTO rules_messages (id, conversation_id, role, content) VALUES (?, ?, 'user', ?)");
+$stmt->execute([$userMessageId, $conversationId, $userMessage]);
 
 // ── Return immediately — client will poll for result ─────────────────────
 $earlyResponse = json_encode([
@@ -610,22 +610,25 @@ function executeTool(string $name, array $input): string {
 
     if ($name === 'compare_decklists') {
         global $db, $gameContext;
-        $deckIds = array_filter(array_map('intval', $input['deck_ids'] ?? []), fn($id) => $id > 0);
+        $deckIds = array_filter(array_map('strval', $input['deck_ids'] ?? []), fn($id) => $id !== '');
         if (empty($deckIds)) return json_encode(['error' => 'No valid deck_ids provided']);
 
         // Build player name index from game context
         $playerByDeck = [];
         foreach (($gameContext['players'] ?? []) as $p) {
-            if (!empty($p['deckId'])) $playerByDeck[(int)$p['deckId']] = $p['playerName'] ?? 'Unknown';
+            if (!empty($p['deckId'])) $playerByDeck[(string)$p['deckId']] = $p['playerName'] ?? 'Unknown';
         }
 
         $placeholders = implode(',', array_fill(0, count($deckIds), '?'));
         $stmt = $db->prepare("
-            SELECT dc.deck_id, dc.card_name, dc.quantity, dc.is_commander, sc.type_line
-            FROM deck_cards dc
-            LEFT JOIN scryfall_card_cache sc ON sc.scryfall_id = dc.scryfall_id
-            WHERE dc.deck_id IN ($placeholders)
-            ORDER BY dc.deck_id, dc.is_commander DESC, dc.card_name ASC
+            SELECT l.deck_id, lc.card_name, lc.quantity,
+                   (lc.role = 'commander') AS is_commander,
+                   lc.role, sc.type_line
+            FROM list_cards lc
+            JOIN lists l ON l.id = lc.list_id
+            LEFT JOIN scryfall_card_cache sc ON sc.scryfall_id = lc.scryfall_id
+            WHERE l.deck_id IN ($placeholders) AND l.role = 'main' AND l.deleted_at IS NULL
+            ORDER BY l.deck_id, (lc.role = 'commander') DESC, lc.card_name ASC
         ");
         $stmt->execute(array_values($deckIds));
         $rows = $stmt->fetchAll();
@@ -635,7 +638,7 @@ function executeTool(string $name, array $input): string {
         // Group by deck → type
         $decks = [];
         foreach ($rows as $row) {
-            $did   = (int)$row['deck_id'];
+            $did   = (string)$row['deck_id'];
             $entry = $row['quantity'] > 1 ? "{$row['quantity']}x {$row['card_name']}" : $row['card_name'];
             if (!isset($decks[$did])) $decks[$did] = ['player' => $playerByDeck[$did] ?? "Deck {$did}", 'cards' => []];
             $type = $row['type_line'] ?? '';
@@ -660,12 +663,14 @@ function executeTool(string $name, array $input): string {
         if (!$deckId) return json_encode(['error' => 'deck_id is required']);
 
         $stmt = $db->prepare("
-            SELECT dc.card_name, dc.quantity, dc.is_commander,
-                   sc.type_line
-            FROM deck_cards dc
-            LEFT JOIN scryfall_card_cache sc ON sc.scryfall_id = dc.scryfall_id
-            WHERE dc.deck_id = ?
-            ORDER BY dc.is_commander DESC, dc.card_name ASC
+            SELECT lc.card_name, lc.quantity,
+                   (lc.role = 'commander') AS is_commander,
+                   lc.role, sc.type_line
+            FROM list_cards lc
+            JOIN lists l ON l.id = lc.list_id
+            LEFT JOIN scryfall_card_cache sc ON sc.scryfall_id = lc.scryfall_id
+            WHERE l.deck_id = ? AND l.role = 'main' AND l.deleted_at IS NULL
+            ORDER BY (lc.role = 'commander') DESC, lc.card_name ASC
         ");
         $stmt->execute([$deckId]);
         $rows = $stmt->fetchAll();
@@ -722,13 +727,14 @@ function executeTool(string $name, array $input): string {
         $stmt->execute([$conversationId]);
         $qaId = $stmt->fetchColumn() ?: null;
 
+        $correctionId = $db->query("SELECT UUID()")->fetchColumn();
         $stmt = $db->prepare("
-            INSERT INTO rules_ai_corrections (conversation_id, qa_log_id, severity, correction, assumptions, model)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO rules_ai_corrections (id, conversation_id, qa_log_id, severity, correction, assumptions, model)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$conversationId, $qaId, $severity, $correctionNote, $assumptions, 'claude-haiku-4-5-20251001']);
+        $stmt->execute([$correctionId, $conversationId, $qaId, $severity, $correctionNote, $assumptions, 'claude-haiku-4-5-20251001']);
 
-        return json_encode(['logged' => true, 'correction_id' => (int)$db->lastInsertId(), 'qa_log_id' => $qaId]);
+        return json_encode(['logged' => true, 'correction_id' => $correctionId, 'qa_log_id' => $qaId]);
     }
 
     return json_encode(['error' => "Unknown tool: $name"]);
@@ -823,12 +829,12 @@ while ($iter < $maxIter) {
 // ── Save assistant message to DB ───────────────────────────────────────────
 $pendingJson = $pendingPattern ? json_encode($pendingPattern) : null;
 
+$messageId = $db->query("SELECT UUID()")->fetchColumn();
 $stmt = $db->prepare("
-    INSERT INTO rules_messages (conversation_id, role, content, pending_pattern)
-    VALUES (?, 'assistant', ?, ?)
+    INSERT INTO rules_messages (id, conversation_id, role, content, pending_pattern)
+    VALUES (?, ?, 'assistant', ?, ?)
 ");
-$stmt->execute([$conversationId, $assistantContent, $pendingJson]);
-$messageId = (int)$db->lastInsertId();
+$stmt->execute([$messageId, $conversationId, $assistantContent, $pendingJson]);
 
 // ── Log Q&A pair for validity review ──────────────────────────────────────
 if ($assistantContent) {
@@ -853,13 +859,15 @@ if ($assistantContent) {
         $cardsJson = json_encode(array_values($cards));
     }
 
+    $qaLogId = $db->query("SELECT UUID()")->fetchColumn();
     $qaStmt = $db->prepare("
         INSERT INTO rules_qa_log
-            (conversation_id, user_message_id, assistant_message_id, question, answer,
+            (id, conversation_id, user_message_id, assistant_message_id, question, answer,
              pattern_ids, cr_refs, cards_referenced, pending_pattern_id, model, had_game_context)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $qaStmt->execute([
+        $qaLogId,
         $conversationId,
         $userMessageId,
         $messageId,

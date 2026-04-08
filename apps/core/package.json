@@ -1,6 +1,6 @@
 {
   "name": "@commander/core",
-  "version": "4.6.0",
+  "version": "5.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,7 +9,7 @@
     "lint": "eslint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-"test": "vitest",
+    "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage"
   },
@@ -29,6 +29,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hook-form": "^7.71.1",
+    "react-window": "^1.8.11",
     "sass": "^1.97.3",
     "zod": "^4.3.6"
   },
@@ -39,6 +40,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/react-window": "^1.8.8",
     "@vitejs/plugin-react": "^5.1.4",
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^9",

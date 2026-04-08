@@ -128,7 +128,7 @@ $stmt->execute([$userId]);
 $player = $stmt->fetch();
 
 $playerDataPrompt = '';
-$playerId = $player ? (int)$player['id'] : 0;
+$playerId = $player ? (string)$player['id'] : '';
 
 if ($player) {
     $playerName = $player['name'];
@@ -258,12 +258,19 @@ if ($player) {
     $playerDataPrompt .= "**Overall:** {$overall['total_games']} games, {$overall['wins']} wins, {$overall['win_rate']}% win rate, avg finish: {$overall['avg_finish']}\n";
     $playerDataPrompt .= "**Current streak:** {$currentStreak} {$currentStreakType}" . ($currentStreak > 1 ? 's' : '') . "\n\n";
 
-    // Get card counts for each deck
-    $cardCountStmt = $db->prepare("SELECT deck_id, COUNT(*) AS cnt FROM deck_cards WHERE deck_id IN (" . implode(',', array_map(fn($d) => (int)$d['id'], $decks)) . ") GROUP BY deck_id");
+    // Get card counts for each deck via the main list
+    $cardCountStmt = $db->prepare(
+        "SELECT l.deck_id, COALESCE(SUM(lc.quantity), 0) AS cnt
+         FROM lists l
+         LEFT JOIN list_cards lc ON lc.list_id = l.id
+         WHERE l.deck_id IN (" . implode(',', array_map(fn($d) => $db->quote($d['id']), $decks)) . ")
+           AND l.role = 'main' AND l.deleted_at IS NULL
+         GROUP BY l.deck_id"
+    );
     $cardCountStmt->execute();
     $cardCounts = [];
     while ($row = $cardCountStmt->fetch()) {
-        $cardCounts[(int)$row['deck_id']] = (int)$row['cnt'];
+        $cardCounts[$row['deck_id']] = (int)$row['cnt'];
     }
 
     $playerDataPrompt .= "### Decks\n\n";
@@ -271,7 +278,7 @@ if ($player) {
     $playerDataPrompt .= "| deck_id | Deck | Commander | Colors | Cards | Games | Wins | Win Rate | Avg Finish |\n";
     $playerDataPrompt .= "|---------|------|-----------|--------|-------|-------|------|----------|------------|\n";
     foreach ($decks as $d) {
-        $cc = $cardCounts[(int)$d['id']] ?? 0;
+        $cc = $cardCounts[(string)$d['id']] ?? 0;
         $playerDataPrompt .= "| {$d['id']} | {$d['name']} | {$d['commander']} | {$d['colors']} | {$cc} | {$d['total_games']} | {$d['wins']} | {$d['win_rate']}% | {$d['avg_finish']} |\n";
     }
 
@@ -957,25 +964,29 @@ function executeTool(string $name, array $input): string {
         if ($existing) {
             $stmt = $db->prepare("UPDATE coach_notes SET observation = ?, reasoning = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
             $stmt->execute([$observation, $reasoning, $existing]);
-            return json_encode(['saved' => true, 'note_id' => (int)$existing, 'action' => 'updated']);
+            return json_encode(['saved' => true, 'note_id' => (string)$existing, 'action' => 'updated']);
         } else {
-            $stmt = $db->prepare("INSERT INTO coach_notes (player_id, topic, observation, reasoning) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$playerId, $topic, $observation, $reasoning]);
-            return json_encode(['saved' => true, 'note_id' => (int)$db->lastInsertId(), 'action' => 'created']);
+            $newNoteId = $db->query("SELECT UUID()")->fetchColumn();
+            $stmt = $db->prepare("INSERT INTO coach_notes (id, player_id, topic, observation, reasoning) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([$newNoteId, $playerId, $topic, $observation, $reasoning]);
+            return json_encode(['saved' => true, 'note_id' => $newNoteId, 'action' => 'created']);
         }
     }
 
     if ($name === 'lookup_decklist') {
         global $db;
-        $deckId = (int)($input['deck_id'] ?? 0);
+        $deckId = (string)($input['deck_id'] ?? '');
         if (!$deckId) return json_encode(['error' => 'deck_id is required']);
 
         $stmt = $db->prepare("
-            SELECT dc.card_name, dc.quantity, dc.is_commander, sc.type_line
-            FROM deck_cards dc
-            LEFT JOIN scryfall_card_cache sc ON sc.scryfall_id = dc.scryfall_id
-            WHERE dc.deck_id = ?
-            ORDER BY dc.is_commander DESC, dc.card_name ASC
+            SELECT lc.card_name, lc.quantity,
+                   (lc.role = 'commander') AS is_commander,
+                   lc.role, sc.type_line
+            FROM list_cards lc
+            JOIN lists l ON l.id = lc.list_id
+            LEFT JOIN scryfall_card_cache sc ON sc.scryfall_id = lc.scryfall_id
+            WHERE l.deck_id = ? AND l.role = 'main' AND l.deleted_at IS NULL
+            ORDER BY (lc.role = 'commander') DESC, lc.card_name ASC
         ");
         $stmt->execute([$deckId]);
         $rows = $stmt->fetchAll();
@@ -1012,13 +1023,15 @@ function executeTool(string $name, array $input): string {
 
         $stmt = $db->prepare("
             SELECT d.id, d.name, d.commander, d.colors, p.name AS player_name,
-                (SELECT COALESCE(SUM(dc2.quantity), 0) FROM deck_cards dc2 WHERE dc2.deck_id = d.id) AS card_count,
+                (SELECT COALESCE(SUM(lc2.quantity), 0)
+                   FROM list_cards lc2
+                   JOIN lists l2 ON l2.id = lc2.list_id
+                   WHERE l2.deck_id = d.id AND l2.role = 'main' AND l2.deleted_at IS NULL) AS card_count,
                 COUNT(DISTINCT gr.id) AS total_games,
                 COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) AS wins,
                 ROUND(COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 / NULLIF(COUNT(DISTINCT gr.id), 0), 1) AS win_rate
             FROM decks d
             JOIN players p ON p.id = d.player_id
-            LEFT JOIN deck_cards dc ON dc.deck_id = d.id
             LEFT JOIN game_results gr ON gr.deck_id = d.id
             WHERE d.commander LIKE ? AND d.player_id != ?
             GROUP BY d.id
@@ -1040,11 +1053,20 @@ function executeTool(string $name, array $input): string {
 
     if ($name === 'check_card_in_deck') {
         global $db;
-        $deckId   = (int)($input['deck_id'] ?? 0);
+        $deckId   = (string)($input['deck_id'] ?? '');
         $cardName = trim($input['card_name'] ?? '');
         if (!$deckId || !$cardName) return json_encode(['error' => 'deck_id and card_name are required']);
 
-        $stmt = $db->prepare("SELECT card_name, quantity, is_commander FROM deck_cards WHERE deck_id = ? AND card_name LIKE ? LIMIT 5");
+        $stmt = $db->prepare("
+            SELECT lc.card_name, lc.quantity,
+                   (lc.role = 'commander') AS is_commander,
+                   lc.role
+            FROM list_cards lc
+            JOIN lists l ON l.id = lc.list_id
+            WHERE l.deck_id = ? AND l.role = 'main' AND l.deleted_at IS NULL
+              AND lc.card_name LIKE ?
+            LIMIT 5
+        ");
         $stmt->execute([$deckId, '%' . $cardName . '%']);
         $rows = $stmt->fetchAll();
 
@@ -1056,22 +1078,25 @@ function executeTool(string $name, array $input): string {
 
     if ($name === 'search_deck_cards') {
         global $db;
-        $deckId       = (int)($input['deck_id'] ?? 0);
+        $deckId       = (string)($input['deck_id'] ?? '');
         $query        = trim($input['query'] ?? '');
         $typeCategory = trim($input['type_category'] ?? '');
         if (!$deckId) return json_encode(['error' => 'deck_id is required']);
 
-        $sql    = "SELECT dc.card_name, dc.quantity, dc.is_commander, sc.type_line
-                   FROM deck_cards dc
-                   LEFT JOIN scryfall_card_cache sc ON sc.scryfall_id = dc.scryfall_id
-                   WHERE dc.deck_id = ?";
+        $sql    = "SELECT lc.card_name, lc.quantity,
+                          (lc.role = 'commander') AS is_commander,
+                          lc.role, sc.type_line
+                   FROM list_cards lc
+                   JOIN lists l ON l.id = lc.list_id
+                   LEFT JOIN scryfall_card_cache sc ON sc.scryfall_id = lc.scryfall_id
+                   WHERE l.deck_id = ? AND l.role = 'main' AND l.deleted_at IS NULL";
         $params = [$deckId];
 
         if ($query) {
-            $sql     .= " AND dc.card_name LIKE ?";
+            $sql     .= " AND lc.card_name LIKE ?";
             $params[] = '%' . $query . '%';
         }
-        $sql .= " ORDER BY dc.is_commander DESC, dc.card_name";
+        $sql .= " ORDER BY (lc.role = 'commander') DESC, lc.card_name";
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         $rows = $stmt->fetchAll();
@@ -1105,7 +1130,7 @@ function executeTool(string $name, array $input): string {
 
     if ($name === 'get_deck_stats') {
         global $db;
-        $deckId = (int)($input['deck_id'] ?? 0);
+        $deckId = (string)($input['deck_id'] ?? '');
         if (!$deckId) return json_encode(['error' => 'deck_id is required']);
 
         $stmt = $db->prepare("
@@ -1164,12 +1189,14 @@ function executeTool(string $name, array $input): string {
         if (!$listId) return json_encode(['error' => 'list_id is required']);
 
         $stmt = $db->prepare("
-            SELECT lc.id, lc.card_name, lc.quantity, lc.is_commander, lc.is_proxy,
+            SELECT lc.id, lc.card_name, lc.quantity,
+                   (lc.role = 'commander') AS is_commander,
+                   lc.is_proxy, lc.role,
                    sc.type_line, sc.mana_cost, sc.colors, sc.color_identity
             FROM list_cards lc
             LEFT JOIN scryfall_card_cache sc ON sc.scryfall_id = lc.scryfall_id
             WHERE lc.list_id = ?
-            ORDER BY lc.is_commander DESC, lc.card_name ASC
+            ORDER BY (lc.role = 'commander') DESC, lc.card_name ASC
         ");
         $stmt->execute([$listId]);
         $rows = $stmt->fetchAll();
@@ -1230,13 +1257,14 @@ function executeTool(string $name, array $input): string {
             $cardsUpdated = 0;
             if ($cards !== null) {
                 $db->prepare("DELETE FROM list_cards WHERE list_id = ?")->execute([$listId]);
-                $ins = $db->prepare("INSERT INTO list_cards (list_id, card_name, quantity, is_commander) VALUES (?, ?, ?, ?)");
+                $ins = $db->prepare("INSERT INTO list_cards (id, list_id, card_name, quantity, role) VALUES (UUID(), ?, ?, ?, ?)");
                 foreach ($cards as $card) {
                     $cardName    = trim($card['card_name'] ?? '');
                     $quantity    = max(1, (int)($card['quantity'] ?? 1));
                     $isCommander = empty($card['is_commander']) ? 0 : 1;
+                    $role        = $isCommander ? 'commander' : null;
                     if (!$cardName) continue;
-                    $ins->execute([$listId, $cardName, $quantity, $isCommander]);
+                    $ins->execute([$listId, $cardName, $quantity, $role]);
                     $cardsUpdated++;
                 }
             }
@@ -1262,20 +1290,21 @@ function executeTool(string $name, array $input): string {
 
         $db->beginTransaction();
         try {
-            $stmt = $db->prepare("INSERT INTO lists (name, description, user_id) VALUES (?, ?, ?)");
-            $stmt->execute([$listName, $description ?: null, $userId]);
-            $listId = (int)$db->lastInsertId();
+            $listId = $db->query("SELECT UUID()")->fetchColumn();
+            $stmt = $db->prepare("INSERT INTO lists (id, name, description, user_id) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$listId, $listName, $description ?: null, $userId]);
 
             $cardIns = $db->prepare(
-                "INSERT INTO list_cards (list_id, card_name, quantity, is_commander) VALUES (?, ?, ?, ?)"
+                "INSERT INTO list_cards (id, list_id, card_name, quantity, role) VALUES (UUID(), ?, ?, ?, ?)"
             );
             $inserted = 0;
             foreach ($cards as $card) {
                 $cardName    = trim($card['card_name'] ?? '');
                 $quantity    = max(1, (int)($card['quantity'] ?? 1));
                 $isCommander = empty($card['is_commander']) ? 0 : 1;
+                $role        = $isCommander ? 'commander' : null;
                 if (!$cardName) continue;
-                $cardIns->execute([$listId, $cardName, $quantity, $isCommander]);
+                $cardIns->execute([$listId, $cardName, $quantity, $role]);
                 $inserted++;
             }
 
@@ -1296,7 +1325,7 @@ function executeTool(string $name, array $input): string {
     if ($name === 'get_game_notes') {
         global $db, $playerId;
         $limit  = min((int)($input['limit'] ?? 10), 30);
-        $deckId = isset($input['deck_id']) ? (int)$input['deck_id'] : null;
+        $deckId = isset($input['deck_id']) ? (string)$input['deck_id'] : null;
 
         $sql    = "
             SELECT g.id AS game_id, g.played_at, g.notes, d.name AS deck_name, d.commander,
@@ -1327,7 +1356,7 @@ function executeTool(string $name, array $input): string {
     if ($name === 'get_game_history') {
         global $db, $playerId;
         $limit    = min((int)($input['limit'] ?? 30), 100);
-        $deckId   = isset($input['deck_id'])   ? (int)$input['deck_id']      : null;
+        $deckId   = isset($input['deck_id'])   ? (string)$input['deck_id']      : null;
         $dateFrom = isset($input['date_from'])  ? trim($input['date_from'])   : null;
         $dateTo   = isset($input['date_to'])    ? trim($input['date_to'])     : null;
 

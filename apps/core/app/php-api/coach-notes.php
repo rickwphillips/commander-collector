@@ -31,7 +31,7 @@ if ($method === 'GET' && isset($_GET['all'])) {
 
 // PUT: update a note (admin or note owner)
 if ($method === 'PUT') {
-    $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+    $id = (string)($_GET['id'] ?? '');
     if (!$id) sendError('id parameter required');
 
     $data = getJSONInput();
@@ -67,7 +67,7 @@ if (!$player) {
     sendError('No player linked to account');
 }
 
-$playerId = (int)$player['id'];
+$playerId = (string)$player['id'];
 
 if ($method === 'GET') {
     $stmt = $db->prepare("
@@ -81,7 +81,7 @@ if ($method === 'GET') {
 }
 
 if ($method === 'DELETE') {
-    $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+    $id = (string)($_GET['id'] ?? '');
     if (!$id) sendError('id parameter required');
 
     // Admin can delete any note; users only their own

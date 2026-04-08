@@ -53,10 +53,11 @@ function normaliseCard(array $card): array {
 
 // ── Helper: insert/update one row in the cache ────────────────────────────────
 function cacheCard(PDO $db, array $row): void {
+    $newId = $db->query("SELECT UUID()")->fetchColumn();
     $stmt = $db->prepare(
         'INSERT INTO scryfall_card_cache
-            (scryfall_id, name, image_uri, back_image_uri, colors, color_identity, type_line, mana_cost)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (id, scryfall_id, name, image_uri, back_image_uri, colors, color_identity, type_line, mana_cost)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
             name = VALUES(name),
             image_uri = VALUES(image_uri),
@@ -68,6 +69,7 @@ function cacheCard(PDO $db, array $row): void {
             cached_at = CURRENT_TIMESTAMP'
     );
     $stmt->execute([
+        $newId,
         $row['scryfall_id'],
         $row['name'],
         $row['image_uri'],
@@ -104,8 +106,11 @@ if ($method === 'GET') {
     $row = normaliseCard($card);
     cacheCard($db, $row);
 
-    $row['id']         = (int) $db->lastInsertId() ?: null;
-    $row['cached_at']  = date('Y-m-d H:i:s');
+    $fetched = $db->prepare('SELECT id, cached_at FROM scryfall_card_cache WHERE scryfall_id = ? LIMIT 1');
+    $fetched->execute([$row['scryfall_id']]);
+    $cached = $fetched->fetch(PDO::FETCH_ASSOC);
+    $row['id']         = $cached['id'] ?? null;
+    $row['cached_at']  = $cached['cached_at'] ?? date('Y-m-d H:i:s');
     sendJSON($row);
 }
 

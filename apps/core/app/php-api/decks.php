@@ -25,8 +25,8 @@ function colorsToFields(string $colors): array {
 
 $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
-$id = isset($_GET['id']) ? (int)$_GET['id'] : null;
-$playerId = isset($_GET['player_id']) ? (int)$_GET['player_id'] : null;
+$id = isset($_GET['id']) ? (string)$_GET['id'] : null;
+$playerId = isset($_GET['player_id']) ? (string)$_GET['player_id'] : null;
 
 switch ($method) {
     case 'GET':
@@ -84,7 +84,10 @@ switch ($method) {
                     $_tgD,
                     $_w,
                     $_wrD,
-                    (SELECT COALESCE(SUM(dc.quantity), 0) FROM deck_cards dc WHERE dc.deck_id = d.id) as card_count
+                    (SELECT COALESCE(SUM(lc.quantity), 0)
+                       FROM list_cards lc
+                       JOIN lists l ON l.id = lc.list_id
+                       WHERE l.deck_id = d.id AND l.role = 'main' AND l.deleted_at IS NULL) AS card_count
                 FROM decks d
                 JOIN players p ON d.player_id = p.id
                 LEFT JOIN game_results gr ON gr.deck_id = d.id
@@ -111,12 +114,14 @@ switch ($method) {
         $colorFields = colorsToFields(isset($data['colors']) ? $data['colors'] : '');
         $partner = isset($data['partner']) && trim($data['partner']) !== '' ? trim($data['partner']) : null;
 
+        $newDeckId = $pdo->query("SELECT UUID()")->fetchColumn();
         $stmt = $pdo->prepare('
-            INSERT INTO decks (player_id, name, commander, partner, colors, has_w, has_u, has_b, has_r, has_g)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO decks (id, player_id, name, commander, partner, colors, has_w, has_u, has_b, has_r, has_g)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ');
         $stmt->execute([
-            (int)$data['player_id'],
+            $newDeckId,
+            (string)$data['player_id'],
             trim($data['name']),
             trim($data['commander']),
             $partner,
@@ -129,8 +134,8 @@ switch ($method) {
         ]);
 
         sendJSON([
-            'id' => (int)$pdo->lastInsertId(),
-            'player_id' => (int)$data['player_id'],
+            'id' => $newDeckId,
+            'player_id' => (string)$data['player_id'],
             'name' => trim($data['name']),
             'commander' => trim($data['commander']),
             'partner' => $partner,
@@ -178,7 +183,7 @@ switch ($method) {
         }
         if (isset($data['player_id'])) {
             $updates[] = 'player_id = ?';
-            $params[] = (int)$data['player_id'];
+            $params[] = (string)$data['player_id'];
         }
         if (array_key_exists('partner', $data)) {
             $updates[] = 'partner = ?';

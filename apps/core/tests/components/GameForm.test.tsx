@@ -12,17 +12,17 @@ vi.mock('next/navigation', () => ({
 
 const mockGetPlayers = vi.fn<() => Promise<Player[]>>();
 const mockGetDecks = vi.fn<() => Promise<DeckWithPlayer[]>>();
-const mockGetGame = vi.fn<(id: number) => Promise<GameWithResults>>();
-const mockCreateGame = vi.fn<() => Promise<{ id: number }>>();
-const mockUpdateGame = vi.fn<() => Promise<void>>();
+const mockGetGame = vi.fn<(id: string) => Promise<GameWithResults>>();
+const mockCreateGame = vi.fn<(data: unknown) => Promise<{ id: string }>>();
+const mockUpdateGame = vi.fn<(id: string, data: unknown) => Promise<void>>();
 
 vi.mock('@/lib/api', () => ({
   api: {
     getPlayers: (...args: unknown[]) => mockGetPlayers(...(args as [])),
     getDecks: (...args: unknown[]) => mockGetDecks(...(args as [])),
-    getGame: (...args: unknown[]) => mockGetGame(...(args as [number])),
-    createGame: (...args: unknown[]) => mockCreateGame(...(args as [])),
-    updateGame: (...args: unknown[]) => mockUpdateGame(...(args as [])),
+    getGame: (...args: unknown[]) => mockGetGame(...(args as [string])),
+    createGame: (...args: unknown[]) => mockCreateGame(...(args as [unknown])),
+    updateGame: (...args: unknown[]) => mockUpdateGame(...(args as [string, unknown])),
   },
 }));
 
@@ -41,26 +41,26 @@ vi.mock('@/components/LoadingSpinner', () => ({
 // ---- Test data ----
 
 const players: Player[] = [
-  { id: 1, name: 'Alice', user_id: null, created_at: '2025-01-01' },
-  { id: 2, name: 'Bob', user_id: null, created_at: '2025-01-01' },
-  { id: 3, name: 'Carol', user_id: null, created_at: '2025-01-01' },
-  { id: 4, name: 'Dave', user_id: null, created_at: '2025-01-01' },
-  { id: 5, name: 'Eve', user_id: null, created_at: '2025-01-01' },
+  { id: 'player-alice', name: 'Alice', user_id: null, created_at: '2025-01-01' },
+  { id: 'player-bob', name: 'Bob', user_id: null, created_at: '2025-01-01' },
+  { id: 'player-carol', name: 'Carol', user_id: null, created_at: '2025-01-01' },
+  { id: 'player-dave', name: 'Dave', user_id: null, created_at: '2025-01-01' },
+  { id: 'player-eve', name: 'Eve', user_id: null, created_at: '2025-01-01' },
 ];
 
 const decks: DeckWithPlayer[] = [
-  { id: 10, player_id: 1, name: 'Elves', commander: 'Lathril', colors: 'BG', has_w: 0, has_u: 0, has_b: 1, has_r: 0, has_g: 1, created_at: '2025-01-01', player_name: 'Alice', card_count: 100 },
-  { id: 20, player_id: 2, name: 'Dragons', commander: 'Ur-Dragon', colors: 'WUBRG', has_w: 1, has_u: 1, has_b: 1, has_r: 1, has_g: 1, created_at: '2025-01-01', player_name: 'Bob', card_count: 99 },
-  { id: 30, player_id: 3, name: 'Artifacts', commander: 'Urza', colors: 'U', has_w: 0, has_u: 1, has_b: 0, has_r: 0, has_g: 0, created_at: '2025-01-01', player_name: 'Carol', card_count: 100 },
-  { id: 40, player_id: 4, name: 'Angels', commander: 'Giada', colors: 'W', has_w: 1, has_u: 0, has_b: 0, has_r: 0, has_g: 0, created_at: '2025-01-01', player_name: 'Dave', card_count: 100 },
-  { id: 50, player_id: 5, name: 'Goblins', commander: 'Krenko', colors: 'R', has_w: 0, has_u: 0, has_b: 0, has_r: 1, has_g: 0, created_at: '2025-01-01', player_name: 'Eve', card_count: 80 },
-  { id: 11, player_id: 1, name: 'Zombies', commander: 'Wilhelt', colors: 'UB', has_w: 0, has_u: 1, has_b: 1, has_r: 0, has_g: 0, created_at: '2025-01-01', player_name: 'Alice', card_count: 100 },
+  { id: 'deck-elves', player_id: 'player-alice', name: 'Elves', commander: 'Lathril', partner: null, colors: 'BG', has_w: 0, has_u: 0, has_b: 1, has_r: 0, has_g: 1, created_at: '2025-01-01', player_name: 'Alice', card_count: 100 },
+  { id: 'deck-dragons', player_id: 'player-bob', name: 'Dragons', commander: 'Ur-Dragon', partner: null, colors: 'WUBRG', has_w: 1, has_u: 1, has_b: 1, has_r: 1, has_g: 1, created_at: '2025-01-01', player_name: 'Bob', card_count: 99 },
+  { id: 'deck-artifacts', player_id: 'player-carol', name: 'Artifacts', commander: 'Urza', partner: null, colors: 'U', has_w: 0, has_u: 1, has_b: 0, has_r: 0, has_g: 0, created_at: '2025-01-01', player_name: 'Carol', card_count: 100 },
+  { id: 'deck-angels', player_id: 'player-dave', name: 'Angels', commander: 'Giada', partner: null, colors: 'W', has_w: 1, has_u: 0, has_b: 0, has_r: 0, has_g: 0, created_at: '2025-01-01', player_name: 'Dave', card_count: 100 },
+  { id: 'deck-goblins', player_id: 'player-eve', name: 'Goblins', commander: 'Krenko', partner: null, colors: 'R', has_w: 0, has_u: 0, has_b: 0, has_r: 1, has_g: 0, created_at: '2025-01-01', player_name: 'Eve', card_count: 80 },
+  { id: 'deck-zombies', player_id: 'player-alice', name: 'Zombies', commander: 'Wilhelt', partner: null, colors: 'UB', has_w: 0, has_u: 1, has_b: 1, has_r: 0, has_g: 0, created_at: '2025-01-01', player_name: 'Alice', card_count: 100 },
 ];
 
 function setupDefaultMocks() {
   mockGetPlayers.mockResolvedValue(players);
   mockGetDecks.mockResolvedValue(decks);
-  mockCreateGame.mockResolvedValue({ id: 999 });
+  mockCreateGame.mockResolvedValue({ id: 'game-999' });
   mockUpdateGame.mockResolvedValue(undefined);
 }
 
@@ -189,15 +189,15 @@ describe('GameForm', () => {
 
     it('renders Update Game button in edit mode', async () => {
       const gameData: GameWithResults = {
-        id: 1, played_at: '2025-06-01T00:00:00', winning_turn: null, notes: 'Test',
+        id: 'game-1', played_at: '2025-06-01T00:00:00', winning_turn: null, notes: 'Test',
         game_type: 'standard', created_at: '2025-06-01',
         results: [
-          { id: 1, game_id: 1, deck_id: 10, player_id: 1, finish_position: 1, eliminated_turn: null, team_number: null, deck_name: 'Elves', commander: 'Lathril', player_name: 'Alice', colors: 'BG' },
-          { id: 2, game_id: 1, deck_id: 20, player_id: 2, finish_position: 2, eliminated_turn: 8, team_number: null, deck_name: 'Dragons', commander: 'Ur-Dragon', player_name: 'Bob', colors: 'WUBRG' },
+          { id: 'result-1', game_id: 'game-1', deck_id: 'deck-elves', player_id: 'player-alice', finish_position: 1, eliminated_turn: null, team_number: null, deck_name: 'Elves', commander: 'Lathril', player_name: 'Alice', colors: 'BG' },
+          { id: 'result-2', game_id: 'game-1', deck_id: 'deck-dragons', player_id: 'player-bob', finish_position: 2, eliminated_turn: 8, team_number: null, deck_name: 'Dragons', commander: 'Ur-Dragon', player_name: 'Bob', colors: 'WUBRG' },
         ],
       };
       mockGetGame.mockResolvedValue(gameData);
-      await renderAndWaitForLoad({ mode: 'edit', gameId: 1 });
+      await renderAndWaitForLoad({ mode: 'edit', gameId: 'game-1' });
       expect(screen.getByRole('button', { name: 'Update Game' })).toBeInTheDocument();
     });
 
@@ -484,11 +484,11 @@ describe('GameForm', () => {
 
     it('ignores prefill in edit mode', async () => {
       const gameData: GameWithResults = {
-        id: 1, played_at: '2025-06-01T00:00:00', winning_turn: null, notes: 'Edited game',
+        id: 'game-1', played_at: '2025-06-01T00:00:00', winning_turn: null, notes: 'Edited game',
         game_type: 'standard', created_at: '2025-06-01',
         results: [
-          { id: 1, game_id: 1, deck_id: 10, player_id: 1, finish_position: 1, eliminated_turn: null, team_number: null, deck_name: 'Elves', commander: 'Lathril', player_name: 'Alice', colors: 'BG' },
-          { id: 2, game_id: 1, deck_id: 20, player_id: 2, finish_position: 2, eliminated_turn: 8, team_number: null, deck_name: 'Dragons', commander: 'Ur-Dragon', player_name: 'Bob', colors: 'WUBRG' },
+          { id: 'result-1', game_id: 'game-1', deck_id: 'deck-elves', player_id: 'player-alice', finish_position: 1, eliminated_turn: null, team_number: null, deck_name: 'Elves', commander: 'Lathril', player_name: 'Alice', colors: 'BG' },
+          { id: 'result-2', game_id: 'game-1', deck_id: 'deck-dragons', player_id: 'player-bob', finish_position: 2, eliminated_turn: 8, team_number: null, deck_name: 'Dragons', commander: 'Ur-Dragon', player_name: 'Bob', colors: 'WUBRG' },
         ],
       };
       mockGetGame.mockResolvedValue(gameData);
@@ -496,12 +496,12 @@ describe('GameForm', () => {
       localStorage.setItem('commander_game_prefill', JSON.stringify({
         playedAt: '2025-07-15',
         results: [
-          { playerId: 3, deckId: 30, finishPosition: 1, eliminatedTurn: '' },
-          { playerId: 4, deckId: 40, finishPosition: 2, eliminatedTurn: '' },
+          { playerId: 'player-carol', deckId: 'deck-artifacts', finishPosition: 1, eliminatedTurn: '' },
+          { playerId: 'player-dave', deckId: 'deck-angels', finishPosition: 2, eliminatedTurn: '' },
         ],
       }));
 
-      await renderAndWaitForLoad({ mode: 'edit', gameId: 1 });
+      await renderAndWaitForLoad({ mode: 'edit', gameId: 'game-1' });
       expect(screen.getByDisplayValue('2025-06-01')).toBeInTheDocument();
     });
   });
@@ -510,19 +510,19 @@ describe('GameForm', () => {
   describe('edit mode', () => {
     it('loads existing game data and populates form', async () => {
       const gameData: GameWithResults = {
-        id: 5, played_at: '2025-03-20T00:00:00', winning_turn: null, notes: 'Great game!',
+        id: 'game-5', played_at: '2025-03-20T00:00:00', winning_turn: null, notes: 'Great game!',
         game_type: 'standard', created_at: '2025-03-20',
         results: [
-          { id: 1, game_id: 5, deck_id: 10, player_id: 1, finish_position: 1, eliminated_turn: null, team_number: null, deck_name: 'Elves', commander: 'Lathril', player_name: 'Alice', colors: 'BG' },
-          { id: 2, game_id: 5, deck_id: 20, player_id: 2, finish_position: 2, eliminated_turn: 9, team_number: null, deck_name: 'Dragons', commander: 'Ur-Dragon', player_name: 'Bob', colors: 'WUBRG' },
-          { id: 3, game_id: 5, deck_id: 30, player_id: 3, finish_position: 3, eliminated_turn: 7, team_number: null, deck_name: 'Artifacts', commander: 'Urza', player_name: 'Carol', colors: 'U' },
+          { id: 'result-1', game_id: 'game-5', deck_id: 'deck-elves', player_id: 'player-alice', finish_position: 1, eliminated_turn: null, team_number: null, deck_name: 'Elves', commander: 'Lathril', player_name: 'Alice', colors: 'BG' },
+          { id: 'result-2', game_id: 'game-5', deck_id: 'deck-dragons', player_id: 'player-bob', finish_position: 2, eliminated_turn: 9, team_number: null, deck_name: 'Dragons', commander: 'Ur-Dragon', player_name: 'Bob', colors: 'WUBRG' },
+          { id: 'result-3', game_id: 'game-5', deck_id: 'deck-artifacts', player_id: 'player-carol', finish_position: 3, eliminated_turn: 7, team_number: null, deck_name: 'Artifacts', commander: 'Urza', player_name: 'Carol', colors: 'U' },
         ],
       };
       mockGetGame.mockResolvedValue(gameData);
 
-      await renderAndWaitForLoad({ mode: 'edit', gameId: 5 });
+      await renderAndWaitForLoad({ mode: 'edit', gameId: 'game-5' });
 
-      expect(mockGetGame).toHaveBeenCalledWith(5);
+      expect(mockGetGame).toHaveBeenCalledWith('game-5');
       expect(screen.getByDisplayValue('2025-03-20')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Great game!')).toBeInTheDocument();
       expect(screen.getAllByText(/^Player \d+$/)).toHaveLength(3);
@@ -530,18 +530,18 @@ describe('GameForm', () => {
 
     it('loads 2HG game data and populates teams', async () => {
       const gameData: GameWithResults = {
-        id: 8, played_at: '2025-04-10T00:00:00', winning_turn: null, notes: '',
+        id: 'game-8', played_at: '2025-04-10T00:00:00', winning_turn: null, notes: '',
         game_type: '2hg', created_at: '2025-04-10',
         results: [
-          { id: 1, game_id: 8, deck_id: 10, player_id: 1, finish_position: 1, eliminated_turn: null, team_number: 1, deck_name: 'Elves', commander: 'Lathril', player_name: 'Alice', colors: 'BG' },
-          { id: 2, game_id: 8, deck_id: 20, player_id: 2, finish_position: 1, eliminated_turn: null, team_number: 1, deck_name: 'Dragons', commander: 'Ur-Dragon', player_name: 'Bob', colors: 'WUBRG' },
-          { id: 3, game_id: 8, deck_id: 30, player_id: 3, finish_position: 2, eliminated_turn: 10, team_number: 2, deck_name: 'Artifacts', commander: 'Urza', player_name: 'Carol', colors: 'U' },
-          { id: 4, game_id: 8, deck_id: 40, player_id: 4, finish_position: 2, eliminated_turn: 10, team_number: 2, deck_name: 'Angels', commander: 'Giada', player_name: 'Dave', colors: 'W' },
+          { id: 'result-1', game_id: 'game-8', deck_id: 'deck-elves', player_id: 'player-alice', finish_position: 1, eliminated_turn: null, team_number: 1, deck_name: 'Elves', commander: 'Lathril', player_name: 'Alice', colors: 'BG' },
+          { id: 'result-2', game_id: 'game-8', deck_id: 'deck-dragons', player_id: 'player-bob', finish_position: 1, eliminated_turn: null, team_number: 1, deck_name: 'Dragons', commander: 'Ur-Dragon', player_name: 'Bob', colors: 'WUBRG' },
+          { id: 'result-3', game_id: 'game-8', deck_id: 'deck-artifacts', player_id: 'player-carol', finish_position: 2, eliminated_turn: 10, team_number: 2, deck_name: 'Artifacts', commander: 'Urza', player_name: 'Carol', colors: 'U' },
+          { id: 'result-4', game_id: 'game-8', deck_id: 'deck-angels', player_id: 'player-dave', finish_position: 2, eliminated_turn: 10, team_number: 2, deck_name: 'Angels', commander: 'Giada', player_name: 'Dave', colors: 'W' },
         ],
       };
       mockGetGame.mockResolvedValue(gameData);
 
-      await renderAndWaitForLoad({ mode: 'edit', gameId: 8 });
+      await renderAndWaitForLoad({ mode: 'edit', gameId: 'game-8' });
 
       expect(screen.getByText('Teams & Results')).toBeInTheDocument();
       expect(screen.getByText('Team 1 (Winners)')).toBeInTheDocument();
@@ -581,29 +581,29 @@ describe('GameForm', () => {
         played_at: string;
         notes: string | null;
         game_type: string;
-        results: Array<{ deck_id: number; player_id: number; finish_position: number }>;
+        results: Array<{ deck_id: string; player_id: string; finish_position: number }>;
       };
       expect(payload.game_type).toBe('standard');
       expect(payload.notes).toBeNull();
       expect(payload.results).toHaveLength(2);
-      expect(payload.results[0]).toMatchObject({ deck_id: 10, player_id: 1, finish_position: 1 });
-      expect(payload.results[1]).toMatchObject({ deck_id: 20, player_id: 2, finish_position: 2 });
-      expect(onSuccess).toHaveBeenCalledWith(999);
+      expect(payload.results[0]).toMatchObject({ deck_id: 'deck-elves', player_id: 'player-alice', finish_position: 1 });
+      expect(payload.results[1]).toMatchObject({ deck_id: 'deck-dragons', player_id: 'player-bob', finish_position: 2 });
+      expect(onSuccess).toHaveBeenCalledWith('game-999');
     });
 
     it('calls api.updateGame with correct payload in edit mode', async () => {
       const user = userEvent.setup();
       const gameData: GameWithResults = {
-        id: 42, played_at: '2025-05-01T00:00:00', winning_turn: null, notes: 'Old notes',
+        id: 'game-42', played_at: '2025-05-01T00:00:00', winning_turn: null, notes: 'Old notes',
         game_type: 'standard', created_at: '2025-05-01',
         results: [
-          { id: 1, game_id: 42, deck_id: 10, player_id: 1, finish_position: 1, eliminated_turn: null, team_number: null, deck_name: 'Elves', commander: 'Lathril', player_name: 'Alice', colors: 'BG' },
-          { id: 2, game_id: 42, deck_id: 20, player_id: 2, finish_position: 2, eliminated_turn: 8, team_number: null, deck_name: 'Dragons', commander: 'Ur-Dragon', player_name: 'Bob', colors: 'WUBRG' },
+          { id: 'result-1', game_id: 'game-42', deck_id: 'deck-elves', player_id: 'player-alice', finish_position: 1, eliminated_turn: null, team_number: null, deck_name: 'Elves', commander: 'Lathril', player_name: 'Alice', colors: 'BG' },
+          { id: 'result-2', game_id: 'game-42', deck_id: 'deck-dragons', player_id: 'player-bob', finish_position: 2, eliminated_turn: 8, team_number: null, deck_name: 'Dragons', commander: 'Ur-Dragon', player_name: 'Bob', colors: 'WUBRG' },
         ],
       };
       mockGetGame.mockResolvedValue(gameData);
 
-      const { onSuccess } = await renderAndWaitForLoad({ mode: 'edit', gameId: 42 });
+      const { onSuccess } = await renderAndWaitForLoad({ mode: 'edit', gameId: 'game-42' });
 
       await user.click(screen.getByRole('button', { name: 'Update Game' }));
 
@@ -611,11 +611,11 @@ describe('GameForm', () => {
         expect(mockUpdateGame).toHaveBeenCalledTimes(1);
       });
 
-      const [id, payload] = mockUpdateGame.mock.calls[0] as [number, { game_type: string; results: unknown[] }];
-      expect(id).toBe(42);
+      const [id, payload] = mockUpdateGame.mock.calls[0] as [string, { game_type: string; results: unknown[] }];
+      expect(id).toBe('game-42');
       expect(payload.game_type).toBe('standard');
       expect(payload.results).toHaveLength(2);
-      expect(onSuccess).toHaveBeenCalledWith(42);
+      expect(onSuccess).toHaveBeenCalledWith('game-42');
     });
 
     it('shows error when createGame fails', async () => {

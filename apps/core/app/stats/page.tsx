@@ -83,7 +83,7 @@ function StatsPageInner() {
   const [snackbar, setSnackbar] = useState<string | null>(null);
 
   // View system
-  const [activeView, setActiveView] = useState<'default' | number>('default');
+  const [activeView, setActiveView] = useState<'default' | string>('default');
   const [panels, setPanels] = useState<StatPanelsResponse>({ own: [], shared: [] });
   const [activePanelData, setActivePanelData] = useState<StatPanel | null>(null);
 
@@ -92,8 +92,8 @@ function StatsPageInner() {
   const [comparisonLoading, setComparisonLoading] = useState(false);
 
   // Inline panels (drawer toggles)
-  const [shownPanelIds, setShownPanelIds] = useState<Set<number>>(new Set());
-  const [inlinePanelData, setInlinePanelData] = useState<Record<number, ComparisonResult>>({});
+  const [shownPanelIds, setShownPanelIds] = useState<Set<string>>(new Set());
+  const [inlinePanelData, setInlinePanelData] = useState<Record<string, ComparisonResult>>({});
 
   const {
     hiddenSections,
@@ -145,11 +145,10 @@ function StatsPageInner() {
     [inlinePanelData]
   );
 
-  // Handle ?panel_id=<id> URL param (own panels by numeric ID)
+  // Handle ?panel_id=<id> URL param (own panels by UUID)
   useEffect(() => {
     if (!panelIdParam || loading) return;
-    const id = parseInt(panelIdParam, 10);
-    if (isNaN(id)) return;
+    const id = panelIdParam;
     const match = panels.own.find((p) => p.id === id);
     if (match) activatePanel(match);
   }, [panelIdParam, panels.own, loading, activatePanel]);
@@ -251,7 +250,7 @@ function StatsPageInner() {
   );
 
   const handleViewChange = useCallback(
-    (view: 'default' | number) => {
+    (view: 'default' | string) => {
       if (view === 'default') {
         setActiveView('default');
         setActivePanelData(null);

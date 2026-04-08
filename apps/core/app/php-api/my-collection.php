@@ -43,7 +43,7 @@ if (!$player) {
     ]);
 }
 
-$playerId = (int)$player['id'];
+$playerId = (string)$player['id'];
 
 // ── Summary stats ─────────────────────────────────────────────────────────
 $stmt = $db->prepare("
@@ -73,7 +73,10 @@ $stmt = $db->prepare("
             COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 /
             NULLIF(COUNT(gr.id), 0), 1
         ) AS win_rate,
-        (SELECT COALESCE(SUM(dc.quantity), 0) FROM deck_cards dc WHERE dc.deck_id = d.id) AS card_count
+        (SELECT COALESCE(SUM(lc.quantity), 0)
+           FROM list_cards lc
+           JOIN lists l ON l.id = lc.list_id
+           WHERE l.deck_id = d.id AND l.role = 'main' AND l.deleted_at IS NULL) AS card_count
     FROM decks d
     LEFT JOIN game_results gr ON gr.deck_id = d.id
     WHERE d.player_id = ?

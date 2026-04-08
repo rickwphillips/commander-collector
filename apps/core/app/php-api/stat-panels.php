@@ -5,7 +5,7 @@ $user = requireAuth();
 
 $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
-$id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+$id = isset($_GET['id']) ? (string)$_GET['id'] : null;
 $shareCode = isset($_GET['share_code']) ? trim($_GET['share_code']) : null;
 
 $validSections = [
@@ -33,8 +33,8 @@ function formatPanel($row) {
     }
     $config = isset($row['config']) ? (is_string($row['config']) ? json_decode($row['config'], true) : $row['config']) : null;
     return [
-        'id' => (int)$row['id'],
-        'user_id' => (int)$row['user_id'],
+        'id' => (string)$row['id'],
+        'user_id' => (string)$row['user_id'],
         'name' => $row['name'],
         'sections' => $sections,
         'panel_type' => $row['panel_type'] ?? 'predefined',
@@ -145,8 +145,10 @@ switch ($method) {
             sendError('Maximum of 10 panels allowed', 400);
         }
 
-        $stmt = $pdo->prepare('INSERT INTO stat_panels (user_id, name, sections, panel_type, config) VALUES (?, ?, ?, ?, ?)');
+        $newId = $pdo->query("SELECT UUID()")->fetchColumn();
+        $stmt = $pdo->prepare('INSERT INTO stat_panels (id, user_id, name, sections, panel_type, config) VALUES (?, ?, ?, ?, ?, ?)');
         $stmt->execute([
+            $newId,
             $user['sub'],
             trim($data['name']),
             json_encode($sections),
@@ -154,7 +156,6 @@ switch ($method) {
             $config,
         ]);
 
-        $newId = (int)$pdo->lastInsertId();
         $fetch = $pdo->prepare('SELECT * FROM stat_panels WHERE id = ?');
         $fetch->execute([$newId]);
         sendJSON(formatPanel($fetch->fetch()), 201);

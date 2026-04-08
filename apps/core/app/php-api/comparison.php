@@ -25,9 +25,9 @@ $dateFrom        = $_GET['date_from'] ?? null;
 $dateTo          = $_GET['date_to'] ?? null;
 $minGames        = isset($_GET['min_games']) ? (int)$_GET['min_games'] : 1;
 
-// Array params (sent as required_player_ids[]=1&required_player_ids[]=2)
+// Array params (sent as required_player_ids[]=uuid&required_player_ids[]=uuid)
 $reqPlayerIds    = isset($_GET['required_player_ids']) && is_array($_GET['required_player_ids'])
-    ? array_map('intval', $_GET['required_player_ids']) : [];
+    ? array_map('strval', $_GET['required_player_ids']) : [];
 $reqCommanders   = isset($_GET['required_commanders']) && is_array($_GET['required_commanders'])
     ? array_map('strval', $_GET['required_commanders']) : [];
 $mustIncludeColors = isset($_GET['must_include_colors']) && is_array($_GET['must_include_colors'])
@@ -40,9 +40,9 @@ $colorMode        = in_array($_GET['color_mode'] ?? '', ['or', 'only'], true)
 
 // Entity filter
 $filterPlayerIds  = isset($_GET['filter_player_ids']) && is_array($_GET['filter_player_ids'])
-    ? array_map('intval', $_GET['filter_player_ids']) : [];
+    ? array_map('strval', $_GET['filter_player_ids']) : [];
 $filterDeckIds    = isset($_GET['filter_deck_ids']) && is_array($_GET['filter_deck_ids'])
-    ? array_map('intval', $_GET['filter_deck_ids']) : [];
+    ? array_map('strval', $_GET['filter_deck_ids']) : [];
 $filterCommanders = isset($_GET['filter_commanders']) && is_array($_GET['filter_commanders'])
     ? array_map('strval', $_GET['filter_commanders']) : [];
 $filterColors     = isset($_GET['filter_colors']) && is_array($_GET['filter_colors'])
@@ -59,7 +59,7 @@ $myGamesOnly      = filter_var($_GET['my_games_only'] ?? false, FILTER_VALIDATE_
 $myDecksOnly      = filter_var($_GET['my_decks_only'] ?? false, FILTER_VALIDATE_BOOLEAN)
     && !empty($user['player_id']);
 $oppPlayerIds     = isset($_GET['opponent_player_ids']) && is_array($_GET['opponent_player_ids'])
-    ? array_map('intval', $_GET['opponent_player_ids']) : [];
+    ? array_map('strval', $_GET['opponent_player_ids']) : [];
 $oppCommanders    = isset($_GET['opponent_commanders']) && is_array($_GET['opponent_commanders'])
     ? array_map('strval', $_GET['opponent_commanders']) : [];
 $oppColors        = isset($_GET['opponent_colors']) && is_array($_GET['opponent_colors'])
@@ -70,7 +70,7 @@ $oppColors        = isset($_GET['opponent_colors']) && is_array($_GET['opponent_
 $oppColorMode     = in_array($_GET['opponent_color_mode'] ?? '', ['or', 'only'], true)
     ? $_GET['opponent_color_mode'] : 'and';
 $excludePlayerIds = isset($_GET['exclude_player_ids']) && is_array($_GET['exclude_player_ids'])
-    ? array_map('intval', $_GET['exclude_player_ids']) : [];
+    ? array_map('strval', $_GET['exclude_player_ids']) : [];
 $topN             = isset($_GET['top_n']) ? max(1, (int)$_GET['top_n']) : null;
 
 // Validate groupBy

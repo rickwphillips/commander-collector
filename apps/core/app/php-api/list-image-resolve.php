@@ -1,6 +1,6 @@
 <?php
 /**
- * List Image Audit
+ * List Image Resolve
  *
  * POST { list_id } — Finds list_cards entries missing scryfall data, batch-fetches
  * from Scryfall, caches results, and updates list_cards.scryfall_id.
@@ -13,7 +13,7 @@ requireAuth();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') sendError('Method not allowed', 405);
 
 $input  = getJSONInput();
-$listId = (int)($input['list_id'] ?? 0);
+$listId = (string)($input['list_id'] ?? '');
 if (!$listId) sendError('list_id required');
 
 $db = getDB();
@@ -48,7 +48,7 @@ foreach (array_chunk($names, 75) as $chunk) {
         CURLOPT_TIMEOUT        => 30,
         CURLOPT_HTTPHEADER     => [
             'Content-Type: application/json',
-            'User-Agent: CommanderCollector/1.0 (list-audit)',
+            'User-Agent: CommanderCollector/1.0 (list-image-resolve)',
         ],
     ]);
     $raw  = curl_exec($ch);
@@ -112,7 +112,7 @@ foreach ($missing as $row) {
     $updateStmt->execute([$match['scryfall_id'], $row['id']]);
 
     $updated[] = [
-        'id'             => (int)$row['id'],
+        'id'             => (string)$row['id'],
         'card_name'      => $row['card_name'],
         'scryfall_id'    => $match['scryfall_id'],
         'image_uri'      => $match['image_uri'],

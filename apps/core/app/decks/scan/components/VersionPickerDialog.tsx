@@ -31,15 +31,26 @@ interface VersionPickerDialogProps {
 export function VersionPickerDialog({ card, onClose, onSelect }: VersionPickerDialogProps) {
   const [prints, setPrints] = useState<CardPrint[]>([]);
   const [loading, setLoading] = useState(false);
+  // Track previous card to detect changes without setState-in-effect.
+  const [prevCard, setPrevCard] = useState(card);
 
+  // Render-time derived-state reset: when card changes, clear prints and mark loading.
+  // This avoids calling setState inside a useEffect body (react-compiler rule).
+  if (card !== prevCard) {
+    setPrevCard(card);
+    setPrints([]);
+    setLoading(!!card);
+  }
+
+  // Fetch prints asynchronously; state updates happen only in async callbacks.
   useEffect(() => {
     if (!card) return;
-    setPrints([]);
-    setLoading(true);
+    let cancelled = false;
     api.getCardPrints(card.card_name)
-      .then(({ prints: data }) => setPrints(data))
+      .then(({ prints: data }) => { if (!cancelled) setPrints(data); })
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [card]);
 
   function handleSelect(print: CardPrint) {

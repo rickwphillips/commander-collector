@@ -45,8 +45,8 @@ vi.mock('@/game-manager/components/GameSetup', () => ({
       data-testid="start-btn"
       onClick={() => onStart(
         [
-          { playerId: 1, deckId: 1, playerName: 'Alice', deckName: 'D1', commander: { name: 'Atraxa' } },
-          { playerId: 2, deckId: 2, playerName: 'Bob',   deckName: 'D2', commander: { name: 'Urza'   } },
+          { playerId: 'player-alice', deckId: 'deck-1', playerName: 'Alice', deckName: 'D1', commander: { name: 'Atraxa' } },
+          { playerId: 'player-bob', deckId: 'deck-2', playerName: 'Bob',   deckName: 'D2', commander: { name: 'Urza'   } },
         ],
         40,
         300,
@@ -76,7 +76,7 @@ import type { GameManagerState, LiveGameEvent, PlayerState } from '@/lib/types';
 
 function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
   return {
-    playerId: 1, deckId: 1, playerName: 'Alice', deckName: 'D',
+    playerId: 'player-alice', deckId: 'deck-test-1', playerName: 'Alice', deckName: 'D',
     commander: { name: 'X' }, position: 'bottom',
     life: 40, poison: 0, commanderTax: 0,
     isMonarch: false, hasInitiative: false, hasCitysBlessing: false,
@@ -88,8 +88,8 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
 
 const mockPlayingState: GameManagerState = {
   players: [
-    makePlayer({ playerId: 1, position: 'bottom' }),
-    makePlayer({ playerId: 2, position: 'top', playerName: 'Bob' }),
+    makePlayer({ playerId: 'player-alice', position: 'bottom' }),
+    makePlayer({ playerId: 'player-bob', position: 'top', playerName: 'Bob' }),
   ],
   commanderDamage: { 0: { 1: [0, 0] }, 1: { 0: [0, 0] } },
   currentPlayerIdx: 0,

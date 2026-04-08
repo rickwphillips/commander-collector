@@ -38,7 +38,7 @@ export default function CustomizePage() {
   const [snackbar, setSnackbar] = useState<string | null>(null);
 
   // Builder state
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [panelName, setPanelName] = useState('');
   const [saving, setSaving] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
@@ -55,9 +55,9 @@ export default function CustomizePage() {
   const [decks, setDecks] = useState<DeckWithPlayer[]>([]);
 
   // Preview state
-  const [previewId, setPreviewId] = useState<number | null>(null);
-  const [previewData, setPreviewData] = useState<Record<number, ComparisonResult | 'error'>>({});
-  const [previewLoading, setPreviewLoading] = useState<Set<number>>(new Set());
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<Record<string, ComparisonResult | 'error'>>({});
+  const [previewLoading, setPreviewLoading] = useState<Set<string>>(new Set());
 
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<StatPanel | null>(null);

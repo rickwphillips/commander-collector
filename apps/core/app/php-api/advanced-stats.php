@@ -66,7 +66,7 @@ foreach ($gameSizeRaw as $row) {
         ];
     }
     $gameSizeStats[$podSize]['entries'][] = [
-        'player_id' => (int)$row['player_id'],
+        'player_id' => (string)$row['player_id'],
         'player_name' => $row['player_name'],
         'games_played' => (int)$row['games_played'],
         'wins' => (int)$row['wins'],
@@ -159,9 +159,9 @@ foreach ($twoHgTeamRows as $row) {
     $key = $row['player1_id'] . '-' . $row['player2_id'];
     if (!isset($teamPairings[$key])) {
         $teamPairings[$key] = [
-            'player1_id' => (int)$row['player1_id'],
+            'player1_id' => (string)$row['player1_id'],
             'player1_name' => $row['player1_name'],
-            'player2_id' => (int)$row['player2_id'],
+            'player2_id' => (string)$row['player2_id'],
             'player2_name' => $row['player2_name'],
             'total_games' => 0,
             'wins' => 0,

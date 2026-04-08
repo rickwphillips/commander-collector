@@ -21,14 +21,14 @@ function saveSet<T extends string | number>(key: string, set: Set<T>) {
 
 export function useHiddenStats() {
   const [hiddenSections, setHiddenSections] = useState<Set<StatsSectionId>>(new Set());
-  const [hiddenPanelIds, setHiddenPanelIds] = useState<Set<number>>(new Set());
+  const [hiddenPanelIds, setHiddenPanelIds] = useState<Set<string>>(new Set());
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- same pattern as ThemeProvider: must read localStorage on mount
     setHiddenSections(loadSet<StatsSectionId>(HIDDEN_SECTIONS_KEY));
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setHiddenPanelIds(loadSet<number>(HIDDEN_PANELS_KEY));
+    setHiddenPanelIds(loadSet<string>(HIDDEN_PANELS_KEY));
     setLoaded(true);
   }, []);
 
@@ -54,7 +54,7 @@ export function useHiddenStats() {
     saveSet(HIDDEN_SECTIONS_KEY, all);
   }, []);
 
-  const togglePanelVisibility = useCallback((panelId: number) => {
+  const togglePanelVisibility = useCallback((panelId: string) => {
     setHiddenPanelIds((prev) => {
       const next = new Set(prev);
       if (next.has(panelId)) next.delete(panelId);

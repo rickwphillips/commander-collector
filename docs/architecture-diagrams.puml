@@ -1,3 +1,9 @@
+' Updated for v5.0.0 — unified card workflow refactor (Phase 5 cleanup complete)
+' Decks and lists are PEERS. Both first-class. Neither subordinate.
+' decks.commander/partner/colors/has_* are deck-native and live forever.
+' list_cards.role is list-native and lives forever.
+' deck_cards table dropped in v5.0.0 — all card storage flows through list_cards.
+
 ' ══════════════════════════════════════════════════════════
 ' 1. HIGH-LEVEL ARCHITECTURE OVERVIEW
 ' ══════════════════════════════════════════════════════════
@@ -7,7 +13,7 @@ top to bottom direction
 skinparam ranksep 35
 skinparam nodesep 20
 
-title Commander Collector — Architecture Overview (v4.4.0)
+title Commander Collector — Architecture Overview (v5.0.0)
 
 package "Layout" as LAY {
   [layout.tsx → ThemeProvider → AuthGuard] as LAYOUT
@@ -15,13 +21,13 @@ package "Layout" as LAY {
 }
 
 package "Shared UI" as SUI {
-  [Shared Components\nPageContainer · LoadingSpinner · EmptyState\nStatsCard · ManaSymbol · ColorIdentityChips\nManaCost · DeckBreakdown · GameForm\nViewSelector · DeckFilters · DeckActions\nCardListDisplay · CardGridEditor] as SHARED
+  [Shared Components\nPageContainer · LoadingSpinner · EmptyState\nStatsCard · ManaSymbol · ColorIdentityChips\nManaCost · DeckBreakdown · GameForm\nViewSelector · DeckActions\nCardListView · CardListToolbar · CardInputPanel\nSaveToListDialog · ScanInput] as SHARED
   [packages/shared\nCardTooltip · ConfirmDeleteDialog\ncardNameUtils] as PKG
 }
 
 package "Feature Pages" as FEAT {
   [Dashboard] as DASH
-  [Deck System\n5 pages + 7 scan dialogs] as DECK
+  [Deck System\n4 pages] as DECK
   [Game System\n4 pages] as GAME
   [Game Manager\nSetup · Board · PlayerPanel\nCenterZone · Remote · EndSummary] as GMGR
   [Stats System\nStats · Customize\nComparisonBuilder · ComparisonPanel] as STAT
@@ -33,13 +39,13 @@ package "Feature Pages" as FEAT {
 }
 
 package "API Layer" as APIL {
-  [api.ts · apiFetch()\nscryfall.ts] as API
-  [Shared Lib\ntypes · utils · statsSections · version] as LIB
+  [api.ts · apiFetch()\nlib/scryfall/client.ts] as API
+  [Shared Lib\ntypes · utils · statsSections · version\nlib/scan/* · lib/cards/* · lib/formats/*] as LIB
 }
 
 package "PHP Backend" as PHP {
-  [Core (14 endpoints)\ngames · decks · deck-cards · players\nstats · comparison · advanced-stats\nstat-panels · live-game · scryfall-cache\nscan · head-to-head] as CORE
-  [Features (14 endpoints)\ncoach-chat · coach-notes · tts-export\nlists · list-audit · my-collection\ncard-prints · card-image · scan-draft\nactive-game · game-settings\ndeck-profile · changelog · players-public] as FAPI
+  [Core (13 endpoints)\ngames · decks · players\nstats · comparison · advanced-stats\nstat-panels · live-game · scryfall-cache\nscan · head-to-head · cleanup-trash] as CORE
+  [Features (14 endpoints)\ncoach-chat · coach-notes · tts-export\nlists · list-image-resolve · my-collection\ncard-prints · card-image · buffer-draft\nactive-game · game-settings\ndeck-profile · changelog · players-public] as FAPI
   [Auth (7 endpoints)\nlogin · register · me · change-password\nusers · jwt · invite] as AUTH
   [Rules Guru (6 endpoints)\nchat · conversations · patterns\nactive-game · qa-log-rate · seed] as RULES
   [config.php · sql-helpers.php\nauth/middleware.php] as CFG
@@ -120,10 +126,12 @@ package "Shared Components (apps/core)" {
   [DeckBreakdown] as DB
   [GameForm] as GF
   [ViewSelector] as VS
-  [CardListDisplay] as CLD
+  [CardListView] as CLV
+  [CardListToolbar] as CLT
+  [CardInputPanel] as CIP
+  [SaveToListDialog] as STL
+  [ScanInput] as SIN
   [DeckActions] as DA
-  [CardGridEditor] as CGE
-  [DeckFilters] as DF
 }
 
 package "Shared Package (packages/shared)" {
@@ -137,6 +145,10 @@ package "Shared Lib" {
   [utils.ts] as UTL
   [statsSections.ts] as SSC
   [version.ts] as VER
+  [lib/scan/*] as LSCAN
+  [lib/cards/*] as LCARDS
+  [lib/formats/*] as LFMT
+  [lib/scryfall/client.ts] as LSCR
 }
 
 ' Represents feature pages that consume these shared components
@@ -158,10 +170,13 @@ DB --> MC
 DB --> MS
 
 ' Card display components
-CLD --> MC
-CLD --> CTT
-CLD --> DF
-CGE --> CTT
+CLV --> MC
+CLV --> CTT
+CLT --> CLV
+CIP --> LSCAN
+CIP --> LCARDS
+STL --> CLV
+SIN --> CIP
 DA --> CDD
 
 ' Leaf components (consumed by feature pages)
@@ -177,6 +192,9 @@ FP --> CNU
 ' Shared lib
 UTL --> TYP
 SSC --> TYP
+LSCR --> LSCAN
+LSCAN --> LCARDS
+LCARDS --> LFMT
 
 @enduml
 
@@ -194,22 +212,12 @@ package "Deck Pages" {
   [DecksListPage] as DLP
   [DeckDetailPage] as DDP
   [NewDeckPage] as NDP
-  [DecklistPage] as DKL
-  [ScanDeckPage] as SDP
-}
+  [DecklistPage\n(/decks/decklist?id=<uuid>)] as DKL
 
-package "Scan Sub-Components" {
-  [CardReviewGrid] as CRG
-  [ScanProgressDialog] as SPD
-  [ScanResultsDialog] as SRD
-  [CardAddDialog] as CAD
-  [CardEditDialog] as CED
-  [VersionPickerDialog] as VPD
-  [ImageEditorDialog] as IED
-
-  note bottom of CRG
-    ScanDeckPage: 1368 lines
-    (decomposed from 2036)
+  note right of DKL
+    Canonical card editor URL.
+    Path-segment routes reverted
+    (static export incompatible).
   end note
 }
 
@@ -222,15 +230,20 @@ package "Shared Components" <<Rectangle>> {
   [ColorIdentityChips] as CIC
   [DeckBreakdown] as DB
   [DeckActions] as DA
-  [DeckFilters] as DF
-  [CardListDisplay] as CLD
-  [CardGridEditor] as CGE
+  [CardListView] as CLV
+  [CardListToolbar] as CLT
+  [CardInputPanel] as CIP
+  [SaveToListDialog] as STL
+  [ScanInput] as SIN
+  [VersionPickerDialog] as VPD
+  [ImageEditorDialog] as IED
   [ConfirmDeleteDialog] as CDD
 }
 
 package "API Layer" <<Rectangle>> {
   [api.ts] as API
-  [scryfall.ts] as SCR
+  [useList hook] as UL
+  [lib/scryfall/client.ts] as SCR
 }
 
 ' Deck pages → shared
@@ -248,28 +261,23 @@ DDP --> DB
 DDP --> DA
 DA --> CDD
 DKL --> DB
-DKL --> CLD
-DKL --> CGE
-DKL --> DF
+DKL --> CLV
+DKL --> CLT
+DKL --> CIP
+DKL --> STL
+CIP --> SIN
+SIN --> VPD
+SIN --> IED
 
-' Scan sub-components
-SDP --> MS
-SDP --> DB
-SDP --> CRG
-SDP --> SPD
-SDP --> SRD
-SDP --> CAD
-SDP --> CED
-SDP --> VPD
-SDP --> IED
+' useList hook dependency chain
+DKL -down-> UL
+UL -down-> API
 
 ' API wiring
 DLP -down-> API
 NDP -down-> API
 DDP -down-> API
-DKL -down-> API
-SDP -down-> API
-SDP --> SCR
+API --> SCR
 
 @enduml
 
@@ -387,7 +395,13 @@ package "Players" {
 
 package "Lists" {
   [ListsPage] as LSP
-  [ListDetailPage] as LDP
+  [ListDetailPage\n(/lists/detail?id=<uuid>)] as LDP
+
+  note right of LDP
+    Canonical card editor URL.
+    Peer to DecklistPage — neither
+    is subordinate to the other.
+  end note
 }
 
 package "My Collection" {
@@ -414,15 +428,17 @@ package "Shared Components" <<Rectangle>> {
   [ManaSymbol] as MS
   [ColorIdentityChips] as CIC
   [ViewSelector] as VS
-  [CardListDisplay] as CLD
-  [CardGridEditor] as CGE
-  [DeckFilters] as DF
+  [CardListView] as CLV
+  [CardListToolbar] as CLT
+  [CardInputPanel] as CIP
+  [SaveToListDialog] as STL
   [cardNameUtils] as CNU
   [utils.ts] as UTL
 }
 
 package "API Layer" <<Rectangle>> {
   [api.ts] as API
+  [useList hook] as UL
 }
 
 ' Stats internal
@@ -450,9 +466,12 @@ PDP --> CIC
 LSP --> PC
 LSP --> LS
 LSP --> ES
-LDP --> CLD
-LDP --> CGE
-LDP --> DF
+LDP --> CLV
+LDP --> CLT
+LDP --> CIP
+LDP --> STL
+LDP -down-> UL
+UL -down-> API
 
 ' My Collection
 MCP --> SC
@@ -483,27 +502,40 @@ RCP -down-> API
 
 ' ============================================================
 
-@startuml sequence-deck-create
+@startuml sequence-scan-to-list
 !theme plain
-title Deck System — Create Deck via Scan
+title Card Input — Scan Flow (ScanInput → buffer-draft → SaveToListDialog)
 
 actor User
-participant "ScanDeckPage" as Scan
+participant "DecklistPage\nor ListDetailPage" as Page
+participant "CardInputPanel" as CIP
+participant "ScanInput" as Scan
 participant "VersionPickerDialog" as VPick
 participant "ImageEditorDialog" as IEdit
-participant "CardReviewGrid" as Review
-participant "ManaSymbol\n(Color Picker)" as Color
-participant "DeckBreakdown" as Breakdown
+participant "CardListView" as CLV
+participant "SaveToListDialog" as STL
+participant "useList hook" as UL
 participant "api.ts" as API
 participant "scan.php" as ScanAPI
-participant "scan-draft.php" as DraftAPI
+participant "buffer-draft.php" as DraftAPI
 participant "scryfall-cache.php" as Scryfall
 participant "card-prints.php" as Prints
-participant "decks.php" as DecksAPI
-participant "deck-cards.php" as CardsAPI
+participant "lists.php" as ListsAPI
 database "MySQL" as DB
 
-== Step 0: Capture ==
+== Capture ==
+User -> Page : Navigate to /decks/decklist?id=<uuid>\nor /lists/detail?id=<uuid>
+Page -> UL : useList(listId)
+UL -> API : api.getList(listId)
+API -> ListsAPI : GET /lists?id=<uuid>
+ListsAPI -> DB : SELECT list_cards WHERE list_id = ?
+DB --> ListsAPI : ListCard[]
+ListsAPI --> API : {list, cards[]}
+API --> UL : List + cards loaded
+UL --> Page : {cards, save, ...}
+
+User -> CIP : Tap "Scan" tab
+CIP -> Scan : Mount ScanInput
 User -> Scan : Upload photo / take picture
 Scan -> Scan : fileToBase64()\nrotate, brightness, contrast
 
@@ -515,7 +547,7 @@ end
 
 Scan -> Scan : splitCanvasToTiles()\n3x3 + full = 10 tiles
 
-== Step 1: Review ==
+== Recognize & Enrich ==
 loop Batch of 3 tiles
   Scan -> API : api.scanDeck(base64, mime)
   API -> ScanAPI : POST /scan
@@ -528,18 +560,9 @@ loop Batch of 3 tiles
   API --> Scan : Merge scryfall data
 end
 
-Scan -> Review : Display card grid for review
-
-opt Cards not found
-  Scan -> API : api.findCardCrop(image, name)
-  API -> ScanAPI : POST /scan {find_card}
-  ScanAPI --> API : crop coordinates
-  API --> Scan : crop data URL
-end
-
 opt Select specific printing
-  User -> Review : Click card version
-  Review -> VPick : Open version picker
+  User -> Scan : Click card version
+  Scan -> VPick : Open version picker
   VPick -> API : api.getCardPrints(name)
   API -> Prints : GET /card-prints
   Prints --> API : PrintVersion[]
@@ -548,30 +571,32 @@ opt Select specific printing
   VPick --> Scan : Updated card with set/art
 end
 
-Scan -> API : Auto-save draft (debounced 1.5s)
-API -> DraftAPI : POST /scan-draft
-DraftAPI -> DB : Persist cross-device draft
+Scan -> API : Auto-save buffer (debounced 1.5s)
+API -> DraftAPI : POST /buffer-draft\n{user, device, context_type, context_ref}
+DraftAPI -> DB : UPSERT buffer_drafts
 User -> Scan : Adjust quantities, toggle commander/proxy
-Scan -> Breakdown : Render type/color breakdown
-User -> Scan : Click "Save Deck"
 
-== Step 2: Save ==
-User -> Color : Select color identity (WUBRG/C)
-User -> Scan : Enter deck name, select player
-Scan -> API : api.createDeck({player_id, name, commander, colors})
-API -> DecksAPI : POST /decks
-DecksAPI -> DB : INSERT INTO decks
-DB --> DecksAPI : deck.id
-DecksAPI --> API : {id}
-API --> Scan : deck created
+== Finalize ==
+User -> CIP : Click "Add to List"
+CIP -> STL : Open SaveToListDialog
+STL -> CLV : Preview merged card list
+User -> STL : Confirm
+STL -> UL : save(mergedCards[])
+UL -> API : api.saveListCards(listId, cards[])
+API -> ListsAPI : POST /lists?id=<uuid>
+ListsAPI -> DB : DELETE old + INSERT new list_cards
+DB --> ListsAPI : ok
+ListsAPI --> API : ok
+API --> UL : saved
+UL --> Page : Updated card list
+Page -> CLV : Re-render with saved cards
 
-Scan -> API : api.saveDeckCards(deckId, cards[])
-API -> CardsAPI : POST /deck-cards
-CardsAPI -> DB : DELETE old + INSERT new cards
-DB --> CardsAPI : ok
-CardsAPI --> API : ok
-API --> Scan : saved
-Scan -> Scan : router.push(/decks/detail)
+note right of ListsAPI
+  All card storage flows through list_cards.
+  lists.php is the canonical card-container
+  endpoint (?deck_id=&role=main supported).
+  No deck_cards table exists in v5.0.0.
+end note
 
 @enduml
 
@@ -852,8 +877,8 @@ User -> Actions : Click "Export to TTS"
 Actions -> API : api.exportToTTS(deckId)
 API -> TTS : GET /tts-export?deck_id=X
 
-TTS -> DB : SELECT cards + quantities\nFROM deck_cards\nWHERE deck_id = ?
-DB --> TTS : DeckCard[] with scryfall data
+TTS -> DB : SELECT lc.card_name, lc.quantity, lc.is_commander\nFROM list_cards lc\nJOIN lists l ON l.id = lc.list_id\nWHERE l.deck_id = ?
+DB --> TTS : ListCard[] with scryfall data
 
 loop Each card in deck
   TTS -> Scryfall : Lookup cached card data\n(image URLs, DFC status)
@@ -942,5 +967,235 @@ Convos -> DB : SELECT conversations\nORDER BY updated_at DESC
 DB --> Convos : Conversation[]
 Convos --> API : conversation list
 API --> Chat : Display conversation history
+
+@enduml
+
+' ══════════════════════════════════════════════════════════
+' 7. ENTITY RELATIONSHIP — Core Card Storage Model
+' ══════════════════════════════════════════════════════════
+@startuml er-card-model
+!theme plain
+top to bottom direction
+skinparam ranksep 40
+skinparam nodesep 30
+
+title Commander Collector — ER Diagram: Core Card Model (v5.0.0)
+
+entity "players" as PLAYERS {
+  * id : int
+  --
+  name : varchar(100)
+  user_id : char(36)
+  created_at : timestamp
+}
+
+entity "decks" as DECKS {
+  * id : int
+  --
+  player_id : int <<FK>>
+  name : varchar(100)
+  commander : varchar(150) <<deck-native>>
+  partner : varchar(150) <<deck-native>>
+  colors : varchar(10) <<deck-native>>
+  has_w/u/b/r/g : tinyint(1) <<deck-native>>
+  created_at : timestamp
+}
+
+entity "lists" as LISTS {
+  * id : int
+  --
+  deck_id : int <<FK, optional>>
+  name : varchar(255)
+  description : text
+  user_id : varchar(36)
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+entity "list_cards" as LIST_CARDS {
+  * id : int
+  --
+  list_id : int <<FK>>
+  scryfall_id : varchar(64)
+  card_name : varchar(255)
+  quantity : int
+  is_commander : tinyint(1)
+  is_proxy : tinyint(1)
+  role : varchar(32) <<list-native>>
+}
+
+entity "list_history" as LIST_HISTORY {
+  * id : int
+  --
+  list_id : int <<FK>>
+  user_id : varchar(36)
+  action : varchar(64)
+  payload : json
+  created_at : timestamp
+}
+
+entity "buffer_drafts" as BUFFER_DRAFTS {
+  * id : int
+  --
+  user_id : varchar(36)
+  device_id : varchar(128)
+  context_type : varchar(32)
+  context_ref : varchar(64)
+  state : json
+  updated_at : timestamp
+}
+
+entity "system_state" as SYSTEM_STATE {
+  * key : varchar(64)
+  --
+  value : text
+  updated_at : timestamp
+}
+
+entity "game_results" as GAME_RESULTS {
+  * id : int
+  --
+  game_id : int <<FK>>
+  deck_id : int <<FK>>
+  player_id : int <<FK>>
+  finish_position : tinyint
+  eliminated_turn : int
+}
+
+entity "games" as GAMES {
+  * id : int
+  --
+  played_at : date
+  winning_turn : int
+  game_type : varchar(20)
+  notes : text
+}
+
+entity "scryfall_card_cache" as SCC {
+  * id : int
+  --
+  scryfall_id : varchar(36)
+  name : varchar(255)
+  image_uri : text
+  back_image_uri : text
+  colors : varchar(10)
+  color_identity : varchar(10)
+  type_line : varchar(255)
+  mana_cost : varchar(100)
+}
+
+' Relationships
+PLAYERS ||--o{ DECKS : "owns"
+DECKS ||--o{ LISTS : "has (optional)"
+LISTS ||--|{ LIST_CARDS : "contains"
+LISTS ||--o{ LIST_HISTORY : "audit trail"
+GAMES ||--|{ GAME_RESULTS : "produces"
+DECKS ||--o{ GAME_RESULTS : "recorded in"
+PLAYERS ||--o{ GAME_RESULTS : "participates"
+
+note right of LISTS
+  lists.deck_id is the join from a list
+  to its deck. A list may exist standalone
+  (no deck_id) — e.g. wishlist, binder.
+  A deck may have 0, 1, or many lists.
+end note
+
+note right of LIST_CARDS
+  list_cards.role is list-native.
+  role='commander' and role='partner'
+  are the list's own claim, independent
+  of decks.commander/partner.
+end note
+
+note right of BUFFER_DRAFTS
+  Renamed from scan_drafts in v5.0.0.
+  Keyed on (user, device, context_type,
+  context_ref) for multi-context autosave.
+end note
+
+note right of SYSTEM_STATE
+  K/V store for app-level state.
+  Example key: last_cleanup_at
+end note
+
+@enduml
+
+' ══════════════════════════════════════════════════════════
+' 8. PHP ENDPOINT MAP
+' ══════════════════════════════════════════════════════════
+@startuml endpoint-map
+!theme plain
+top to bottom direction
+skinparam ranksep 30
+skinparam nodesep 20
+
+title PHP Endpoint Map (v5.0.0)
+
+package "Core Endpoints" as CORE {
+  [games.php] as EP_GAMES
+  [decks.php] as EP_DECKS
+  [players.php] as EP_PLAYERS
+  [stats.php] as EP_STATS
+  [comparison.php] as EP_COMP
+  [advanced-stats.php] as EP_ADV
+  [stat-panels.php] as EP_PANELS
+  [live-game.php] as EP_LIVE
+  [scryfall-cache.php] as EP_SCR
+  [scan.php] as EP_SCAN
+  [head-to-head.php] as EP_H2H
+  [cleanup-trash.php] as EP_CLEANUP
+}
+
+package "Feature Endpoints" as FEAT {
+  [lists.php\n★ canonical card container\n?deck_id=&role=main] as EP_LISTS
+  [list-image-resolve.php\n(renamed from list-audit.php)] as EP_LIR
+  [buffer-draft.php\n(renamed from scan-draft.php)] as EP_BUF
+  [coach-chat.php] as EP_COACH
+  [coach-notes.php] as EP_NOTES
+  [tts-export.php] as EP_TTS
+  [my-collection.php] as EP_COLL
+  [card-prints.php] as EP_PRINTS
+  [card-image.php] as EP_IMG
+  [active-game.php] as EP_ACTIVE
+  [game-settings.php] as EP_GSETTINGS
+  [deck-profile.php] as EP_DPROF
+  [changelog.php] as EP_CHANGE
+  [players-public.php] as EP_PPUB
+}
+
+package "Auth Endpoints" as AUTH {
+  [login.php · register.php] as EP_AUTH
+  [me.php · change-password.php] as EP_ME
+  [users.php · jwt.php · invite.php] as EP_USERS
+}
+
+package "Rules Guru Endpoints" as RULES {
+  [rules/chat.php] as EP_RCHAT
+  [rules/conversations.php] as EP_RCONV
+  [rules/patterns.php] as EP_RPAT
+  [rules/active-game.php] as EP_RAG
+  [rules/qa-log-rate.php] as EP_RRATE
+  [rules/seed.php] as EP_RSEED
+}
+
+package "410 Gone Shims" as SHIMS {
+  [scan-draft.php (410)] as EP_SDRAFT_SHIM
+  [deck-cards.php (410)] as EP_DCARDS_SHIM
+
+  note bottom of EP_SDRAFT_SHIM
+    Replaced by buffer-draft.php
+  end note
+  note bottom of EP_DCARDS_SHIM
+    deck_cards table dropped v5.0.0.
+    All cards now via lists.php.
+  end note
+}
+
+database "MySQL" as DB
+
+CORE --> DB
+FEAT --> DB
+AUTH --> DB
+RULES --> DB
 
 @enduml

@@ -242,6 +242,12 @@ if [ "$STATIC_ONLY" = false ] && [ "$GURU_ONLY" = false ]; then
 fi
 
 # ── Step 5: Restore .htaccess files (ALWAYS — lftp mirror excludes dotfiles) ──
+# WHY THIS EXISTS: lftp's mirror command has a built-in mirror:exclude-regex "^\."
+# that silently drops all dotfiles, including .htaccess. Combined with --delete,
+# any existing .htaccess on the remote is wiped on every static deploy. This has
+# recurred 4 times. The explicit SSH cat-write below is the canonical fix — do NOT
+# remove it or replace with set mirror:exclude-regex "". See memory file:
+# ~/.claude/projects/-Users-rick-FreddyRhetorickProjects/memory/feedback_htaccess_deploy.md
 if [ "$PHP_ONLY" = false ]; then
   echo "═══════════════════════════════════════════"
   echo "  Restoring .htaccess files..."

@@ -10,8 +10,8 @@ if ($method !== 'GET') {
     sendError('Method not allowed', 405);
 }
 
-$player1Id = isset($_GET['player1']) ? (int)$_GET['player1'] : null;
-$player2Id = isset($_GET['player2']) ? (int)$_GET['player2'] : null;
+$player1Id = isset($_GET['player1']) ? (string)$_GET['player1'] : null;
+$player2Id = isset($_GET['player2']) ? (string)$_GET['player2'] : null;
 
 // Specific head-to-head between two players
 if ($player1Id && $player2Id) {

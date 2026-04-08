@@ -45,7 +45,7 @@ import type { DeckDetail as DeckDetailType, GameWithResults, DeckCard } from '@/
 export default function DeckDetailPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const deckId = Number(searchParams.get('id'));
+  const deckId = searchParams.get('id') ?? '';
 
   const [deck, setDeck] = useState<DeckDetailType | null>(null);
   const [games, setGames] = useState<GameWithResults[]>([]);
@@ -247,7 +247,7 @@ export default function DeckDetailPage() {
           onExport={handleExportTCGPlayer}
           onTTS={handleExportTTS}
           ttsBusy={ttsBusy}
-          decklistHref={`/decks/decklist?id=${deckId}`}
+          decklistHref={`/decks/decklist?id=${encodeURIComponent(deckId)}`}
           onEdit={handleEdit}
           onDelete={() => setDeleteDialogOpen(true)}
           hasCards={deckCards.length > 0}

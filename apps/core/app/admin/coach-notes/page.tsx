@@ -15,7 +15,7 @@ import { useAuth } from '@/components/AuthGuard';
 import { api } from '@/lib/api';
 import type { CoachNote } from '@/lib/types';
 
-type AdminNote = CoachNote & { player_id: number; player_name: string };
+type AdminNote = CoachNote & { player_id: string; player_name: string };
 
 export default function CoachNotesAdminPage() {
   const { user } = useAuth();
@@ -44,7 +44,7 @@ export default function CoachNotesAdminPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Delete this note?')) return;
     await api.deleteCoachNote(id);
     setNotes((prev) => prev.filter((n) => n.id !== id));

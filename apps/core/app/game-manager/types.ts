@@ -11,8 +11,8 @@ export type {
 export interface GameManagerPrefill {
   playedAt: string;
   results: Array<{
-    playerId: number;
-    deckId: number;
+    playerId: string;
+    deckId: string;
     finishPosition: number | '';
     eliminatedTurn: number | '';
   }>;

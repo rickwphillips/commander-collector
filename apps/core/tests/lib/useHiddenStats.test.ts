@@ -101,31 +101,31 @@ describe('useHiddenStats', () => {
     const { result } = renderHook(() => useHiddenStats());
     await waitFor(() => expect(result.current.loaded).toBe(true));
     act(() => {
-      result.current.togglePanelVisibility(42);
+      result.current.togglePanelVisibility('panel-42');
     });
-    expect(result.current.hiddenPanelIds.has(42)).toBe(true);
+    expect(result.current.hiddenPanelIds.has('panel-42')).toBe(true);
   });
 
   it('togglePanelVisibility shows a hidden panel when toggled again', async () => {
     const { result } = renderHook(() => useHiddenStats());
     await waitFor(() => expect(result.current.loaded).toBe(true));
     act(() => {
-      result.current.togglePanelVisibility(42);
+      result.current.togglePanelVisibility('panel-42');
     });
     act(() => {
-      result.current.togglePanelVisibility(42);
+      result.current.togglePanelVisibility('panel-42');
     });
-    expect(result.current.hiddenPanelIds.has(42)).toBe(false);
+    expect(result.current.hiddenPanelIds.has('panel-42')).toBe(false);
   });
 
   it('togglePanelVisibility persists to localStorage', async () => {
     const { result } = renderHook(() => useHiddenStats());
     await waitFor(() => expect(result.current.loaded).toBe(true));
     act(() => {
-      result.current.togglePanelVisibility(7);
+      result.current.togglePanelVisibility('panel-7');
     });
     const stored = JSON.parse(localStorage.getItem(HIDDEN_PANELS_KEY)!);
-    expect(stored).toContain(7);
+    expect(stored).toContain('panel-7');
   });
 
   it('restores hiddenSections from localStorage on mount', async () => {
@@ -137,10 +137,10 @@ describe('useHiddenStats', () => {
   });
 
   it('restores hiddenPanelIds from localStorage on mount', async () => {
-    localStorage.setItem(HIDDEN_PANELS_KEY, JSON.stringify([3, 14]));
+    localStorage.setItem(HIDDEN_PANELS_KEY, JSON.stringify(['panel-3', 'panel-14']));
     const { result } = renderHook(() => useHiddenStats());
     await waitFor(() => expect(result.current.loaded).toBe(true));
-    expect(result.current.hiddenPanelIds.has(3)).toBe(true);
-    expect(result.current.hiddenPanelIds.has(14)).toBe(true);
+    expect(result.current.hiddenPanelIds.has('panel-3')).toBe(true);
+    expect(result.current.hiddenPanelIds.has('panel-14')).toBe(true);
   });
 });

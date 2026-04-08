@@ -644,16 +644,60 @@ function colorFlags(string $colors): array {
     ];
 }
 
+// ── UUID mint helper ─────────────────────────────────────────────────────────
+// Mints a UUID v4-shaped identifier using random_int() for cryptographic
+// uniformity. We generate in PHP rather than relying on MySQL UUID() so we
+// have the value in hand before the INSERT (no lastInsertId() on CHAR(36) PKs).
+function mintUuid(): string {
+    return sprintf(
+        '%08x-%04x-%04x-%04x-%012x',
+        random_int(0, 0xffffffff),
+        random_int(0, 0xffff),
+        random_int(0, 0xffff),
+        random_int(0, 0xffff),
+        random_int(0, 0xffffffffffff)
+    );
+}
+
+// ── list_cards idempotent insert ──────────────────────────────────────────────
+// NOTE: list_cards does NOT have a UNIQUE KEY on (list_id, scryfall_id) as of
+// v4.8.0, so ON DUPLICATE KEY UPDATE is not available. We use SELECT-then-
+// UPDATE-or-INSERT instead. Schema migration to add the unique key is tracked
+// separately; once it lands, this can be simplified to ON DUPLICATE KEY UPDATE.
+function upsertListCard(PDO $pdo, string $listId, string $scryfallId, string $cardName, int $qty, int $isCommander): void {
+    $stmt = $pdo->prepare(
+        "SELECT id FROM list_cards WHERE list_id = ? AND scryfall_id = ? LIMIT 1"
+    );
+    $stmt->execute([$listId, $scryfallId]);
+    $existing = $stmt->fetchColumn();
+
+    if ($existing !== false) {
+        $pdo->prepare(
+            "UPDATE list_cards SET quantity = ?, is_commander = ?, card_name = ? WHERE id = ?"
+        )->execute([$qty, $isCommander, $cardName, $existing]);
+    } else {
+        $pdo->prepare(
+            "INSERT INTO list_cards (list_id, scryfall_id, card_name, quantity, is_commander, is_proxy)
+             VALUES (?, ?, ?, ?, ?, 0)"
+        )->execute([$listId, $scryfallId, $cardName, $qty, $isCommander]);
+    }
+}
+
+// ── Seed each deck ───────────────────────────────────────────────────────────
+// Phase 2.2 step 4: writes go to list_cards via the deck's main list.
+// deck_cards is frozen as a read-shadow; no new writes to it.
+
 $deckInsert = $pdo->prepare("
-    INSERT INTO decks (player_id, name, commander, colors, has_w, has_u, has_b, has_r, has_g)
-    VALUES (:player_id, :name, :commander, :colors, :has_w, :has_u, :has_b, :has_r, :has_g)
+    INSERT INTO decks (id, player_id, name, commander, colors, has_w, has_u, has_b, has_r, has_g)
+    VALUES (:id, :player_id, :name, :commander, :colors, :has_w, :has_u, :has_b, :has_r, :has_g)
 ");
 
-$cardInsert = $pdo->prepare("
-    INSERT INTO deck_cards (deck_id, scryfall_id, card_name, quantity, is_commander, is_proxy)
-    VALUES (:deck_id, :scryfall_id, :card_name, :quantity, :is_commander, 0)
-    ON DUPLICATE KEY UPDATE quantity = VALUES(quantity)
-");
+$listLookup = $pdo->prepare(
+    "SELECT id FROM lists WHERE deck_id = ? AND role = 'main' AND deleted_at IS NULL LIMIT 1"
+);
+$listInsert = $pdo->prepare(
+    "INSERT INTO lists (id, deck_id, name, role, format, source) VALUES (?, ?, ?, 'main', 'commander', 'seed')"
+);
 
 foreach ($decks as $deck) {
     echo "\n=== {$deck['name']} (Commander: {$deck['commander']}) → player {$deck['player_id']} ===\n";
@@ -663,8 +707,11 @@ foreach ($decks as $deck) {
     $scryfallMap = scryfallLookup($uniqueNames);
     echo "  Resolved " . count($scryfallMap) . " cards.\n";
 
+    // Mint deck UUID and insert deck row
+    $deckId = mintUuid();
     $flags = colorFlags($deck['colors']);
     $deckInsert->execute([
+        ':id'        => $deckId,
         ':player_id' => $deck['player_id'],
         ':name'      => $deck['name'],
         ':commander' => $deck['commander'],
@@ -675,12 +722,23 @@ foreach ($decks as $deck) {
         ':has_r'     => $flags['has_r'],
         ':has_g'     => $flags['has_g'],
     ]);
-    $deckId = (int)$pdo->lastInsertId();
     echo "  Inserted deck id=$deckId\n";
+
+    // Look up or create the deck's main list
+    $listLookup->execute([$deckId]);
+    $listId = $listLookup->fetchColumn();
+    if (!$listId) {
+        $listId = mintUuid();
+        $listInsert->execute([$listId, $deckId, $deck['name'] . ' (main)']);
+        echo "  Created main list id=$listId\n";
+    } else {
+        echo "  Found existing main list id=$listId\n";
+    }
 
     cacheCards($pdo, $scryfallMap);
     echo "  Cache populated.\n";
 
+    // Insert cards into list_cards (removed: INSERT INTO deck_cards)
     $inserted = 0;
     foreach ($deck['cards'] as $cardName => $qty) {
         $key = strtolower($cardName);
@@ -693,16 +751,10 @@ foreach ($decks as $deck) {
             continue;
         }
 
-        $cardInsert->execute([
-            ':deck_id'      => $deckId,
-            ':scryfall_id'  => $scryfallId,
-            ':card_name'    => $resolvedName,
-            ':quantity'     => $qty,
-            ':is_commander' => $isCommander,
-        ]);
+        upsertListCard($pdo, $listId, $scryfallId, $resolvedName, $qty, $isCommander);
         $inserted++;
     }
-    echo "  Inserted $inserted card rows.\n";
+    echo "  Inserted/updated $inserted card rows in list_cards.\n";
 }
 
 echo "\nDone.\n";

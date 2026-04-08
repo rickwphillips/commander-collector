@@ -11,8 +11,8 @@ if ($method !== 'GET') {
     sendError('Method not allowed', 405);
 }
 
-$playerId = isset($_GET['player_id']) ? (int)$_GET['player_id'] : null;
-$deckId = isset($_GET['deck_id']) ? (int)$_GET['deck_id'] : null;
+$playerId = isset($_GET['player_id']) ? (string)$_GET['player_id'] : null;
+$deckId = isset($_GET['deck_id']) ? (string)$_GET['deck_id'] : null;
 
 $_totalGamesD = totalGamesDistinct();
 $_totalGamesR = totalGames();

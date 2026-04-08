@@ -78,7 +78,7 @@ export default function ListsPage() {
       setCreateOpen(false);
       setNewName('');
       setNewDesc('');
-      router.push(`/lists/detail?id=${res.list_id}`);
+      router.push(`/lists/detail?id=${encodeURIComponent(res.list_id)}`);
     } catch {
       setError('Failed to create list');
     } finally {
@@ -182,7 +182,7 @@ export default function ListsPage() {
             <Grid key={list.id} size={{ xs: 12, sm: 6, md: 4 }}>
               <Grow in timeout={600 + index * 100}>
                 <Card>
-                  <CardActionArea component="div" onClick={() => router.push(`/lists/detail?id=${list.id}`)}>
+                  <CardActionArea component="div" onClick={() => router.push(`/lists/detail?id=${encodeURIComponent(list.id)}`)}>
                     <CardContent>
                       <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -199,7 +199,7 @@ export default function ListsPage() {
                           <Tooltip title="Edit cards">
                             <IconButton
                               size="small"
-                              onClick={(e) => { e.stopPropagation(); router.push(`/lists/detail?id=${list.id}&edit=1`); }}
+                              onClick={(e) => { e.stopPropagation(); router.push(`/lists/detail?id=${encodeURIComponent(list.id)}&edit=1`); }}
                             >
                               <EditIcon fontSize="small" />
                             </IconButton>

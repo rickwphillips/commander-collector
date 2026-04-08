@@ -11,18 +11,21 @@ requireAuth();
 $method = $_SERVER['REQUEST_METHOD'];
 if ($method !== 'GET') sendError('Method not allowed', 405);
 
-$deckId = (int) ($_GET['id'] ?? 0);
-if (!$deckId) sendError('id required');
+$deckId = trim((string) ($_GET['id'] ?? ''));
+if ($deckId === '') sendError('id required');
 
 $db = getDB();
 
 $stmt = $db->prepare("
-    SELECT dc.card_name, dc.quantity, dc.is_commander, dc.is_proxy,
+    SELECT lc.card_name, lc.quantity,
+           (lc.role = 'commander') AS is_commander,
+           lc.is_proxy, lc.role,
            sc.type_line, sc.mana_cost
-    FROM deck_cards dc
-    LEFT JOIN scryfall_card_cache sc ON dc.scryfall_id = sc.scryfall_id
-    WHERE dc.deck_id = ?
-    ORDER BY dc.is_commander DESC, dc.card_name
+    FROM list_cards lc
+    JOIN lists l ON l.id = lc.list_id
+    LEFT JOIN scryfall_card_cache sc ON lc.scryfall_id = sc.scryfall_id
+    WHERE l.deck_id = ? AND l.role = 'main' AND l.deleted_at IS NULL
+    ORDER BY (lc.role = 'commander') DESC, lc.card_name
 ");
 $stmt->execute([$deckId]);
 $cards = $stmt->fetchAll();

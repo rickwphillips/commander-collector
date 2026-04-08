@@ -1,37 +1,13 @@
 <?php
-require_once 'config.php';
-require_once __DIR__ . '/auth/middleware.php';
-requireAuth();
-
-$user   = $GLOBALS['currentUser'];
-$userId = (int) $user['sub'];
-$pdo    = getDB();
-$method = $_SERVER['REQUEST_METHOD'];
-
-switch ($method) {
-    case 'GET':
-        $stmt = $pdo->prepare('SELECT state FROM scan_drafts WHERE user_id = ?');
-        $stmt->execute([$userId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        sendJSON(['state' => $row ? json_decode($row['state'], true) : null]);
-
-    case 'PUT':
-        $data  = getJSONInput();
-        $state = $data['state'] ?? null;
-        if ($state === null) sendError('Missing state', 400);
-        $json = json_encode($state);
-        $stmt = $pdo->prepare(
-            'INSERT INTO scan_drafts (user_id, state) VALUES (?, ?)
-             ON DUPLICATE KEY UPDATE state = VALUES(state), updated_at = CURRENT_TIMESTAMP'
-        );
-        $stmt->execute([$userId, $json]);
-        sendJSON(['success' => true]);
-
-    case 'DELETE':
-        $stmt = $pdo->prepare('DELETE FROM scan_drafts WHERE user_id = ?');
-        $stmt->execute([$userId]);
-        sendJSON(['success' => true]);
-
-    default:
-        sendError('Method not allowed', 405);
-}
+// DEPRECATED — replaced by buffer-draft.php (v4.8.0 unified card workflow refactor).
+// All callers have been updated. This shim returns 410 Gone so stale clients
+// surface a clear error rather than a silent 404.
+http_response_code(410);
+header('Content-Type: application/json');
+header('X-Deprecated-By: buffer-draft.php');
+echo json_encode([
+    'error'      => 'This endpoint has been removed. Use /buffer-draft instead.',
+    'moved_to'   => '/buffer-draft',
+    'deprecated' => 'v4.8.0',
+]);
+exit;

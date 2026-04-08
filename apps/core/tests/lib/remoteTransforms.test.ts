@@ -21,8 +21,8 @@ import type { GameManagerState, PlayerState, LiveGameEvent } from '@/lib/types';
 
 function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
   return {
-    playerId: 1,
-    deckId: 1,
+    playerId: 'player-alice',
+    deckId: 'deck-test-1',
     playerName: 'Alice',
     deckName: 'Test Deck',
     commander: { name: 'Atraxa' },
@@ -44,10 +44,10 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
 
 function makeState(overrides: Partial<GameManagerState> = {}): GameManagerState {
   const players: PlayerState[] = overrides.players ?? [
-    makePlayer({ position: 'bottom', playerName: 'Alice', playerId: 1 }),
-    makePlayer({ position: 'left',   playerName: 'Bob',   playerId: 2 }),
-    makePlayer({ position: 'top',    playerName: 'Carol', playerId: 3 }),
-    makePlayer({ position: 'right',  playerName: 'Dave',  playerId: 4 }),
+    makePlayer({ position: 'bottom', playerName: 'Alice', playerId: 'player-alice' }),
+    makePlayer({ position: 'left',   playerName: 'Bob',   playerId: 'player-bob' }),
+    makePlayer({ position: 'top',    playerName: 'Carol', playerId: 'player-carol' }),
+    makePlayer({ position: 'right',  playerName: 'Dave',  playerId: 'player-dave' }),
   ];
   return {
     players,
@@ -403,8 +403,8 @@ describe('applyPassTurn', () => {
       players: [
         makePlayer({ position: 'bottom' }),
         makePlayer({ position: 'left', isEliminated: true }),
-        makePlayer({ position: 'top', playerName: 'Carol', playerId: 3 }),
-        makePlayer({ position: 'right', playerName: 'Dave', playerId: 4 }),
+        makePlayer({ position: 'top', playerName: 'Carol', playerId: 'player-carol' }),
+        makePlayer({ position: 'right', playerName: 'Dave', playerId: 'player-dave' }),
       ],
     });
     const result = applyPassTurn(state);

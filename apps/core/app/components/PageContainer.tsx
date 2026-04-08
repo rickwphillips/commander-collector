@@ -86,7 +86,7 @@ export function PageContainer({
                   {title}
                 </Typography>
                 {subtitle && (
-                  <Typography variant="body1" color="text.secondary">
+                  <Typography variant="body1" color="text.secondary" component="div">
                     {subtitle}
                   </Typography>
                 )}

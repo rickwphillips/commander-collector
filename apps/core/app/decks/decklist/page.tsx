@@ -1,623 +1,225 @@
 'use client';
 
-import { useEffect, useState, Suspense, useMemo, useRef } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
   Alert,
   Box,
   Button,
-  Card,
-  CardMedia,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Grid,
+  Link as MuiLink,
   Stack,
-  Tab,
-  Tabs,
-  TextField,
-  Tooltip,
   Typography,
-  Zoom,
 } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import FlipIcon from '@mui/icons-material/SyncAlt';
-import SaveIcon from '@mui/icons-material/Save';
-import { DeckActions } from '@/components/DeckActions';
-import { CardListImport } from '@/components/CardListImport';
+import Link from 'next/link';
 import { PageContainer } from '@/components/PageContainer';
-import { DeckBreakdown } from '@/components/DeckBreakdown';
-import { DeckFilters, EMPTY_FILTERS, TYPE_CATEGORIES, getTypeCategory, hasActiveFilters, matchesFilters, sortCards } from '@/components/DeckFilters';
-import type { DeckFilterState, TypeCategory } from '@/components/DeckFilters';
-import { CardGridEditor } from '@/components/CardGridEditor';
-import type { EditableCard } from '@/components/CardGridEditor';
+import { ColorIdentityChips } from '@/components/ColorIdentityChips';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
+import { CardListToolbar } from '@/components/cards/CardListToolbar';
+import { CardListView } from '@/components/cards/CardListView';
+import { useList } from '@/lib/lists/useList';
 import { api } from '@/lib/api';
-import type { ParsedCard } from '@/lib/parseImport';
-import type { DeckDetail, DeckCard } from '@/lib/types';
+import type { Card } from '@/lib/cards/types';
+import type { DeckDetail } from '@/lib/types';
+import type { SaveDestination } from '@/components/cards/SaveToListDialog';
 
-// ── Converter ─────────────────────────────────────────────────────────────────
-
-function deckCardToEditable(c: DeckCard): EditableCard {
-  return {
-    _key:           `${c.id ?? 'new'}-${Math.random().toString(36).slice(2)}`,
-    card_name:      c.card_name,
-    scryfall_id:    c.scryfall_id,
-    image_uri:      c.image_uri      ?? null,
-    back_image_uri: c.back_image_uri ?? null,
-    type_line:      c.type_line      ?? null,
-    mana_cost:      c.mana_cost      ?? null,
-    color_identity: c.color_identity ?? '',
-    quantity:       c.quantity,
-    is_commander:   !!c.is_commander,
-    is_proxy:       !!c.is_proxy,
-  };
-}
-
-// ── Gallery card (view mode) ──────────────────────────────────────────────────
-
-function GalleryCard({ card }: { card: DeckCard }) {
-  const [flipped, setFlipped] = useState(false);
-  const isDfc = !!card.back_image_uri;
-  return (
-    <Tooltip
-      disableInteractive
-      placement="top"
-      title={
-        <Stack direction="row" spacing={0.5}>
-          <Box component="img" src={card.image_uri!} alt={card.card_name}
-            sx={{ width: 220, borderRadius: 1.5, display: 'block' }} />
-          {card.back_image_uri && (
-            <Box component="img" src={card.back_image_uri} alt={`${card.card_name} (back)`}
-              sx={{ width: 220, borderRadius: 1.5, display: 'block' }} />
-          )}
-        </Stack>
-      }
-      slotProps={{ tooltip: { sx: { bgcolor: 'transparent', p: 0, boxShadow: 8 } } }}
-    >
-      <Card sx={{ cursor: isDfc ? 'pointer' : 'default', perspective: '600px', position: 'relative' }}
-        onClick={isDfc ? () => setFlipped((f) => !f) : undefined}>
-        <Box sx={{
-          transformStyle: 'preserve-3d',
-          transition: 'transform 0.5s ease',
-          transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-          position: 'relative',
-          aspectRatio: '488/680',
-        }}>
-          <CardMedia component="img" image={card.image_uri!} alt={card.card_name}
-            sx={{ position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden' }} />
-          {card.back_image_uri && (
-            <CardMedia component="img" image={card.back_image_uri} alt={`${card.card_name} (back)`}
-              sx={{ position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }} />
-          )}
-        </Box>
-        {isDfc && (
-          <Box
-            onClick={(e) => { e.stopPropagation(); setFlipped((f) => !f); }}
-            sx={{
-              position: 'absolute', inset: 0, zIndex: 1,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              opacity: 0, transition: 'opacity 0.2s',
-              '&:hover': { opacity: 1 },
-              cursor: 'pointer',
-            }}
-          >
-            <Box sx={{
-              bgcolor: 'rgba(0,0,0,0.45)', borderRadius: '50%',
-              width: 44, height: 44,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <FlipIcon sx={{ fontSize: 26, color: '#fff' }} />
-            </Box>
-          </Box>
-        )}
-      </Card>
-    </Tooltip>
-  );
-}
-
-// ── Main component ────────────────────────────────────────────────────────────
-
-function DecklistPageInner() {
+function DeckListPageInner() {
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const deckId = Number(searchParams.get('id'));
+  const router  = useRouter();
+  const deckId  = searchParams.get('id') ?? '';
 
-  const [deck, setDeck]     = useState<DeckDetail | null>(null);
-  const [cards, setCards]   = useState<DeckCard[]>([]);
-  const [loading, setLoading] = useState(!!deckId);
-  const [error, setError]   = useState<string | null>(null);
-  const [tab, setTab]       = useState(0);
-  const [filters, setFilters] = useState<DeckFilterState>(EMPTY_FILTERS);
-
-  // ── Edit state ─────────────────────────────────────────────────────────────
-  const [editMode, setEditMode]     = useState(false);
-  const [draftCards, setDraftCards] = useState<EditableCard[]>([]);
-  const [saving, setSaving]         = useState(false);
-  const [isDirty, setIsDirty]       = useState(false);
-  const savedCardsRef               = useRef<EditableCard[]>([]);
-
-  const [refreshing, setRefreshing] = useState(false);
-
-  // Detach to List
-  const [detachOpen, setDetachOpen] = useState(false);
-  const [detachName, setDetachName] = useState('');
-  const [detaching, setDetaching]   = useState(false);
-
-  // ── Load ───────────────────────────────────────────────────────────────────
+  // ── Deck metadata (deck-native: name, commander, partner, colors) ─────────
+  const [deck,        setDeck]        = useState<DeckDetail | null>(null);
+  const [deckLoading, setDeckLoading] = useState(true);
+  const [deckError,   setDeckError]   = useState<string | null>(null);
 
   useEffect(() => {
-    if (!deckId) return;
-    (async () => {
-      try {
-        const [deckData, cardsData] = await Promise.all([
-          api.getDeck(deckId),
-          api.getDeckCards(deckId),
-        ]);
-        setDeck(deckData);
-        setCards(cardsData);
-      } catch {
-        setError('Failed to load deck');
-      } finally {
-        setLoading(false);
-      }
-    })();
+    if (!deckId) { setDeckLoading(false); return; }
+    api.getDeck(deckId)
+      .then(setDeck)
+      .catch(() => setDeckError('Deck not found.'))
+      .finally(() => setDeckLoading(false));
   }, [deckId]);
 
-  // ── Edit mode ──────────────────────────────────────────────────────────────
+  // ── List data (list-native: cards, version, role) ────────────────────────
+  const {
+    list, cards, loading: listLoading, error: listError, conflict,
+    save, addCards, detachFromDeck, refresh,
+  } = useList({ deckId });
 
-  const handleEditStart = () => {
-    const editable = cards.map(deckCardToEditable);
-    savedCardsRef.current = editable;
-    setDraftCards(editable);
-    setIsDirty(false);
-    setEditMode(true);
-  };
+  // ── Local UI state ────────────────────────────────────────────────────────
+  const [viewMode,  setViewMode]  = useState<'gallery' | 'text' | 'breakdown'>('gallery');
+  const [editMode,  setEditMode]  = useState(false);
+  const [buffer,    setBuffer]    = useState<Card[]>([]);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const handleEditCancel = () => {
-    setIsDirty(false);
-    setEditMode(false);
-  };
+  // ── Handlers ──────────────────────────────────────────────────────────────
 
-  const handleDraftChange = (updated: EditableCard[]) => {
-    setDraftCards(updated);
-    setIsDirty(true);
-  };
-
-  const handleImport = async (cards: ParsedCard[]) => {
-    // Resolve Scryfall data for imported cards
-    const scryfallMap = new Map<string, { scryfall_id: string; image_uri?: string | null; back_image_uri?: string | null; type_line?: string | null; mana_cost?: string | null; color_identity?: string | null }>();
+  // Toolbar Save — merge buffer into list
+  const handleSave = useCallback(async (_destination: SaveDestination) => {
+    if (buffer.length === 0) return;
     try {
-      const { results } = await api.bulkLookupCards(cards.map(c => c.card_name));
-      for (const r of results) {
-        if (!r.error) scryfallMap.set(r.name.toLowerCase(), r);
-      }
-    } catch { /* non-fatal */ }
-
-    // Merge: update quantity for existing cards, add new ones
-    const updated = [...draftCards];
-    for (const parsed of cards) {
-      const existing = updated.find(c => c.card_name.toLowerCase() === parsed.card_name.toLowerCase());
-      if (existing) {
-        existing.quantity += parsed.quantity;
-        if (parsed.is_commander) existing.is_commander = true;
-      } else {
-        const sf = scryfallMap.get(parsed.card_name.toLowerCase());
-        updated.push({
-          _key:           `import-${Math.random().toString(36).slice(2)}`,
-          card_name:      parsed.card_name,
-          scryfall_id:    sf?.scryfall_id ?? null,
-          image_uri:      sf?.image_uri ?? null,
-          back_image_uri: sf?.back_image_uri ?? null,
-          type_line:      sf?.type_line ?? null,
-          mana_cost:      sf?.mana_cost ?? null,
-          color_identity: sf?.color_identity ?? '',
-          quantity:       parsed.quantity,
-          is_commander:   parsed.is_commander,
-          is_proxy:       parsed.is_proxy,
-        });
-      }
-    }
-    setDraftCards(updated);
-    setIsDirty(true);
-  };
-
-  const doSave = async (exitEdit: boolean) => {
-    if (!deck) return;
-    setSaving(true);
-    try {
-      await api.saveDeckCards(deckId, draftCards.map(c => ({
-        card_name:    c.card_name,
-        scryfall_id:  c.scryfall_id,
-        quantity:     c.quantity,
-        is_commander: c.is_commander,
-        is_proxy:     c.is_proxy,
-      })));
-      const commanderCards = draftCards.filter(c => c.is_commander);
-      if (commanderCards.length >= 1 && commanderCards[0].card_name !== deck.commander) {
-        await api.updateDeck(deckId, { commander: commanderCards[0].card_name }).catch(() => {});
-      }
-      if (commanderCards.length >= 2 && commanderCards[1].card_name !== deck.partner) {
-        await api.updateDeck(deckId, { partner: commanderCards[1].card_name }).catch(() => {});
-      } else if (commanderCards.length < 2 && deck.partner) {
-        await api.updateDeck(deckId, { partner: null }).catch(() => {});
-      }
-      const [freshDeck, freshCards] = await Promise.all([
-        api.getDeck(deckId),
-        api.getDeckCards(deckId),
-      ]);
-      setDeck(freshDeck);
-      setCards(freshCards);
-      if (exitEdit) {
-        setEditMode(false);
-      } else {
-        const editable = freshCards.map(deckCardToEditable);
-        savedCardsRef.current = editable;
-        setDraftCards(editable);
-        setIsDirty(false);
-      }
-    } catch {
-      setError('Failed to save deck cards');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSave            = () => doSave(true);
-  const handleSaveAndContinue = () => doSave(false);
-
-  // ── Detach to list ─────────────────────────────────────────────────────────
-
-  const handleDetach = async () => {
-    if (!deck || !detachName.trim()) return;
-    setDetaching(true);
-    try {
-      const res = await api.detachDeckToList(deck.id, detachName.trim());
-      setCards([]);
-      setDetachOpen(false);
-      router.push(`/lists/detail?id=${res.list_id}`);
-    } catch {
-      setError('Failed to detach list');
-      setDetaching(false);
-    }
-  };
-
-  // ── Scryfall refresh ───────────────────────────────────────────────────────
-
-  const handleRefreshViewCards = async () => {
-    setRefreshing(true);
-    try {
-      const { results } = await api.bulkLookupCards(cards.map(c => c.card_name));
-      const hit = new Map(results.filter(r => !r.error).map(r => [r.name.toLowerCase(), r]));
-      await api.saveDeckCards(deckId, cards.map(c => ({
-        card_name:    c.card_name,
-        scryfall_id:  hit.get(c.card_name.toLowerCase())?.scryfall_id ?? c.scryfall_id,
-        quantity:     c.quantity,
-        is_commander: !!c.is_commander,
-        is_proxy:     !!c.is_proxy,
-      })));
-      setCards(await api.getDeckCards(deckId));
-    } catch {
-      setError('Failed to refresh card data');
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  const handleRefreshDraftCards = async () => {
-    setRefreshing(true);
-    try {
-      const { results } = await api.bulkLookupCards(draftCards.map(c => c.card_name));
-      const hit = new Map(results.filter(r => !r.error).map(r => [r.name.toLowerCase(), r]));
-      setDraftCards(prev => prev.map(c => {
-        const found = hit.get(c.card_name.toLowerCase());
-        if (!found) return c;
-        return { ...c, scryfall_id: found.scryfall_id, image_uri: found.image_uri, back_image_uri: found.back_image_uri ?? null, type_line: found.type_line, mana_cost: found.mana_cost, color_identity: found.color_identity, notFound: false };
-      }));
-      setIsDirty(true);
-    } catch {
-      setError('Failed to refresh card data');
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  // ── Exports ────────────────────────────────────────────────────────────────
-
-  const [ttsBusy, setTtsBusy] = useState(false);
-
-  const handleExportTCGPlayer = () => {
-    if (!deck || cards.length === 0) return;
-    const blob = new Blob([cards.map(c => `${c.quantity} ${c.card_name}`).join('\n')], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${deck.name.replace(/[^a-z0-9]/gi, '_')}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleExportTTS = async () => {
-    if (!deck || cards.length === 0 || ttsBusy) return;
-    setTtsBusy(true);
-    try {
-      const ttsData = await api.exportTTS({ deckId });
-      const blob = new Blob([JSON.stringify(ttsData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${deck.name.replace(/[^a-z0-9]/gi, '_')}_TTS.json`;
-      a.click();
-      URL.revokeObjectURL(url);
+      await addCards(buffer);
+      setBuffer([]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'TTS export failed');
-    } finally {
-      setTtsBusy(false);
+      setSaveError(err instanceof Error ? err.message : 'Save failed');
     }
-  };
+  }, [buffer, addCards]);
 
-  // ── View mode derived data ─────────────────────────────────────────────────
-
-  const commanderCard = useMemo(() => cards.find(c => c.is_commander), [cards]);
-
-  const galleryCards = useMemo(() =>
-    cards.flatMap(c => Array.from({ length: c.quantity }, (_, i) => ({ ...c, _key: `${c.id}-${i}` } as DeckCard & { _key: string }))),
-    [cards]
-  );
-  const cardsWithImages    = useMemo(() => galleryCards.filter(c => c.image_uri), [galleryCards]);
-  const cardsWithoutImages = useMemo(() => galleryCards.filter(c => !c.image_uri), [galleryCards]);
-  const filteredGallery    = useMemo(() => sortCards(cardsWithImages.filter(c => matchesFilters(c, filters)), filters.sortOrder, filters.sortDirection), [cardsWithImages, filters]);
-  const filteredBreakdown  = useMemo(() => sortCards(cards.filter(c => matchesFilters(c, filters)), filters.sortOrder, filters.sortDirection), [cards, filters]);
-  const active             = hasActiveFilters(filters);
-
-  // Gallery grouped by type (only when filters active)
-  const galleryByType = useMemo(() => {
-    if (!active) return null;
-    const groups: Partial<Record<TypeCategory | 'Other', DeckCard[]>> = {};
-    for (const card of filteredGallery) {
-      const cat = getTypeCategory(card.type_line);
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat]!.push(card);
+  // Toolbar Clear — wipe the list
+  const handleClear = useCallback(async () => {
+    try {
+      await save([]);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Clear failed');
     }
-    const order: (TypeCategory | 'Other')[] = [...TYPE_CATEGORIES, 'Other'];
-    return order.filter(t => groups[t]?.length).map(t => ({ type: t, cards: groups[t]! }));
-  }, [filteredGallery, active]);
+  }, [save]);
+
+  // Toolbar Detach — unlink list from deck, navigate away
+  const handleDetach = useCallback(async () => {
+    await detachFromDeck();
+    await refresh();
+    router.push('/decks');
+  }, [detachFromDeck, refresh, router]);
+
+  // CardListView onChange — called on every in-editor mutation; save immediately
+  const handleCardsChange = useCallback(async (updated: Card[]) => {
+    try {
+      await save(updated);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Auto-save failed');
+    }
+  }, [save]);
+
+  // Conflict resolution
+  const handleConflictResolve = useCallback((choice: 'accept-server' | 'keep-local') => {
+    if (choice === 'accept-server') refresh();
+  }, [refresh]);
 
   // ── Guards ────────────────────────────────────────────────────────────────
 
+  const loading = deckLoading || listLoading;
+
   if (!deckId) {
     return (
-      <PageContainer title="Decklist" backHref="/decks" backLabel="Back to Decks">
+      <PageContainer title="Deck Card List" backHref="/decks" backLabel="Back to Decks">
         <Typography>No deck ID provided.</Typography>
       </PageContainer>
     );
   }
+
   if (loading) {
     return (
-      <PageContainer title="Decklist" backHref="/decks" backLabel="Back to Decks">
+      <PageContainer title="Deck Card List" backHref="/decks" backLabel="Back to Decks">
         <Stack alignItems="center" py={8}><CircularProgress size={48} /></Stack>
       </PageContainer>
     );
   }
-  if (!deck) {
+
+  if (deckError || !deck) {
     return (
-      <PageContainer title="Decklist" backHref="/decks" backLabel="Back to Decks">
-        <Typography>Deck not found.</Typography>
+      <PageContainer title="Deck Not Found" backHref="/decks" backLabel="Back to Decks">
+        <Alert severity="error" sx={{ mb: 2 }}>{deckError ?? 'Deck not found.'}</Alert>
+        <Button component={Link} href="/decks" variant="outlined">Back to Decks</Button>
       </PageContainer>
     );
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  const deckContext = { id: deckId, name: deck.name };
+
   return (
     <PageContainer
-      title={editMode ? `Editing: ${deck.name}` : deck.name}
-      subtitle={editMode
-        ? undefined
-        : <>
-            Commander: <CardTooltip name={deck.commander} style={{ borderBottom: '1px dotted currentColor' }}>{deck.commander}</CardTooltip>
+      title={deck.name}
+      subtitle={
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+          <Typography variant="body2" color="text.secondary" component="span">
+            Commander:{' '}
+            <CardTooltip name={deck.commander} style={{ borderBottom: '1px dotted currentColor' }}>
+              {deck.commander}
+            </CardTooltip>
             {deck.partner && (
-              <> + <CardTooltip name={deck.partner} style={{ borderBottom: '1px dotted currentColor' }}>{deck.partner}</CardTooltip></>
+              <>
+                {' + '}
+                <CardTooltip name={deck.partner} style={{ borderBottom: '1px dotted currentColor' }}>
+                  {deck.partner}
+                </CardTooltip>
+              </>
             )}
-          </>
+          </Typography>
+          <ColorIdentityChips colors={deck.colors} size="small" />
+        </Stack>
       }
       backHref={`/decks/detail?id=${deckId}`}
       backLabel="Back to Deck"
-      actions={
-        editMode ? (
-          <DeckActions
-            onCancel={handleEditCancel}
-            onRefresh={handleRefreshDraftCards}
-            onSaveAndContinue={handleSaveAndContinue}
-            onSave={handleSave}
-            saving={saving}
-            refreshing={refreshing}
-          />
-        ) : cards.length > 0 ? (
-          <DeckActions
-            onExport={handleExportTCGPlayer}
-            onTTS={handleExportTTS}
-            ttsBusy={ttsBusy}
-            onRefresh={handleRefreshViewCards}
-            onEdit={handleEditStart}
-            editLabel="Edit Cards"
-            onDetach={() => { setDetachName(deck.name + ' List'); setDetachOpen(true); }}
-            hasCards
-            refreshing={refreshing}
-          />
-        ) : undefined
-      }
     >
-      {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
-
-      {/* Detach to List Dialog */}
-      <Dialog open={detachOpen} onClose={() => setDetachOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Save as Standalone List</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            All cards will be removed from this deck and saved as a standalone list.
-          </Typography>
-          <TextField
-            label="List Name"
-            fullWidth
-            size="small"
-            autoFocus
-            value={detachName}
-            onChange={(e) => setDetachName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleDetach(); }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDetachOpen(false)}>Cancel</Button>
-          <Button variant="contained" disabled={!detachName.trim() || detaching} onClick={handleDetach}>
-            Save &amp; Remove
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* ── Edit Mode ──────────────────────────────────────────────────────── */}
-      {editMode ? (
-        <>
-          <Accordion disableGutters elevation={0} sx={{ mb: 3, border: '1px solid', borderColor: 'divider', borderRadius: 1, '&:before': { display: 'none' } }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle2">Import Card List</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <CardListImport onImport={handleImport} />
-            </AccordionDetails>
-          </Accordion>
-          <CardGridEditor cards={draftCards} onChange={handleDraftChange} />
-          <Zoom in={isDirty && !saving}>
-            <Box sx={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 1100 }}>
-              <Button
-                variant="contained"
-                color="success"
-                startIcon={<SaveIcon />}
-                onClick={handleSaveAndContinue}
-                disabled={saving}
-                sx={{ borderRadius: 3, px: 3, boxShadow: 6 }}
-              >
-                Save
-              </Button>
-            </Box>
-          </Zoom>
-        </>
-      ) : (
-        /* ── View Mode ─────────────────────────────────────────────────────── */
-        <>
-          {/* Commander hero */}
-          {commanderCard?.image_uri && (
-            <Box sx={{ display: 'flex', flexDirection: 'row', gap: 3, mb: 3, alignItems: 'flex-start' }}>
-              <Box sx={{ flexShrink: 0, width: { xs: 90, sm: 110, md: 130 } }}>
-                <Box
-                  component="img"
-                  src={commanderCard.image_uri}
-                  alt={commanderCard.card_name}
-                  sx={{ width: '100%', borderRadius: 2, display: 'block', boxShadow: 4 }}
-                />
-              </Box>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="h5" fontWeight={700} sx={{ mb: 0.5 }}>
-                  {deck.name}
-                </Typography>
-                <Typography variant="body1" color="text.secondary">
-                  Commander:{' '}
-                  <CardTooltip name={deck.commander} style={{ borderBottom: '1px dotted currentColor' }}>
-                    {deck.commander}
-                  </CardTooltip>
-                </Typography>
-              </Box>
-            </Box>
-          )}
-
-          <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
-            <Tab label="Breakdown" />
-            <Tab label={`Gallery (${cardsWithImages.length})`} />
-          </Tabs>
-
-          {/* Shared filter bar */}
-          <DeckFilters
-            filters={filters}
-            onChange={setFilters}
-            cards={tab === 0 ? cards : cardsWithImages}
-            resultCount={tab === 0 ? filteredBreakdown.length : filteredGallery.length}
-            totalCount={tab === 0 ? cards.length : cardsWithImages.length}
-          />
-
-          {tab === 0 && (
-            <DeckBreakdown cards={active ? filteredBreakdown : cards} showList sortOrder={filters.sortOrder} sortDirection={filters.sortDirection} />
-          )}
-
-          {tab === 1 && (
-            <>
-              {galleryByType ? (
-                galleryByType.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 4, textAlign: 'center' }}>
-                    No cards match the current filters.
-                  </Typography>
-                ) : (
-                  <Stack spacing={3}>
-                    {galleryByType.map(({ type, cards: group }) => (
-                      <Box key={type}>
-                        <Typography variant="subtitle2" color="text.secondary"
-                          sx={{ mb: 1, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: 1 }}>
-                          {type} ({group.length})
-                        </Typography>
-                        <Grid container spacing={1}>
-                          {group.map((card, i) => (
-                            <Grid key={`${card.card_name}-${i}`} size={{ xs: 4, sm: 3, md: 2 }}>
-                              <GalleryCard card={card} />
-                            </Grid>
-                          ))}
-                        </Grid>
-                      </Box>
-                    ))}
-                  </Stack>
-                )
-              ) : (
-                <Grid container spacing={1}>
-                  {filteredGallery.map((card, i) => (
-                    <Grid key={`${card.card_name}-${i}`} size={{ xs: 4, sm: 3, md: 2 }}>
-                      <GalleryCard card={card} />
-                    </Grid>
-                  ))}
-                </Grid>
-              )}
-
-              {cardsWithoutImages.length > 0 && (
-                <Box sx={{ mt: 3 }}>
-                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                    No image available ({cardsWithoutImages.length})
-                  </Typography>
-                  <Stack spacing={0.5}>
-                    {cardsWithoutImages.map((card, i) => (
-                      <Typography key={`${card.card_name}-${i}`} variant="body2">
-                        {card.quantity > 1 ? `${card.quantity}× ` : ''}
-                        <CardTooltip name={card.card_name} style={{ borderBottom: '1px dotted currentColor' }}>
-                          {card.card_name}
-                        </CardTooltip>
-                      </Typography>
-                    ))}
-                  </Stack>
-                </Box>
-              )}
-            </>
-          )}
-        </>
+      {/* Errors */}
+      {(listError || saveError) && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setSaveError(null)}>
+          {listError ?? saveError}
+        </Alert>
       )}
+
+      {/* Empty-state when deck has no list yet */}
+      {!list && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          This deck has no cards yet. Click <strong>Add</strong> in the toolbar to start.
+        </Alert>
+      )}
+
+      {/* Toolbar — add, view/edit mode, undo/redo, save, clear, detach */}
+      <CardListToolbar
+        buffer={buffer}
+        onBufferChange={setBuffer}
+        format={list?.format}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        editMode={editMode}
+        onEditModeChange={setEditMode}
+        canUndo={false}
+        canRedo={false}
+        onUndo={() => {}}
+        onRedo={() => {}}
+        onSave={handleSave}
+        onClear={handleClear}
+        listId={list?.id}
+        deckContext={deckContext}
+        onDetachFromDeck={handleDetach}
+      />
+
+      {/* Card list */}
+      <Box sx={{ mt: 2 }}>
+        <CardListView
+          cards={cards}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          editMode={editMode}
+          onChange={handleCardsChange}
+          conflict={conflict ? { serverCards: cards } : null}
+          onConflictResolve={handleConflictResolve}
+          deckContext={deckContext}
+        />
+      </Box>
+
+      {/* Back link */}
+      <Box sx={{ mt: 3 }}>
+        <MuiLink component={Link} href={`/decks/detail?id=${deckId}`} variant="body2" color="text.secondary">
+          Back to deck profile
+        </MuiLink>
+      </Box>
     </PageContainer>
   );
 }
 
-export default function DecklistPage() {
+export default function DeckListPage() {
   return (
-    <Suspense>
-      <DecklistPageInner />
+    <Suspense fallback={
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+        <CircularProgress />
+      </Box>
+    }>
+      <DeckListPageInner />
     </Suspense>
   );
 }

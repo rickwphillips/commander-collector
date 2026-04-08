@@ -126,7 +126,7 @@ describe('api methods', () => {
   it('api.getPlayerStats(id) includes player_id in query string', async () => {
     const fetchMock = mockFetch(200, {});
     vi.stubGlobal('fetch', fetchMock);
-    await api.getPlayerStats(5);
+    await api.getPlayerStats('5');
     const [url] = fetchMock.mock.calls[0];
     expect(url).toContain('stats.php?player_id=5');
   });
@@ -134,7 +134,7 @@ describe('api methods', () => {
   it('api.getHeadToHead(p1, p2) includes both player params', async () => {
     const fetchMock = mockFetch(200, {});
     vi.stubGlobal('fetch', fetchMock);
-    await api.getHeadToHead(1, 2);
+    await api.getHeadToHead('1', '2');
     const [url] = fetchMock.mock.calls[0];
     expect(url).toContain('player1=1');
     expect(url).toContain('player2=2');
@@ -156,7 +156,7 @@ describe('api — players CRUD', () => {
 
   it('api.getPlayer(id) includes id param', async () => {
     vi.stubGlobal('fetch', mockFetch(200, {}));
-    await api.getPlayer(3);
+    await api.getPlayer('3');
     const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toContain('players.php?id=3');
   });
@@ -172,7 +172,7 @@ describe('api — players CRUD', () => {
 
   it('api.updatePlayer(id, data) PUTs', async () => {
     vi.stubGlobal('fetch', mockFetch(200, { success: true }));
-    await api.updatePlayer(2, { name: 'Bob' });
+    await api.updatePlayer('2', { name: 'Bob' });
     const [url, opts] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toContain('players.php?id=2');
     expect(opts.method).toBe('PUT');
@@ -180,7 +180,7 @@ describe('api — players CRUD', () => {
 
   it('api.deletePlayer(id) DELETEs', async () => {
     vi.stubGlobal('fetch', mockFetch(200, { success: true }));
-    await api.deletePlayer(4);
+    await api.deletePlayer('4');
     const [url, opts] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toContain('players.php?id=4');
     expect(opts.method).toBe('DELETE');
@@ -193,21 +193,21 @@ describe('api — decks CRUD', () => {
 
   it('api.getDeck(id) includes id param', async () => {
     vi.stubGlobal('fetch', mockFetch(200, {}));
-    await api.getDeck(7);
+    await api.getDeck('7');
     const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toContain('decks.php?id=7');
   });
 
   it('api.getDecksByPlayer(playerId) includes player_id param', async () => {
     vi.stubGlobal('fetch', mockFetch(200, []));
-    await api.getDecksByPlayer(2);
+    await api.getDecksByPlayer('2');
     const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toContain('decks.php?player_id=2');
   });
 
   it('api.createDeck(data) POSTs', async () => {
     vi.stubGlobal('fetch', mockFetch(200, {}));
-    await api.createDeck({ player_id: 1, name: 'My Deck', commander: 'Atraxa', colors: 'WUBG' });
+    await api.createDeck({ player_id: '1', name: 'My Deck', commander: 'Atraxa', colors: 'WUBG' });
     const [url, opts] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toContain('decks.php');
     expect(opts.method).toBe('POST');
@@ -215,7 +215,7 @@ describe('api — decks CRUD', () => {
 
   it('api.updateDeck(id, data) PUTs', async () => {
     vi.stubGlobal('fetch', mockFetch(200, { success: true }));
-    await api.updateDeck(3, { name: 'Updated' });
+    await api.updateDeck('3', { name: 'Updated' });
     const [url, opts] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toContain('decks.php?id=3');
     expect(opts.method).toBe('PUT');
@@ -223,7 +223,7 @@ describe('api — decks CRUD', () => {
 
   it('api.deleteDeck(id) DELETEs', async () => {
     vi.stubGlobal('fetch', mockFetch(200, { success: true }));
-    await api.deleteDeck(5);
+    await api.deleteDeck('5');
     const [url, opts] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toContain('decks.php?id=5');
     expect(opts.method).toBe('DELETE');
@@ -243,14 +243,14 @@ describe('api — games CRUD', () => {
 
   it('api.getGame(id) includes id param', async () => {
     vi.stubGlobal('fetch', mockFetch(200, {}));
-    await api.getGame(10);
+    await api.getGame('10');
     const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toContain('games.php?id=10');
   });
 
   it('api.updateGame(id, data) PUTs', async () => {
     vi.stubGlobal('fetch', mockFetch(200, { success: true }));
-    await api.updateGame(5, { played_at: '2026-01-01' });
+    await api.updateGame('5', { played_at: '2026-01-01' });
     const [url, opts] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toContain('games.php?id=5');
     expect(opts.method).toBe('PUT');
@@ -258,7 +258,7 @@ describe('api — games CRUD', () => {
 
   it('api.deleteGame(id) DELETEs', async () => {
     vi.stubGlobal('fetch', mockFetch(200, { success: true }));
-    await api.deleteGame(6);
+    await api.deleteGame('6');
     const [url, opts] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toContain('games.php?id=6');
     expect(opts.method).toBe('DELETE');
@@ -278,7 +278,7 @@ describe('api — stats', () => {
 
   it('api.getDeckStats(id) includes deck_id param', async () => {
     vi.stubGlobal('fetch', mockFetch(200, {}));
-    await api.getDeckStats(9);
+    await api.getDeckStats('9');
     const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toContain('stats.php?deck_id=9');
   });
@@ -304,7 +304,7 @@ describe('api — stat panels', () => {
 
   it('api.getStatPanel(id) includes id param', async () => {
     vi.stubGlobal('fetch', mockFetch(200, {}));
-    await api.getStatPanel(2);
+    await api.getStatPanel('2');
     const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toContain('stat-panels.php?id=2');
   });
@@ -326,7 +326,7 @@ describe('api — stat panels', () => {
 
   it('api.updateStatPanel(id, data) PUTs', async () => {
     vi.stubGlobal('fetch', mockFetch(200, {}));
-    await api.updateStatPanel(1, { name: 'Updated' });
+    await api.updateStatPanel('1', { name: 'Updated' });
     const [url, opts] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toContain('stat-panels.php?id=1');
     expect(opts.method).toBe('PUT');
@@ -334,7 +334,7 @@ describe('api — stat panels', () => {
 
   it('api.deleteStatPanel(id) DELETEs', async () => {
     vi.stubGlobal('fetch', mockFetch(200, { success: true }));
-    await api.deleteStatPanel(3);
+    await api.deleteStatPanel('3');
     const [url, opts] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toContain('stat-panels.php?id=3');
     expect(opts.method).toBe('DELETE');
@@ -413,7 +413,7 @@ describe('buildComparisonParams via api.getComparison', () => {
       groupBy: 'player',
       metrics: ['win_rate'],
       conditions: {
-        required_player_ids: [1, 2],
+        required_player_ids: ['1', '2'],
         required_commanders: ['Atraxa'],
         must_include_colors: ['W', 'U'],
       },
@@ -433,8 +433,8 @@ describe('buildComparisonParams via api.getComparison', () => {
       metrics: ['win_rate'],
       conditions: {},
       entityFilter: {
-        player_ids: [3],
-        deck_ids: [5, 6],
+        player_ids: ['3'],
+        deck_ids: ['5', '6'],
         commanders: ['Ur-Dragon'],
         colors: ['R'],
       },

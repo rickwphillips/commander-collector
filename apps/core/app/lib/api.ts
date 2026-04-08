@@ -1,6 +1,9 @@
 // API base URL - works for both dev (proxied via Next.js rewrites) and production
 export const API_BASE = '/php-api/';
 
+import { fromApiCard } from './cards/types';
+import type { ApiCardRow } from './cards/types';
+
 // Asset base path — Next.js basePath is NOT auto-prepended to src="" attributes
 // Must be prepended manually for any public/ assets referenced in code
 const isDev = process.env.NODE_ENV === 'development';
@@ -24,6 +27,21 @@ function redirectToLogin() {
   localStorage.removeItem(AUTH_TOKEN_KEY);
   const currentUrl = window.location.href;
   window.location.href = `${LOGIN_URL}?redirect=${encodeURIComponent(currentUrl)}`;
+}
+
+// Stable per-device identifier stored in localStorage.
+// Used as part of the composite key for buffer_drafts so that drafts are
+// scoped to the originating device even when the same user is logged in elsewhere.
+const DEVICE_ID_KEY = 'commander_device_id';
+
+export function getDeviceId(): string {
+  if (typeof window === 'undefined') return 'ssr';
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(DEVICE_ID_KEY, id);
+  }
+  return id;
 }
 
 // Helper for API calls
@@ -66,51 +84,51 @@ export async function apiFetch<T>(endpoint: string, options?: RequestInit): Prom
 export const api = {
   // Players
   getPlayers: () => apiFetch<import('./types').Player[]>('/players'),
-  getPlayer: (id: number) => apiFetch<import('./types').Player>(`/players?id=${id}`),
+  getPlayer: (id: string) => apiFetch<import('./types').Player>(`/players?id=${id}`),
   createPlayer: (data: import('./types').CreatePlayerInput) =>
     apiFetch<import('./types').Player>('/players', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   updatePlayer: (
-    id: number,
-    data: Partial<import('./types').CreatePlayerInput> & { user_id?: number | null }
+    id: string,
+    data: Partial<import('./types').CreatePlayerInput> & { user_id?: string | null }
   ) =>
     apiFetch<{ success: boolean }>(`/players?id=${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
-  deletePlayer: (id: number) =>
+  deletePlayer: (id: string) =>
     apiFetch<{ success: boolean }>(`/players?id=${id}`, { method: 'DELETE' }),
 
   // Decks
   getDecks: () => apiFetch<import('./types').DeckWithPlayer[]>('/decks'),
-  getDeck: (id: number) => apiFetch<import('./types').DeckDetail>(`/decks?id=${id}`),
-  getDecksByPlayer: (playerId: number) =>
+  getDeck: (id: string) => apiFetch<import('./types').DeckDetail>(`/decks?id=${id}`),
+  getDecksByPlayer: (playerId: string) =>
     apiFetch<import('./types').Deck[]>(`/decks?player_id=${playerId}`),
   createDeck: (data: import('./types').CreateDeckInput) =>
     apiFetch<import('./types').Deck>('/decks', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  updateDeck: (id: number, data: Partial<import('./types').CreateDeckInput>) =>
+  updateDeck: (id: string, data: Partial<import('./types').CreateDeckInput>) =>
     apiFetch<{ success: boolean }>(`/decks?id=${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
-  deleteDeck: (id: number) =>
+  deleteDeck: (id: string) =>
     apiFetch<{ success: boolean }>(`/decks?id=${id}`, { method: 'DELETE' }),
 
   // Games
   getGames: () => apiFetch<import('./types').GameWithResults[]>('/games'),
-  getGame: (id: number) => apiFetch<import('./types').GameWithResults>(`/games?id=${id}`),
+  getGame: (id: string) => apiFetch<import('./types').GameWithResults>(`/games?id=${id}`),
   createGame: (data: import('./types').CreateGameInput) =>
-    apiFetch<{ id: number }>('/games', {
+    apiFetch<{ id: string }>('/games', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   updateGame: (
-    id: number,
+    id: string,
     data: Partial<import('./types').CreateGameInput> & {
       played_at?: string;
       notes?: string | null;
@@ -120,14 +138,14 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
-  deleteGame: (id: number) =>
+  deleteGame: (id: string) =>
     apiFetch<{ success: boolean }>(`/games?id=${id}`, { method: 'DELETE' }),
 
   // Stats
   getStats: () => apiFetch<import('./types').StatsResponse>('/stats'),
-  getPlayerStats: (id: number) => apiFetch<import('./types').PlayerStats>(`/stats?player_id=${id}`),
-  getDeckStats: (id: number) => apiFetch<import('./types').DeckStats>(`/stats?deck_id=${id}`),
-  getHeadToHead: (player1Id?: number, player2Id?: number) => {
+  getPlayerStats: (id: string) => apiFetch<import('./types').PlayerStats>(`/stats?player_id=${id}`),
+  getDeckStats: (id: string) => apiFetch<import('./types').DeckStats>(`/stats?deck_id=${id}`),
+  getHeadToHead: (player1Id?: string, player2Id?: string) => {
     const params = player1Id && player2Id ? `?player1=${player1Id}&player2=${player2Id}` : '';
     return apiFetch<import('./types').HeadToHeadResponse>(`/head-to-head${params}`);
   },
@@ -137,7 +155,7 @@ export const api = {
 
   // Stat Panels
   getStatPanels: () => apiFetch<import('./types').StatPanelsResponse>('/stat-panels'),
-  getStatPanel: (id: number) => apiFetch<import('./types').StatPanel>(`/stat-panels?id=${id}`),
+  getStatPanel: (id: string) => apiFetch<import('./types').StatPanel>(`/stat-panels?id=${id}`),
   getStatPanelByCode: (code: string) =>
     apiFetch<import('./types').StatPanel>(`/stat-panels?share_code=${code}`),
   createStatPanel: (data: import('./types').CreateStatPanelInput) =>
@@ -145,12 +163,12 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  updateStatPanel: (id: number, data: import('./types').UpdateStatPanelInput) =>
+  updateStatPanel: (id: string, data: import('./types').UpdateStatPanelInput) =>
     apiFetch<import('./types').StatPanel>(`/stat-panels?id=${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
-  deleteStatPanel: (id: number) =>
+  deleteStatPanel: (id: string) =>
     apiFetch<{ success: boolean }>(`/stat-panels?id=${id}`, { method: 'DELETE' }),
 
   // Live Game Sessions (no auth — seat code is the credential)
@@ -189,48 +207,171 @@ export const api = {
     }>('/active-game'),
 
   // Deck Cards (card list for a deck)
-  getDeckCards: (deckId: number) =>
-    apiFetch<import('./types').DeckCard[]>(`/deck-cards?deck_id=${deckId}`),
-  getDeckProfile: (deckId: number) =>
+  // Phase 5: deck-cards.php is now a 410 Gone shim. This wrapper routes through
+  // lists.php?deck_id=&role=main, which returns the deck's main list with cards.
+  // The shape is adapted back to DeckCard[] for backwards compat with legacy callers.
+  getDeckCards: async (deckId: string): Promise<import('./types').DeckCard[]> => {
+    try {
+      const detail = await apiFetch<{ id: string; cards: ApiCardRow[] }>(
+        `/lists?deck_id=${encodeURIComponent(deckId)}&role=main`
+      );
+      const rows = detail.cards ?? [];
+      // Stamp deck_id onto each card so legacy callers that read row.deck_id still work.
+      return rows.map((r) => ({ ...fromApiCard(r), deck_id: deckId })) as unknown as import('./types').DeckCard[];
+    } catch (err) {
+      // 404 = deck has no main list yet (valid empty state). Return [].
+      if (err instanceof Error && err.message.toLowerCase().includes('not found')) return [];
+      throw err;
+    }
+  },
+  getDeckProfile: (deckId: string) =>
     apiFetch<import('./types').DeckProfile>(`/deck-profile?id=${deckId}`),
-  saveDeckCards: (deckId: number, cards: import('./types').CreateDeckCardInput[]) =>
-    apiFetch<{ success: boolean; deck_id: number }>('/deck-cards', {
-      method: 'POST',
-      body: JSON.stringify({ deck_id: deckId, cards }),
-    }),
-  deleteDeckCards: (deckId: number) =>
-    apiFetch<{ success: boolean }>(`/deck-cards?deck_id=${deckId}`, { method: 'DELETE' }),
+  // Phase 5 reroute: deck-cards.php is a 410 Gone shim. saveDeckCards finds the
+  // deck's role='main' list and replaces its cards. If the deck has no main list
+  // (e.g., a freshly-created deck from the new-deck save flow), creates one and
+  // attaches it to the deck before saving. This preserves the legacy contract
+  // where saveDeckCards "just works" against any deck id.
+  saveDeckCards: async (deckId: string, cards: import('./types').CreateDeckCardInput[]): Promise<{ success: boolean; deck_id: string }> => {
+    let listId: string;
+    try {
+      const list = await apiFetch<{ id: string }>(`/lists?deck_id=${encodeURIComponent(deckId)}&role=main`);
+      listId = list.id;
+    } catch (err) {
+      if (!(err instanceof Error && err.message.toLowerCase().includes('not found'))) throw err;
+      const created = await apiFetch<{ success: boolean; list_id: string }>('/lists', {
+        method: 'POST',
+        body: JSON.stringify({ name: 'Main', format: 'commander', role: 'main' }),
+      });
+      listId = created.list_id;
+      await apiFetch<{ success: boolean }>('/lists?action=attach_deck', {
+        method: 'POST',
+        body: JSON.stringify({ list_id: listId, deck_id: deckId }),
+      });
+    }
+    await apiFetch<{ success: boolean }>(`/lists?id=${encodeURIComponent(listId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ cards }),
+    });
+    return { success: true, deck_id: deckId };
+  },
+  // Phase 5 reroute: deck-cards.php is a 410 Gone shim. deleteDeckCards now:
+  //   Finds the deck's role='main' list and clears its cards via PATCH /lists?id={ cards: [] }.
+  //   The list stays attached to the deck — clearing cards in the deck context should
+  //   leave the deck empty without spawning an orphan list in /lists.
+  //   If the deck has no main list, the call is a no-op.
+  deleteDeckCards: async (deckId: string): Promise<{ success: boolean }> => {
+    let listId: string;
+    try {
+      const list = await apiFetch<{ id: string }>(`/lists?deck_id=${encodeURIComponent(deckId)}&role=main`);
+      listId = list.id;
+    } catch (err) {
+      if (err instanceof Error && err.message.toLowerCase().includes('not found')) {
+        return { success: true };
+      }
+      throw err;
+    }
+    return apiFetch<{ success: boolean }>(`/lists?id=${encodeURIComponent(listId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ cards: [] }),
+    });
+  },
 
   // Card Lists
   getLists: () => apiFetch<import('./types').CardList[]>('/lists'),
-  getList: (id: number) => apiFetch<import('./types').CardListDetail>(`/lists?id=${id}`),
+  getList: async (id: string): Promise<import('./types').CardListDetail> => {
+    // TODO Phase 1: return a Card[]-based detail type and remove the cast once call sites migrate.
+    // ListCard.is_commander is number; Card.is_commander is boolean — structurally incompatible.
+    // fromApiCard is the one place where 0|1 → boolean conversion happens for list cards.
+    const detail = await apiFetch<import('./types').CardListDetail & { cards: ApiCardRow[] }>(`/lists?id=${id}`);
+    return {
+      ...detail,
+      cards: detail.cards.map(fromApiCard) as unknown as import('./types').ListCard[],
+    };
+  },
   createList: (name: string, description?: string, cards?: import('./types').CreateDeckCardInput[]) =>
-    apiFetch<{ success: boolean; list_id: number }>('/lists', {
+    apiFetch<{ success: boolean; list_id: string }>('/lists', {
       method: 'POST',
       body: JSON.stringify({ name, description, cards }),
     }),
-  updateList: (id: number, patch: { name?: string; description?: string; cards?: import('./types').CreateDeckCardInput[] }) =>
+  updateList: (id: string, patch: { name?: string; description?: string; cards?: import('./types').CreateDeckCardInput[] }) =>
     apiFetch<{ success: boolean }>(`/lists?id=${id}`, {
       method: 'PATCH',
       body: JSON.stringify(patch),
     }),
-  deleteList: (id: number) =>
+  deleteList: (id: string) =>
     apiFetch<{ success: boolean }>(`/lists?id=${id}`, { method: 'DELETE' }),
-  detachDeckToList: (deckId: number, name: string) =>
-    apiFetch<{ success: boolean; list_id: number }>('/lists?action=detach_deck', {
+  detachDeckToList: (deckId: string, name: string) =>
+    apiFetch<{ success: boolean; list_id: string }>('/lists?action=detach_deck', {
       method: 'POST',
       body: JSON.stringify({ deck_id: deckId, name }),
     }),
-  attachListToDeck: (listId: number, deckId: number) =>
+  attachListToDeck: (listId: string, deckId: string) =>
     apiFetch<{ success: boolean }>('/lists?action=attach_deck', {
       method: 'POST',
       body: JSON.stringify({ list_id: listId, deck_id: deckId }),
     }),
-  auditListImages: (listId: number) =>
-    apiFetch<{ updated: import('./types').ListCard[] }>('/list-audit', {
+
+  // Lists v2 — deck-aware (UUID-keyed, post-v4.7.0 schema)
+  // These methods complement the existing integer-keyed list methods above and
+  // are used by the useList hook introduced in Phase 2.2 Step 3.
+
+  /**
+   * Load the deck's role='main' list with its cards.
+   * Returns a CardListDetail-shaped object with Card[] (boolean flags already converted).
+   * If the endpoint doesn't support the deck_id+role query, the caller (useList) falls
+   * back to /decks?id=<uuid> to get the main_list_id, then calls getList.
+   */
+  getListByDeckId: async (deckId: string): Promise<import('./types').CardListDetail & { deck_id: string | null; role: string | null; version: number }> => {
+    const detail = await apiFetch<import('./types').CardListDetail & { deck_id: string | null; role: string | null; version: number; cards: ApiCardRow[] }>(
+      `/lists?deck_id=${encodeURIComponent(deckId)}&role=main`
+    );
+    return {
+      ...detail,
+      cards: detail.cards.map(fromApiCard) as unknown as import('./types').ListCard[],
+    };
+  },
+
+  /**
+   * Atomically replace a list's cards (POST /lists?id=<uuid>).
+   * Passes `version` for optimistic concurrency control — server returns 409 on mismatch.
+   * Returns the new server-assigned version number on success.
+   */
+  saveListCards: (listId: string, cards: import('./types').CreateListCardInput[], version: number): Promise<{ success: boolean; version: number }> =>
+    apiFetch<{ success: boolean; version: number }>(`/lists?id=${encodeURIComponent(listId)}`, {
+      method: 'POST',
+      body: JSON.stringify({ cards, version }),
+    }),
+
+  /**
+   * Attach a list to a deck (UUID-keyed).
+   * TODO(Step 6): No-op shim until Step 6 makes the underlying SQL functional.
+   * Call refresh() after this to pick up the updated deck_id once Step 6 lands.
+   */
+  attachListToDeckV2: (listId: string, deckId: string): Promise<{ success: boolean }> =>
+    apiFetch<{ success: boolean }>(`/lists?id=${encodeURIComponent(listId)}&action=attach_deck`, {
+      method: 'POST',
+      body: JSON.stringify({ deck_id: deckId }),
+    }),
+
+  /**
+   * Detach a list from its deck (UUID-keyed).
+   * TODO(Step 6): No-op shim until Step 6 makes the underlying SQL functional.
+   * Call refresh() after this to pick up the cleared deck_id once Step 6 lands.
+   */
+  detachListFromDeck: (listId: string): Promise<{ success: boolean }> =>
+    apiFetch<{ success: boolean }>(`/lists?id=${encodeURIComponent(listId)}&action=detach_deck`, {
+      method: 'POST',
+    }),
+
+  resolveListImages: async (listId: string): Promise<{ updated: import('./types').ListCard[] }> => {
+    // TODO Phase 1: return Card[] in the updated array once call sites migrate off ListCard.
+    // ListCard.is_commander is number; Card.is_commander is boolean — structurally incompatible.
+    const result = await apiFetch<{ updated: ApiCardRow[] }>('/list-image-resolve', {
       method: 'POST',
       body: JSON.stringify({ list_id: listId }),
-    }),
+    });
+    return { updated: result.updated.map(fromApiCard) as unknown as import('./types').ListCard[] };
+  },
 
   // Scryfall card cache
   lookupCard: (name: string) =>
@@ -269,15 +410,23 @@ export const api = {
 
   // Users (admin)
   getUsers: () =>
-    apiFetch<{ id: number; username: string; display_name: string; role: string }[]>('/auth/users'),
+    apiFetch<{ id: string; username: string; display_name: string; role: string }[]>('/auth/users'),
 
-  // Scan draft (cross-device persistence)
-  getScanDraft: () =>
-    apiFetch<{ state: import('./types').ScanDraft | null }>('scan-draft'),
-  saveScanDraft: (state: import('./types').ScanDraft) =>
-    apiFetch<{ success: boolean }>('scan-draft', { method: 'PUT', body: JSON.stringify({ state }) }),
-  clearScanDraft: () =>
-    apiFetch<{ success: boolean }>('scan-draft', { method: 'DELETE' }),
+  // Buffer draft (cross-device pre-save card buffer, keyed by device+context)
+  getBufferDraft: (deviceId: string, contextType: string, contextRef = '') =>
+    apiFetch<{ state: import('./types').ScanDraft | null }>(
+      `/buffer-draft?device_id=${encodeURIComponent(deviceId)}&context_type=${encodeURIComponent(contextType)}&context_ref=${encodeURIComponent(contextRef)}`
+    ),
+  saveBufferDraft: (deviceId: string, contextType: string, contextRef: string, state: import('./types').ScanDraft) =>
+    apiFetch<{ success: boolean }>('/buffer-draft', {
+      method: 'POST',
+      body: JSON.stringify({ device_id: deviceId, context_type: contextType, context_ref: contextRef, state }),
+    }),
+  clearBufferDraft: (deviceId: string, contextType: string, contextRef = '') =>
+    apiFetch<{ success: boolean }>(
+      `/buffer-draft?device_id=${encodeURIComponent(deviceId)}&context_type=${encodeURIComponent(contextType)}&context_ref=${encodeURIComponent(contextRef)}`,
+      { method: 'DELETE' }
+    ),
 
   // Comparison Builder
   getComparison: (config: import('./types').ComparisonConfig) => {
@@ -305,7 +454,7 @@ export const api = {
     ),
 
   // TTS Export — generates sprite-sheet JSON for Tabletop Simulator
-  exportTTS: (params: { deckId?: number; listId?: number }) => {
+  exportTTS: (params: { deckId?: string; listId?: string }) => {
     const q = params.deckId ? `deck_id=${params.deckId}` : `list_id=${params.listId}`;
     return apiFetch<Record<string, unknown>>(`/tts-export?${q}`);
   },
@@ -320,18 +469,18 @@ export const api = {
   getCoachNotes: () =>
     apiFetch<import('./types').CoachNote[]>('/coach-notes'),
   getAllCoachNotes: () =>
-    apiFetch<(import('./types').CoachNote & { player_id: number; player_name: string })[]>('/coach-notes?all=1'),
-  updateCoachNote: (id: number, data: { topic?: string; observation?: string; reasoning?: string }) =>
+    apiFetch<(import('./types').CoachNote & { player_id: string; player_name: string })[]>('/coach-notes?all=1'),
+  updateCoachNote: (id: string, data: { topic?: string; observation?: string; reasoning?: string }) =>
     apiFetch<{ success: boolean }>(`/coach-notes?id=${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteCoachNote: (id: number) =>
+  deleteCoachNote: (id: string) =>
     apiFetch<{ success: boolean }>(`/coach-notes?id=${id}`, { method: 'DELETE' }),
 
   // Coach Chat (polling-based)
   sendCoachMessage: async (
     message: string,
     history: import('./types').CoachMessage[],
-    activeDeck?: { deckId: number; deckName: string; commander: string; cardCount: number; colors: string },
-    activeList?: { listId: number; listName: string; cardCount: number },
+    activeDeck?: { deckId: string; deckName: string; commander: string; cardCount: number; colors: string },
+    activeList?: { listId: string; listName: string; cardCount: number },
     onPartial?: (text: string) => void,
     signal?: AbortSignal,
   ): Promise<{ response: string; toolsUsed: { name: string; input: Record<string, unknown> }[] }> => {

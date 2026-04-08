@@ -14,8 +14,8 @@ import type {
 const EMPTY_CONDITIONS: ComparisonConditions = {};
 const EMPTY_ENTITY_FILTER: ComparisonEntityFilter = {};
 const PLAYERS: Player[] = [
-  { id: 1, name: 'Alice', user_id: null, created_at: '' },
-  { id: 2, name: 'Bob', user_id: null, created_at: '' },
+  { id: 'player-alice', name: 'Alice', user_id: null, created_at: '' },
+  { id: 'player-bob', name: 'Bob', user_id: null, created_at: '' },
 ];
 const DECKS: DeckWithPlayer[] = [];
 
@@ -142,7 +142,7 @@ describe('buildQuerySentence', () => {
 
   it('includes required_player_ids clause (singular)', () => {
     const result = sentence({
-      conditions: { required_player_ids: [1] },
+      conditions: { required_player_ids: ['player-alice'] },
     });
     expect(result).toBe(
       'Show me all players, when Alice was in the pod, ranked by Win Rate.',
@@ -151,7 +151,7 @@ describe('buildQuerySentence', () => {
 
   it('includes required_player_ids clause (plural)', () => {
     const result = sentence({
-      conditions: { required_player_ids: [1, 2] },
+      conditions: { required_player_ids: ['player-alice', 'player-bob'] },
     });
     expect(result).toBe(
       'Show me all players, when Alice and Bob were in the pod, ranked by Win Rate.',

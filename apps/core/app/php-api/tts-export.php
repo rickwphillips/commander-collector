@@ -38,8 +38,8 @@ const TTS_CARD_H        = 585;  // Card height per slot
 const TTS_MTG_BACK      = 'https://i.imgur.com/Hg8CwwU.jpeg';
 
 // ── Input ────────────────────────────────────────────────────────────────────
-$deckId = isset($_GET['deck_id']) ? (int)$_GET['deck_id'] : 0;
-$listId = isset($_GET['list_id']) ? (int)$_GET['list_id'] : 0;
+$deckId = (string)($_GET['deck_id'] ?? '');
+$listId = (string)($_GET['list_id'] ?? '');
 if (!$deckId && !$listId) ttsError('deck_id or list_id required');
 
 $db = getDB();
@@ -53,14 +53,17 @@ if ($deckId) {
     $exportName = $meta['name'];
 
     $stmt = $db->prepare('
-        SELECT dc.card_name, dc.quantity, dc.is_commander,
+        SELECT lc.card_name, lc.quantity,
+               (lc.role = \'commander\') AS is_commander,
+               lc.role,
                sc.image_uri, sc.image_b64,
                sc.back_image_uri,
                sc.type_line
-        FROM deck_cards dc
-        LEFT JOIN scryfall_card_cache sc ON dc.scryfall_id = sc.scryfall_id
-        WHERE dc.deck_id = ?
-        ORDER BY dc.is_commander DESC, dc.card_name ASC
+        FROM list_cards lc
+        JOIN lists l ON l.id = lc.list_id
+        LEFT JOIN scryfall_card_cache sc ON lc.scryfall_id = sc.scryfall_id
+        WHERE l.deck_id = ? AND l.role = \'main\' AND l.deleted_at IS NULL
+        ORDER BY (lc.role = \'commander\') DESC, lc.card_name ASC
     ');
     $stmt->execute([$deckId]);
 } else {
@@ -71,14 +74,16 @@ if ($deckId) {
     $exportName = $meta['name'];
 
     $stmt = $db->prepare('
-        SELECT lc.card_name, lc.quantity, lc.is_commander,
+        SELECT lc.card_name, lc.quantity,
+               (lc.role = \'commander\') AS is_commander,
+               lc.role,
                sc.image_uri, sc.image_b64,
                sc.back_image_uri,
                sc.type_line
         FROM list_cards lc
         LEFT JOIN scryfall_card_cache sc ON lc.scryfall_id = sc.scryfall_id
         WHERE lc.list_id = ?
-        ORDER BY lc.is_commander DESC, lc.card_name ASC
+        ORDER BY (lc.role = \'commander\') DESC, lc.card_name ASC
     ');
     $stmt->execute([$listId]);
 }

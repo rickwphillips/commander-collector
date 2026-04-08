@@ -56,18 +56,18 @@ export default function MyCollectionPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [coachOpen, setCoachOpen] = useState(false);
-  const [expandedDeckId, setExpandedDeckId] = useState<number | null>(null);
-  const [expandedListId, setExpandedListId] = useState<number | null>(null);
+  const [expandedDeckId, setExpandedDeckId] = useState<string | null>(null);
+  const [expandedListId, setExpandedListId] = useState<string | null>(null);
   const [refreshed, setRefreshed] = useState(false);
   const coachRef = useRef<CoachChatHandle>(null);
 
   // Collapse other section when one expands
-  const handleDeckToggle = useCallback((id: number | null) => {
+  const handleDeckToggle = useCallback((id: string | null) => {
     setExpandedDeckId(id);
     if (id !== null) setExpandedListId(null);
   }, []);
 
-  const handleListToggle = useCallback((id: number | null) => {
+  const handleListToggle = useCallback((id: string | null) => {
     setExpandedListId(id);
     if (id !== null) setExpandedDeckId(null);
   }, []);
@@ -615,7 +615,7 @@ function DeckRow({
 }: {
   deck: import('@/lib/types').CollectionDeck;
   expanded: boolean;
-  onToggle: (id: number | null) => void;
+  onToggle: (id: string | null) => void;
   onCardClick: (name: string) => void;
   coachRef: React.RefObject<CoachChatHandle | null>;
 }) {
@@ -696,7 +696,7 @@ function DeckRow({
                     size="small"
                     variant="outlined"
                     endIcon={<OpenInNewIcon fontSize="inherit" />}
-                    href={`/decks/decklist?id=${deck.id}`}
+                    href={`/decks/decklist?id=${encodeURIComponent(deck.id)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     component={Link}
@@ -736,7 +736,7 @@ function ListRow({
 }: {
   list: import('@/lib/types').CollectionList;
   expanded: boolean;
-  onToggle: (id: number | null) => void;
+  onToggle: (id: string | null) => void;
   onCardClick: (name: string) => void;
   coachRef: React.RefObject<CoachChatHandle | null>;
 }) {
@@ -795,7 +795,7 @@ function ListRow({
                     size="small"
                     variant="outlined"
                     endIcon={<OpenInNewIcon fontSize="inherit" />}
-                    href={`/lists/detail?id=${list.id}`}
+                    href={`/lists/detail?id=${encodeURIComponent(list.id)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     component={Link}

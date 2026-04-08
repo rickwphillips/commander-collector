@@ -117,12 +117,12 @@ switch ($method) {
             }
 
             // Create session
+            $sessionId = $pdo->query("SELECT UUID()")->fetchColumn();
             $stmt = $pdo->prepare('
-                INSERT INTO live_game_sessions (user_id, state, expires_at)
-                VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))
+                INSERT INTO live_game_sessions (id, user_id, state, expires_at)
+                VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))
             ');
-            $stmt->execute([$userId, json_encode($data['state'])]);
-            $sessionId = (int)$pdo->lastInsertId();
+            $stmt->execute([$sessionId, $userId, json_encode($data['state'])]);
 
             // Create one code per seat
             $seatCodes = [];

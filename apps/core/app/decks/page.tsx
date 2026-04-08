@@ -384,7 +384,7 @@ export default function DecksPage() {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                router.push(`/decks/decklist?id=${deck.id}`);
+                                router.push(`/decks/decklist?id=${encodeURIComponent(deck.id)}`);
                               }}
                             >
                               <EditIcon fontSize="small" />

@@ -17,6 +17,9 @@ tsconfig.tsbuildinfo
 .env.local
 .env*.local
 
+# Vitest coverage reports (generated)
+apps/core/coverage
+
 # Generated TTS sheets
 apps/core/app/tts-sheets
 

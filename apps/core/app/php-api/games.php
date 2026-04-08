@@ -5,7 +5,7 @@ requireAuth();
 
 $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
-$id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+$id = isset($_GET['id']) ? (string)$_GET['id'] : null;
 
 switch ($method) {
     case 'GET':
@@ -134,17 +134,18 @@ switch ($method) {
             $pdo->beginTransaction();
 
             // Insert game
+            $gameId = $pdo->query("SELECT UUID()")->fetchColumn();
             $stmt = $pdo->prepare('
-                INSERT INTO games (played_at, winning_turn, notes, game_type)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO games (id, played_at, winning_turn, notes, game_type)
+                VALUES (?, ?, ?, ?, ?)
             ');
             $stmt->execute([
+                $gameId,
                 $data['played_at'],
                 $winningTurn,
                 $data['notes'] ?? null,
                 $gameType
             ]);
-            $gameId = (int)$pdo->lastInsertId();
 
             // Insert results
             $resultStmt = $pdo->prepare('
@@ -160,20 +161,20 @@ switch ($method) {
                 // Default player_id to deck owner if not provided
                 $playerId = null;
                 if (!empty($result['player_id'])) {
-                    $playerId = (int)$result['player_id'];
+                    $playerId = (string)$result['player_id'];
                 } else {
                     $deckStmt = $pdo->prepare('SELECT player_id FROM decks WHERE id = ?');
-                    $deckStmt->execute([(int)$result['deck_id']]);
+                    $deckStmt->execute([(string)$result['deck_id']]);
                     $deck = $deckStmt->fetch();
                     if (!$deck) {
                         throw new Exception('Deck not found: ' . $result['deck_id']);
                     }
-                    $playerId = (int)$deck['player_id'];
+                    $playerId = (string)$deck['player_id'];
                 }
 
                 $resultStmt->execute([
                     $gameId,
-                    (int)$result['deck_id'],
+                    (string)$result['deck_id'],
                     $playerId,
                     (int)$result['finish_position'],
                     $result['eliminated_turn'] ?? null,
@@ -255,19 +256,19 @@ switch ($method) {
 
                     $playerId = null;
                     if (!empty($result['player_id'])) {
-                        $playerId = (int)$result['player_id'];
+                        $playerId = (string)$result['player_id'];
                     } else {
                         $deckStmt = $pdo->prepare('SELECT player_id FROM decks WHERE id = ?');
-                        $deckStmt->execute([(int)$result['deck_id']]);
+                        $deckStmt->execute([(string)$result['deck_id']]);
                         $deck = $deckStmt->fetch();
                         if ($deck) {
-                            $playerId = (int)$deck['player_id'];
+                            $playerId = (string)$deck['player_id'];
                         }
                     }
 
                     $resultStmt->execute([
                         $id,
-                        (int)$result['deck_id'],
+                        (string)$result['deck_id'],
                         $playerId,
                         (int)$result['finish_position'],
                         $result['eliminated_turn'] ?? null,

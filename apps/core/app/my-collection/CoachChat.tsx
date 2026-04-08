@@ -154,7 +154,7 @@ function buildThinkingMessages(
 }
 
 export interface ActiveDeckContext {
-  deckId: number;
+  deckId: string;
   deckName: string;
   cardCount: number;
   commander: string;
@@ -162,7 +162,7 @@ export interface ActiveDeckContext {
 }
 
 export interface ActiveListContext {
-  listId: number;
+  listId: string;
   listName: string;
   cardCount: number;
 }
@@ -671,7 +671,7 @@ const TOOL_LABELS: Record<string, string> = {
   lookup_card:          'Looked up card',
   lookup_decklist:      'Fetched full decklist',
   check_card_in_deck:   'Checked deck for card',
-  search_deck_cards:    'Searched deck cards',
+  search_deck_cards:    "Searched deck's card list",
   get_deck_stats:       'Fetched match history',
   save_coach_note:      'Saved note',
   get_pattern:          'Checked rules pattern',

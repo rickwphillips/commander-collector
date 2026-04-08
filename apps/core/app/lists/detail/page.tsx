@@ -1,722 +1,380 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback, useTransition, useRef, Suspense } from 'react';
+import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
-  CardMedia,
   Chip,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControl,
-  Grid,
-  InputLabel,
-  MenuItem,
-  Select,
   Stack,
-  Tab,
-  Tabs,
-  TextField,
-  Tooltip,
   Typography,
-  Zoom,
 } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import EditIcon from '@mui/icons-material/Edit';
-import FlipIcon from '@mui/icons-material/SyncAlt';
-import SaveIcon from '@mui/icons-material/Save';
-import { DeckActions } from '@/components/DeckActions';
-import { CardListImport } from '@/components/CardListImport';
+import RestoreIcon from '@mui/icons-material/Restore';
+import LinkIcon from '@mui/icons-material/Link';
+
 import { PageContainer } from '@/components/PageContainer';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { DeckBreakdown } from '@/components/DeckBreakdown';
-import { DeckFilters, EMPTY_FILTERS, TYPE_CATEGORIES, getTypeCategory, sortCards, hasActiveFilters, matchesFilters } from '@/components/DeckFilters';
-import type { DeckFilterState } from '@/components/DeckFilters';
-import { CardGridEditor } from '@/components/CardGridEditor';
-import type { EditableCard } from '@/components/CardGridEditor';
-import { CardTooltip } from '@commander/shared/components/CardTooltip';
+import { CardListView } from '@/components/cards/CardListView';
+import { CardListToolbar } from '@/components/cards/CardListToolbar';
+import { useList } from '@/lib/lists/useList';
 import { api } from '@/lib/api';
-import type { ParsedCard } from '@/lib/parseImport';
-import type { CardListDetail, ListCard, DeckWithPlayer } from '@/lib/types';
+import type { Card } from '@/lib/cards/types';
+import type { FilterSortState } from '@/lib/cards/filter';
+import type { SaveDestination } from '@/components/cards/SaveToListDialog';
 
-// ── Converters ────────────────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 
-function listCardToEditable(card: ListCard, idx: number): EditableCard {
-  return {
-    _key:           `${card.id ?? 'new'}-${idx}-${Math.random().toString(36).slice(2)}`,
-    card_name:      card.card_name,
-    scryfall_id:    card.scryfall_id,
-    image_uri:      card.image_uri      ?? null,
-    back_image_uri: card.back_image_uri ?? null,
-    type_line:      card.type_line      ?? null,
-    mana_cost:      card.mana_cost      ?? null,
-    color_identity: card.color_identity ?? '',
-    quantity:       card.quantity,
-    is_commander:   !!card.is_commander,
-    is_proxy:       !!card.is_proxy,
-  };
+const DEFAULT_FILTER_STATE: FilterSortState = { sort: 'name', sortDir: 'asc' };
+
+// ── Undo stack (simple array of Card[] snapshots, 50-step cap) ─────────────────
+
+interface UndoStack {
+  past: Card[][];
+  future: Card[][];
 }
 
-// ── Gallery card (view mode, DFC flip) ───────────────────────────────────────
+const UNDO_CAP = 50;
 
-function GalleryCard({ card }: { card: ListCard & { _key?: string } }) {
-  const [flipped, setFlipped] = useState(false);
-  const isDfc = !!card.back_image_uri;
-
-  return (
-    <Tooltip
-      disableInteractive
-      placement="top"
-      title={
-        <Stack direction="row" spacing={0.5}>
-          <Box component="img" src={card.image_uri!} alt={card.card_name}
-            sx={{ width: 220, borderRadius: 1.5, display: 'block' }} />
-          {card.back_image_uri && (
-            <Box component="img" src={card.back_image_uri} alt={`${card.card_name} (back)`}
-              sx={{ width: 220, borderRadius: 1.5, display: 'block' }} />
-          )}
-        </Stack>
-      }
-      slotProps={{ tooltip: { sx: { bgcolor: 'transparent', p: 0, boxShadow: 8 } } }}
-    >
-      <Card
-        sx={{ cursor: isDfc ? 'pointer' : 'default', perspective: '600px', position: 'relative' }}
-        onClick={isDfc ? () => setFlipped(f => !f) : undefined}
-      >
-        <Box sx={{
-          transformStyle: 'preserve-3d',
-          transition: 'transform 0.5s ease',
-          transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-          position: 'relative',
-          aspectRatio: '488/680',
-        }}>
-          <CardMedia component="img" image={card.image_uri!} alt={card.card_name}
-            sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', backfaceVisibility: 'hidden' }} />
-          {card.back_image_uri && (
-            <CardMedia component="img" image={card.back_image_uri} alt={`${card.card_name} (back)`}
-              sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }} />
-          )}
-        </Box>
-        {isDfc && (
-          <Box
-            onClick={(e) => { e.stopPropagation(); setFlipped(f => !f); }}
-            sx={{
-              position: 'absolute', inset: 0, zIndex: 1,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              opacity: 0, transition: 'opacity 0.2s',
-              '&:hover': { opacity: 1 },
-              cursor: 'pointer',
-            }}
-          >
-            <Box sx={{
-              bgcolor: 'rgba(0,0,0,0.45)', borderRadius: '50%',
-              width: 44, height: 44,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <FlipIcon sx={{ fontSize: 26, color: '#fff' }} />
-            </Box>
-          </Box>
-        )}
-        {card.quantity > 1 && (
-          <Box sx={{
-            position: 'absolute', bottom: 4, left: 4,
-            bgcolor: 'rgba(0,0,0,0.7)', color: 'white',
-            borderRadius: '50%', width: 22, height: 22,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, fontWeight: 700,
-          }}>
-            {card.quantity}
-          </Box>
-        )}
-      </Card>
-    </Tooltip>
-  );
+function pushUndo(stack: UndoStack, snapshot: Card[]): UndoStack {
+  const past = [...stack.past, snapshot].slice(-UNDO_CAP);
+  return { past, future: [] };
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+// ── Inner component (uses useSearchParams) ────────────────────────────────────
 
-function ListDetailInner() {
+function ListPageInner() {
   const searchParams = useSearchParams();
-  const router       = useRouter();
-  const id           = Number(searchParams.get('id'));
-  const autoEdit     = searchParams.get('edit') === '1';
+  const router = useRouter();
+  const listId = searchParams.get('id') ?? '';
 
-  const [list, setList]       = useState<CardListDetail | null>(null);
-  const [decks, setDecks]     = useState<DeckWithPlayer[]>([]);
-  const [loading, setLoading]   = useState(!!id);
-  const [auditing, setAuditing]   = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
-  const [tab, setTab]                   = useState(0);
-  const [filters, setFilters]           = useState<DeckFilterState>(EMPTY_FILTERS);
-  const [filterPending, startFilterTransition] = useTransition();
+  // ── List hook ──────────────────────────────────────────────────────────────
+  const {
+    list,
+    cards,
+    loading,
+    error: listError,
+    conflict,
+    save,
+    detachFromDeck,
+    refresh,
+  } = useList({ id: listId });
 
-  // ── Edit state ─────────────────────────────────────────────────────────────
-  const [editMode, setEditMode]     = useState(false);
-  const [draftName, setDraftName]   = useState('');
-  const [draftDesc, setDraftDesc]   = useState('');
-  const [draftCards, setDraftCards] = useState<EditableCard[]>([]);
-  const [saving, setSaving]         = useState(false);
-  const [ttsBusy, setTtsBusy]       = useState(false);
-  const [isDirty, setIsDirty]       = useState(false);
-  const savedCardsRef               = useRef<EditableCard[]>([]);
+  // ── Deck name (only fetched when list is attached to a deck) ──────────────
+  const [deckName, setDeckName] = useState<string | null>(null);
+  const [deckNameLoading, setDeckNameLoading] = useState(false);
 
-  // Attach to deck state
-  const [attachOpen, setAttachOpen]         = useState(false);
-  const [selectedDeckId, setSelectedDeckId] = useState<number | ''>('');
-  const [attaching, setAttaching]           = useState(false);
+  // ── Local UI state ────────────────────────────────────────────────────────
+  const [error, setError] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState(false);
 
-  // ── Load ───────────────────────────────────────────────────────────────────
+  // Edit state
+  const [editMode, setEditMode] = useState(false);
+  const [buffer, setBuffer] = useState<Card[]>([]);
+  const [viewMode, setViewMode] = useState<'gallery' | 'text' | 'breakdown'>('gallery');
+  const [filterState, setFilterState] = useState<FilterSortState>(DEFAULT_FILTER_STATE);
+
+  // Undo/redo
+  const undoStack = useRef<UndoStack>({ past: [], future: [] });
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
+  // Conflict resolution
+  const [conflictProp, setConflictProp] = useState<{ serverCards: Card[] } | null>(null);
+
+  // ── Load deck name when list has a deck_id ────────────────────────────────
 
   useEffect(() => {
-    if (!id) return;
-    (async () => {
-      try {
-        const [listData, decksData] = await Promise.all([
-          api.getList(id),
-          api.getDecks(),
-        ]);
-        setList(listData);
-        setDecks(decksData as DeckWithPlayer[]);
-        runAudit(listData);
-        if (autoEdit) {
-          const editable = listData.cards.map(listCardToEditable);
-          savedCardsRef.current = editable;
-          setDraftName(listData.name);
-          setDraftDesc(listData.description ?? '');
-          setDraftCards(editable);
-          setEditMode(true);
-        }
-      } catch {
-        setError('Failed to load list');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
-  const runAudit = useCallback(async (listData: CardListDetail) => {
-    if (!listData.cards.some(c => !c.image_uri)) return;
-    setAuditing(true);
-    try {
-      const { updated } = await api.auditListImages(id);
-      if (updated.length > 0) {
-        const byId = new Map(updated.map(u => [u.id!, u]));
-        setList(prev => prev ? {
-          ...prev,
-          cards: prev.cards.map(c => byId.has(c.id!) ? { ...c, ...byId.get(c.id!)! } : c),
-        } : prev);
-      }
-    } catch {
-      // Silent
-    } finally {
-      setAuditing(false);
+    if (!list?.deck_id) {
+      setDeckName(null);
+      return;
     }
-  }, [id]);
-
-  // ── Edit mode ──────────────────────────────────────────────────────────────
-
-  const handleEditStart = () => {
-    if (!list) return;
-    const editable = list.cards.map(listCardToEditable);
-    savedCardsRef.current = editable;
-    setDraftName(list.name);
-    setDraftDesc(list.description ?? '');
-    setDraftCards(editable);
-    setIsDirty(false);
-    setEditMode(true);
-  };
-
-  const handleEditCancel = () => {
-    setIsDirty(false);
-    setEditMode(false);
-  };
-
-  const handleDraftChange = (updated: EditableCard[]) => {
-    setDraftCards(updated);
-    setIsDirty(true);
-  };
-
-  const handleImport = async (cards: ParsedCard[]) => {
-    const scryfallMap = new Map<string, { scryfall_id: string; image_uri?: string | null; back_image_uri?: string | null; type_line?: string | null; mana_cost?: string | null; color_identity?: string | null }>();
-    try {
-      const { results } = await api.bulkLookupCards(cards.map(c => c.card_name));
-      for (const r of results) {
-        if (!r.error) scryfallMap.set(r.name.toLowerCase(), r);
-      }
-    } catch { /* non-fatal */ }
-
-    const updated = [...draftCards];
-    for (const parsed of cards) {
-      const existing = updated.find(c => c.card_name.toLowerCase() === parsed.card_name.toLowerCase());
-      if (existing) {
-        existing.quantity += parsed.quantity;
-        if (parsed.is_commander) existing.is_commander = true;
-      } else {
-        const sf = scryfallMap.get(parsed.card_name.toLowerCase());
-        updated.push({
-          _key:           `import-${Math.random().toString(36).slice(2)}`,
-          card_name:      parsed.card_name,
-          scryfall_id:    sf?.scryfall_id ?? null,
-          image_uri:      sf?.image_uri ?? null,
-          back_image_uri: sf?.back_image_uri ?? null,
-          type_line:      sf?.type_line ?? null,
-          mana_cost:      sf?.mana_cost ?? null,
-          color_identity: sf?.color_identity ?? '',
-          quantity:       parsed.quantity,
-          is_commander:   parsed.is_commander,
-          is_proxy:       parsed.is_proxy,
-        });
-      }
-    }
-    setDraftCards(updated);
-    setIsDirty(true);
-  };
-
-  const doSave = async (exitEdit: boolean) => {
-    setSaving(true);
-    try {
-      await api.updateList(id, {
-        name:        draftName.trim(),
-        description: draftDesc.trim() || undefined,
-        cards:       draftCards.map(c => ({
-          card_name:    c.card_name,
-          scryfall_id:  c.scryfall_id ?? undefined,
-          quantity:     c.quantity,
-          is_commander: c.is_commander,
-          is_proxy:     c.is_proxy,
-        })),
+    let cancelled = false;
+    setDeckNameLoading(true);
+    api.getDeck(list.deck_id)
+      .then((deck) => {
+        if (!cancelled) setDeckName(deck.name);
+      })
+      .catch(() => {
+        if (!cancelled) setDeckName(null);
+      })
+      .finally(() => {
+        if (!cancelled) setDeckNameLoading(false);
       });
-      const fresh = await api.getList(id);
-      setList(fresh);
-      runAudit(fresh);
-      if (exitEdit) {
-        setEditMode(false);
-      } else {
-        const editable = fresh.cards.map(listCardToEditable);
-        savedCardsRef.current = editable;
-        setDraftCards(editable);
-        setIsDirty(false);
-      }
-    } catch {
-      setError('Failed to save');
-    } finally {
-      setSaving(false);
+    return () => { cancelled = true; };
+  }, [list?.deck_id]);
+
+  // ── Sync buffer when cards load (or are reloaded) ─────────────────────────
+
+  useEffect(() => {
+    setBuffer(cards);
+    // Reset undo stack on reload
+    undoStack.current = { past: [], future: [] };
+    setCanUndo(false);
+    setCanRedo(false);
+  }, [cards]);
+
+  // ── Redirect to /lists on 404 (list not found after load completes) ────────
+
+  useEffect(() => {
+    if (!loading && !listError && !list && listId) {
+      router.replace('/lists');
     }
-  };
+  }, [loading, listError, list, listId, router]);
 
-  const handleSave            = () => doSave(true);
-  const handleSaveAndContinue = () => doSave(false);
+  // ── Conflict: propagate hook conflict into prop ───────────────────────────
 
-  // Attach to deck
-  const handleAttach = async () => {
-    if (!list || !selectedDeckId) return;
-    setAttaching(true);
+  useEffect(() => {
+    if (conflict) {
+      // Server cards are available via refresh; use current server-loaded cards
+      // as the conflict snapshot (the hook retains its server state on conflict).
+      setConflictProp({ serverCards: cards });
+    } else {
+      setConflictProp(null);
+    }
+  }, [conflict, cards]);
+
+  // ── Buffer change handler (records undo step) ─────────────────────────────
+
+  const handleBufferChange = useCallback((next: Card[]) => {
+    undoStack.current = pushUndo(undoStack.current, buffer);
+    setBuffer(next);
+    setCanUndo(true);
+    setCanRedo(false);
+  }, [buffer]);
+
+  // ── Undo / Redo ───────────────────────────────────────────────────────────
+
+  const handleUndo = useCallback(() => {
+    const { past, future } = undoStack.current;
+    if (past.length === 0) return;
+    const previous = past[past.length - 1];
+    undoStack.current = {
+      past: past.slice(0, -1),
+      future: [buffer, ...future].slice(0, UNDO_CAP),
+    };
+    setBuffer(previous);
+    setCanUndo(undoStack.current.past.length > 0);
+    setCanRedo(true);
+  }, [buffer]);
+
+  const handleRedo = useCallback(() => {
+    const { past, future } = undoStack.current;
+    if (future.length === 0) return;
+    const next = future[0];
+    undoStack.current = {
+      past: [...past, buffer].slice(-UNDO_CAP),
+      future: future.slice(1),
+    };
+    setBuffer(next);
+    setCanUndo(true);
+    setCanRedo(undoStack.current.future.length > 0);
+  }, [buffer]);
+
+  // ── Clear ─────────────────────────────────────────────────────────────────
+
+  const handleClear = useCallback(() => {
+    undoStack.current = pushUndo(undoStack.current, buffer);
+    setBuffer([]);
+    setCanUndo(true);
+    setCanRedo(false);
+  }, [buffer]);
+
+  // ── Save ──────────────────────────────────────────────────────────────────
+
+  const handleSave = useCallback(async (_destination: SaveDestination) => {
     try {
-      await api.attachListToDeck(list.id, selectedDeckId as number);
-      setAttachOpen(false);
-      setSelectedDeckId('');
+      await save(buffer);
+      setEditMode(false);
     } catch {
-      setError('Failed to attach list to deck');
-    } finally {
-      setAttaching(false);
+      setError('Failed to save list');
     }
-  };
+  }, [save, buffer]);
 
-  // ── Scryfall refresh ───────────────────────────────────────────────────────
+  // ── Detach from deck ──────────────────────────────────────────────────────
 
-  const handleRefreshViewCards = async () => {
-    if (!list) return;
-    setRefreshing(true);
+  const handleDetach = useCallback(async () => {
     try {
-      const { results } = await api.bulkLookupCards(list.cards.map(c => c.card_name));
-      const hit = new Map(results.filter(r => !r.error).map(r => [r.name.toLowerCase(), r]));
-      await api.updateList(id, {
-        name: list.name,
-        cards: list.cards.map(c => ({
-          card_name:    c.card_name,
-          scryfall_id:  hit.get(c.card_name.toLowerCase())?.scryfall_id ?? c.scryfall_id ?? undefined,
-          quantity:     c.quantity,
-          is_commander: !!c.is_commander,
-          is_proxy:     !!c.is_proxy,
-        })),
-      });
-      const fresh = await api.getList(id);
-      setList(fresh);
+      await detachFromDeck();
+      await refresh();
     } catch {
-      setError('Failed to refresh card data');
-    } finally {
-      setRefreshing(false);
+      setError('Failed to detach list from deck');
     }
-  };
+  }, [detachFromDeck, refresh]);
 
-  const handleRefreshDraftCards = async () => {
-    setRefreshing(true);
+  // ── Restore soft-deleted list ─────────────────────────────────────────────
+
+  const handleRestore = useCallback(async () => {
+    setRestoring(true);
     try {
-      const { results } = await api.bulkLookupCards(draftCards.map(c => c.card_name));
-      const hit = new Map(results.filter(r => !r.error).map(r => [r.name.toLowerCase(), r]));
-      setDraftCards(prev => prev.map(c => {
-        const found = hit.get(c.card_name.toLowerCase());
-        if (!found) return c;
-        return { ...c, scryfall_id: found.scryfall_id, image_uri: found.image_uri, back_image_uri: found.back_image_uri ?? null, type_line: found.type_line, mana_cost: found.mana_cost, color_identity: found.color_identity, notFound: false };
-      }));
-      setIsDirty(true);
-    } catch {
-      setError('Failed to refresh card data');
+      // api.restoreList does not exist yet — surface via error banner for now.
+      // TODO: implement api.restoreList when the PHP endpoint is available.
+      setError('Restore is not yet available. Please contact an admin.');
     } finally {
-      setRefreshing(false);
+      setRestoring(false);
     }
-  };
+  }, []);
 
-  // ── Exports ────────────────────────────────────────────────────────────────
+  // ── Conflict resolution ───────────────────────────────────────────────────
 
-  const handleExportTCGPlayer = () => {
-    if (!list || list.cards.length === 0) return;
-    const content = list.cards.map((c) => `${c.quantity} ${c.card_name}`).join('\n');
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${list.name.replace(/[^a-z0-9]/gi, '_')}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleExportTTS = async () => {
-    if (!list || list.cards.length === 0 || ttsBusy) return;
-    setTtsBusy(true);
-    try {
-      const ttsData = await api.exportTTS({ listId: id });
-      const blob = new Blob([JSON.stringify(ttsData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${list.name.replace(/[^a-z0-9]/gi, '_')}_TTS.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'TTS export failed');
-    } finally {
-      setTtsBusy(false);
+  const handleConflictResolve = useCallback(async (choice: 'accept-server' | 'keep-local') => {
+    if (choice === 'accept-server') {
+      await refresh();
     }
-  };
-
-  // ── Derived display data ──────────────────────────────────────────────────
-
-  const viewCards     = list?.cards ?? [];
-  const totalCards    = (editMode ? draftCards : viewCards).reduce((s, c) => s + c.quantity, 0);
-  const commanderCard = useMemo(() => viewCards.find(c => c.is_commander), [viewCards]);
-
-  const galleryExpanded = useMemo(() =>
-    viewCards.flatMap((c, ci) =>
-      Array.from({ length: c.quantity }, (_, i) => ({ ...c, _key: `${ci}-${i}` }))
-    ), [viewCards]);
-
-  const cardsWithImages    = useMemo(() => galleryExpanded.filter(c => c.image_uri && !c.is_commander), [galleryExpanded]);
-  const cardsWithoutImages = useMemo(() => galleryExpanded.filter(c => !c.image_uri), [galleryExpanded]);
-  const filteredGallery    = useMemo(() => sortCards(cardsWithImages.filter(c => matchesFilters(c, filters)), filters.sortOrder, filters.sortDirection), [cardsWithImages, filters]);
-  const filteredBreakdown  = useMemo(() => sortCards(viewCards.filter(c => matchesFilters(c, filters)), filters.sortOrder, filters.sortDirection), [viewCards, filters]);
-  const active             = hasActiveFilters(filters);
-
-  // Gallery always grouped by type
-  const galleryByType = useMemo(() => {
-    const source = filteredGallery;
-    const groups: Partial<Record<string, typeof cardsWithImages>> = {};
-    for (const card of source) {
-      const cat = card.is_commander ? 'Commander' : getTypeCategory(card.type_line);
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat]!.push(card);
-    }
-    const order = ['Commander', ...TYPE_CATEGORIES, 'Other'];
-    return order.filter(t => groups[t]?.length).map(t => ({ type: t, cards: groups[t]! }));
-  }, [filteredGallery, cardsWithImages, active]);
+    setConflictProp(null);
+  }, [refresh]);
 
   // ── Guards ────────────────────────────────────────────────────────────────
 
-  if (!id) {
+  if (!listId) {
     return (
-      <PageContainer title="List Not Found">
+      <PageContainer title="List Not Found" backHref="/lists" backLabel="Lists">
         <Typography>No list ID provided.</Typography>
       </PageContainer>
     );
   }
 
   if (loading) {
-    return <PageContainer title="Card List"><LoadingSpinner message="Loading list…" /></PageContainer>;
+    return (
+      <PageContainer title="Card List" backHref="/lists" backLabel="Lists">
+        <LoadingSpinner message="Loading list…" />
+      </PageContainer>
+    );
+  }
+
+  if (listError && !list) {
+    return (
+      <PageContainer title="Error" backHref="/lists" backLabel="Lists">
+        <Alert severity="error">{listError}</Alert>
+      </PageContainer>
+    );
   }
 
   if (!list) {
-    return <PageContainer title="Not Found"><Alert severity="error">List not found.</Alert></PageContainer>;
+    // Redirect effect will fire; show spinner while navigating
+    return (
+      <PageContainer title="Not Found" backHref="/lists" backLabel="Lists">
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress />
+        </Box>
+      </PageContainer>
+    );
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Derived values ────────────────────────────────────────────────────────
+
+  const isDeleted = !!list.deleted_at;
+  const deckContext =
+    list.deck_id && deckName
+      ? { id: list.deck_id, name: deckName }
+      : list.deck_id
+      ? { id: list.deck_id, name: deckNameLoading ? 'Loading…' : 'Attached Deck' }
+      : undefined;
+
+  const headerSubtitle = (
+    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+      {list.format && (
+        <Chip label={list.format} size="small" variant="outlined" />
+      )}
+      {deckContext && (
+        <Chip
+          icon={<LinkIcon />}
+          label={`Deck: ${deckContext.name}`}
+          size="small"
+          color="primary"
+          variant="outlined"
+          component="a"
+          href={`/decks/detail?id=${deckContext.id}`}
+          clickable
+        />
+      )}
+      {isDeleted && (
+        <Chip label="Deleted" size="small" color="error" variant="filled" />
+      )}
+    </Stack>
+  );
 
   return (
     <PageContainer
-      title={editMode ? `Editing: ${list.name}` : list.name}
-      subtitle={editMode ? undefined : (list.description ?? `${totalCards} cards`)}
-      titleImage={!editMode ? (commanderCard?.image_uri ?? null) : null}
+      title={list.name}
+      subtitle={headerSubtitle}
       backHref="/lists"
       backLabel="Lists"
-      actions={
-        editMode ? (
-          <DeckActions
-            onCancel={handleEditCancel}
-            onRefresh={handleRefreshDraftCards}
-            onSaveAndContinue={handleSaveAndContinue}
-            onSave={handleSave}
-            saving={saving}
-            refreshing={refreshing}
-          />
-        ) : (
-          <DeckActions
-            onExport={handleExportTCGPlayer}
-            onTTS={handleExportTTS}
-            ttsBusy={ttsBusy}
-            onRefresh={handleRefreshViewCards}
-            onEdit={handleEditStart}
-            onAttach={() => setAttachOpen(true)}
-            hasCards={list.cards.length > 0}
-            refreshing={refreshing}
-          />
-        )
-      }
     >
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>
+      {/* Error banner */}
+      {(error || listError) && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error ?? listError}
+        </Alert>
       )}
 
-      {auditing && (
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-          <CircularProgress size={14} />
-          <Typography variant="caption" color="text.secondary">Fetching card images…</Typography>
-        </Stack>
-      )}
-
-      {/* ── Edit Mode ──────────────────────────────────────────────────────── */}
-      {editMode ? (
-        <>
-          {/* Metadata */}
-          <Card sx={{ mb: 3 }}>
-            <Box sx={{ p: 2, pb: 1 }}>
-              <TextField
-                label="List name"
-                size="small"
-                value={draftName}
-                onChange={e => setDraftName(e.target.value)}
-                fullWidth
-              />
-            </Box>
-            <Accordion disableGutters elevation={0} sx={{ '&:before': { display: 'none' } }}>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ px: 2, minHeight: 36, '& .MuiAccordionSummary-content': { my: 0.5 } }}>
-                <Typography variant="caption" color="text.secondary">Description</Typography>
-              </AccordionSummary>
-              <AccordionDetails sx={{ px: 2, pt: 0, pb: 2 }}>
-                <TextField
-                  size="small"
-                  value={draftDesc}
-                  onChange={e => setDraftDesc(e.target.value)}
-                  fullWidth
-                  multiline
-                  minRows={2}
-                />
-              </AccordionDetails>
-            </Accordion>
-          </Card>
-
-          <Accordion disableGutters elevation={0} sx={{ mb: 3, border: '1px solid', borderColor: 'divider', borderRadius: 1, '&:before': { display: 'none' } }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle2">Import Card List</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <CardListImport onImport={handleImport} />
-            </AccordionDetails>
-          </Accordion>
-          <CardGridEditor cards={draftCards} onChange={handleDraftChange} />
-          <Zoom in={isDirty && !saving}>
-            <Box sx={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 1100 }}>
-              <Button
-                variant="contained"
-                color="success"
-                startIcon={<SaveIcon />}
-                onClick={handleSaveAndContinue}
-                disabled={saving}
-                sx={{ borderRadius: 3, px: 3, boxShadow: 6 }}
-              >
-                Save
-              </Button>
-            </Box>
-          </Zoom>
-        </>
-      ) : (
-        /* ── View Mode ─────────────────────────────────────────────────────── */
-        <>
-          {list.cards.length === 0 ? (
-            <Card sx={{ p: 4, textAlign: 'center' }}>
-              <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
-                This list has no cards yet.
-              </Typography>
-              <Button variant="contained" startIcon={<EditIcon />} onClick={handleEditStart}>
-                Add Cards
-              </Button>
-            </Card>
-          ) : (
-            <>
-              <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
-                <Tab label="Breakdown" />
-                <Tab label={`Gallery (${cardsWithImages.length})`} />
-              </Tabs>
-
-              <DeckFilters
-                filters={filters}
-                onChange={f => startFilterTransition(() => setFilters(f))}
-                cards={tab === 0 ? viewCards : cardsWithImages}
-                resultCount={tab === 0 ? filteredBreakdown.reduce((s, c) => s + c.quantity, 0) : filteredGallery.length}
-                totalCount={tab === 0 ? viewCards.reduce((s, c) => s + c.quantity, 0) : cardsWithImages.length}
-              />
-
-              <Box sx={{ opacity: filterPending ? 0.5 : 1, transition: 'opacity 0.25s ease' }}>
-
-              {tab === 0 && (
-                <>
-                  {active && (
-                    <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap alignItems="center" sx={{ mb: 1.5 }}>
-                      <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>Filters:</Typography>
-                      {filters.nameFilter && (
-                        <Chip size="small" label={`"${filters.nameFilter}"`} variant="filled" sx={{ height: 20, fontSize: '0.68rem' }} />
-                      )}
-                      {filters.typeFilter.map(t => (
-                        <Chip key={t} size="small" label={t} color="primary" variant="filled" sx={{ height: 20, fontSize: '0.68rem' }} />
-                      ))}
-                      {filters.cmcFilter.map(n => (
-                        <Chip key={n} size="small" label={`CMC ${n}`} color="primary" variant="outlined" sx={{ height: 20, fontSize: '0.68rem' }} />
-                      ))}
-                      {filters.colorFilter.length > 0 && (
-                        <Chip
-                          size="small"
-                          label={`${filters.colorFilter.join('')} (${filters.colorMode}${filters.useColorIdentity ? ' · identity' : ''})`}
-                          variant="filled"
-                          sx={{ height: 20, fontSize: '0.68rem' }}
-                        />
-                      )}
-                      {filters.commanderOnly && <Chip size="small" label="Commander" color="secondary" variant="filled" sx={{ height: 20, fontSize: '0.68rem' }} />}
-                      {filters.proxyOnly    && <Chip size="small" label="Proxy"     color="warning"   variant="filled" sx={{ height: 20, fontSize: '0.68rem' }} />}
-                      {filters.dfcOnly      && <Chip size="small" label="DFC"       color="info"      variant="filled" sx={{ height: 20, fontSize: '0.68rem' }} />}
-                    </Stack>
-                  )}
-                  <DeckBreakdown cards={filteredBreakdown} showList sortOrder={filters.sortOrder} sortDirection={filters.sortDirection} useColorIdentity={filters.useColorIdentity} />
-                </>
-              )}
-
-              {tab === 1 && (
-                <>
-                  {galleryByType.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 4, textAlign: 'center' }}>
-                      No cards match the current filters.
-                    </Typography>
-                  ) : (
-                    <Stack spacing={3}>
-                      {galleryByType.map(({ type, cards: group }) => (
-                        <Box key={type}>
-                          <Typography variant="subtitle2" color="text.secondary"
-                            sx={{ mb: 1, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: 1 }}>
-                            {type} ({group.length})
-                          </Typography>
-                          <Grid container spacing={1}>
-                            {group.map((card, i) => (
-                              <Grid key={`${card.card_name}-${i}`} size={{ xs: 4, sm: 3, md: 2 }}>
-                                <GalleryCard card={card} />
-                              </Grid>
-                            ))}
-                          </Grid>
-                        </Box>
-                      ))}
-                    </Stack>
-                  )}
-
-                  {cardsWithoutImages.length > 0 && (
-                    <Box sx={{ mt: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                        No image available ({cardsWithoutImages.length})
-                      </Typography>
-                      <Stack spacing={0.5}>
-                        {cardsWithoutImages.map((card, i) => (
-                          <Typography key={`${card.card_name}-${i}`} variant="body2">
-                            {card.quantity > 1 ? `${card.quantity}× ` : ''}
-                            <CardTooltip name={card.card_name} style={{ borderBottom: '1px dotted currentColor' }}>
-                              {card.card_name}
-                            </CardTooltip>
-                          </Typography>
-                        ))}
-                      </Stack>
-                    </Box>
-                  )}
-                </>
-              )}
-
-              </Box>{/* end filterPending transition wrapper */}
-            </>
-          )}
-        </>
-      )}
-
-      {/* ── Attach to Deck Dialog ─────────────────────────────────────────── */}
-      <Dialog
-        open={attachOpen}
-        onClose={() => { setAttachOpen(false); setSelectedDeckId(''); }}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Attach to Deck</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            This will replace the selected deck&apos;s current card list with the cards from{' '}
-            <strong>{list.name}</strong>.
-          </Typography>
-          <FormControl fullWidth size="small">
-            <InputLabel>Deck</InputLabel>
-            <Select
-              value={selectedDeckId}
-              label="Deck"
-              onChange={e => setSelectedDeckId(e.target.value as number)}
+      {/* Soft-delete banner */}
+      {isDeleted && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 2 }}
+          action={
+            <Button
+              size="small"
+              startIcon={<RestoreIcon />}
+              onClick={handleRestore}
+              disabled={restoring}
             >
-              {decks.map(d => (
-                <MenuItem key={d.id} value={d.id}>
-                  {d.name}
-                  <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                    — {d.commander}
-                  </Typography>
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => { setAttachOpen(false); setSelectedDeckId(''); }}>Cancel</Button>
-          <Button variant="contained" disabled={!selectedDeckId || attaching} onClick={handleAttach}>
-            Attach
-          </Button>
-        </DialogActions>
-      </Dialog>
+              Restore
+            </Button>
+          }
+        >
+          This list is in the trash.
+        </Alert>
+      )}
+
+      {/* Toolbar */}
+      <CardListToolbar
+        buffer={buffer}
+        onBufferChange={handleBufferChange}
+        format={list.format}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        editMode={editMode}
+        onEditModeChange={setEditMode}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        onSave={handleSave}
+        onClear={handleClear}
+        listId={list.id}
+        deckContext={deckContext ?? null}
+        onDetachFromDeck={deckContext ? handleDetach : undefined}
+      />
+
+      {/* Card list */}
+      <CardListView
+        cards={buffer}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        editMode={editMode}
+        onChange={handleBufferChange}
+        filterState={filterState}
+        onFilterStateChange={setFilterState}
+        conflict={conflictProp}
+        onConflictResolve={handleConflictResolve}
+        deckContext={deckContext}
+      />
+
     </PageContainer>
   );
 }
 
 export default function ListDetailPage() {
   return (
-    <Suspense fallback={<LoadingSpinner message="Loading…" />}>
-      <ListDetailInner />
+    <Suspense fallback={
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+        <CircularProgress />
+      </Box>
+    }>
+      <ListPageInner />
     </Suspense>
   );
 }

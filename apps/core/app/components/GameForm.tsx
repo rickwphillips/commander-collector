@@ -41,8 +41,8 @@ interface DeckOption extends DeckWithPlayer {
 }
 
 interface PlayerResult {
-  player_id: number | '';
-  deck_id: number | '';
+  player_id: string | '';
+  deck_id: string | '';
   finish_position: number | '';
   eliminated_turn: number | '';
   team_number: number | null;
@@ -64,8 +64,8 @@ const default2hgResults: PlayerResult[] = [
 
 interface GameFormProps {
   mode: 'create' | 'edit';
-  gameId?: number;
-  onSuccess: (gameId: number) => void;
+  gameId?: string;
+  onSuccess: (gameId: string) => void;
 }
 
 export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
@@ -195,9 +195,9 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
   ) => {
     const newResults = [...results];
     if (field === 'player_id') {
-      newResults[index].player_id = value as number | '';
+      newResults[index].player_id = value as string | '';
     } else if (field === 'deck_id') {
-      newResults[index].deck_id = value as number | '';
+      newResults[index].deck_id = value as string | '';
       if (value !== '' && newResults[index].player_id === '') {
         const deck = decks.find((d) => d.id === value);
         if (deck) {
@@ -321,8 +321,8 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
       }
 
       const gameResults: GameResultInput[] = validResults.map((r) => ({
-        deck_id: r.deck_id as number,
-        player_id: r.player_id as number,
+        deck_id: r.deck_id as string,
+        player_id: r.player_id as string,
         finish_position: gameType === '2hg' ? (teamPositions[r.team_number ?? 0] ?? 2) : (r.finish_position as number),
         eliminated_turn:
           gameType === '2hg'
@@ -356,7 +356,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
     }
   };
 
-  const getSelectedDeck = (deckId: number | '') => {
+  const getSelectedDeck = (deckId: string | '') => {
     if (deckId === '') return null;
     return decks.find((d) => d.id === deckId);
   };
@@ -397,7 +397,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
             label="Player"
             value={result.player_id}
             onChange={(e) =>
-              updateResult(index, 'player_id', e.target.value === '' ? '' : Number(e.target.value))
+              updateResult(index, 'player_id', e.target.value)
             }
             sx={{ minWidth: 180 }}
             required
@@ -418,7 +418,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
             select
             label="Deck"
             value={result.deck_id}
-            onChange={(e) => updateResult(index, 'deck_id', Number(e.target.value))}
+            onChange={(e) => updateResult(index, 'deck_id', e.target.value)}
             fullWidth
             required
           >

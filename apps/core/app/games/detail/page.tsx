@@ -35,7 +35,7 @@ import type { GameWithResults } from '@/lib/types';
 export default function GameDetailPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const gameId = Number(searchParams.get('id'));
+  const gameId = searchParams.get('id') ?? '';
 
   const [game, setGame] = useState<GameWithResults | null>(null);
   const [loading, setLoading] = useState(!!gameId);

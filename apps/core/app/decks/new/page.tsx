@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Alert,
-  Autocomplete,
   Box,
   Button,
   Card,
@@ -18,175 +17,134 @@ import {
 } from '@mui/material';
 import { PageContainer } from '@/components/PageContainer';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { ManaSymbol } from '@/components/ManaSymbol';
-import { CardListImport } from '@/components/CardListImport';
-import { CardTooltip } from '@commander/shared/components/CardTooltip';
+import { CardLookupField } from '@/components/cards/CardLookupField';
 import { api } from '@/lib/api';
-import { scryfallCommanderSearch, scryfallPartnerSearch, scryfallGetCard, getOracleText, getCardArtCrop, type ScryfallCard, type ScryfallSearchResult } from '@/lib/scryfall';
-import { ManaCost } from '@/components/ManaCost';
-import { MTG_COLORS_WITH_C } from '@/lib/utils';
-import type { ParsedCard } from '@/lib/parseImport';
+import type { Card as CardData } from '@/lib/cards/types';
 import type { Player } from '@/lib/types';
+import type { CreateDeckInput } from '@/lib/types';
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Constants ──────────────────────────────────────────────────────────────────
+
+const FORMATS = [
+  'commander',
+  'standard',
+  'modern',
+  'pioneer',
+  'legacy',
+  'vintage',
+  'pauper',
+] as const;
+
+type Format = (typeof FORMATS)[number];
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+/** Union two color_identity strings (WUBRG chars) into a sorted WUBRG string or 'C'. */
+function unionColorIdentity(a: string, b?: string): string {
+  const WUBRG = ['W', 'U', 'B', 'R', 'G'];
+  const chars = new Set<string>(
+    [...(a ?? ''), ...(b ?? '')].filter((c) => WUBRG.includes(c))
+  );
+  const result = WUBRG.filter((c) => chars.has(c)).join('');
+  return result.length > 0 ? result : 'C';
+}
+
+// ── Component ──────────────────────────────────────────────────────────────────
+
+// CreateDeckInput doesn't expose has_* or format yet; cast via extension.
+type CreateDeckPayload = CreateDeckInput & {
+  has_w: number;
+  has_u: number;
+  has_b: number;
+  has_r: number;
+  has_g: number;
+  format: string;
+};
 
 export default function NewDeckPage() {
-  const router       = useRouter();
+  const router = useRouter();
 
   const [players,    setPlayers]    = useState<Player[]>([]);
   const [loading,    setLoading]    = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error,      setError]      = useState<string | null>(null);
 
-  // Deck fields
-  const [playerId,   setPlayerId]   = useState<number | ''>('');
+  // Form fields
+  const [playerId,   setPlayerId]   = useState<string>('');
   const [name,       setName]       = useState('');
-  const [commander,  setCommander]  = useState('');
-  const [colors,     setColors]     = useState<string[]>([]);
-
-  // Commander autocomplete
-  const [cmdrOptions, setCmdrOptions] = useState<ScryfallSearchResult[]>([]);
-  const cmdrDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Commander preview
-  const [cmdrArt, setCmdrArt] = useState<string | null>(null);
-  const [partnerArt, setPartnerArt] = useState<string | null>(null);
-  const cardCache = useRef(new Map<string, ScryfallCard>());
-
-  // Partner
-  const [hasPartner,         setHasPartner]         = useState(false);
-  const [partner,            setPartner]            = useState('');
-  const [partnerOptions,     setPartnerOptions]     = useState<ScryfallSearchResult[]>([]);
-  const [backgroundEligible, setBackgroundEligible] = useState(false);
-  const partnerDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const getCachedCard = async (name: string) => {
-    if (cardCache.current.has(name)) return cardCache.current.get(name)!;
-    const card = await scryfallGetCard(name);
-    if (card) cardCache.current.set(name, card);
-    return card;
-  };
-
-  const handleCommanderInput = (_: unknown, value: string) => {
-    setCommander(value);
-    const cached = cardCache.current.get(value);
-    if (cached) {
-      setCmdrArt(getCardArtCrop(cached));
-    }
-    if (cmdrDebounce.current) clearTimeout(cmdrDebounce.current);
-    if (value.length < 2) { setCmdrOptions([]); return; }
-    cmdrDebounce.current = setTimeout(async () => {
-      setCmdrOptions((await scryfallCommanderSearch(value)).slice(0, 8));
-    }, 300);
-  };
-
-  const handleCommanderSelect = async (_: unknown, value: string | null) => {
-    if (typeof value !== 'string') return;
-    setCommander(value);
-    const card = await getCachedCard(value);
-    if (card) {
-      setCmdrArt(getCardArtCrop(card));
-      const ci = card.color_identity ?? [];
-      setColors(ci.length > 0 ? ci : ['C']);
-      const hasBg = getOracleText(card).includes('Choose a Background');
-      setBackgroundEligible(hasBg);
-      if (!hasBg && backgroundEligible) {
-        setPartner('');
-        setPartnerOptions([]);
-        setPartnerArt(null);
-      }
-    } else {
-      setCmdrArt(null);
-    }
-  };
-
-  const handlePartnerInput = (_: unknown, value: string) => {
-    setPartner(value);
-    // Restore art instantly from cache if exact match
-    const cached = cardCache.current.get(value);
-    if (cached) {
-      setPartnerArt(getCardArtCrop(cached));
-    }
-    if (partnerDebounce.current) clearTimeout(partnerDebounce.current);
-    if (value.length < 2) { setPartnerOptions([]); return; }
-    partnerDebounce.current = setTimeout(async () => {
-      setPartnerOptions((await scryfallPartnerSearch(value, backgroundEligible)).slice(0, 8));
-    }, 300);
-  };
-
-  // Import
-  const [parsedCards,  setParsedCards]  = useState<ParsedCard[]>([]);
+  const [format,     setFormat]     = useState<Format>('commander');
+  const [commander,  setCommander]  = useState<CardData | null>(null);
+  const [hasPartner, setHasPartner] = useState(false);
+  const [partner,    setPartner]    = useState<CardData | null>(null);
 
   useEffect(() => {
     api.getPlayers()
-      .then(setPlayers)
+      .then((data) => {
+        setPlayers(data);
+        // No auto-select: let user choose explicitly.
+      })
       .catch(() => setError('Failed to load players'))
       .finally(() => setLoading(false));
   }, []);
 
-  const handleColorClick = (color: string) => {
-    const active = colors.includes(color);
-    if (color === 'C') {
-      setColors(active ? [] : ['C']);
-    } else {
-      const current = colors.filter((c) => c !== 'C');
-      setColors(active ? current.filter((c) => c !== color) : [...current, color]);
+  // Auto-suggest deck name when commander is picked and name is still blank.
+  useEffect(() => {
+    if (commander && !name.trim()) {
+      setName(`${commander.card_name} deck`);
+    }
+  }, [commander]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleCommanderChange = (card: CardData | null) => {
+    setCommander(card);
+    // If no name set yet, auto-fill; if name was auto-filled from old commander, replace it.
+    if (card) {
+      setName((prev) => {
+        if (!prev.trim() || (commander && prev === `${commander.card_name} deck`)) {
+          return `${card.card_name} deck`;
+        }
+        return prev;
+      });
     }
   };
 
-  const handleImport = (cards: ParsedCard[], deckName: string | null) => {
-    setParsedCards(cards);
-    if (!name.trim() && deckName) setName(deckName);
-    const cmdrs = cards.filter((c) => c.is_commander);
-    if (!commander.trim() && cmdrs[0]) setCommander(cmdrs[0].card_name);
-    if (cmdrs.length >= 2 && !partner.trim()) {
-      setHasPartner(true);
-      setPartner(cmdrs[1].card_name);
-    }
+  const handlePartnerToggle = (checked: boolean) => {
+    setHasPartner(checked);
+    if (!checked) setPartner(null);
   };
 
-  const handleSubmit = async (e: React.SyntheticEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!playerId || !name.trim() || !commander.trim()) {
-      setError('Please fill in all required fields');
-      return;
-    }
+
+    if (!playerId) { setError('Please select a player'); return; }
+    if (!name.trim()) { setError('Please enter a deck name'); return; }
+    if (!commander) { setError('Please select a commander'); return; }
 
     setSubmitting(true);
     setError(null);
 
     try {
-      const deck = await api.createDeck({
-        player_id: playerId as number,
+      const colors = unionColorIdentity(
+        commander.color_identity,
+        partner?.color_identity
+      );
+      const colorSet = new Set(colors === 'C' ? [] : [...colors]);
+
+      const payload: CreateDeckPayload = {
+        player_id: playerId,
         name:      name.trim(),
-        commander: commander.trim(),
-        partner:   hasPartner && partner.trim() ? partner.trim() : null,
-        colors:    colors.length > 0 ? colors.join('') : 'C',
-      });
+        commander: commander.card_name,
+        partner:   hasPartner && partner ? partner.card_name : null,
+        colors,
+        has_w: colorSet.has('W') ? 1 : 0,
+        has_u: colorSet.has('U') ? 1 : 0,
+        has_b: colorSet.has('B') ? 1 : 0,
+        has_r: colorSet.has('R') ? 1 : 0,
+        has_g: colorSet.has('G') ? 1 : 0,
+        format,
+      };
 
-      if (parsedCards.length > 0) {
-        const scryfallMap = new Map<string, string>();
-        try {
-          const { results } = await api.bulkLookupCards(parsedCards.map((c) => c.card_name));
-          for (const card of results) {
-            if (!card.error) scryfallMap.set(card.name.toLowerCase(), card.scryfall_id);
-          }
-        } catch { /* non-fatal */ }
-
-        await api.saveDeckCards(
-          deck.id,
-          parsedCards.map((c) => ({
-            card_name:    c.card_name,
-            scryfall_id:  scryfallMap.get(c.card_name.toLowerCase()) ?? null,
-            quantity:     c.quantity,
-            is_commander: c.is_commander,
-            is_proxy:     c.is_proxy,
-          }))
-        );
-        router.push(`/decks/detail?id=${deck.id}`);
-      } else {
-        router.push('/decks');
-      }
+      const deck = await api.createDeck(payload as CreateDeckInput);
+      router.push(`/decks/decklist?id=${encodeURIComponent(deck.id)}`);
     } catch {
       setError('Failed to create deck');
     } finally {
@@ -194,16 +152,41 @@ export default function NewDeckPage() {
     }
   };
 
+  // ── Loading state ────────────────────────────────────────────────────────────
+
   if (loading) {
     return (
-      <PageContainer title="Add Deck" backHref="/decks" backLabel="Back to Decks">
+      <PageContainer title="New Deck" backHref="/decks" backLabel="Back to Decks">
         <LoadingSpinner message="Loading..." />
       </PageContainer>
     );
   }
 
+  // ── Empty players guard ──────────────────────────────────────────────────────
+
+  if (players.length === 0) {
+    return (
+      <PageContainer title="New Deck" backHref="/decks" backLabel="Back to Decks">
+        <Alert severity="info">
+          No players found.{' '}
+          <Typography
+            component="a"
+            href="/players"
+            variant="body2"
+            sx={{ color: 'primary.main' }}
+          >
+            Add a player first
+          </Typography>{' '}
+          before creating a deck.
+        </Alert>
+      </PageContainer>
+    );
+  }
+
+  // ── Form ─────────────────────────────────────────────────────────────────────
+
   return (
-    <PageContainer title="Add Deck" backHref="/decks" backLabel="Back to Decks">
+    <PageContainer title="New Deck" backHref="/decks" backLabel="Back to Decks">
       {error && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
           {error}
@@ -212,179 +195,92 @@ export default function NewDeckPage() {
 
       <form onSubmit={handleSubmit}>
         <Stack spacing={3}>
-
-          {/* ── Deck metadata ── */}
           <Card>
-            <CardContent sx={{ p: 4 }}>
+            <CardContent sx={{ p: { xs: 2, sm: 4 } }}>
               <Stack spacing={3}>
+
+                {/* Player */}
                 <TextField
                   select
                   label="Player"
                   value={playerId}
-                  onChange={(e) => setPlayerId(Number(e.target.value))}
+                  onChange={(e) => setPlayerId(e.target.value)}
                   required
                   fullWidth
                 >
                   <MenuItem value="">Select a player</MenuItem>
-                  {players.map((player) => (
-                    <MenuItem key={player.id} value={player.id}>
-                      {player.name}
+                  {players.map((p) => (
+                    <MenuItem key={p.id} value={p.id}>
+                      {p.name}
                     </MenuItem>
                   ))}
                 </TextField>
 
+                {/* Deck name */}
                 <TextField
                   label="Deck Name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
                   fullWidth
-                  placeholder="e.g., Landfall Aggro"
+                  placeholder="e.g., Omnath Lands"
                 />
 
-                <Stack direction="row" spacing={2} alignItems="flex-start">
-                  <Box sx={{ flex: 1 }}>
-                    <Autocomplete<ScryfallSearchResult, false, false, true>
-                      freeSolo
-                      options={cmdrOptions}
-                      inputValue={commander}
-                      onInputChange={handleCommanderInput}
-                      onChange={(_, value) => handleCommanderSelect(_, typeof value === 'string' ? value : value?.name ?? null)}
-                      getOptionLabel={(opt) => typeof opt === 'string' ? opt : opt.name}
-                      filterOptions={(x) => x}
-                      renderOption={(props, opt) => (
-                        <li {...props} key={opt.name}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                            <span>{opt.name}</span>
-                            {opt.mana_cost && <ManaCost cost={opt.mana_cost} size={0.7} />}
-                          </Box>
-                        </li>
-                      )}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          label="Commander"
-                          required
-                          fullWidth
-                          placeholder="e.g., Omnath, Locus of Creation"
-                        />
-                      )}
-                    />
-                  </Box>
-                  <Box sx={{ flex: 1 }}>
-                    <Autocomplete<ScryfallSearchResult, false, false, true>
-                      freeSolo
-                      disabled={!hasPartner}
-                      options={partnerOptions}
-                      inputValue={partner}
-                      onInputChange={handlePartnerInput}
-                      onChange={async (_, value) => {
-                        const name = typeof value === 'string' ? value : value?.name;
-                        if (!name) return;
-                        setPartner(name);
-                        const card = await getCachedCard(name);
-                        if (card) {
-                          setPartnerArt(getCardArtCrop(card));
-                          if (card.color_identity?.length) {
-                            setColors((prev) => {
-                              const merged = [...new Set([...prev.filter(c => c !== 'C'), ...card.color_identity!])];
-                              return merged.length > 0 ? merged : ['C'];
-                            });
-                          }
-                        } else {
-                          setPartnerArt(null);
-                        }
-                      }}
-                      getOptionLabel={(opt) => typeof opt === 'string' ? opt : opt.name}
-                      filterOptions={(x) => x}
-                      renderOption={(props, opt) => (
-                        <li {...props} key={opt.name}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                            <span>{opt.name}</span>
-                            {opt.mana_cost && <ManaCost cost={opt.mana_cost} size={0.7} />}
-                          </Box>
-                        </li>
-                      )}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          label="Partner Commander"
-                          fullWidth
-                          placeholder={backgroundEligible ? 'Search partners or backgrounds…' : 'Search partner commanders…'}
-                        />
-                      )}
-                    />
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={hasPartner}
-                          onChange={(e) => {
-                            setHasPartner(e.target.checked);
-                            if (!e.target.checked) { setPartner(''); setPartnerOptions([]); setPartnerArt(null); }
-                          }}
-                          size="small"
-                        />
-                      }
-                      label="Partner Commander?"
-                      sx={{ mt: 0.5 }}
-                    />
-                  </Box>
-                </Stack>
+                {/* Commander */}
+                <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    Commander
+                  </Typography>
+                  <CardLookupField
+                    label="Commander"
+                    resultFilter={{ legendaryCreaturesOnly: true }}
+                    singletonMode
+                    placeholder="Search for a legendary permanent…"
+                    onChange={handleCommanderChange}
+                  />
+                </Box>
 
-                <Stack direction="row" alignItems="flex-start" justifyContent="space-between">
-                  {(cmdrArt || partnerArt) && (
-                    <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
-                      {cmdrArt && (
-                        <CardTooltip name={commander} placement="right">
-                          <Box
-                            component="img"
-                            src={cmdrArt}
-                            alt={commander}
-                            sx={{ width: 120, borderRadius: 2, boxShadow: 3 }}
-                          />
-                        </CardTooltip>
-                      )}
-                      {partnerArt && (
-                        <CardTooltip name={partner} placement="right">
-                          <Box
-                            component="img"
-                            src={partnerArt}
-                            alt={partner}
-                            sx={{ width: 120, borderRadius: 2, boxShadow: 3 }}
-                          />
-                        </CardTooltip>
-                      )}
-                    </Stack>
+                {/* Partner toggle + picker */}
+                <Box>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={hasPartner}
+                        onChange={(e) => handlePartnerToggle(e.target.checked)}
+                        size="small"
+                      />
+                    }
+                    label="Add a partner / background"
+                  />
+                  {hasPartner && (
+                    <Box sx={{ mt: 1 }}>
+                      <CardLookupField
+                        label="Partner"
+                        resultFilter={{ partnerOnly: true }}
+                        singletonMode
+                        placeholder="Search for a partner or background…"
+                        onChange={(card) => setPartner(card)}
+                      />
+                    </Box>
                   )}
-                  <Box>
-                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                      Color Identity
-                    </Typography>
-                    <Stack direction="row" spacing={1.5} alignItems="center">
-                      {MTG_COLORS_WITH_C.map((color) => (
-                        <ManaSymbol
-                          key={color}
-                          color={color}
-                          size={22}
-                          active={colors.includes(color)}
-                          dimmed
-                          onClick={cmdrArt ? undefined : () => handleColorClick(color)}
-                        />
-                      ))}
-                    </Stack>
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                      {colors.length === 0 ? 'Leave empty for colorless' : `Selected: ${colors.join('')}`}
-                    </Typography>
-                  </Box>
-                </Stack>
-              </Stack>
-            </CardContent>
-          </Card>
+                </Box>
 
-          {/* ── Card list import ── */}
-          <Card>
-            <CardContent sx={{ p: 4 }}>
-              <CardListImport onImport={handleImport} />
+                {/* Format */}
+                <TextField
+                  select
+                  label="Format"
+                  value={format}
+                  onChange={(e) => setFormat(e.target.value as Format)}
+                  fullWidth
+                >
+                  {FORMATS.map((f) => (
+                    <MenuItem key={f} value={f}>
+                      {f.charAt(0).toUpperCase() + f.slice(1)}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+              </Stack>
             </CardContent>
           </Card>
 
@@ -392,11 +288,10 @@ export default function NewDeckPage() {
             type="submit"
             variant="contained"
             size="large"
-            disabled={submitting}
+            disabled={submitting || !playerId || !name.trim() || !commander}
           >
-            {submitting ? 'Creating…' : parsedCards.length > 0 ? 'Create Deck & Import Cards' : 'Create Deck'}
+            {submitting ? 'Creating…' : 'Create Deck'}
           </Button>
-
         </Stack>
       </form>
     </PageContainer>

@@ -1,9 +1,12 @@
 <?php
 /**
- * Backfill scryfall_card_cache for any deck_cards missing from it.
+ * Backfill scryfall_card_cache for any list_cards missing from it.
  * Usage: php scripts/backfill-card-cache.php [deck_id,deck_id,...]
  *   e.g. php scripts/backfill-card-cache.php 21,22,23,24
  *        php scripts/backfill-card-cache.php   (backfills all missing)
+ *
+ * Phase 2.2 cutover: reads from list_cards (via lists.deck_id join) instead
+ * of deck_cards. The deck_id filter still works — it filters by lists.deck_id.
  */
 
 require_once getenv('HOME') . '/auth_secrets_dev.php';
@@ -14,20 +17,24 @@ $pdo = new PDO(
     [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
 );
 
-// Optionally filter to specific deck IDs passed as argv
+// Optionally filter to specific deck IDs passed as argv (filters by lists.deck_id)
 $deckFilter = '';
 if (!empty($argv[1])) {
     $ids = array_map('intval', explode(',', $argv[1]));
     $ph = implode(',', $ids);
-    $deckFilter = "AND dc.deck_id IN ($ph)";
+    $deckFilter = "AND l.deck_id IN ($ph)";
 }
 
-// Find all scryfall_ids not yet in cache
+// Find all scryfall_ids in list_cards not yet in cache
 $stmt = $pdo->query("
-    SELECT DISTINCT dc.scryfall_id
-    FROM deck_cards dc
-    LEFT JOIN scryfall_card_cache sc ON sc.scryfall_id = dc.scryfall_id
-    WHERE sc.scryfall_id IS NULL $deckFilter
+    SELECT DISTINCT lc.scryfall_id
+    FROM list_cards lc
+    JOIN lists l ON l.id = lc.list_id
+    LEFT JOIN scryfall_card_cache sc ON sc.scryfall_id = lc.scryfall_id
+    WHERE sc.scryfall_id IS NULL
+      AND lc.scryfall_id IS NOT NULL
+      AND l.deleted_at IS NULL
+      $deckFilter
 ");
 $missing = $stmt->fetchAll(PDO::FETCH_COLUMN);
 

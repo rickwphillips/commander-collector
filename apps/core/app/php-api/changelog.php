@@ -37,11 +37,11 @@ switch ($method) {
             // Get the highest current sort_order and add 1
             $maxSort = $pdo->query('SELECT COALESCE(MAX(sort_order), 0) FROM changelog_releases')->fetchColumn();
 
+            $releaseId = $pdo->query("SELECT UUID()")->fetchColumn();
             $stmt = $pdo->prepare(
-                'INSERT INTO changelog_releases (version, date, title, sort_order) VALUES (?, ?, ?, ?)'
+                'INSERT INTO changelog_releases (id, version, date, title, sort_order) VALUES (?, ?, ?, ?, ?)'
             );
-            $stmt->execute([$input['version'], $input['date'], $input['title'], $maxSort + 1]);
-            $releaseId = $pdo->lastInsertId();
+            $stmt->execute([$releaseId, $input['version'], $input['date'], $input['title'], $maxSort + 1]);
 
             if (!empty($input['changes'])) {
                 $changeStmt = $pdo->prepare(

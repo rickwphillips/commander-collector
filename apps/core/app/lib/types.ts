@@ -1,7 +1,12 @@
+// Canonical card type and API adapters (Phase 0 unified card workflow)
+export type { Card } from './cards/types';
+export { toApiCard, fromApiCard } from './cards/types';
+
 // Game type
 export type GameType = 'standard' | '2hg';
 
 // Scan draft (cross-device persistence)
+/** @deprecated Use Card from './cards/types' instead. */
 export interface ScannedCard {
   id: string;
   card_name: string;
@@ -21,13 +26,13 @@ export interface ScanDraft {
   step: number;
   cards: ScannedCard[];
   deckName: string;
-  playerId: number | '';
+  playerId: string | '';
   colors: string[];
 }
 
 // Scryfall card cache
 export interface ScryfallCachedCard {
-  id?: number;
+  id?: string;
   scryfall_id: string;
   name: string;
   image_uri: string | null;
@@ -40,9 +45,10 @@ export interface ScryfallCachedCard {
 }
 
 // Deck card list entry
+/** @deprecated Use Card from './cards/types' instead. */
 export interface DeckCard {
-  id?: number;
-  deck_id: number;
+  id?: string;
+  deck_id: string;
   scryfall_id: string | null;
   card_name: string;
   quantity: number;
@@ -65,9 +71,22 @@ export interface CreateDeckCardInput {
   is_proxy?: boolean;
 }
 
+/**
+ * Input shape for saving a card into a list (POST /lists?id=<uuid>).
+ * Mirror of CreateDeckCardInput — lists use the same wire shape.
+ * Introduced in Phase 2.2 Step 3 for the useList hook.
+ */
+export interface CreateListCardInput {
+  card_name: string;
+  scryfall_id?: string | null;
+  quantity?: number;
+  is_commander?: boolean;
+  is_proxy?: boolean;
+}
+
 // Card Lists (standalone, no commander restriction)
 export interface CardList {
-  id: number;
+  id: string;
   name: string;
   description: string | null;
   card_count: number;
@@ -79,9 +98,10 @@ export interface CardListDetail extends CardList {
   cards: ListCard[];
 }
 
+/** @deprecated Use Card from './cards/types' instead. */
 export interface ListCard {
-  id?: number;
-  list_id: number;
+  id?: string;
+  list_id: string;
   scryfall_id: string | null;
   card_name: string;
   quantity: number;
@@ -109,15 +129,15 @@ export interface CardPrint {
 
 // Database row types
 export interface Player {
-  id: number;
+  id: string;
   name: string;
-  user_id: number | null;
+  user_id: string | null;
   created_at: string;
 }
 
 export interface Deck {
-  id: number;
-  player_id: number;
+  id: string;
+  player_id: string;
   name: string;
   commander: string;
   partner: string | null;
@@ -131,7 +151,7 @@ export interface Deck {
 }
 
 export interface Game {
-  id: number;
+  id: string;
   played_at: string;
   winning_turn: number | null;
   notes: string | null;
@@ -140,10 +160,10 @@ export interface Game {
 }
 
 export interface GameResult {
-  id: number;
-  game_id: number;
-  deck_id: number;
-  player_id: number; // The player who piloted this deck (may differ from deck owner)
+  id: string;
+  game_id: string;
+  deck_id: string;
+  player_id: string; // The player who piloted this deck (may differ from deck owner)
   finish_position: number; // 1 = winner, 2-8 = order of elimination
   eliminated_turn: number | null;
   team_number: number | null; // 1 or 2 for 2HG, null for standard
@@ -177,7 +197,7 @@ export interface GameResultWithDeck extends GameResult {
 
 // Stats types
 export interface PlayerStats {
-  player_id: number;
+  player_id: string;
   player_name: string;
   total_games: number;
   wins: number;
@@ -186,7 +206,7 @@ export interface PlayerStats {
 }
 
 export interface DeckStats {
-  deck_id: number;
+  deck_id: string;
   deck_name: string;
   commander: string;
   colors: string;
@@ -206,9 +226,9 @@ export interface CommanderStats {
 }
 
 export interface HeadToHeadRecord {
-  player1_id: number;
+  player1_id: string;
   player1_name: string;
-  player2_id: number;
+  player2_id: string;
   player2_name: string;
   player1_wins: number;
   player2_wins: number;
@@ -236,7 +256,7 @@ export interface StatsResponse {
 }
 
 export interface RecentGame {
-  id: number;
+  id: string;
   played_at: string;
   winning_turn: number | null;
   winning_deck: string;
@@ -257,7 +277,7 @@ export interface ColorMetaStats {
 }
 
 export interface GameSizeEntry {
-  player_id: number;
+  player_id: string;
   player_name: string;
   games_played: number;
   wins: number;
@@ -272,7 +292,7 @@ export interface GameSizeStats {
 }
 
 export interface PlayerStreak {
-  player_id: number;
+  player_id: string;
   player_name: string;
   current_streak: number;
   current_streak_type: 'W' | 'L';
@@ -285,7 +305,7 @@ export interface PlayerStreak {
 }
 
 export interface DeckStreak {
-  deck_id: number;
+  deck_id: string;
   deck_name: string;
   commander: string;
   colors: string;
@@ -301,7 +321,7 @@ export interface DeckStreak {
 }
 
 export interface TwoHgPlayerStats {
-  player_id: number;
+  player_id: string;
   player_name: string;
   total_games: number;
   wins: number;
@@ -309,9 +329,9 @@ export interface TwoHgPlayerStats {
 }
 
 export interface TwoHgTeamPairing {
-  player1_id: number;
+  player1_id: string;
   player1_name: string;
-  player2_id: number;
+  player2_id: string;
   player2_name: string;
   total_games: number;
   wins: number;
@@ -319,7 +339,7 @@ export interface TwoHgTeamPairing {
 }
 
 export interface TwoHgRecentGame {
-  id: number;
+  id: string;
   played_at: string;
   winning_turn: number | null;
   notes: string | null;
@@ -405,7 +425,7 @@ export interface ComparisonConditions {
   min_winning_turn?: number;
   max_winning_turn?: number;
   min_finish_position?: number;
-  required_player_ids?: number[];
+  required_player_ids?: string[];
   required_commanders?: string[];
   date_from?: string;
   date_to?: string;
@@ -414,16 +434,16 @@ export interface ComparisonConditions {
   color_mode?: ColorFilterMode;
   my_games_only?: boolean;
   my_decks_only?: boolean;
-  opponent_player_ids?: number[];
+  opponent_player_ids?: string[];
   opponent_commanders?: string[];
   opponent_colors?: string[];
   opponent_color_mode?: ColorFilterMode;
-  exclude_player_ids?: number[];
+  exclude_player_ids?: string[];
 }
 
 export interface ComparisonEntityFilter {
-  player_ids?: number[];
-  deck_ids?: number[];
+  player_ids?: string[];
+  deck_ids?: string[];
   commanders?: string[];
   colors?: string[];
   color_mode?: ColorFilterMode; // mode for filter_colors — default 'and'
@@ -438,7 +458,7 @@ export interface ComparisonConfig {
 }
 
 export interface ComparisonEntityResult {
-  id: number | string;
+  id: string;
   label: string;
   sublabel?: string;
   commander?: string | null;
@@ -465,8 +485,8 @@ export interface ComparisonResult {
 
 // Stat Panel types
 export interface StatPanel {
-  id: number;
-  user_id: number;
+  id: string;
+  user_id: string;
   name: string;
   sections: string[];
   panel_type: PanelType;
@@ -499,7 +519,7 @@ export interface StatPanelsResponse {
 
 // Live game session types
 export interface LiveGameSession {
-  session_id: number;
+  session_id: string;
   seats: Record<string, string>; // { bottom: 'a3f9c12b', top: '...', ... }
   expires_at: string;
 }
@@ -554,8 +574,8 @@ export interface CommanderInfo {
 }
 
 export interface PlayerSetup {
-  playerId: number;
-  deckId: number;
+  playerId: string;
+  deckId: string;
   playerName: string;
   deckName: string;
   commander: CommanderInfo;
@@ -610,7 +630,7 @@ export interface CollectionSummary {
 }
 
 export interface CollectionDeck {
-  id: number;
+  id: string;
   name: string;
   commander: string;
   colors: string;
@@ -622,7 +642,7 @@ export interface CollectionDeck {
 }
 
 export interface CollectionGame {
-  game_id: number;
+  game_id: string;
   played_at: string;
   winning_turn: number | null;
   game_type: string;
@@ -644,7 +664,7 @@ export interface CollectionCommander {
 }
 
 export interface CollectionNemesis {
-  opponent_id: number;
+  opponent_id: string;
   opponent_name: string;
   games_together: number;
   their_wins: number;
@@ -680,7 +700,7 @@ export interface CollectionPodStat {
 }
 
 export interface CollectionList {
-  id: number;
+  id: string;
   name: string;
   description: string | null;
   card_count: number;
@@ -689,7 +709,7 @@ export interface CollectionList {
 }
 
 export interface MyCollectionResponse {
-  player: { id: number; name: string } | null;
+  player: { id: string; name: string } | null;
   summary: CollectionSummary | null;
   decks: CollectionDeck[];
   lists: CollectionList[];
@@ -708,7 +728,7 @@ export interface DeckProfile {
 }
 
 export interface CoachNote {
-  id: number;
+  id: string;
   topic: string;
   observation: string;
   reasoning: string | null;
@@ -733,7 +753,7 @@ export interface CreatePlayerInput {
 }
 
 export interface CreateDeckInput {
-  player_id: number;
+  player_id: string;
   name: string;
   commander: string;
   partner?: string | null;
@@ -741,8 +761,8 @@ export interface CreateDeckInput {
 }
 
 export interface GameResultInput {
-  deck_id: number;
-  player_id?: number; // Defaults to deck owner if omitted
+  deck_id: string;
+  player_id?: string; // Defaults to deck owner if omitted
   finish_position: number;
   eliminated_turn: number | null;
   team_number: number | null;

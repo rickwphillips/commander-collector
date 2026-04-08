@@ -21,7 +21,7 @@ export interface DeckActionsProps {
   /** Download TTS JSON */
   onTTS?: () => void;
   ttsBusy?: boolean;
-  /** Navigate to /decks/decklist */
+  /** Navigate to /decks/decklist?id=<deckId> */
   decklistHref?: string;
   /** Edit deck metadata (or enter card edit mode on decklist page) */
   onEdit?: () => void;

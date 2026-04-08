@@ -8,9 +8,9 @@ import { GameForm } from '@/components/GameForm';
 export default function EditGamePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const gameId = Number(searchParams.get('id'));
+  const gameId = searchParams.get('id') ?? '';
 
-  const handleSuccess = (id: number) => {
+  const handleSuccess = (id: string) => {
     router.push(`/games/detail?id=${id}`);
   };
 

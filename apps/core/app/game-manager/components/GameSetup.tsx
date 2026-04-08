@@ -53,8 +53,8 @@ const emptyCommander = (): CommanderFieldState => ({
 });
 
 interface PlayerSlot {
-  playerId: number | '';
-  deckId: number | '';
+  playerId: string | '';
+  deckId: string | '';
   commander: CommanderFieldState;
   hasPartner: boolean;
   partner: CommanderFieldState;
@@ -124,7 +124,7 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
               : emptyCommander(),
           })));
         } else if (process.env.NODE_ENV === 'development') {
-          const seen = new Set<number>();
+          const seen = new Set<string>();
           const devSlots: PlayerSlot[] = [];
           for (const deck of deckData) {
             if (seen.has(deck.player_id)) continue;
@@ -158,11 +158,11 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
     setSlots((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
   }, []);
 
-  const handlePlayerChange = (idx: number, playerId: number | '') => {
+  const handlePlayerChange = (idx: number, playerId: string | '') => {
     updateSlot(idx, { playerId });
   };
 
-  const handleDeckChange = (idx: number, deckId: number | '') => {
+  const handleDeckChange = (idx: number, deckId: string | '') => {
     const deck = decks.find((d) => d.id === deckId);
     const commanderName = deck?.commander ?? '';
     const ownerPlayerId = deck?.player_id ?? '';
@@ -290,7 +290,7 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
   const handleRandom = useCallback(() => {
     setError(null);
     const shuffled = [...decks].sort(() => Math.random() - 0.5);
-    const seen = new Set<number>();
+    const seen = new Set<string>();
     const picked: DeckWithPlayer[] = [];
     for (const deck of shuffled) {
       if (seen.has(deck.player_id)) continue;
@@ -348,8 +348,8 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
       const deck = decks.find((d) => d.id === s.deckId);
       const player = players.find((p) => p.id === s.playerId);
       const setup: PlayerSetup = {
-        playerId: s.playerId as number,
-        deckId: s.deckId as number,
+        playerId: s.playerId as string,
+        deckId: s.deckId as string,
         playerName: player?.name ?? `Player ${i + 1}`,
         deckName: deck?.name ?? '',
         commander: { name: s.commander.name, artCropUrl: s.commander.artCropUrl },
@@ -445,7 +445,7 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
               label="Deck"
               value={slot.deckId}
               onChange={(e) =>
-                handleDeckChange(idx, e.target.value === '' ? '' : Number(e.target.value))
+                handleDeckChange(idx, e.target.value)
               }
               size="small"
               fullWidth
@@ -478,7 +478,7 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
               label="Player"
               value={slot.playerId}
               onChange={(e) =>
-                handlePlayerChange(idx, e.target.value === '' ? '' : Number(e.target.value))
+                handlePlayerChange(idx, e.target.value)
               }
               size="small"
               fullWidth

@@ -9,7 +9,7 @@ $db     = getDB();
 // GET /rules/conversations.php           → list all conversations
 // GET /rules/conversations.php?id=123    → single conversation + messages
 if ($method === 'GET') {
-    $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+    $id = isset($_GET['id']) ? (string)$_GET['id'] : null;
 
     if ($id) {
         $conv = $db->prepare("SELECT * FROM rules_conversations WHERE id = ?");
@@ -40,17 +40,18 @@ if ($method === 'POST') {
     $input = getJSONInput();
     $title = trim($input['title'] ?? '');
 
-    $stmt = $db->prepare("INSERT INTO rules_conversations (title) VALUES (?)");
-    $stmt->execute([$title ?: null]);
-    $id   = (int)$db->lastInsertId();
+    $newId = $db->query("SELECT UUID()")->fetchColumn();
+    $stmt = $db->prepare("INSERT INTO rules_conversations (id, title) VALUES (?, ?)");
+    $stmt->execute([$newId, $title ?: null]);
 
-    $row = $db->query("SELECT * FROM rules_conversations WHERE id = $id")->fetch();
-    sendJSON(['conversation' => $row], 201);
+    $fetchStmt = $db->prepare("SELECT * FROM rules_conversations WHERE id = ?");
+    $fetchStmt->execute([$newId]);
+    sendJSON(['conversation' => $fetchStmt->fetch()], 201);
 }
 
 // DELETE /rules/conversations.php?id=123
 if ($method === 'DELETE') {
-    $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+    $id = (string)($_GET['id'] ?? '');
     if (!$id) sendError('id is required');
 
     $stmt = $db->prepare("DELETE FROM rules_conversations WHERE id = ?");

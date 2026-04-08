@@ -45,21 +45,24 @@ $cardsByDeck = [];
 if (!empty($deckIds)) {
     $placeholders = implode(',', array_fill(0, count($deckIds), '?'));
     $stmt = $db->prepare("
-        SELECT deck_id, card_name, is_commander
-        FROM deck_cards
-        WHERE deck_id IN ($placeholders)
-        ORDER BY is_commander DESC, card_name ASC
+        SELECT l.deck_id, lc.card_name,
+               (lc.role = 'commander') AS is_commander,
+               lc.role
+        FROM list_cards lc
+        JOIN lists l ON l.id = lc.list_id
+        WHERE l.deck_id IN ($placeholders) AND l.role = 'main' AND l.deleted_at IS NULL
+        ORDER BY l.deck_id, (lc.role = 'commander') DESC, lc.card_name ASC
     ");
     $stmt->execute($deckIds);
     foreach ($stmt->fetchAll() as $row) {
-        $cardsByDeck[(int)$row['deck_id']][] = $row['card_name'];
+        $cardsByDeck[(string)$row['deck_id']][] = $row['card_name'];
     }
 }
 
 // Build response
 $gamePlayers = [];
 foreach ($players as $p) {
-    $deckId = isset($p['deckId']) ? (int)$p['deckId'] : null;
+    $deckId = isset($p['deckId']) ? (string)$p['deckId'] : null;
     $cards  = ($deckId && isset($cardsByDeck[$deckId])) ? $cardsByDeck[$deckId] : [];
     $gamePlayers[] = [
         'playerName' => $p['playerName'] ?? 'Unknown',
