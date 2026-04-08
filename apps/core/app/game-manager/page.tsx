@@ -158,6 +158,20 @@ export default function GameManagerPage() {
     api.updateLiveGame(state.sessionCode, state).catch(() => {});
   }, [state.sessionCode]);
 
+  // Guard against accidental refresh / close-tab / browser-back while a game is
+  // in progress. Browser shows its native "Leave site?" prompt; we cannot
+  // customize the wording (anti-phishing measure). In-app <Link> clicks in the
+  // layout header bypass this — there is no router-level nav guard in App Router.
+  useEffect(() => {
+    if (state.phase !== 'playing') return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [state.phase]);
+
   // Poll for remote events. The host is the sole writer of full state; remotes
   // append typed events to the queue instead. We consume (read + clear) the queue
   // every second and apply any events to our local state. The existing write effect
