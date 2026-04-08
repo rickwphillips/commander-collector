@@ -18,18 +18,15 @@ import {
 } from '@mui/material';
 
 import {
-  CardListView,
-  CardListToolbar,
   FlipCard,
   CardTile,
-  CardSearchDialog,
   DeleteImpactDialog,
   Trash,
   CardInputPanel,
   SaveToListDialog,
   CardLookupField,
 } from '@/components/cards';
-import type { SaveDestination, TrashItem } from '@/components/cards';
+import type { TrashItem } from '@/components/cards';
 import type { Card } from '@/lib/cards/types';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -149,20 +146,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function CardsSandboxPage() {
 
-  // ── Section 1: CardListView + CardListToolbar ─────────────────────────────
-  // Single buffer shared between toolbar (for adds) and view (for display).
-  const [listCards, setListCards] = useState<Card[]>(FIXTURE_250);
-  const [editMode, setEditMode] = useState(false);
-  const [viewMode, setViewMode] = useState<'gallery' | 'text' | 'breakdown'>('gallery');
-  const [canUndo] = useState(false);
-  const [canRedo] = useState(false);
-
   // ── Section 2: FlipCard ───────────────────────────────────────────────────
   const [controlledFlipped, setControlledFlipped] = useState(false);
-
-  // ── Section 4: CardSearchDialog ───────────────────────────────────────────
-  const [searchAddOpen, setSearchAddOpen] = useState(false);
-  const [searchEditOpen, setSearchEditOpen] = useState(false);
 
   // ── Section 5: DeleteImpactDialog ─────────────────────────────────────────
   const [deleteDeckOpen, setDeleteDeckOpen] = useState(false);
@@ -189,54 +174,6 @@ export default function CardsSandboxPage() {
       <Alert severity="warning" sx={{ mb: 4, fontWeight: 700 }}>
         DEV SANDBOX — not for production use. All actions are local state only.
       </Alert>
-
-      {/* ── Section 1: CardListView ────────────────────────────────────────── */}
-      <Section title="1. CardListView + CardListToolbar (250-card fixture)">
-        <CardListToolbar
-          buffer={listCards}
-          onBufferChange={(cards) => {
-            console.log('[sandbox] onBufferChange', cards.length);
-            setListCards(cards);
-          }}
-          viewMode={viewMode}
-          onViewModeChange={(m) => {
-            console.log('[sandbox] onViewModeChange', m);
-            setViewMode(m);
-          }}
-          editMode={editMode}
-          onEditModeChange={(v) => {
-            console.log('[sandbox] onEditModeChange', v);
-            setEditMode(v);
-          }}
-          canUndo={canUndo}
-          canRedo={canRedo}
-          onUndo={() => console.log('[sandbox] undo')}
-          onRedo={() => console.log('[sandbox] redo')}
-          onSave={(dest: SaveDestination) => console.log('[sandbox] onSave', dest)}
-          onClear={() => {
-            console.log('[sandbox] onClear');
-            setListCards([]);
-          }}
-          deckContext={{ id: 'fake-deck-1', name: 'Sandbox Deck' }}
-          onDetachFromDeck={() => console.log('[sandbox] onDetachFromDeck')}
-          decks={FAKE_DECKS}
-          lists={FAKE_LISTS}
-        />
-        <CardListView
-          cards={listCards}
-          viewMode={viewMode}
-          onViewModeChange={(m) => {
-            console.log('[sandbox] listview onViewModeChange', m);
-            setViewMode(m);
-          }}
-          editMode={editMode}
-          onChange={(cards) => {
-            console.log('[sandbox] onChange', cards.length, 'cards');
-            setListCards(cards);
-          }}
-          deckContext={{ id: 'fake-deck-1', name: 'Sandbox Deck' }}
-        />
-      </Section>
 
       {/* ── Section 2: FlipCard ───────────────────────────────────────────── */}
       <Section title="2. FlipCard — uncontrolled / controlled / no-back">
@@ -328,45 +265,6 @@ export default function CardsSandboxPage() {
             />
           </Box>
         </Stack>
-      </Section>
-
-      {/* ── Section 4: CardSearchDialog ───────────────────────────────────── */}
-      <Section title="4. CardSearchDialog — add mode / edit mode">
-        <Stack direction="row" spacing={2}>
-          <Button variant="outlined" onClick={() => setSearchAddOpen(true)}>
-            Open (add mode)
-          </Button>
-          <Button variant="outlined" onClick={() => setSearchEditOpen(true)}>
-            Open (edit mode)
-          </Button>
-        </Stack>
-
-        <CardSearchDialog
-          open={searchAddOpen}
-          mode="add"
-          onCancel={() => {
-            console.log('[sandbox] CardSearchDialog add cancel');
-            setSearchAddOpen(false);
-          }}
-          onConfirm={(cards) => {
-            console.log('[sandbox] CardSearchDialog add confirm', cards);
-            setSearchAddOpen(false);
-          }}
-        />
-
-        <CardSearchDialog
-          open={searchEditOpen}
-          mode="edit"
-          initialCard={FIXTURE_CARD}
-          onCancel={() => {
-            console.log('[sandbox] CardSearchDialog edit cancel');
-            setSearchEditOpen(false);
-          }}
-          onConfirm={(cards) => {
-            console.log('[sandbox] CardSearchDialog edit confirm', cards);
-            setSearchEditOpen(false);
-          }}
-        />
       </Section>
 
       {/* ── Section 5: DeleteImpactDialog ─────────────────────────────────── */}

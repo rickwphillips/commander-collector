@@ -129,8 +129,11 @@ export function matchesFilters(
   }
   if (f.colorFilter.length) {
     const isLand = card.type_line?.includes('Land') ?? false;
-    // Lands always use color_identity for filtering (their colors field is always empty)
-    const raw = (f.useColorIdentity || isLand) ? (card.color_identity ?? '') : (card.colors ?? '');
+    // Lands have no `colors` (no mana cost). In Color mode they're colorless (match
+    // C only). In Identity mode they match by `color_identity`.
+    const raw = f.useColorIdentity
+      ? (card.color_identity ?? '')
+      : (isLand ? '' : (card.colors ?? ''));
     const cardColors = [...raw].filter(ch => 'WUBRG'.includes(ch));
     const isColorless = cardColors.length === 0;
     const cardSet = isColorless ? new Set(['C']) : new Set(cardColors);
@@ -438,7 +441,9 @@ export function DeckFilters({ filters, onChange, resultCount, totalCount, cards 
 
             const selected  = isBasic ? colorFilter.includes(sym) : manaSymbolFilter.includes(sym);
             const valid     = isBasic ? validColors.has(sym as typeof MTG_COLORS[number]) : validManaSymbols.has(sym);
-            const disabled  = !valid && !selected;
+            // In identity mode, only WUBRGC are valid identity components — hybrid/Phyrexian/twobrid are mana cost symbols, not identities.
+            const identityBlocked = useColorIdentity && !isBasic;
+            const disabled  = identityBlocked || (!valid && !selected);
             const opacity   = disabled ? 0.2 : (selected || !anyPipSelected) ? 1 : 0.4;
             const onClick   = disabled ? undefined : () => isBasic ? toggleColor(sym) : toggleManaSymbol(sym);
             const label     = isBasic ? (COLOR_NAMES[sym] ?? sym) : (SYMBOL_NAMES[sym] ?? sym);

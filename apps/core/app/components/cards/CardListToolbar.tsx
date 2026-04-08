@@ -65,9 +65,9 @@ export interface CardListToolbarProps {
   /** Format context for CardInputPanel singleton default */
   format?: string;
 
-  /** View-mode controls */
-  viewMode: 'gallery' | 'text' | 'breakdown';
-  onViewModeChange: (mode: 'gallery' | 'text' | 'breakdown') => void;
+  /** View-mode controls — optional. When omitted, the view-mode toggle is hidden. */
+  viewMode?: 'text' | 'gallery';
+  onViewModeChange?: (mode: 'text' | 'gallery') => void;
 
   /** Edit mode controls */
   editMode: boolean;
@@ -83,8 +83,24 @@ export interface CardListToolbarProps {
   onSave: (destination: SaveDestination) => void;
   onClear: () => void;
 
+  /**
+   * Optional simple-save handler. When provided AND the editor has a current
+   * list to save into, the primary Save button calls this directly (no dialog).
+   * The "Save as…" button still opens the destination dialog for advanced cases.
+   */
+  onSimpleSave?: () => void;
+
+  /** When true, the buffer differs from the server — Save button is highlighted. */
+  isDirty?: boolean;
+
   /** Optional list metadata for export */
   listId?: string;
+
+  /**
+   * The current list being edited, if any. Forwarded to SaveToListDialog so it
+   * can hide tabs that don't make sense (e.g. attach-to-deck for already-attached).
+   */
+  currentList?: { id: string; name: string; deck_id: string | null } | null;
 
   /** When set, the "detach from deck" button is rendered */
   deckContext?: { id: string; name: string } | null;
@@ -111,7 +127,10 @@ export function CardListToolbar({
   onRedo,
   onSave,
   onClear,
+  onSimpleSave,
+  isDirty = false,
   listId,
+  currentList,
   deckContext,
   onDetachFromDeck,
   decks = [],
@@ -194,12 +213,12 @@ export function CardListToolbar({
 
   function handleViewModeChange(
     _: React.MouseEvent<HTMLElement>,
-    newMode: 'gallery' | 'text' | 'breakdown' | null,
+    newMode: 'text' | 'gallery' | null,
   ) {
     // ToggleButtonGroup can emit null if the selected button is clicked again;
     // keep the current selection in that case.
     if (newMode !== null) {
-      onViewModeChange(newMode);
+      onViewModeChange?.(newMode);
     }
   }
 
@@ -330,31 +349,28 @@ export function CardListToolbar({
             </Button>
           </Tooltip>
 
-          {/* 2. View mode toggle — always visible */}
-          <ToggleButtonGroup
-            value={viewMode}
-            exclusive
-            onChange={handleViewModeChange}
-            size="small"
-            aria-label="View mode"
-            sx={{ flexShrink: 0 }}
-          >
-            <ToggleButton value="gallery" aria-label="Gallery view">
-              <Tooltip title="Gallery">
-                <GridViewIcon fontSize="small" />
-              </Tooltip>
-            </ToggleButton>
-            <ToggleButton value="text" aria-label="Text view">
-              <Tooltip title="Text list">
-                <SubjectIcon fontSize="small" />
-              </Tooltip>
-            </ToggleButton>
-            <ToggleButton value="breakdown" aria-label="Breakdown view">
-              <Tooltip title="Breakdown by type">
-                <TableChartIcon fontSize="small" />
-              </Tooltip>
-            </ToggleButton>
-          </ToggleButtonGroup>
+          {/* 2. View mode toggle — only when caller provides viewMode */}
+          {viewMode !== undefined && (
+            <ToggleButtonGroup
+              value={viewMode}
+              exclusive
+              onChange={handleViewModeChange}
+              size="small"
+              aria-label="View mode"
+              sx={{ flexShrink: 0 }}
+            >
+              <ToggleButton value="text" aria-label="Text view">
+                <Tooltip title="Text list">
+                  <SubjectIcon fontSize="small" />
+                </Tooltip>
+              </ToggleButton>
+              <ToggleButton value="gallery" aria-label="Gallery view">
+                <Tooltip title="Gallery">
+                  <GridViewIcon fontSize="small" />
+                </Tooltip>
+              </ToggleButton>
+            </ToggleButtonGroup>
+          )}
 
           {/* 3. Edit mode toggle — always visible */}
           <Tooltip title={editMode ? 'Exit edit mode' : 'Enter edit mode'}>
@@ -424,20 +440,59 @@ export function CardListToolbar({
             secondaryActions
           )}
 
-          {/* 6. Save — always visible */}
-          <Tooltip title="Save cards">
+          {/* 6. Save — primary action, simple commit. Pulses red when dirty. */}
+          <Tooltip
+            title={
+              onSimpleSave
+                ? (isDirty ? 'Unsaved changes — click to save' : 'Save changes')
+                : 'Save cards to a list or deck'
+            }
+          >
             <Button
               variant="contained"
+              color={isDirty ? 'error' : 'primary'}
               size="small"
               startIcon={<SaveIcon />}
-              onClick={handleSaveClick}
-              aria-label="Save cards to a list or deck"
-              aria-haspopup="dialog"
-              sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+              onClick={onSimpleSave ?? handleSaveClick}
+              aria-label={isDirty ? 'Save unsaved changes' : 'Save cards'}
+              aria-haspopup={onSimpleSave ? undefined : 'dialog'}
+              sx={{
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
+                ...(isDirty && {
+                  animation: 'savePulse 1.6s ease-in-out infinite',
+                  '@keyframes savePulse': {
+                    '0%, 100%': {
+                      boxShadow: (theme) => `0 0 0 0 ${theme.palette.error.main}`,
+                      transform: 'scale(1)',
+                    },
+                    '50%': {
+                      boxShadow: (theme) => `0 0 0 6px ${theme.palette.error.main}33`,
+                      transform: 'scale(1.04)',
+                    },
+                  },
+                }),
+              }}
             >
-              Save
+              {isDirty ? 'Save *' : 'Save'}
             </Button>
           </Tooltip>
+
+          {/* 7. Save as… — only when there's a simple-save target; advanced destinations live here */}
+          {onSimpleSave && (
+            <Tooltip title="Save to a different list or deck…">
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={handleSaveClick}
+                aria-label="Save as new list or deck"
+                aria-haspopup="dialog"
+                sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+              >
+                Save as…
+              </Button>
+            </Tooltip>
+          )}
         </Toolbar>
       </AppBar>
 
@@ -532,6 +587,7 @@ export function CardListToolbar({
         open={saveOpen}
         buffer={buffer}
         deckContext={deckContext}
+        currentList={currentList}
         decks={decks}
         lists={lists}
         onCancel={handleSaveCancel}

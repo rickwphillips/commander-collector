@@ -145,7 +145,10 @@ interface ApiListByDeckRow {
 export function useList(opts: UseListOptions): UseListResult {
   const [list, setList] = useState<ListMeta | null>(null);
   const [cards, setCards] = useState<Card[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Initialize loading=true if there's an id/deckId to fetch — otherwise the
+  // first render flashes "no list" and any "redirect on missing list" effect
+  // in the caller fires before the fetch even starts.
+  const [loading, setLoading] = useState<boolean>(Boolean(opts.id || opts.deckId));
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
 
@@ -261,7 +264,7 @@ export function useList(opts: UseListOptions): UseListResult {
       const result = await apiFetch<{ success: boolean; version: number; conflict?: boolean }>(
         `/lists?id=${encodeURIComponent(list.id)}`,
         {
-          method: 'POST',
+          method: 'PATCH',
           body: JSON.stringify({ cards: payload, version: list.version }),
         }
       );

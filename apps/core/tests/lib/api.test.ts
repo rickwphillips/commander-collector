@@ -108,7 +108,7 @@ describe('api methods', () => {
   });
 
   it('api.createGame(data) POSTs with correct JSON body', async () => {
-    const fetchMock = mockFetch(200, { id: 1 });
+    const fetchMock = mockFetch(200, { id: '00000000-0000-0000-0000-000000000001' });
     vi.stubGlobal('fetch', fetchMock);
     const data = {
       played_at: '2026-02-22',

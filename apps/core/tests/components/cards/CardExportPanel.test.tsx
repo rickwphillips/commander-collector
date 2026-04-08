@@ -131,7 +131,7 @@ describe('CardExportPanel', () => {
   });
 
   it('TTS button is enabled when listId is provided', () => {
-    render(<CardExportPanel cards={sampleCards} listId={42} />);
+    render(<CardExportPanel cards={sampleCards} listId="42" />);
     expect(screen.getByLabelText('Download Tabletop Simulator JSON')).not.toBeDisabled();
   });
 

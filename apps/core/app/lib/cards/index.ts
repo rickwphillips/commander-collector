@@ -18,7 +18,6 @@ export * from './fromScryfall';
 export * from './tempId';
 
 export * from './categorize';
-export * from './filter';
 export * from './colorIdentity';
 export * from './matchKey';
 export * from './mergeIntoBuffer';

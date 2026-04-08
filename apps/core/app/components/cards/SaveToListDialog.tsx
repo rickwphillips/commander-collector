@@ -82,6 +82,12 @@ export interface SaveToListDialogProps {
   buffer: Card[];
   /** Currently-attached deck context, if any. Pre-selects the "into-deck" tab. */
   deckContext?: { id: string; name: string } | null;
+  /**
+   * The current list being edited, if any. When set, "save into the same list"
+   * branches are hidden — that's what the primary Save button is for. The dialog
+   * is reserved for *different* destinations.
+   */
+  currentList?: { id: string; name: string; deck_id: string | null } | null;
   /** Existing decks for the "attach to deck" picker */
   decks: Array<{ id: string; name: string }>;
   /** Existing lists for the "append to list" picker */
@@ -100,15 +106,27 @@ function todayISO(): string {
 }
 
 /**
- * Derive a default name from the buffer. Checks `role === 'commander'` first
- * (list-native, Phase 2+), then falls back to `is_commander` (deck-native).
- * Returns null when no commander card is found in the buffer.
+ * Find the commander Card in the buffer (if any). Checks `role === 'commander'`
+ * first (list-native, Phase 2+), then falls back to `is_commander` (deck-native).
  */
-function commanderNameFromBuffer(buffer: Card[]): string | null {
-  const cmd =
+function commanderCardFromBuffer(buffer: Card[]): Card | null {
+  return (
     buffer.find((c) => c.role === 'commander') ??
-    buffer.find((c) => c.is_commander);
-  return cmd?.card_name ?? null;
+    buffer.find((c) => c.is_commander) ??
+    null
+  );
+}
+
+/** Same, but the partner slot. */
+function partnerCardFromBuffer(buffer: Card[]): Card | null {
+  return (
+    buffer.find((c) => c.role === 'partner') ??
+    null
+  );
+}
+
+function commanderNameFromBuffer(buffer: Card[]): string | null {
+  return commanderCardFromBuffer(buffer)?.card_name ?? null;
 }
 
 function defaultListName(buffer: Card[]): string {
@@ -644,6 +662,7 @@ export function SaveToListDialog({
   open,
   buffer,
   deckContext,
+  currentList,
   decks,
   lists,
   onCancel,
@@ -657,10 +676,35 @@ export function SaveToListDialog({
   // Focus-return ref: capture the trigger element when the dialog opens.
   const triggerRef = useRef<Element | null>(null);
 
+  // ── Visible tabs ────────────────────────────────────────────────────────────
+  // Hide destinations that don't make sense in the current context. The primary
+  // Save button (in CardListToolbar) handles the same-list save case; this
+  // dialog is for *different* destinations only.
+  //
+  // Rules:
+  //   - new-list:        always available (you can always fork to a new list)
+  //   - new-deck:        always available (you can always fork to a new deck)
+  //   - attach-to-deck:  HIDDEN when current list is already deck-attached
+  //                      (it's already in a deck — re-attach is meaningless)
+  //   - into-deck:       HIDDEN when there's no deck context
+  //                      ALSO hidden when current list IS the deck's main list
+  //                      (that case is just "Save", handled by the primary button)
+  //   - append-to-list:  HIDDEN when there are no other lists to append into
+  const visibleTabs = TAB_ORDER.filter((kind) => {
+    switch (kind) {
+      case 'new-list':       return true;
+      case 'new-deck':       return true;
+      case 'attach-to-deck': return !currentList?.deck_id;
+      case 'into-deck':      return !!deckContext && currentList?.deck_id !== deckContext.id;
+      case 'append-to-list': return lists.filter((l) => l.id !== currentList?.id).length > 0;
+    }
+  });
+
   // ── Derive initial tab ──────────────────────────────────────────────────────
   const initialTab: SaveDestination['kind'] =
-    defaultDestination ??
-    (deckContext ? 'into-deck' : 'new-list');
+    (defaultDestination && visibleTabs.includes(defaultDestination))
+      ? defaultDestination
+      : (visibleTabs[0] ?? 'new-list');
 
   // ── Tab state ───────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<SaveDestination['kind']>(initialTab);
@@ -673,13 +717,15 @@ export function SaveToListDialog({
   const [newListName,   setNewListName]   = useState(() => defaultListName(buffer));
   const [newListFormat, setNewListFormat] = useState<Format>('commander');
 
-  // ── new-deck state ──────────────────────────────────────────────────────────
+  // ── new-deck state — auto-pick commander/partner from the buffer ───────────
+  const bufferCommander = commanderCardFromBuffer(buffer);
+  const bufferPartner   = partnerCardFromBuffer(buffer);
   const [newDeckName,        setNewDeckName]        = useState(() => defaultDeckName(buffer));
   const [newDeckListName,    setNewDeckListName]     = useState('Main');
   const [newDeckFormat,      setNewDeckFormat]       = useState<Format>('commander');
-  const [pickedCommander,    setPickedCommander]     = useState<Card | null>(null);
-  const [pickedPartner,      setPickedPartner]       = useState<Card | null>(null);
-  const [showPartnerPicker,  setShowPartnerPicker]   = useState(false);
+  const [pickedCommander,    setPickedCommander]     = useState<Card | null>(bufferCommander);
+  const [pickedPartner,      setPickedPartner]       = useState<Card | null>(bufferPartner);
+  const [showPartnerPicker,  setShowPartnerPicker]   = useState(!!bufferPartner);
 
   // ── attach-to-deck state ────────────────────────────────────────────────────
   const [attachDeckId,       setAttachDeckId]        = useState<string | null>(null);
@@ -844,14 +890,13 @@ export function SaveToListDialog({
           allowScrollButtonsMobile
           aria-label="Save destination"
         >
-          {TAB_ORDER.map((kind) => (
+          {visibleTabs.map((kind) => (
             <Tab
               key={kind}
               value={kind}
               label={TAB_LABELS[kind]}
               id={`save-tab-${kind}`}
               aria-controls={`save-tabpanel-${kind}`}
-              disabled={kind === 'into-deck' && !deckContext}
               sx={{ minWidth: 100, fontSize: '0.8rem' }}
             />
           ))}
@@ -860,7 +905,7 @@ export function SaveToListDialog({
 
       {/* ── Panel content ──────────────────────────────────────────────────── */}
       <DialogContent>
-        {TAB_ORDER.map((kind) => (
+        {visibleTabs.map((kind) => (
           <Box
             key={kind}
             role="tabpanel"
@@ -918,7 +963,7 @@ export function SaveToListDialog({
                   <AppendToListPanel
                     listId={appendListId}
                     bufferCount={buffer.length}
-                    lists={lists}
+                    lists={lists.filter((l) => l.id !== currentList?.id)}
                     onChangeListId={setAppendListId}
                   />
                 )}

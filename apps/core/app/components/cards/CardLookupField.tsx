@@ -29,6 +29,7 @@ import {
   IconButton,
   InputAdornment,
   Paper,
+  Popper,
   Stack,
   TextField,
   Tooltip,
@@ -258,6 +259,7 @@ export function CardLookupField({
   const debounceRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef      = useRef<AbortController | null>(null);
   const resultsRef    = useRef<HTMLDivElement>(null);
+  const anchorRef     = useRef<HTMLDivElement>(null);
   // When the user hovers the result panel, freeze the list so new searches
   // can't shift rows out from under their click.
   const hoverInResults = useRef(false);
@@ -480,7 +482,7 @@ export function CardLookupField({
 
   return (
     <ClickAwayListener onClickAway={closeResults}>
-    <Box sx={{ position: 'relative', width: '100%' }}>
+    <Box ref={anchorRef} sx={{ position: 'relative', width: '100%' }}>
       {/* ── Input ─────────────────────────────────────────────────────────── */}
       <TextField
         id={inputId}
@@ -553,10 +555,19 @@ export function CardLookupField({
         </Typography>
       )}
 
-      {/* ── Result list ───────────────────────────────────────────────────── */}
-      {showResults && (
+      {/* ── Result list (portal'd via Popper to escape parent overflow:hidden) ── */}
+      <Popper
+        open={showResults}
+        anchorEl={anchorRef.current}
+        placement="bottom-start"
+        modifiers={[
+          { name: 'offset', options: { offset: [0, 4] } },
+          { name: 'preventOverflow', options: { boundary: 'viewport' } },
+        ]}
+        style={{ zIndex: 1400, width: anchorRef.current?.offsetWidth }}
+      >
         <Paper
-          elevation={4}
+          elevation={8}
           onMouseEnter={() => {
             hoverInResults.current = true;
             // Cancel any in-flight debounce so it doesn't fire while hovering.
@@ -569,11 +580,6 @@ export function CardLookupField({
             hoverInResults.current = false;
           }}
           sx={{
-            position: 'absolute',
-            top: 'calc(100% + 4px)',
-            left: 0,
-            right: 0,
-            zIndex: 1400,
             maxHeight: 360,
             overflowY: 'auto',
             borderRadius: 1,
@@ -631,7 +637,7 @@ export function CardLookupField({
             )}
           </Box>
         </Paper>
-      )}
+      </Popper>
     </Box>
     </ClickAwayListener>
   );

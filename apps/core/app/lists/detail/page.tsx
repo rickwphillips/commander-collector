@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
+import { Suspense, useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Alert,
@@ -16,31 +16,10 @@ import LinkIcon from '@mui/icons-material/Link';
 
 import { PageContainer } from '@/components/PageContainer';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { CardListView } from '@/components/cards/CardListView';
-import { CardListToolbar } from '@/components/cards/CardListToolbar';
+import { ListEditor } from '@/components/cards/ListEditor';
 import { useList } from '@/lib/lists/useList';
+import { useConfirm } from '@/lib/useConfirm';
 import { api } from '@/lib/api';
-import type { Card } from '@/lib/cards/types';
-import type { FilterSortState } from '@/lib/cards/filter';
-import type { SaveDestination } from '@/components/cards/SaveToListDialog';
-
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-const DEFAULT_FILTER_STATE: FilterSortState = { sort: 'name', sortDir: 'asc' };
-
-// ── Undo stack (simple array of Card[] snapshots, 50-step cap) ─────────────────
-
-interface UndoStack {
-  past: Card[][];
-  future: Card[][];
-}
-
-const UNDO_CAP = 50;
-
-function pushUndo(stack: UndoStack, snapshot: Card[]): UndoStack {
-  const past = [...stack.past, snapshot].slice(-UNDO_CAP);
-  return { past, future: [] };
-}
 
 // ── Inner component (uses useSearchParams) ────────────────────────────────────
 
@@ -69,19 +48,27 @@ function ListPageInner() {
   const [error, setError] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
 
-  // Edit state
-  const [editMode, setEditMode] = useState(false);
-  const [buffer, setBuffer] = useState<Card[]>([]);
-  const [viewMode, setViewMode] = useState<'gallery' | 'text' | 'breakdown'>('gallery');
-  const [filterState, setFilterState] = useState<FilterSortState>(DEFAULT_FILTER_STATE);
+  // ── Dirty guard ───────────────────────────────────────────────────────────
+  const [dirty, setDirty] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
-  // Undo/redo
-  const undoStack = useRef<UndoStack>({ past: [], future: [] });
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
-
-  // Conflict resolution
-  const [conflictProp, setConflictProp] = useState<{ serverCards: Card[] } | null>(null);
+  const confirmLeaveIfDirty = useCallback(
+    (e: React.MouseEvent<HTMLAnchorElement>) => {
+      if (!dirty) return;
+      e.preventDefault();
+      const href = e.currentTarget.getAttribute('href');
+      confirm({
+        title:        'Unsaved changes',
+        message:      'You have unsaved changes. Leave this page anyway?',
+        confirmLabel: 'Leave',
+        cancelLabel:  'Stay',
+        destructive:  true,
+      }).then((ok) => {
+        if (ok && href) router.push(href);
+      });
+    },
+    [dirty, confirm, router],
+  );
 
   // ── Load deck name when list has a deck_id ────────────────────────────────
 
@@ -105,16 +92,6 @@ function ListPageInner() {
     return () => { cancelled = true; };
   }, [list?.deck_id]);
 
-  // ── Sync buffer when cards load (or are reloaded) ─────────────────────────
-
-  useEffect(() => {
-    setBuffer(cards);
-    // Reset undo stack on reload
-    undoStack.current = { past: [], future: [] };
-    setCanUndo(false);
-    setCanRedo(false);
-  }, [cards]);
-
   // ── Redirect to /lists on 404 (list not found after load completes) ────────
 
   useEffect(() => {
@@ -123,85 +100,26 @@ function ListPageInner() {
     }
   }, [loading, listError, list, listId, router]);
 
-  // ── Conflict: propagate hook conflict into prop ───────────────────────────
-
-  useEffect(() => {
-    if (conflict) {
-      // Server cards are available via refresh; use current server-loaded cards
-      // as the conflict snapshot (the hook retains its server state on conflict).
-      setConflictProp({ serverCards: cards });
-    } else {
-      setConflictProp(null);
-    }
-  }, [conflict, cards]);
-
-  // ── Buffer change handler (records undo step) ─────────────────────────────
-
-  const handleBufferChange = useCallback((next: Card[]) => {
-    undoStack.current = pushUndo(undoStack.current, buffer);
-    setBuffer(next);
-    setCanUndo(true);
-    setCanRedo(false);
-  }, [buffer]);
-
-  // ── Undo / Redo ───────────────────────────────────────────────────────────
-
-  const handleUndo = useCallback(() => {
-    const { past, future } = undoStack.current;
-    if (past.length === 0) return;
-    const previous = past[past.length - 1];
-    undoStack.current = {
-      past: past.slice(0, -1),
-      future: [buffer, ...future].slice(0, UNDO_CAP),
-    };
-    setBuffer(previous);
-    setCanUndo(undoStack.current.past.length > 0);
-    setCanRedo(true);
-  }, [buffer]);
-
-  const handleRedo = useCallback(() => {
-    const { past, future } = undoStack.current;
-    if (future.length === 0) return;
-    const next = future[0];
-    undoStack.current = {
-      past: [...past, buffer].slice(-UNDO_CAP),
-      future: future.slice(1),
-    };
-    setBuffer(next);
-    setCanUndo(true);
-    setCanRedo(undoStack.current.future.length > 0);
-  }, [buffer]);
-
-  // ── Clear ─────────────────────────────────────────────────────────────────
-
-  const handleClear = useCallback(() => {
-    undoStack.current = pushUndo(undoStack.current, buffer);
-    setBuffer([]);
-    setCanUndo(true);
-    setCanRedo(false);
-  }, [buffer]);
-
-  // ── Save ──────────────────────────────────────────────────────────────────
-
-  const handleSave = useCallback(async (_destination: SaveDestination) => {
-    try {
-      await save(buffer);
-      setEditMode(false);
-    } catch {
-      setError('Failed to save list');
-    }
-  }, [save, buffer]);
-
   // ── Detach from deck ──────────────────────────────────────────────────────
 
   const handleDetach = useCallback(async () => {
+    if (dirty) {
+      const ok = await confirm({
+        title:        'Unsaved changes',
+        message:      'You have unsaved changes. Detach from deck anyway?',
+        confirmLabel: 'Detach',
+        cancelLabel:  'Cancel',
+        destructive:  true,
+      });
+      if (!ok) return;
+    }
     try {
       await detachFromDeck();
       await refresh();
     } catch {
       setError('Failed to detach list from deck');
     }
-  }, [detachFromDeck, refresh]);
+  }, [dirty, confirm, detachFromDeck, refresh]);
 
   // ── Restore soft-deleted list ─────────────────────────────────────────────
 
@@ -209,21 +127,11 @@ function ListPageInner() {
     setRestoring(true);
     try {
       // api.restoreList does not exist yet — surface via error banner for now.
-      // TODO: implement api.restoreList when the PHP endpoint is available.
       setError('Restore is not yet available. Please contact an admin.');
     } finally {
       setRestoring(false);
     }
   }, []);
-
-  // ── Conflict resolution ───────────────────────────────────────────────────
-
-  const handleConflictResolve = useCallback(async (choice: 'accept-server' | 'keep-local') => {
-    if (choice === 'accept-server') {
-      await refresh();
-    }
-    setConflictProp(null);
-  }, [refresh]);
 
   // ── Guards ────────────────────────────────────────────────────────────────
 
@@ -301,6 +209,7 @@ function ListPageInner() {
       subtitle={headerSubtitle}
       backHref="/lists"
       backLabel="Lists"
+      onBackClick={confirmLeaveIfDirty}
     >
       {/* Error banner */}
       {(error || listError) && (
@@ -329,40 +238,19 @@ function ListPageInner() {
         </Alert>
       )}
 
-      {/* Toolbar */}
-      <CardListToolbar
-        buffer={buffer}
-        onBufferChange={handleBufferChange}
-        format={list.format}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        editMode={editMode}
-        onEditModeChange={setEditMode}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        onSave={handleSave}
-        onClear={handleClear}
-        listId={list.id}
+      {/* Unified card editor — same component used by decks/decklist */}
+      <ListEditor
+        list={list}
+        cards={cards}
+        save={save}
+        conflict={conflict}
+        refresh={refresh}
         deckContext={deckContext ?? null}
         onDetachFromDeck={deckContext ? handleDetach : undefined}
+        onDirtyChange={setDirty}
       />
 
-      {/* Card list */}
-      <CardListView
-        cards={buffer}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        editMode={editMode}
-        onChange={handleBufferChange}
-        filterState={filterState}
-        onFilterStateChange={setFilterState}
-        conflict={conflictProp}
-        onConflictResolve={handleConflictResolve}
-        deckContext={deckContext}
-      />
-
+      {confirmDialog}
     </PageContainer>
   );
 }

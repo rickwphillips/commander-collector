@@ -14,7 +14,7 @@ import {
 import SaveIcon from '@mui/icons-material/Save';
 import { PageContainer } from '@/components/PageContainer';
 import { ScanInput } from '@/components/scan/ScanInput';
-import { CardListView } from '@/components/cards/CardListView';
+import { CardListDisplay } from '@/components/CardListDisplay';
 import { SaveToListDialog, type SaveDestination } from '@/components/cards/SaveToListDialog';
 import { api } from '@/lib/api';
 import type { Card } from '@/lib/cards/types';
@@ -159,7 +159,7 @@ function ScanPageInner() {
               </Button>
             </Stack>
           </Stack>
-          <CardListView cards={buffer} editMode onChange={setBuffer} />
+          <CardListDisplay cards={buffer} editMode onChange={setBuffer} />
         </Box>
       )}
 

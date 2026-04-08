@@ -15,13 +15,11 @@ import Link from 'next/link';
 import { PageContainer } from '@/components/PageContainer';
 import { ColorIdentityChips } from '@/components/ColorIdentityChips';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
-import { CardListToolbar } from '@/components/cards/CardListToolbar';
-import { CardListView } from '@/components/cards/CardListView';
+import { ListEditor } from '@/components/cards/ListEditor';
 import { useList } from '@/lib/lists/useList';
+import { useConfirm } from '@/lib/useConfirm';
 import { api } from '@/lib/api';
-import type { Card } from '@/lib/cards/types';
 import type { DeckDetail } from '@/lib/types';
-import type { SaveDestination } from '@/components/cards/SaveToListDialog';
 
 function DeckListPageInner() {
   const searchParams = useSearchParams();
@@ -44,57 +42,50 @@ function DeckListPageInner() {
   // ── List data (list-native: cards, version, role) ────────────────────────
   const {
     list, cards, loading: listLoading, error: listError, conflict,
-    save, addCards, detachFromDeck, refresh,
+    save, detachFromDeck, refresh,
   } = useList({ deckId });
 
-  // ── Local UI state ────────────────────────────────────────────────────────
-  const [viewMode,  setViewMode]  = useState<'gallery' | 'text' | 'breakdown'>('gallery');
-  const [editMode,  setEditMode]  = useState(false);
-  const [buffer,    setBuffer]    = useState<Card[]>([]);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  // ── Dirty guard ───────────────────────────────────────────────────────────
+  const [dirty, setDirty] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  // Synchronous link interceptor: a click handler can't await a Promise and
+  // still preventDefault, so we approximate — preventDefault FIRST, then prompt
+  // and (on confirm) navigate via router.push.
+  const confirmLeaveIfDirty = useCallback(
+    (e: React.MouseEvent<HTMLAnchorElement>) => {
+      if (!dirty) return;
+      e.preventDefault();
+      const href = e.currentTarget.getAttribute('href');
+      confirm({
+        title:        'Unsaved changes',
+        message:      'You have unsaved changes. Leave this page anyway?',
+        confirmLabel: 'Leave',
+        cancelLabel:  'Stay',
+        destructive:  true,
+      }).then((ok) => {
+        if (ok && href) router.push(href);
+      });
+    },
+    [dirty, confirm, router],
+  );
 
-  // Toolbar Save — merge buffer into list
-  const handleSave = useCallback(async (_destination: SaveDestination) => {
-    if (buffer.length === 0) return;
-    try {
-      await addCards(buffer);
-      setBuffer([]);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Save failed');
-    }
-  }, [buffer, addCards]);
-
-  // Toolbar Clear — wipe the list
-  const handleClear = useCallback(async () => {
-    try {
-      await save([]);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Clear failed');
-    }
-  }, [save]);
-
-  // Toolbar Detach — unlink list from deck, navigate away
+  // ── Toolbar Detach — unlink list from deck, navigate away ─────────────────
   const handleDetach = useCallback(async () => {
+    if (dirty) {
+      const ok = await confirm({
+        title:        'Unsaved changes',
+        message:      'You have unsaved changes. Detach from deck anyway?',
+        confirmLabel: 'Detach',
+        cancelLabel:  'Cancel',
+        destructive:  true,
+      });
+      if (!ok) return;
+    }
     await detachFromDeck();
     await refresh();
     router.push('/decks');
-  }, [detachFromDeck, refresh, router]);
-
-  // CardListView onChange — called on every in-editor mutation; save immediately
-  const handleCardsChange = useCallback(async (updated: Card[]) => {
-    try {
-      await save(updated);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Auto-save failed');
-    }
-  }, [save]);
-
-  // Conflict resolution
-  const handleConflictResolve = useCallback((choice: 'accept-server' | 'keep-local') => {
-    if (choice === 'accept-server') refresh();
-  }, [refresh]);
+  }, [dirty, confirm, detachFromDeck, refresh, router]);
 
   // ── Guards ────────────────────────────────────────────────────────────────
 
@@ -153,11 +144,12 @@ function DeckListPageInner() {
       }
       backHref={`/decks/detail?id=${deckId}`}
       backLabel="Back to Deck"
+      onBackClick={confirmLeaveIfDirty}
     >
       {/* Errors */}
-      {(listError || saveError) && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setSaveError(null)}>
-          {listError ?? saveError}
+      {listError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {listError}
         </Alert>
       )}
 
@@ -168,46 +160,26 @@ function DeckListPageInner() {
         </Alert>
       )}
 
-      {/* Toolbar — add, view/edit mode, undo/redo, save, clear, detach */}
-      <CardListToolbar
-        buffer={buffer}
-        onBufferChange={setBuffer}
-        format={list?.format}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        editMode={editMode}
-        onEditModeChange={setEditMode}
-        canUndo={false}
-        canRedo={false}
-        onUndo={() => {}}
-        onRedo={() => {}}
-        onSave={handleSave}
-        onClear={handleClear}
-        listId={list?.id}
+      {/* Unified card editor — same component used by lists/detail */}
+      <ListEditor
+        list={list}
+        cards={cards}
+        save={save}
+        conflict={conflict}
+        refresh={refresh}
         deckContext={deckContext}
         onDetachFromDeck={handleDetach}
+        onDirtyChange={setDirty}
       />
-
-      {/* Card list */}
-      <Box sx={{ mt: 2 }}>
-        <CardListView
-          cards={cards}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          editMode={editMode}
-          onChange={handleCardsChange}
-          conflict={conflict ? { serverCards: cards } : null}
-          onConflictResolve={handleConflictResolve}
-          deckContext={deckContext}
-        />
-      </Box>
 
       {/* Back link */}
       <Box sx={{ mt: 3 }}>
-        <MuiLink component={Link} href={`/decks/detail?id=${deckId}`} variant="body2" color="text.secondary">
+        <MuiLink component={Link} href={`/decks/detail?id=${deckId}`} onClick={confirmLeaveIfDirty} variant="body2" color="text.secondary">
           Back to deck profile
         </MuiLink>
       </Box>
+
+      {confirmDialog}
     </PageContainer>
   );
 }

@@ -13,6 +13,12 @@ interface PageContainerProps {
   titleImage?: string | null;
   backHref?: string;
   backLabel?: string;
+  /**
+   * Optional click interceptor for the back button. Called with the synthetic
+   * mouse event before navigation. Call `e.preventDefault()` to cancel the
+   * navigation (e.g. unsaved-changes confirm).
+   */
+  onBackClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
   children: ReactNode;
   actions?: ReactNode;
 }
@@ -23,6 +29,7 @@ export function PageContainer({
   titleImage,
   backHref = '/',
   backLabel = 'Back',
+  onBackClick,
   children,
   actions,
 }: PageContainerProps) {
@@ -38,7 +45,7 @@ export function PageContainer({
       <SettingsTab />
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-          <Button component={Link} href={backHref} startIcon={<ArrowBackIcon />}>
+          <Button component={Link} href={backHref} onClick={onBackClick} startIcon={<ArrowBackIcon />}>
             {backLabel}
           </Button>
           {actions && <Box>{actions}</Box>}

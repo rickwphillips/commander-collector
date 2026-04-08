@@ -1,7 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
-import { Box, Typography } from '@mui/material';
+import { useMemo, useCallback } from 'react';
+import { Box, IconButton, Stack, Typography } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import RemoveIcon from '@mui/icons-material/Remove';
+import CloseIcon from '@mui/icons-material/Close';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import { ManaCost } from '@/components/ManaCost';
 import { ColorSymbols } from '@/components/ManaSymbol';
@@ -17,8 +20,8 @@ export interface CardListEntry {
   color_identity?: string | null;
 }
 
-interface Props {
-  cards: CardListEntry[];
+interface Props<T extends CardListEntry> {
+  cards: T[];
   /** Sort order applied within each type group */
   sortOrder?: SortOrder;
   sortDirection?: SortDirection;
@@ -26,16 +29,30 @@ interface Props {
   useColorIdentity?: boolean;
   /** Called when a card name is clicked — e.g. to send it to coach input */
   onCardClick?: (name: string) => void;
+  /** When true, render inline qty stepper + remove button per row */
+  editMode?: boolean;
+  /** Required when editMode is true. Receives the new full cards array. */
+  onChange?: (next: T[]) => void;
 }
 
 /**
  * Compact multi-column card list grouped by type category.
  * Commander section highlighted; all names show a CardTooltip image preview.
+ *
+ * Edit mode: renders qty − [N] + and a remove × button on each row.
  */
-export function CardListDisplay({ cards, sortOrder = 'name', sortDirection = 'asc', useColorIdentity = false, onCardClick }: Props) {
+export function CardListDisplay<T extends CardListEntry>({
+  cards,
+  sortOrder = 'name',
+  sortDirection = 'asc',
+  useColorIdentity = false,
+  onCardClick,
+  editMode = false,
+  onChange,
+}: Props<T>) {
   const sections = useMemo(() => {
-    const commanders: CardListEntry[] = [];
-    const map: Record<string, CardListEntry[]> = {};
+    const commanders: T[] = [];
+    const map: Record<string, T[]> = {};
 
     for (const c of cards) {
       if (c.is_commander) { commanders.push(c); continue; }
@@ -45,27 +62,40 @@ export function CardListDisplay({ cards, sortOrder = 'name', sortDirection = 'as
     }
 
     const order = [...TYPE_CATEGORIES, 'Other'] as string[];
-    const result: { type: string; cards: CardListEntry[]; isCommander?: boolean }[] = [];
-    if (commanders.length > 0) result.push({ type: 'Commander', cards: sortCards(commanders, sortOrder, sortDirection), isCommander: true });
+    const result: { type: string; cards: T[]; isCommander?: boolean }[] = [];
+    if (commanders.length > 0) result.push({ type: 'Commander', cards: sortCards(commanders, sortOrder, sortDirection) as T[], isCommander: true });
     for (const t of order) {
-      if (map[t]?.length) result.push({ type: t, cards: sortCards(map[t], sortOrder, sortDirection) });
+      if (map[t]?.length) result.push({ type: t, cards: sortCards(map[t], sortOrder, sortDirection) as T[] });
     }
     return result;
   }, [cards, sortOrder, sortDirection]);
 
   const sectionCount = sections.length;
 
+  const handleQtyChange = useCallback((cardName: string, delta: number) => {
+    if (!onChange) return;
+    const next = cards
+      .map((c) => (c.card_name === cardName ? { ...c, quantity: Math.max(0, c.quantity + delta) } : c))
+      .filter((c) => c.quantity > 0);
+    onChange(next as T[]);
+  }, [cards, onChange]);
+
+  const handleRemove = useCallback((cardName: string) => {
+    if (!onChange) return;
+    onChange(cards.filter((c) => c.card_name !== cardName));
+  }, [cards, onChange]);
+
   return (
     <Box sx={{
-      columnCount: { xs: 2, sm: 3, md: 4 },
+      columnCount: editMode ? { xs: 1, sm: 2, md: 3 } : { xs: 2, sm: 3, md: 4 },
       columnGap: 3,
       py: 1,
-      backgroundImage: (theme) => {
+      // Dividers only in read mode — edit mode has wider rows + smaller column count
+      backgroundImage: editMode ? 'none' : (theme) => {
         const c = theme.palette.divider;
         const grad = `linear-gradient(to bottom, transparent 0%, ${c} 15%, ${c} 85%, transparent 100%)`;
         const g2 = [grad, grad].join(', ');
         const g3 = [grad, grad, grad].join(', ');
-        // Number of dividers = min(sectionCount - 1, columnCount - 1)
         const xs = sectionCount >= 2 ? grad : 'none';
         const sm = sectionCount >= 3 ? g2 : sectionCount >= 2 ? grad : 'none';
         const md = sectionCount >= 4 ? g3 : sectionCount >= 3 ? g2 : sectionCount >= 2 ? grad : 'none';
@@ -73,7 +103,6 @@ export function CardListDisplay({ cards, sortOrder = 'name', sortDirection = 'as
       },
       backgroundRepeat: 'no-repeat',
       backgroundPosition: {
-        // Positions always use column-grid boundaries, not dynamic fractions
         xs: '50% 0',
         sm: sectionCount >= 3 ? '33.333% 0, 66.667% 0' : '33.333% 0',
         md: sectionCount >= 4 ? '25% 0, 50% 0, 75% 0' : sectionCount >= 3 ? '25% 0, 50% 0' : '25% 0',
@@ -97,8 +126,31 @@ export function CardListDisplay({ cards, sortOrder = 'name', sortDirection = 'as
           </Typography>
           {group.map((c, i) => (
             <Box key={`${c.card_name}-${i}`} sx={{ display: 'flex', alignItems: 'center', lineHeight: 1.6, gap: 0.5 }}>
+              {editMode && (
+                <Stack direction="row" alignItems="center" spacing={0} sx={{ flexShrink: 0 }}>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleQtyChange(c.card_name, -1)}
+                    aria-label={`Decrease quantity of ${c.card_name}`}
+                    sx={{ p: 0.25 }}
+                  >
+                    <RemoveIcon sx={{ fontSize: 14 }} />
+                  </IconButton>
+                  <Typography variant="caption" sx={{ minWidth: 16, textAlign: 'center', fontWeight: 600 }}>
+                    {c.quantity}
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleQtyChange(c.card_name, 1)}
+                    aria-label={`Increase quantity of ${c.card_name}`}
+                    sx={{ p: 0.25 }}
+                  >
+                    <AddIcon sx={{ fontSize: 14 }} />
+                  </IconButton>
+                </Stack>
+              )}
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                {c.quantity > 1 && (
+                {!editMode && c.quantity > 1 && (
                   <Typography variant="caption" component="span">{c.quantity}x </Typography>
                 )}
                 <CardTooltip name={c.card_name} onClick={onCardClick}>
@@ -116,9 +168,21 @@ export function CardListDisplay({ cards, sortOrder = 'name', sortDirection = 'as
                   </Typography>
                 </CardTooltip>
               </Box>
-              {useColorIdentity && (c.type_line?.includes('Land') ?? false)
-                ? <ColorSymbols colors={c.color_identity || 'C'} size={12} />
-                : c.mana_cost ? <ManaCost cost={c.mana_cost} size={0.75} /> : null}
+              {(c.type_line?.includes('Land') ?? false)
+                ? (useColorIdentity ? <ColorSymbols colors={c.color_identity || 'C'} size={12} /> : null)
+                : useColorIdentity
+                  ? <ColorSymbols colors={c.color_identity || 'C'} size={12} />
+                  : c.mana_cost ? <ManaCost cost={c.mana_cost} size={0.75} /> : null}
+              {editMode && (
+                <IconButton
+                  size="small"
+                  onClick={() => handleRemove(c.card_name)}
+                  aria-label={`Remove ${c.card_name}`}
+                  sx={{ p: 0.25, color: 'error.main', flexShrink: 0 }}
+                >
+                  <CloseIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+              )}
             </Box>
           ))}
         </Box>
