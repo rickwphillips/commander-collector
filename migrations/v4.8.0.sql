@@ -294,7 +294,7 @@ CREATE TABLE IF NOT EXISTS system_state (
   v           TEXT NULL,
   updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (k)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ── New table: list_history ───────────────────────────────────────────────────
 
@@ -305,7 +305,7 @@ CREATE TABLE IF NOT EXISTS system_state (
 --   (lists.user_id, players.user_id, stat_panels.user_id all use this shape).
 --   NULL means system-generated action.
 CREATE TABLE IF NOT EXISTS list_history (
-  id               CHAR(36)     NOT NULL DEFAULT (UUID()),
+  id               CHAR(36)     NOT NULL,
   list_id          CHAR(36)     NOT NULL,
   user_id          VARCHAR(36)  NULL,
   action           ENUM('create','update','rename','detach','attach','soft_delete','restore') NOT NULL,
@@ -316,7 +316,7 @@ CREATE TABLE IF NOT EXISTS list_history (
   PRIMARY KEY (id),
   INDEX idx_list_history_list (list_id, created_at),
   INDEX idx_list_history_user (user_id, created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ── Backfill: role columns from is_commander / decks.partner ──────────────────
 
