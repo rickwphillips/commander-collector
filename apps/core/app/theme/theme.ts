@@ -89,6 +89,13 @@ export const createAppTheme = (mode: 'light' | 'dark') => {
       borderRadius: 8,
     },
     components: {
+      MuiCssBaseline: {
+        styleOverrides: {
+          'body, body *': {
+            transition: 'background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease !important',
+          },
+        },
+      },
       MuiCard: {
         styleOverrides: {
           root: {

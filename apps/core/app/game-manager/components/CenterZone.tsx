@@ -31,6 +31,7 @@ import TextFieldsIcon from '@mui/icons-material/TextFields';
 import ChatIcon from '@mui/icons-material/Chat';
 import MinimizeIcon from '@mui/icons-material/Minimize';
 import Badge from '@mui/material/Badge';
+import { useThemeMode } from '@/components/ThemeProvider';
 import type { PlayerState, CommanderDamageMap } from '../types';
 
 function D20Icon({ size = 16 }: { size?: number }) {
@@ -145,6 +146,7 @@ export function CenterZone({
   const [adamsRule, setAdamsRule] = useState(false);
   const [noLoners, setNoLoners] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const { mode, toggleTheme } = useThemeMode();
   const lastTimerRef = useRef(turnTimerSeconds > 0 ? turnTimerSeconds : 300);
   const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lpFired = useRef(false);
@@ -719,6 +721,11 @@ export function CenterZone({
               <FormControlLabel
                 control={<Switch size="small" checked={soundEnabled} onChange={onToggleSound} />}
                 label={<Typography sx={{ fontSize: 12 }}>Sound</Typography>}
+                sx={{ mx: 0 }}
+              />
+              <FormControlLabel
+                control={<Switch size="small" checked={mode === 'dark'} onChange={toggleTheme} />}
+                label={<Typography sx={{ fontSize: 12 }}>Dark</Typography>}
                 sx={{ mx: 0 }}
               />
               <Button

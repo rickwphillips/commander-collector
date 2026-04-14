@@ -4,7 +4,8 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { usePoisonSound } from '@/game-manager/hooks/usePoisonSound';
 import { useSounds } from '@/game-manager/hooks/useSounds';
 import { keyframes } from '@emotion/react';
-import { Box, Stack, Typography, IconButton, Button, TextField, Tooltip, SvgIcon } from '@mui/material';
+import { Box, CircularProgress, Stack, Typography, IconButton, Button, TextField, Tooltip, SvgIcon } from '@mui/material';
+import { getCardImageByName } from '@commander/shared/lib/cardImageCache';
 import { ControlFocusModal } from './ControlFocusModal';
 import { QRCodeSVG } from 'qrcode.react';
 import { ASSET_BASE } from '@/lib/api';
@@ -656,6 +657,26 @@ export function PlayerPanel({
   const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lpFired = useRef(false);
   const [qrOpen, setQrOpen] = useState(false);
+  const [cmdPreviewName, setCmdPreviewName] = useState<string | null>(null);
+  const [cmdPreviewUrl, setCmdPreviewUrl] = useState<string | null>(null);
+  const [cmdPreviewZoom, setCmdPreviewZoom] = useState(1);
+  const [cmdPreviewBase, setCmdPreviewBase] = useState<{ w: number; h: number } | null>(null);
+  const cmdScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!cmdPreviewName) { setCmdPreviewUrl(null); setCmdPreviewZoom(1); setCmdPreviewBase(null); return; }
+    setCmdPreviewUrl(null);
+    setCmdPreviewZoom(1);
+    setCmdPreviewBase(null);
+    getCardImageByName(cmdPreviewName).then(url => setCmdPreviewUrl(url));
+  }, [cmdPreviewName]);
+
+  // Scroll to bottom when zoom changes so the card bottom (player name/mana cost) stays in view
+  useEffect(() => {
+    if (cmdPreviewZoom > 1 && cmdScrollRef.current) {
+      cmdScrollRef.current.scrollTop = cmdScrollRef.current.scrollHeight;
+    }
+  }, [cmdPreviewZoom]);
 
   // Auto-close QR when remote player connects
   useEffect(() => { if (remoteConnected && qrOpen) setQrOpen(false); }, [remoteConnected, qrOpen]);
@@ -1598,7 +1619,8 @@ export function PlayerPanel({
         <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0, zIndex: 1 }}>
           {player.commander.artCropUrl && (
             <Box component="img" src={player.commander.artCropUrl} alt={player.commander.name}
-              sx={{ height: artHeight, width: 'auto', borderRadius: 0.5, flexShrink: 0 }} />
+              onClick={(e) => { e.stopPropagation(); setCmdPreviewName(player.commander.name); }}
+              sx={{ height: artHeight, width: 'auto', borderRadius: 0.5, flexShrink: 0, cursor: 'zoom-in' }} />
           )}
           {player.commanderTax > 0 && (
             <Tooltip title={`Commander Tax: cast ${player.commanderTax}× (+${player.commanderTax * 2} generic mana)`} placement="bottom" arrow>
@@ -2080,8 +2102,8 @@ export function PlayerPanel({
                         {src.isMonarch && <CrownIcon sx={{ fontSize: fsStatBadge, color: '#DAA520', flexShrink: 0 }} />}
                         {src.hasInitiative && <InitiativeIcon sx={{ fontSize: fsStatBadge, color: '#4FC3F7', flexShrink: 0 }} />}
                       </Stack>
-                      <Typography sx={{ fontSize: fsSectionLabel, color: 'text.secondary', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.commander.name}</Typography>
-                      {src.partner && <Typography sx={{ fontSize: fsSectionLabel, color: 'text.secondary', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.partner.name}</Typography>}
+                      <Typography onClick={(e) => { e.stopPropagation(); setCmdPreviewName(src.commander.name); }} sx={{ fontSize: fsSectionLabel, color: 'text.secondary', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', '&:hover': { color: 'primary.main' } }}>{src.commander.name}</Typography>
+                      {src.partner && <Typography onClick={(e) => { e.stopPropagation(); setCmdPreviewName(src.partner!.name); }} sx={{ fontSize: fsSectionLabel, color: 'text.secondary', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', '&:hover': { color: 'primary.main' } }}>{src.partner.name}</Typography>}
                     </Box>
                     <Typography sx={{ fontSize: 'clamp(28px, 8dvmax, 56px)', fontWeight: 900, lineHeight: 1, color: srcLifeColor || 'primary.main', textDecoration: src.isEliminated ? 'line-through' : 'none', flexShrink: 0 }}>{src.life}</Typography>
                     <Stack direction="column" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
@@ -2126,7 +2148,7 @@ export function PlayerPanel({
                           sx={{ cursor: isMe ? 'default' : 'pointer', borderRadius: 0.5, '&:hover': !isMe ? { bgcolor: 'action.hover' } : undefined, px: 0.25 }}
                         >
                           {tgt.commander?.artCropUrl
-                            ? <Box component="img" src={tgt.commander.artCropUrl} alt="" sx={{ height: 'clamp(16px, 2.5dvmax, 28px)', width: 'auto', borderRadius: 0.25, flexShrink: 0, opacity: isMe ? 1 : 0.75 }} />
+                            ? <Box component="img" src={tgt.commander.artCropUrl} alt="" onClick={(e) => { e.stopPropagation(); setCmdPreviewName(tgt.commander!.name); }} sx={{ height: 'clamp(16px, 2.5dvmax, 28px)', width: 'auto', borderRadius: 0.25, flexShrink: 0, opacity: isMe ? 1 : 0.75, cursor: 'pointer', '&:hover': { opacity: 1 } }} />
                             : <Box sx={{ height: 'clamp(16px, 2.5dvmax, 28px)', width: 'clamp(11px, 1.8dvmax, 20px)', borderRadius: 0.25, flexShrink: 0, bgcolor: 'action.hover' }} />
                           }
                           <Typography sx={{ fontSize: fsSectionLabel, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, color: isMe ? 'primary.main' : 'text.secondary', fontWeight: isMe ? 700 : 400 }}>{tgt.playerName}</Typography>
@@ -2436,6 +2458,56 @@ export function PlayerPanel({
           />
         );
       })()}
+
+      {/* Commander card preview overlay */}
+      {cmdPreviewName && (
+        <Box
+          onClick={() => { setCmdPreviewName(null); setCmdPreviewZoom(1); setCmdPreviewBase(null); }}
+          sx={{ position: 'absolute', inset: 0, zIndex: 35, bgcolor: 'rgba(0,0,0,0.88)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1.5 }}
+        >
+          <IconButton
+            size="small"
+            onClick={(e) => { e.stopPropagation(); setCmdPreviewName(null); setCmdPreviewZoom(1); setCmdPreviewBase(null); }}
+            sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1, color: 'rgba(255,255,255,0.85)', bgcolor: 'rgba(0,0,0,0.5)', '&:hover': { bgcolor: 'rgba(0,0,0,0.75)' } }}
+          >
+            <CloseIcon sx={{ fontSize: 28 }} />
+          </IconButton>
+          {cmdPreviewUrl ? (
+            cmdPreviewZoom > 1 ? (
+              /* Zoomed: scrollable container fills the overlay */
+              <Box
+                ref={cmdScrollRef}
+                onClick={() => { setCmdPreviewName(null); setCmdPreviewZoom(1); setCmdPreviewBase(null); }}
+                sx={{ position: 'absolute', inset: 8, overflow: 'auto', cursor: 'zoom-out', background: 'transparent !important' }}
+              >
+                <Box sx={{ minWidth: '100%', minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent !important' }}>
+                  <Box
+                    component="img"
+                    src={cmdPreviewUrl}
+                    alt={cmdPreviewName ?? ''}
+                    draggable={false}
+                    onClick={(e) => { e.stopPropagation(); setCmdPreviewZoom(1); }}
+                    sx={{ display: 'block', width: cmdPreviewBase ? cmdPreviewBase.w * cmdPreviewZoom : 'auto', height: 'auto', borderRadius: '4.7%', userSelect: 'none', flexShrink: 0 }}
+                  />
+                </Box>
+              </Box>
+            ) : (
+              /* Fit: centered, click to zoom in */
+              <Box
+                component="img"
+                src={cmdPreviewUrl}
+                alt={cmdPreviewName ?? ''}
+                draggable={false}
+                onLoad={(e: React.SyntheticEvent<HTMLImageElement>) => setCmdPreviewBase({ w: e.currentTarget.clientWidth, h: e.currentTarget.clientHeight })}
+                onClick={(e) => { e.stopPropagation(); setCmdPreviewZoom(2.5); }}
+                sx={{ maxHeight: '88%', maxWidth: '88%', borderRadius: '4.7%', display: 'block', cursor: 'zoom-in', userSelect: 'none' }}
+              />
+            )
+          ) : (
+            <CircularProgress size={36} thickness={4} sx={{ color: 'rgba(255,255,255,0.45)' }} />
+          )}
+        </Box>
+      )}
 
       {/* QR overlay — in-panel, does not take over the board */}
       {seatCode && qrOpen && (
