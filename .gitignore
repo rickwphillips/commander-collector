@@ -20,6 +20,11 @@ tsconfig.tsbuildinfo
 # Vitest coverage reports (generated)
 apps/core/coverage
 
+# Playwright auth state (contains JWT tokens) and output
+apps/core/e2e/.auth/
+apps/core/playwright-report/
+apps/core/test-results/
+
 # Generated TTS sheets
 apps/core/app/tts-sheets
 
