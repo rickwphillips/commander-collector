@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Box, Tooltip } from '@mui/material';
+import { Box, CircularProgress, Tooltip } from '@mui/material';
 import { getCardImageByName, getCardBackImageByName } from '../lib/cardImageCache';
 
 interface Props {
@@ -26,55 +26,71 @@ const CARD_CURSOR = `url("data:image/svg+xml,${CARD_SVG}") 7 10, zoom-in`;
  * Renders children as-is (no wrapper span) when no image is available.
  */
 export function CardTooltip({ name, children, previewWidth = 220, placement = 'top', style, onClick }: Props) {
-  const [imageUrl, setImageUrl]     = useState<string | null>(null);
+  const [imageUrl, setImageUrl]         = useState<string | null>(null);
   const [backImageUrl, setBackImageUrl] = useState<string | null>(null);
-  const [hovered, setHovered] = useState(false);
+  const [hovered, setHovered]           = useState(false);
+  const [loading, setLoading]           = useState(true);
 
   // Load on mount
   useEffect(() => {
-    getCardImageByName(name).then((url) => setImageUrl(url));
-    getCardBackImageByName(name).then((url) => setBackImageUrl(url));
+    setLoading(true);
+    Promise.all([
+      getCardImageByName(name),
+      getCardBackImageByName(name),
+    ]).then(([url, backUrl]) => {
+      setImageUrl(url);
+      setBackImageUrl(backUrl);
+      setLoading(false);
+    });
   }, [name]);
 
-  // Retry on hover if initial load failed (cache no longer blocks retries)
+  // Retry on hover if initial load returned nothing (cache no longer blocks retries)
   useEffect(() => {
     if (hovered && !imageUrl) {
-      getCardImageByName(name).then((url) => setImageUrl(url));
-      getCardBackImageByName(name).then((url) => setBackImageUrl(url));
+      setLoading(true);
+      Promise.all([
+        getCardImageByName(name),
+        getCardBackImageByName(name),
+      ]).then(([url, backUrl]) => {
+        setImageUrl(url);
+        setBackImageUrl(backUrl);
+        setLoading(false);
+      });
     }
   }, [hovered, imageUrl, name]);
 
-  if (!imageUrl) return (
-    <span
-      style={style}
-      onMouseEnter={() => setHovered(true)}
-      onClick={onClick ? (e) => { e.stopPropagation(); onClick(name); } : undefined}
-    >
-      {children}
-    </span>
-  );
+  // loading → spinner; image ready → card image; not found → false (disables tooltip)
+  const tooltipTitle: React.ReactNode = loading ? (
+    <Box sx={{
+      width: previewWidth,
+      height: Math.round(previewWidth * 1.4),
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      bgcolor: 'rgba(20, 20, 20, 0.85)',
+      borderRadius: 1.5,
+    }}>
+      <CircularProgress size={28} thickness={4} sx={{ color: 'rgba(255,255,255,0.5)' }} />
+    </Box>
+  ) : imageUrl ? (
+    backImageUrl ? (
+      <Box sx={{ display: 'flex', gap: 0.5 }}>
+        <Box component="img" src={imageUrl} alt={name}
+          sx={{ width: previewWidth, borderRadius: 1.5, display: 'block' }} />
+        <Box component="img" src={backImageUrl} alt={`${name} (back)`}
+          sx={{ width: previewWidth, borderRadius: 1.5, display: 'block' }} />
+      </Box>
+    ) : (
+      <Box component="img" src={imageUrl} alt={name}
+        sx={{ width: previewWidth, borderRadius: 1.5, display: 'block' }} />
+    )
+  ) : false;
 
   return (
     <Tooltip
       placement={placement}
-      enterDelay={150}
-      title={
-        backImageUrl ? (
-          <Box sx={{ display: 'flex', gap: 0.5 }}>
-            <Box component="img" src={imageUrl} alt={name}
-              sx={{ width: previewWidth, borderRadius: 1.5, display: 'block' }} />
-            <Box component="img" src={backImageUrl} alt={`${name} (back)`}
-              sx={{ width: previewWidth, borderRadius: 1.5, display: 'block' }} />
-          </Box>
-        ) : (
-          <Box
-            component="img"
-            src={imageUrl}
-            alt={name}
-            sx={{ width: previewWidth, borderRadius: 1.5, display: 'block' }}
-          />
-        )
-      }
+      enterDelay={loading ? 0 : 150}
+      title={tooltipTitle}
       slotProps={{ tooltip: { sx: { bgcolor: 'transparent', p: 0, boxShadow: 8 } } }}
     >
       <span
