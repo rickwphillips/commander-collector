@@ -55,9 +55,11 @@ test.describe('Decks', () => {
   });
 
   test('clicking a deck opens detail page (?id= URL)', async ({ page }) => {
-    const firstDeck = page.locator('.MuiCard-root').first();
+    await page.waitForLoadState('networkidle');
+    // CardActionArea-root is the actual clickable deck tile (not the search/filter Card)
+    const firstDeck = page.locator('.MuiCardActionArea-root').first();
     await firstDeck.click();
-    await expect(page).toHaveURL(/decks\/detail\?id=|decks\/decklist\?id=/);
+    await expect(page).toHaveURL(/decks\/detail\/\?id=|decks\/decklist\/\?id=/);
   });
 
   test.describe('New Deck form (/decks/new)', () => {
@@ -81,8 +83,11 @@ test.describe('Decks', () => {
       await expect(cmdInput).toBeVisible();
     });
 
-    test('cancel / back button returns to decks list', async ({ page }) => {
-      const backBtn = page.getByRole('button', { name: /back/i }).first();
+    test('back button is present', async ({ page }) => {
+      // PageContainer back button renders as <a> (Button component={Link})
+      const backBtn = page.getByRole('link', { name: /back/i }).first().or(
+        page.getByRole('button', { name: /back/i }).first()
+      );
       await expect(backBtn).toBeVisible();
     });
   });
@@ -91,7 +96,7 @@ test.describe('Decks', () => {
     test.beforeEach(async ({ page }) => {
       await goto(page, '/decks/');
       await page.waitForLoadState('networkidle');
-      const firstDeck = page.locator('.MuiCard-root').first();
+      const firstDeck = page.locator('.MuiCardActionArea-root').first();
       await firstDeck.click();
       await page.waitForLoadState('networkidle');
     });

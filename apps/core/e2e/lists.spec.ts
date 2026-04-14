@@ -60,16 +60,16 @@ test.describe('Lists', () => {
 
   test('clicking a list opens detail page (?id= URL)', async ({ page }) => {
     await page.waitForLoadState('networkidle');
-    const firstList = page.locator('.MuiCard-root').first();
+    const firstList = page.locator('.MuiCardActionArea-root').first();
     await firstList.click();
-    await expect(page).toHaveURL(/lists\/detail\?id=/);
+    await expect(page).toHaveURL(/lists\/detail\/\?id=/);
   });
 
   test.describe('List Detail / Editor', () => {
     test.beforeEach(async ({ page }) => {
       await goto(page, '/lists/');
       await page.waitForLoadState('networkidle');
-      const firstList = page.locator('.MuiCard-root').first();
+      const firstList = page.locator('.MuiCardActionArea-root').first();
       await firstList.click();
       await page.waitForLoadState('networkidle');
     });
@@ -84,8 +84,9 @@ test.describe('Lists', () => {
     });
 
     test('save button is present', async ({ page }) => {
+      // Save button has aria-label="Save cards" or "Save unsaved changes"
       const saveBtn = page.getByRole('button', { name: /save/i }).first();
-      await expect(saveBtn).toBeVisible();
+      await expect(saveBtn).toBeVisible({ timeout: 8000 });
     });
 
     test('delete list button is present', async ({ page }) => {

@@ -84,17 +84,18 @@ test.describe('Players', () => {
   });
 
   test('clicking a player opens detail page', async ({ page }) => {
-    const firstPlayer = page.locator('[data-testid="player-row"], .MuiCard-root').first();
+    await page.waitForLoadState('networkidle');
+    const firstPlayer = page.locator('.MuiCardActionArea-root').first();
     await firstPlayer.click();
-    await expect(page).toHaveURL(/players\/detail\?id=/);
+    await expect(page).toHaveURL(/players\/detail\/\?id=/);
   });
 
   test.describe('Player Detail', () => {
     test.beforeEach(async ({ page }) => {
       await goto(page, '/players/');
       await page.waitForLoadState('networkidle');
-      // Navigate to first player
-      const firstPlayer = page.locator('.MuiCard-root').first();
+      // Navigate to first player via CardActionArea
+      const firstPlayer = page.locator('.MuiCardActionArea-root').first();
       await firstPlayer.click();
       await page.waitForLoadState('networkidle');
     });
