@@ -127,11 +127,12 @@ switch ($method) {
             // Create one code per seat
             $seatCodes = [];
             $seatStmt = $pdo->prepare('
-                INSERT INTO live_game_seats (session_id, seat, code) VALUES (?, ?, ?)
+                INSERT INTO live_game_seats (id, session_id, seat, code) VALUES (?, ?, ?, ?)
             ');
             foreach ($data['seats'] as $seat) {
+                $seatId = $pdo->query("SELECT UUID()")->fetchColumn();
                 $seatCode = generateSeatCode($pdo);
-                $seatStmt->execute([$sessionId, $seat, $seatCode]);
+                $seatStmt->execute([$seatId, $sessionId, $seat, $seatCode]);
                 $seatCodes[$seat] = $seatCode;
             }
 

@@ -656,20 +656,6 @@ export function PlayerPanel({
   const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lpFired = useRef(false);
   const [qrOpen, setQrOpen] = useState(false);
-  const [passTurnHolding, setPassTurnHolding] = useState(false);
-  const passTurnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const startPassTurnHold = () => {
-    if (!onPassTurn || !isCurrentPlayer) return;
-    setPassTurnHolding(true);
-    passTurnTimer.current = setTimeout(() => {
-      setPassTurnHolding(false);
-      onPassTurn();
-    }, 700);
-  };
-  const cancelPassTurnHold = () => {
-    setPassTurnHolding(false);
-    if (passTurnTimer.current) { clearTimeout(passTurnTimer.current); passTurnTimer.current = null; }
-  };
 
   // Auto-close QR when remote player connects
   useEffect(() => { if (remoteConnected && qrOpen) setQrOpen(false); }, [remoteConnected, qrOpen]);
@@ -1688,37 +1674,20 @@ export function PlayerPanel({
               </Stack>
             </Box>
           )}
-          {/* Pass Turn — long press */}
+          {/* Pass Turn */}
           {isCurrentPlayer && onPassTurn && (
             <Box
-              onPointerDown={startPassTurnHold}
-              onPointerUp={cancelPassTurnHold}
-              onPointerLeave={cancelPassTurnHold}
-              onPointerCancel={cancelPassTurnHold}
+              onClick={onPassTurn}
               sx={{
-                position: 'relative', overflow: 'hidden',
                 px: 1.5, py: 0.5,
                 borderRadius: 1.5,
                 border: '2px solid',
                 borderColor: 'primary.main',
                 cursor: 'pointer',
                 userSelect: 'none',
-                ...(passTurnHolding && {
-                  '&::after': {
-                    content: '""',
-                    position: 'absolute', top: 0, left: 0, height: '100%', width: '100%',
-                    bgcolor: 'primary.main',
-                    transformOrigin: 'left center',
-                    animation: 'passFill 0.7s linear forwards',
-                    '@keyframes passFill': {
-                      '0%': { transform: 'scaleX(0)' },
-                      '100%': { transform: 'scaleX(1)' },
-                    },
-                  },
-                }),
               }}
             >
-              <Typography sx={{ fontSize: fsPassBtn, fontWeight: 700, position: 'relative', zIndex: 1, color: 'primary.main', whiteSpace: 'nowrap', lineHeight: 1.4 }}>
+              <Typography sx={{ fontSize: fsPassBtn, fontWeight: 700, color: 'primary.main', whiteSpace: 'nowrap', lineHeight: 1.4 }}>
                 PASS
               </Typography>
             </Box>

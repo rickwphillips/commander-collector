@@ -431,8 +431,8 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   };
 
   const playerCount = players.length;
-  const leftPanelCss = playerCount === 3 ? 'clamp(180px, 22dvw, 340px)' : 'clamp(140px, 18dvw, 260px)';
-  const rightPanelCss = 'clamp(140px, 18dvw, 260px)';
+  const leftPanelCss = playerCount === 3 ? 'clamp(200px, 25dvw, 380px)' : 'clamp(160px, 21dvw, 300px)';
+  const rightPanelCss = 'clamp(160px, 21dvw, 300px)';
   const leftColumnWidth = playerCount >= 3 ? leftPanelCss : '0px';
   const rightColumnWidth = playerCount >= 4 ? rightPanelCss : '0px';
   const gridTemplateColumns = `${leftColumnWidth} 1fr ${rightColumnWidth}`;
