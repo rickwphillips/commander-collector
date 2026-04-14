@@ -21,6 +21,7 @@ import QrCodeIcon from '@mui/icons-material/QrCode';
 import ChatIcon from '@mui/icons-material/Chat';
 import SmartphoneIcon from '@mui/icons-material/Smartphone';
 import CloseIcon from '@mui/icons-material/Close';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import OpenInFullIcon from '@mui/icons-material/OpenInFull';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
@@ -96,6 +97,22 @@ const castleSlideIn = keyframes`
 const castleSlideOut = keyframes`
   from { transform: translateX(0);      opacity: 1; }
   to   { transform: translateX(-280px); opacity: 0; }
+`;
+const castleSlideInRight = keyframes`
+  from { transform: translateX(240px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+`;
+const castleSlideOutRight = keyframes`
+  from { transform: translateX(0);     opacity: 1; }
+  to   { transform: translateX(240px); opacity: 0; }
+`;
+const skylineFadeIn = keyframes`
+  from { opacity: 0; }
+  to   { opacity: 1; }
+`;
+const skylineFadeOut = keyframes`
+  from { opacity: 1; }
+  to   { opacity: 0; }
 `;
 const godRaysFadeIn = keyframes`
   from { opacity: 0; }
@@ -378,6 +395,8 @@ function CityFlag({ left, bottom = -25, riseDelay, wiggleDuration, wiggleOffset,
     }}>
       {/* Per-flag horizontal drift for split/regroup effect */}
       <Box sx={{ animation: `${flagDrift} ${driftDuration}s ${driftOffset}s ease-in-out infinite` }}>
+      {/* Separate non-animated wrapper for the flip so animation doesn't override the transform */}
+      <Box sx={{ transform: 'scaleX(-1)' }}>
       <Box sx={{
         position: 'relative',
         transformOrigin: 'bottom left',
@@ -398,7 +417,7 @@ function CityFlag({ left, bottom = -25, riseDelay, wiggleDuration, wiggleOffset,
                   </Box>
                 </svg>
               ) : (
-                <Box sx={{ width: '100%', height: '100%', bgcolor: 'rgba(20,12,4,0.90)', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 0.5, transformOrigin: 'left top', animation: `${flagImageSkew} ${dur} ${off} ease-in-out infinite` }}>
+                <Box sx={{ width: '100%', height: '100%', bgcolor: 'rgba(20,12,4,0.90)', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 0.5, transform: 'scaleX(-1)', transformOrigin: 'left top', animation: `${flagImageSkew} ${dur} ${off} ease-in-out infinite` }}>
                   <Typography sx={{ fontSize: 7, fontWeight: 800, color: '#DAA520', textAlign: 'center', lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
                     {commanderName}
                   </Typography>
@@ -415,6 +434,7 @@ function CityFlag({ left, bottom = -25, riseDelay, wiggleDuration, wiggleOffset,
         {/* Pole */}
         <Box sx={{ width: 3, height: 140, background: 'linear-gradient(to right, #DAA520, #8B6914)' }} />
       </Box>
+      </Box>{/* end flip wrapper */}
       </Box>{/* end drift wrapper */}
     </Box>
   );
@@ -657,6 +677,7 @@ export function PlayerPanel({
   const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lpFired = useRef(false);
   const [qrOpen, setQrOpen] = useState(false);
+  const [countersOpen, setCountersOpen] = useState(true);
   const [cmdPreviewName, setCmdPreviewName] = useState<string | null>(null);
   const [cmdPreviewUrl, setCmdPreviewUrl] = useState<string | null>(null);
   const [cmdPreviewZoom, setCmdPreviewZoom] = useState(1);
@@ -1123,47 +1144,167 @@ export function PlayerPanel({
         </Box>
       )}
 
-      {/* ── City's Blessing castle silhouette ── */}
+
+      {/* ── City's Blessing: castle + house row — single connected SVG, no overlap ── */}
       {cityBlessingVisible && (
-        <Box component="svg" viewBox="0 0 300 240" sx={{
-          position: 'absolute', bottom: -60, left: -120,
-          width: 320, height: 256, fill: 'rgba(0,0,0,0.55)', stroke: 'rgba(0,0,0,0.80)', strokeWidth: 1.2,
+        <Box component="svg" viewBox="0 0 640 240" preserveAspectRatio="none" sx={{
+          position: 'absolute', bottom: -55, left: -80,
+          width: 'calc(100% + 80px)', height: 200,
+          fill: 'rgba(0,0,0,0.52)', stroke: 'rgba(0,0,0,0.78)', strokeWidth: 1.2,
           zIndex: 0, pointerEvents: 'none',
           animation: cityBlessingExiting
             ? `${castleSlideOut} 1.8s 2s ease-in forwards`
             : `${castleSlideIn} 1.8s ease-out forwards`,
         }}>
-          {/* Main silhouette */}
+          {/* Castle flowing into houses — one connected path, no seams */}
           <path d="
             M0,240
             L0,62 L40,0 L80,62
-            L80,92 L86,92 L86,80 L94,80 L94,92 L102,92 L102,80 L110,80 L110,92 L118,92 L118,80 L126,80 L126,92
+            L80,92 L86,92 L86,80 L94,80 L94,92 L102,92 L102,80 L110,80 L110,92
+            L118,92 L118,80 L126,80 L126,92
             L126,68 L150,42 L174,68
-            L174,92 L182,92 L182,80 L190,80 L190,92 L198,92 L198,80 L206,80 L206,92 L214,92 L214,80 L222,80 L222,92
+            L174,92 L182,92 L182,80 L190,80 L190,92 L198,92 L198,80 L206,80 L206,92
+            L214,92 L214,80 L222,80 L222,92
             L220,62 L260,0 L300,62
-            L300,240 Z
+            L300,148
+            L320,118 L340,148
+            L360,130 L380,148
+            L380,138 L396,84 L412,138
+            L432,112 L452,138
+            L452,142 L472,96 L492,142
+            L512,120 L532,142
+            L532,136 L550,82 L568,136
+            L588,116 L608,138
+            L608,142 L624,106 L640,132
+            L640,240 Z
           " />
-          {/* Left tower arrow slits */}
-          <rect x="28" y="100" width="5" height="20" rx="2" fill="rgba(0,0,0,0.7)" stroke="none"/>
-          <rect x="48" y="100" width="5" height="20" rx="2" fill="rgba(0,0,0,0.7)" stroke="none"/>
-          {/* Left tower stringcourse */}
-          <line x1="2" y1="130" x2="78" y2="130" strokeWidth="1.5" stroke="rgba(0,0,0,0.5)"/>
-          {/* Right tower arrow slits */}
+          {/* Castle: arrow slits */}
+          <rect x="28"  y="100" width="5" height="20" rx="2" fill="rgba(0,0,0,0.7)" stroke="none"/>
+          <rect x="48"  y="100" width="5" height="20" rx="2" fill="rgba(0,0,0,0.7)" stroke="none"/>
           <rect x="248" y="100" width="5" height="20" rx="2" fill="rgba(0,0,0,0.7)" stroke="none"/>
           <rect x="268" y="100" width="5" height="20" rx="2" fill="rgba(0,0,0,0.7)" stroke="none"/>
-          {/* Right tower stringcourse */}
-          <line x1="222" y1="130" x2="298" y2="130" strokeWidth="1.5" stroke="rgba(0,0,0,0.5)"/>
-          {/* Central turret arrow slit */}
-          <rect x="147" y="115" width="6" height="24" rx="2" fill="rgba(0,0,0,0.7)" stroke="none"/>
-          {/* Wall stringcourse */}
-          <line x1="80" y1="160" x2="220" y2="160" strokeWidth="1.5" stroke="rgba(0,0,0,0.4)"/>
-          {/* Stone block hints - horizontal lines on towers */}
-          <line x1="2" y1="170" x2="78" y2="170" strokeWidth="1" stroke="rgba(0,0,0,0.3)"/>
-          <line x1="2" y1="200" x2="78" y2="200" strokeWidth="1" stroke="rgba(0,0,0,0.3)"/>
-          <line x1="222" y1="170" x2="298" y2="170" strokeWidth="1" stroke="rgba(0,0,0,0.3)"/>
-          <line x1="222" y1="200" x2="298" y2="200" strokeWidth="1" stroke="rgba(0,0,0,0.3)"/>
+          <rect x="147" y="112" width="6" height="24" rx="2" fill="rgba(0,0,0,0.7)" stroke="none"/>
+          {/* Castle: stringcourses */}
+          <line x1="2"   y1="130" x2="78"  y2="130" stroke="rgba(0,0,0,0.5)"  strokeWidth="1.5"/>
+          <line x1="222" y1="130" x2="298" y2="130" stroke="rgba(0,0,0,0.5)"  strokeWidth="1.5"/>
+          <line x1="80"  y1="160" x2="220" y2="160" stroke="rgba(0,0,0,0.4)"  strokeWidth="1.5"/>
+          <line x1="2"   y1="170" x2="78"  y2="170" stroke="rgba(0,0,0,0.3)"  strokeWidth="1"/>
+          <line x1="2"   y1="200" x2="78"  y2="200" stroke="rgba(0,0,0,0.3)"  strokeWidth="1"/>
+          <line x1="222" y1="170" x2="298" y2="170" stroke="rgba(0,0,0,0.3)"  strokeWidth="1"/>
+          <line x1="222" y1="200" x2="298" y2="200" stroke="rgba(0,0,0,0.3)"  strokeWidth="1"/>
+          {/* Houses: chimneys */}
+          <rect x="326" y="136" width="5" height="22" rx="1"/>
+          <rect x="400" y="102" width="5" height="18" rx="1"/>
+          <rect x="460" y="116" width="5" height="20" rx="1"/>
+          <rect x="556" y="100" width="5" height="18" rx="1"/>
+          <rect x="616" y="124" width="4" height="16" rx="1"/>
+          {/* Houses: windows */}
+          <rect x="305" y="130" width="8" height="11" rx="1" fill="rgba(0,0,0,0.7)" stroke="none"/>
+          <rect x="363" y="138" width="8" height="10" rx="1" fill="rgba(0,0,0,0.7)" stroke="none"/>
+          <rect x="416" y="148" width="8" height="11" rx="1" fill="rgba(0,0,0,0.7)" stroke="none"/>
+          <rect x="436" y="148" width="8" height="11" rx="1" fill="rgba(0,0,0,0.7)" stroke="none"/>
+          <rect x="496" y="150" width="8" height="11" rx="1" fill="rgba(0,0,0,0.7)" stroke="none"/>
+          <rect x="516" y="148" width="8" height="11" rx="1" fill="rgba(0,0,0,0.7)" stroke="none"/>
+          <rect x="572" y="146" width="7" height="10" rx="1" fill="rgba(0,0,0,0.7)" stroke="none"/>
+          <rect x="592" y="148" width="7" height="10" rx="1" fill="rgba(0,0,0,0.7)" stroke="none"/>
+          {/* Houses: party walls */}
+          <line x1="340" y1="148" x2="340" y2="240" stroke="rgba(0,0,0,0.35)" strokeWidth="1"/>
+          <line x1="380" y1="138" x2="380" y2="240" stroke="rgba(0,0,0,0.35)" strokeWidth="1"/>
+          <line x1="412" y1="138" x2="412" y2="240" stroke="rgba(0,0,0,0.35)" strokeWidth="1"/>
+          <line x1="452" y1="138" x2="452" y2="240" stroke="rgba(0,0,0,0.35)" strokeWidth="1"/>
+          <line x1="492" y1="142" x2="492" y2="240" stroke="rgba(0,0,0,0.35)" strokeWidth="1"/>
+          <line x1="532" y1="136" x2="532" y2="240" stroke="rgba(0,0,0,0.35)" strokeWidth="1"/>
+          <line x1="568" y1="136" x2="568" y2="240" stroke="rgba(0,0,0,0.35)" strokeWidth="1"/>
+          <line x1="608" y1="138" x2="608" y2="240" stroke="rgba(0,0,0,0.35)" strokeWidth="1"/>
         </Box>
       )}
+
+      {/* ── City's Blessing: rolling hills behind the skyline ── */}
+      {cityBlessingVisible && (
+        <Box component="svg" viewBox="0 0 600 100" preserveAspectRatio="none" sx={{
+          position: 'absolute', bottom: 55, left: 0, right: 0,
+          width: '100%', height: 80,
+          zIndex: 0, pointerEvents: 'none', opacity: 0,
+          animation: cityBlessingExiting
+            ? `${skylineFadeOut} 0.8s 2s ease-in forwards`
+            : `${skylineFadeIn} 4s 0.5s ease-out forwards`,
+        }}>
+          <path d="M0,100 C90,10 200,55 310,22 C430,-5 510,42 600,16 L600,100 Z" fill="rgba(0,0,0,0.09)"/>
+          <path d="M0,100 C75,25 175,60 295,38 C405,16 505,55 600,36 L600,100 Z" fill="rgba(0,0,0,0.11)"/>
+          <path d="M0,100 C60,45 160,70 275,54 C382,38 480,66 600,50 L600,100 Z" fill="rgba(0,0,0,0.14)"/>
+        </Box>
+      )}
+
+      {/* ── City's Blessing: distant skyline strip ── */}
+      {cityBlessingVisible && (
+        <Box component="svg" viewBox="0 0 800 80" preserveAspectRatio="none" sx={{
+          position: 'absolute', bottom: 38, left: 0, right: 0,
+          width: '100%', height: 55,
+          fill: 'rgba(0,0,0,0.22)', stroke: 'none',
+          zIndex: 0, pointerEvents: 'none', opacity: 0,
+          animation: cityBlessingExiting
+            ? `${skylineFadeOut} 0.8s 2s ease-in forwards`
+            : `${skylineFadeIn} 3s 1.2s ease-out forwards`,
+        }}>
+          <path d="
+            M0,80 L0,55 L8,40 L4,40 L14,8 L24,40 L20,40 L22,55
+            L40,55 L40,62 L55,62 L55,50 L65,36 L75,50 L75,62
+            L92,62 L92,55 L102,40 L102,26 L106,6 L110,26 L110,40 L120,55
+            L120,62 L138,62 L138,55 L150,40 L162,55 L162,62 L176,62
+            L176,55 L186,38 L186,24 L190,5 L194,24 L194,38 L204,55
+            L204,62 L222,62 L222,55 L235,42 L248,55 L248,62 L262,62
+            L262,55 L274,40 L274,26 L278,6 L282,26 L282,40 L294,55
+            L294,62 L312,62 L312,55 L325,42 L338,55 L338,62 L352,62
+            L352,55 L364,38 L364,24 L368,5 L372,24 L372,38 L384,55
+            L384,62 L400,62 L400,55 L413,42 L426,55 L426,62 L440,62
+            L440,55 L450,40 L450,26 L454,6 L458,26 L458,40 L468,55
+            L468,62 L485,62 L485,55 L498,42 L511,55 L511,62 L525,62
+            L525,55 L537,38 L537,24 L541,5 L545,24 L545,38 L557,55
+            L557,62 L574,62 L574,55 L587,42 L600,55 L600,62 L615,62
+            L615,55 L625,40 L625,26 L629,6 L633,26 L633,40 L643,55
+            L643,62 L660,62 L660,55 L675,42 L690,55 L690,62 L705,62
+            L705,55 L717,38 L717,24 L721,5 L725,24 L725,38 L737,55
+            L737,62 L755,62 L800,62 L800,80 Z
+          " />
+        </Box>
+      )}
+
+      {/* ── City's Blessing: cathedral (right side) ── */}
+      {cityBlessingVisible && (
+        <Box component="svg" viewBox="0 0 200 220" sx={{
+          position: 'absolute', bottom: -35, right: -40,
+          width: 200, height: 220,
+          fill: 'rgba(0,0,0,0.52)', stroke: 'rgba(0,0,0,0.78)', strokeWidth: 1.2,
+          zIndex: 0, pointerEvents: 'none',
+          animation: cityBlessingExiting
+            ? `${castleSlideOutRight} 1.8s 2s ease-in forwards`
+            : `${castleSlideInRight} 1.8s 0.3s ease-out forwards`,
+        }}>
+          {/* Twin spires + nave */}
+          <path d="
+            M0,220
+            L0,148 L8,148 L8,100 L4,100 L24,12 L44,100 L40,100 L40,148
+            L52,148 L52,132 L100,96 L148,132 L148,148
+            L160,148 L160,100 L156,100 L176,12 L196,100 L192,100 L192,148
+            L200,148 L200,220 Z
+          " />
+          {/* Left spire window */}
+          <rect x="17" y="122" width="5" height="18" rx="2" fill="rgba(0,0,0,0.7)" stroke="none"/>
+          {/* Right spire window */}
+          <rect x="178" y="122" width="5" height="18" rx="2" fill="rgba(0,0,0,0.7)" stroke="none"/>
+          {/* Rose window */}
+          <circle cx="100" cy="120" r="11" fill="none" stroke="rgba(0,0,0,0.65)" strokeWidth="2.5"/>
+          <circle cx="100" cy="120" r="5" fill="none" stroke="rgba(0,0,0,0.5)" strokeWidth="1.5"/>
+          {/* Nave stringcourse */}
+          <line x1="52" y1="156" x2="148" y2="156" stroke="rgba(0,0,0,0.5)" strokeWidth="1.5"/>
+          {/* Spire stringcourses */}
+          <line x1="2" y1="164" x2="48" y2="164" stroke="rgba(0,0,0,0.45)" strokeWidth="1.2"/>
+          <line x1="152" y1="164" x2="198" y2="164" stroke="rgba(0,0,0,0.45)" strokeWidth="1.2"/>
+          {/* Door arch */}
+          <path d="M85,220 L85,192 Q100,175 115,192 L115,220" fill="rgba(0,0,0,0.7)" stroke="none"/>
+        </Box>
+      )}
+
 
       {/* ── City's Blessing fireworks ── */}
       {cityBlessingVisible && (
@@ -1623,7 +1764,7 @@ export function PlayerPanel({
               sx={{ height: artHeight, width: 'auto', borderRadius: 0.5, flexShrink: 0, cursor: 'zoom-in' }} />
           )}
           {player.commanderTax > 0 && (
-            <Tooltip title={`Commander Tax: cast ${player.commanderTax}× (+${player.commanderTax * 2} generic mana)`} placement="bottom" arrow>
+            <Tooltip title={`Tax: cast ${player.commanderTax}× (+${player.commanderTax * 2} generic mana)`} placement="bottom" arrow>
               <Stack direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
                 <Typography sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary', lineHeight: 1, userSelect: 'none' }}>+</Typography>
                 <Box sx={{
@@ -1944,8 +2085,7 @@ export function PlayerPanel({
 
         {/* Commander Damage box */}
         <Box sx={{
-          width: remoteMode ? '33dvw' : '33%',
-          flexShrink: 0,
+          ...(remoteMode ? { width: '33dvw', flexShrink: 0 } : { flex: 1, minWidth: 0 }),
           borderRight: (theme) => `1px solid ${theme.palette.divider}`,
           px: remoteMode ? 1 : 0.5,
           py: remoteMode ? 1 : 0.25,
@@ -2019,7 +2159,7 @@ export function PlayerPanel({
                   <Tooltip title={`Life: ${source.life}`} placement="top" slotProps={ttSlotProps} arrow><Typography sx={{ fontSize: fsStatBadge, fontWeight: 800, color: lifeColor(source.life) || 'primary.main', lineHeight: 1 }}>♥{source.life}</Typography></Tooltip>
                   {source.poison > 0 && <Tooltip title={`Poison: ${source.poison}`} placement="top" slotProps={ttSlotProps} arrow><Typography sx={{ fontSize: fsStatBadge, fontWeight: 800, color: source.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1 }}>☠{source.poison}</Typography></Tooltip>}
                   {source.energy > 0 && <Tooltip title={`Energy: ${source.energy}`} placement="top" slotProps={ttSlotProps} arrow><Typography sx={{ fontSize: fsStatBadge, fontWeight: 800, color: '#4FC8FF', lineHeight: 1 }}>⚡{source.energy}</Typography></Tooltip>}
-                  {source.experience > 0 && <Tooltip title={`Experience: ${source.experience}`} placement="top" slotProps={ttSlotProps} arrow><Stack direction="row" alignItems="center" spacing={0.25}><Box sx={{ bgcolor: 'background.paper', display: 'inline-flex' }}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: fsStatBadge, height: fsStatBadge, objectFit: 'contain', mixBlendMode: 'multiply', transition: 'width 0.2s ease, height 0.2s ease' }} /></Box><Typography sx={{ fontSize: fsStatBadge, fontWeight: 800, color: '#DAA520', lineHeight: 1 }}>{source.experience}</Typography></Stack></Tooltip>}
+                  {source.experience > 0 && <Tooltip title={`XP: ${source.experience}`} placement="top" slotProps={ttSlotProps} arrow><Stack direction="row" alignItems="center" spacing={0.25}><Box sx={{ bgcolor: 'background.paper', display: 'inline-flex' }}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: fsStatBadge, height: fsStatBadge, objectFit: 'contain', mixBlendMode: 'multiply', transition: 'width 0.2s ease, height 0.2s ease' }} /></Box><Typography sx={{ fontSize: fsStatBadge, fontWeight: 800, color: '#DAA520', lineHeight: 1 }}>{source.experience}</Typography></Stack></Tooltip>}
                 </Stack>
               </Box>,
               <Tooltip key={`${sourceIdx}-dec`} open={lpKey === `${sourceIdx}-dec`} title="-5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
@@ -2166,7 +2306,7 @@ export function PlayerPanel({
         </Box>
 
         {/* Life total + controls */}
-        <Box sx={{ width: remoteMode ? '33dvw' : '33%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5, alignSelf: 'stretch', pt: remoteMode ? 2 : 0 }}>
+        <Box sx={{ ...(remoteMode ? { width: '33dvw', flexShrink: 0 } : { flex: 1, minWidth: 0 }), display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5, alignSelf: 'stretch', pt: remoteMode ? 2 : 0 }}>
           <Box sx={{ position: 'relative', lineHeight: 1, overflow: 'visible', width: '100%', flex: remoteMode ? undefined : 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             {showCrown && (
               <CrownIcon sx={{
@@ -2232,7 +2372,7 @@ export function PlayerPanel({
               <Typography onClick={() => setFocusedControl({ type: 'life' })} sx={{
                 position: 'relative', zIndex: 1,
                 fontWeight: 900,
-                fontSize: remoteMode ? 'clamp(80px, 22dvmax, 260px)' : 'clamp(34px, 10dvh, 112px)',
+                fontSize: remoteMode ? 'clamp(80px, 22dvmax, 260px)' : (countersOpen ? 'clamp(34px, 10dvh, 112px)' : 'clamp(60px, 20dvh, 240px)'),
                 lineHeight: 1,
                 cursor: 'pointer',
                 color: computedLifeColor || ((theme: import('@mui/material').Theme) => theme.palette.primary.main),
@@ -2344,40 +2484,98 @@ export function PlayerPanel({
           </Box>
         </Box>
 
-        {/* Counters — right column */}
+        {/* Counters — right column, collapsible */}
         <Box sx={{
-          flex: 1,
+          display: 'flex',
+          flexDirection: 'row',
+          ...(countersOpen ? { flex: 1 } : { flex: 'none', width: 24 }),
           minWidth: 0,
+          overflow: 'hidden',
           borderLeft: (theme) => `1px solid ${theme.palette.divider}`,
-          px: remoteMode ? 1 : 0.5,
-          py: remoteMode ? 1 : 0.25,
-          overflowY: 'auto',
-          display: 'grid',
-          gridTemplateColumns: `1fr ${cmdBtnWidth} ${valColWidth} ${cmdBtnWidth}`,
-          alignContent: remoteMode ? 'start' : 'safe center',
-          alignItems: 'center',
-          rowGap: remoteMode ? 0.5 : 0.1,
-          transition: 'padding 0.2s ease, row-gap 0.2s ease',
         }}>
-          <Typography sx={{ fontSize: fsSectionLabel, fontWeight: 600, color: 'text.secondary', mb: 0.25, textTransform: 'uppercase', letterSpacing: 0.5, gridColumn: '1 / -1' }}>
-            Counters
-          </Typography>
-          {([
-            ['Poison', player.poison, () => onPoisonChange(playerIdx, -1), () => onPoisonChange(playerIdx, 1), () => onPoisonChange(playerIdx, -5), () => onPoisonChange(playerIdx, 5), player.poison >= 10 ? 'error.main' : player.poison > 0 ? 'warning.main' : 'text.disabled'],
-            ['Energy', player.energy, () => onEnergyChange(playerIdx, -1), () => onEnergyChange(playerIdx, 1), () => onEnergyChange(playerIdx, -5), () => onEnergyChange(playerIdx, 5), player.energy > 0 ? 'primary.main' : 'text.disabled'],
-            ['Experience', player.experience, () => onExperienceChange(playerIdx, -1), () => onExperienceChange(playerIdx, 1), () => onExperienceChange(playerIdx, -5), () => onExperienceChange(playerIdx, 5), player.experience > 0 ? 'primary.main' : 'text.disabled'],
-            ['Commander Tax', player.commanderTax, () => onCommanderTaxChange(playerIdx, -1), () => onCommanderTaxChange(playerIdx, 1), () => onCommanderTaxChange(playerIdx, -5), () => onCommanderTaxChange(playerIdx, 5), player.commanderTax > 0 ? 'warning.main' : 'text.disabled'],
-          ] as [string, number, () => void, () => void, () => void, () => void, string][]).flatMap(([label, value, onDec, onInc, onDec5, onInc5, color]) => [
-            <Typography key={`${label}-lbl`} sx={{ fontSize: fsSourceName, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none' }}>{label}</Typography>,
-            <Tooltip key={`${label}-dec`} open={lpKey === `${label}-dec`} title="-5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-              <IconButton onClick={guardClick(onDec)} onPointerDown={() => startLongPress(`${label}-dec`, onDec5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: cmdBtnWidth, minHeight: cmdBtnHeight }}><Typography sx={{ fontSize: fsCounterBtn, fontWeight: 700 }}>−</Typography></IconButton>
-            </Tooltip>,
-            <Typography key={`${label}-val`} onClick={() => { const t = { 'Poison': 'poison', 'Energy': 'energy', 'Experience': 'experience', 'Commander Tax': 'commanderTax' }[label] as 'poison' | 'energy' | 'experience' | 'commanderTax' | undefined; if (t) setFocusedControl({ type: t }); }} sx={{ fontSize: fsCounterValue, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', cursor: 'pointer', color, filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none', ...(label === 'Poison' && value === 9 && { animation: 'poisonPulse 2.5s ease-in-out infinite', '@keyframes poisonPulse': { '0%, 100%': { opacity: 1, transform: 'scale(1)', textShadow: '0 0 8px rgba(0,200,60,0.9), 0 0 20px rgba(0,200,60,0.5)' }, '50%': { opacity: 0.3, transform: 'scale(0.85)', textShadow: '0 0 2px rgba(0,200,60,0.2)' } } }), ...(label === 'Experience' && xpGlow && { textShadow: xpGlow, ...(xpShimmerAnim && { animation: `${xpShimmerAnim} 3s ease-in-out infinite` }) }) }}>{value}</Typography>,
-            <Tooltip key={`${label}-inc`} open={lpKey === `${label}-inc`} title="+5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-              <IconButton onClick={guardClick(onInc)} onPointerDown={() => startLongPress(`${label}-inc`, onInc5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: cmdBtnWidth, minHeight: cmdBtnHeight }}><Typography sx={{ fontSize: fsCounterBtn, fontWeight: 700 }}>+</Typography></IconButton>
-            </Tooltip>,
-          ])}
+          {/* Chevron strip — fixed 18px, always same position/size */}
+          <Box
+            onClick={() => setCountersOpen(o => !o)}
+            sx={{ width: 24, flexShrink: 0, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', pt: 0.5, gap: 0.5, cursor: 'pointer' }}
+          >
+            {!countersOpen && <>
+              {player.poison > 0 && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
+                  <Box sx={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Typography sx={{ fontSize: 14, color: player.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1 }}>☠</Typography>
+                  </Box>
+                  <Typography sx={{ fontSize: 11, color: player.poison >= 10 ? '#e53935' : '#66BB6A', fontWeight: 700, lineHeight: 1 }}>{player.poison}</Typography>
+                </Box>
+              )}
+              {player.energy > 0 && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
+                  <Box sx={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Typography sx={{ fontSize: 14, color: '#4FC8FF', lineHeight: 1 }}>⚡</Typography>
+                  </Box>
+                  <Typography sx={{ fontSize: 11, color: '#4FC8FF', fontWeight: 700, lineHeight: 1 }}>{player.energy}</Typography>
+                </Box>
+              )}
+              {player.experience > 0 && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
+                  <Box sx={{ width: 16, height: 16, bgcolor: 'background.paper', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: 14, height: 14, objectFit: 'contain', mixBlendMode: 'multiply' }} />
+                  </Box>
+                  <Typography sx={{ fontSize: 11, color: '#DAA520', fontWeight: 700, lineHeight: 1 }}>{player.experience}</Typography>
+                </Box>
+              )}
+              {player.commanderTax > 0 && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
+                  <Box sx={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, background: 'radial-gradient(circle at 38% 35%, #d0d0d0, #7a7a7a)', border: '1.5px solid #3a3a3a', boxShadow: '0 1px 3px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Typography sx={{ fontSize: 7, fontWeight: 800, color: '#111', lineHeight: 1, userSelect: 'none' }}>+{player.commanderTax * 2}</Typography>
+                  </Box>
+                  <Typography sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 700, lineHeight: 1 }}>{player.commanderTax}</Typography>
+                </Box>
+              )}
+            </>}
+            {/* Chevron — always vertically centered regardless of icons */}
+            <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }}>
+              <ChevronRightIcon sx={{ fontSize: 22, color: 'text.secondary', transform: countersOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s ease', display: 'block' }} />
+            </Box>
+          </Box>
+          {/* Counter grid */}
+          <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', opacity: countersOpen ? 1 : 0, transition: 'opacity 0.15s ease' }}>
+            <Typography sx={{ fontSize: fsSectionLabel, fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5, px: 0.75, pt: 0.5, pb: 0.25, flexShrink: 0 }}>Counters</Typography>
+            <Box sx={{
+              flex: 1,
+              minWidth: 0,
+              px: remoteMode ? 0.75 : 0.25,
+              pb: remoteMode ? 1 : 0.25,
+              overflowY: 'auto',
+              display: 'grid',
+              gridTemplateColumns: `1fr ${cmdBtnWidth} ${valColWidth} ${cmdBtnWidth}`,
+              alignContent: remoteMode ? 'start' : 'safe center',
+              alignItems: 'center',
+              rowGap: remoteMode ? 0.5 : 0.1,
+            }}>
+            {([
+              ['Poison', player.poison, () => onPoisonChange(playerIdx, -1), () => onPoisonChange(playerIdx, 1), () => onPoisonChange(playerIdx, -5), () => onPoisonChange(playerIdx, 5), player.poison >= 10 ? 'error.main' : player.poison > 0 ? 'warning.main' : 'text.disabled'],
+              ['Energy', player.energy, () => onEnergyChange(playerIdx, -1), () => onEnergyChange(playerIdx, 1), () => onEnergyChange(playerIdx, -5), () => onEnergyChange(playerIdx, 5), player.energy > 0 ? 'primary.main' : 'text.disabled'],
+              ['XP', player.experience, () => onExperienceChange(playerIdx, -1), () => onExperienceChange(playerIdx, 1), () => onExperienceChange(playerIdx, -5), () => onExperienceChange(playerIdx, 5), player.experience > 0 ? 'primary.main' : 'text.disabled'],
+              ['Tax', player.commanderTax, () => onCommanderTaxChange(playerIdx, -1), () => onCommanderTaxChange(playerIdx, 1), () => onCommanderTaxChange(playerIdx, -5), () => onCommanderTaxChange(playerIdx, 5), player.commanderTax > 0 ? 'warning.main' : 'text.disabled'],
+            ] as [string, number, () => void, () => void, () => void, () => void, string][]).flatMap(([label, value, onDec, onInc, onDec5, onInc5, color]) => [
+              <Stack key={`${label}-lbl`} direction="row" alignItems="center" spacing={0.4} sx={{ overflow: 'hidden', filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none', minWidth: 0 }}>
+                {label === 'Poison'     && <Typography component="span" sx={{ fontSize: fsSourceName, color: player.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1, flexShrink: 0 }}>☠</Typography>}
+                {label === 'Energy'     && <Typography component="span" sx={{ fontSize: fsSourceName, color: '#4FC8FF', lineHeight: 1, flexShrink: 0 }}>⚡</Typography>}
+                {label === 'XP' && <Box sx={{ bgcolor: 'background.paper', display: 'inline-flex', flexShrink: 0 }}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: fsSourceName, height: fsSourceName, objectFit: 'contain', mixBlendMode: 'multiply' }} /></Box>}
+                {label === 'Tax'        && <Box sx={{ width: fsSourceName, height: fsSourceName, borderRadius: '50%', flexShrink: 0, background: 'radial-gradient(circle at 38% 35%, #d0d0d0, #7a7a7a)', border: '1px solid #3a3a3a', boxShadow: '0 1px 2px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Typography sx={{ fontSize: 7, fontWeight: 800, color: '#111', lineHeight: 1, userSelect: 'none' }}>+{player.commanderTax * 2}</Typography></Box>}
+                <Typography component="span" sx={{ fontSize: fsSourceName, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</Typography>
+              </Stack>,
+              <Tooltip key={`${label}-dec`} open={lpKey === `${label}-dec`} title="-5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
+                <IconButton onClick={guardClick(onDec)} onPointerDown={() => startLongPress(`${label}-dec`, onDec5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: cmdBtnWidth, minHeight: cmdBtnHeight }}><Typography sx={{ fontSize: fsCounterBtn, fontWeight: 700 }}>−</Typography></IconButton>
+              </Tooltip>,
+              <Typography key={`${label}-val`} onClick={() => { const t = { 'Poison': 'poison', 'Energy': 'energy', 'XP': 'experience', 'Tax': 'commanderTax' }[label] as 'poison' | 'energy' | 'experience' | 'commanderTax' | undefined; if (t) setFocusedControl({ type: t }); }} sx={{ fontSize: fsCounterValue, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', cursor: 'pointer', color, filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none', ...(label === 'Poison' && value === 9 && { animation: 'poisonPulse 2.5s ease-in-out infinite', '@keyframes poisonPulse': { '0%, 100%': { opacity: 1, transform: 'scale(1)', textShadow: '0 0 8px rgba(0,200,60,0.9), 0 0 20px rgba(0,200,60,0.5)' }, '50%': { opacity: 0.3, transform: 'scale(0.85)', textShadow: '0 0 2px rgba(0,200,60,0.2)' } } }), ...(label === 'XP' && xpGlow && { textShadow: xpGlow, ...(xpShimmerAnim && { animation: `${xpShimmerAnim} 3s ease-in-out infinite` }) }) }}>{value}</Typography>,
+              <Tooltip key={`${label}-inc`} open={lpKey === `${label}-inc`} title="+5" placement="top" slotProps={ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
+                <IconButton onClick={guardClick(onInc)} onPointerDown={() => startLongPress(`${label}-inc`, onInc5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: cmdBtnWidth, minHeight: cmdBtnHeight }}><Typography sx={{ fontSize: fsCounterBtn, fontWeight: 700 }}>+</Typography></IconButton>
+              </Tooltip>,
+            ])}
+          </Box>
         </Box>
+      </Box>
       </Box>
 
       {/* Focused control modal — enlarged single counter/damage control */}
@@ -2416,7 +2614,7 @@ export function PlayerPanel({
           onInc5 = () => onEnergyChange(playerIdx, 5);
           valueColor = player.energy > 0 ? 'primary.main' : 'text.disabled';
         } else if (fc.type === 'experience') {
-          label = 'Experience';
+          label = 'XP';
           value = player.experience;
           onDec = () => onExperienceChange(playerIdx, -1);
           onInc = () => onExperienceChange(playerIdx, 1);
@@ -2424,7 +2622,7 @@ export function PlayerPanel({
           onInc5 = () => onExperienceChange(playerIdx, 5);
           valueColor = player.experience > 0 ? 'primary.main' : 'text.disabled';
         } else if (fc.type === 'commanderTax') {
-          label = 'Commander Tax';
+          label = 'Tax';
           value = player.commanderTax;
           onDec = () => onCommanderTaxChange(playerIdx, -1);
           onInc = () => onCommanderTaxChange(playerIdx, 1);
