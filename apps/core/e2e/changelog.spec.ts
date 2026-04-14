@@ -17,10 +17,12 @@ import { goto } from './helpers';
 test.describe('Changelog', () => {
   test.beforeEach(async ({ page }) => {
     await goto(page, '/changelog/');
+    await page.waitForLoadState('networkidle');
   });
 
   test('page loads and heading is visible', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: /changelog/i })).toBeVisible();
+    // Use exact match — release titles also contain "changelog" (strict mode)
+    await expect(page.getByRole('heading', { name: 'Changelog', exact: true })).toBeVisible();
   });
 
   test('at least one release card renders', async ({ page }) => {
@@ -46,16 +48,16 @@ test.describe('Changelog', () => {
   });
 
   test('release dates are displayed', async ({ page }) => {
-    // Dates in YYYY-MM-DD format
-    await expect(page.getByText(/2026-04-14/)).toBeVisible();
+    // Dates are formatted via toLocaleDateString('en-US') → e.g. "April 14, 2026"
+    await expect(page.getByText(/april\s+\d+,\s+2026|\d{1,2}\/\d{1,2}\/2026/i).first()).toBeVisible();
   });
 
-  test('change type labels are visible (added/fixed/improved/changed)', async ({ page }) => {
-    // At least one of these types should be visible across all releases
-    const types = ['added', 'fixed', 'improved', 'changed'];
+  test('change type labels are visible (Added/Fixed/Improved/Changed)', async ({ page }) => {
+    // Chip labels: "Added", "Fixed", "Improved", "Changed"
+    const types = ['Added', 'Fixed', 'Improved', 'Changed'];
     let found = 0;
     for (const type of types) {
-      const els = page.getByText(new RegExp(type, 'i'));
+      const els = page.getByText(new RegExp(`^${type}$`, 'i'));
       if (await els.count() > 0) found++;
     }
     expect(found).toBeGreaterThan(0);

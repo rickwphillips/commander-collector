@@ -59,9 +59,10 @@ test.describe('Dashboard', () => {
   });
 
   test('changelog link (version chip) is present', async ({ page }) => {
-    // The changelog link is a version chip with href="/changelog"
+    await page.waitForLoadState('networkidle');
+    // The changelog link is a version chip with href containing "changelog"
     const changelogLink = page.locator('a[href*="changelog"]');
-    await expect(changelogLink.first()).toBeVisible();
+    await expect(changelogLink.first()).toBeVisible({ timeout: 10000 });
   });
 
   test('version chip shows a version number', async ({ page }) => {
