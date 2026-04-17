@@ -1,6 +1,7 @@
 import { api } from './api';
 
-const cache = new Map<string, string | null>();
+// Only stores successful image URLs — nulls are never written here
+const cache = new Map<string, string>();
 const inFlight = new Map<string, Promise<string | null>>();
 const backCache = new Map<string, string | null>();
 
@@ -33,19 +34,18 @@ function enqueue<T>(fn: () => Promise<T>): Promise<T> {
  *   2. scryfall-cache.php (DB first, Scryfall fallback) → get scryfall_id + image_uri
  *   3. card-image.php → fetch image bytes, store as base64 in scryfall_card_cache, return data URI
  *
- * Subsequent calls for the same name (anywhere in the app) return from memory.
- * Failed lookups are NOT cached — they will retry on next request.
+ * Nulls are NEVER written to cache — failed or missing lookups always retry on next call.
  */
 export async function getCardImageByName(name: string): Promise<string | null> {
-  if (cache.has(name)) return cache.get(name)!;
+  const cached = cache.get(name);
+  if (cached !== undefined) return cached;
   if (inFlight.has(name)) return inFlight.get(name)!;
 
   const promise = enqueue(() => api.lookupCard(name))
     .then(async (meta) => {
       backCache.set(name, meta?.back_image_uri ?? null);
       if (!meta?.scryfall_id) {
-        // Card genuinely not found — safe to cache as null
-        cache.set(name, null);
+        // Don't cache — could be a transient Scryfall error, not genuinely missing
         return null;
       }
       const img = await enqueue(() => api.getCardImage(meta.scryfall_id, meta.image_uri ?? undefined));

@@ -22,17 +22,19 @@ const CARD_CURSOR = `url("data:image/svg+xml,${CARD_SVG}") 7 10, zoom-in`;
 
 /**
  * Wraps children in a MUI Tooltip showing a card image preview on hover.
- * Uses the shared cardImageCache — DB-backed, Scryfall fallback, in-memory dedup.
- * Renders children as-is (no wrapper span) when no image is available.
+ * Lookup is deferred until first hover — shows a spinner immediately, then the image.
+ * If the lookup finds no card, renders children as plain text with no cursor or tooltip.
  */
 export function CardTooltip({ name, children, previewWidth = 220, placement = 'top', style, onClick }: Props) {
   const [imageUrl, setImageUrl]         = useState<string | null>(null);
   const [backImageUrl, setBackImageUrl] = useState<string | null>(null);
   const [hovered, setHovered]           = useState(false);
-  const [loading, setLoading]           = useState(true);
+  const [loading, setLoading]           = useState(false);
+  const [looked, setLooked]             = useState(false); // true once a lookup has completed
 
-  // Load on mount
+  // Trigger lookup on first hover
   useEffect(() => {
+    if (!hovered || looked) return;
     setLoading(true);
     Promise.all([
       getCardImageByName(name),
@@ -41,26 +43,17 @@ export function CardTooltip({ name, children, previewWidth = 220, placement = 't
       setImageUrl(url);
       setBackImageUrl(backUrl);
       setLoading(false);
+      setLooked(true);
     });
-  }, [name]);
+  }, [hovered, looked, name]);
 
-  // Retry on hover if initial load returned nothing (cache no longer blocks retries)
-  useEffect(() => {
-    if (hovered && !imageUrl) {
-      setLoading(true);
-      Promise.all([
-        getCardImageByName(name),
-        getCardBackImageByName(name),
-      ]).then(([url, backUrl]) => {
-        setImageUrl(url);
-        setBackImageUrl(backUrl);
-        setLoading(false);
-      });
-    }
-  }, [hovered, imageUrl, name]);
+  // Once lookup is done and no image was found, render children as-is — no cursor, no tooltip
+  if (looked && !imageUrl) {
+    return <>{children}</>;
+  }
 
-  // loading → spinner; image ready → card image; not found → false (disables tooltip)
-  const tooltipTitle: React.ReactNode = loading ? (
+  // not yet hovered → no tooltip content yet; loading → spinner; image ready → card image
+  const tooltipTitle: React.ReactNode = !hovered ? false : loading ? (
     <Box sx={{
       width: previewWidth,
       height: Math.round(previewWidth * 1.4),
@@ -89,7 +82,7 @@ export function CardTooltip({ name, children, previewWidth = 220, placement = 't
   return (
     <Tooltip
       placement={placement}
-      enterDelay={loading ? 0 : 150}
+      enterDelay={0}
       title={tooltipTitle}
       slotProps={{ tooltip: { sx: { bgcolor: 'transparent', p: 0, boxShadow: 8 } } }}
     >

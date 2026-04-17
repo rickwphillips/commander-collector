@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useImperativeHandle } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -113,8 +113,119 @@ const mdComponents = {
   },
 };
 
+// ── ChatInput — isolated so typing only re-renders this component ────────────
+
+export interface ChatInputHandle {
+  setValue(text: string): void;
+  appendText(text: string): void;
+  focus(): void;
+}
+
+const ChatInput = React.forwardRef<ChatInputHandle, {
+  onSend: (text: string) => void;
+  loading: boolean;
+  placeholder: string;
+}>(function ChatInput({ onSend, loading, placeholder }, ref) {
+  const [value, setValue] = useState('');
+  const innerRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    setValue,
+    appendText: (text) => setValue(prev =>
+      prev.endsWith(' ') || prev === '' ? prev + text : prev + ' ' + text
+    ),
+    focus: () => setTimeout(() => innerRef.current?.focus(), 100),
+  }));
+
+  const submit = () => {
+    const trimmed = value.trim();
+    if (!trimmed || loading) return;
+    setValue('');
+    onSend(trimmed);
+  };
+
+  return (
+    <Paper elevation={3} square sx={{ p: 1.5, display: 'flex', gap: 1, alignItems: 'flex-end' }}>
+      <TextField
+        inputRef={innerRef}
+        fullWidth
+        multiline
+        maxRows={6}
+        placeholder={placeholder}
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
+        disabled={loading}
+        size="small"
+        variant="outlined"
+        autoFocus
+      />
+      <IconButton color="primary" onClick={submit} disabled={!value.trim() || loading} sx={{ mb: 0.25 }}>
+        <SendIcon />
+      </IconButton>
+    </Paper>
+  );
+});
+
+// ── CorrectionForm — isolated so typing only re-renders this component ────────
+
+function CorrectionForm({ qaLogId, msgIndex, onSubmitted, onCancel }: {
+  qaLogId: number;
+  msgIndex: number;
+  onSubmitted: (idx: number) => void;
+  onCancel: () => void;
+}) {
+  const [text, setText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    if (!text.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      await rulesApi.rateQaLog({ qa_log_id: qaLogId, correctness: 1, rating_notes: text.trim() });
+      onSubmitted(msgIndex);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+      <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'error.main', mb: 0.75 }}>
+        What's the correct ruling?
+      </Typography>
+      <TextField
+        multiline
+        minRows={2}
+        maxRows={6}
+        fullWidth
+        size="small"
+        placeholder="Describe the correction or cite the rule…"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        sx={{ fontSize: 12, mb: 0.75 }}
+      />
+      <Box sx={{ display: 'flex', gap: 0.75, justifyContent: 'flex-end' }}>
+        <Button size="small" onClick={onCancel} sx={{ fontSize: 11 }}>Cancel</Button>
+        <Button
+          size="small"
+          variant="contained"
+          color="error"
+          disabled={!text.trim() || submitting}
+          onClick={submit}
+          sx={{ fontSize: 11 }}
+        >
+          {submitting ? 'Saving…' : 'Save Correction'}
+        </Button>
+      </Box>
+    </Box>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function ChatPage() {
-  const [input, setInput] = useState('');
+  const chatInputRef = useRef<ChatInputHandle>(null);
   const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -136,14 +247,10 @@ export default function ChatPage() {
 
   // Correction flagging
   const [flaggedIdx, setFlaggedIdx] = useState<number | null>(null);
-  const [correctionText, setCorrectionText] = useState('');
-  const [submittingFlag, setSubmittingFlag] = useState(false);
   const [flaggedIndices, setFlaggedIndices] = useState<Set<number>>(new Set());
 
-  const [thinkingText, setThinkingText] = useState('Consulting the rules…');
   const thinkingRef = useRef<HTMLSpanElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const retryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const THINKING_MESSAGES = [
@@ -399,20 +506,6 @@ export default function ChatPage() {
     }
   }, []);
 
-  const submitCorrection = useCallback(async (msgIdx: number) => {
-    const msg = messages[msgIdx];
-    if (!msg?.qa_log_id || !correctionText.trim()) return;
-    setSubmittingFlag(true);
-    try {
-      await rulesApi.rateQaLog({ qa_log_id: msg.qa_log_id, correctness: 1, rating_notes: correctionText.trim() });
-      setFlaggedIndices(prev => new Set(prev).add(msgIdx));
-      setFlaggedIdx(null);
-      setCorrectionText('');
-    } finally {
-      setSubmittingFlag(false);
-    }
-  }, [messages, correctionText]);
-
   // Real-time timer state pushed from parent every second
   const liveTimerRef = useRef<ActiveGameContext['_liveTimer']>(undefined);
   useEffect(() => {
@@ -453,7 +546,7 @@ export default function ChatPage() {
     setMessages([]);
     setError(null);
     setHistoryOpen(false);
-    setTimeout(() => inputRef.current?.focus(), 100);
+    chatInputRef.current?.focus();
   };
 
   const deleteConversation = async (id: number, e: React.MouseEvent) => {
@@ -470,19 +563,17 @@ export default function ChatPage() {
   // Insert a #P### reference into the input at the end
   const citePattern = (p: RulesPattern) => {
     const ref = `#${p.pattern_id.toUpperCase()} `;
-    setInput(prev => (prev.endsWith(' ') || prev === '' ? prev + ref : prev + ' ' + ref));
+    chatInputRef.current?.appendText(ref);
     setPatternsOpen(false);
-    setTimeout(() => inputRef.current?.focus(), 100);
+    chatInputRef.current?.focus();
   };
 
-  const handleSend = async () => {
-    const raw = input.trim();
+  const handleSend = async (raw: string) => {
     if (!raw || loading) return;
 
     // Resolve #P### refs so Claude sees the pattern name inline
     const resolved = resolvePatternRefs(raw, patterns);
 
-    setInput('');
     setError(null);
 
     // Show the original (unresolved) text to the user
@@ -496,10 +587,12 @@ export default function ChatPage() {
       return /rate|overload|529|429/i.test(msg);
     };
 
+    const setThinkingDom = (text: string) => { if (thinkingRef.current) thinkingRef.current.textContent = text; };
+
     const waitWithCountdown = (seconds: number): Promise<void> => {
       return new Promise(resolve => {
         let remaining = seconds;
-        setThinkingText(`The rules oracle is a bit overwhelmed — trying again in a moment.`);
+        setThinkingDom(`The rules oracle is a bit overwhelmed — trying again in a moment.`);
         if (retryIntervalRef.current) clearInterval(retryIntervalRef.current);
         retryIntervalRef.current = setInterval(() => {
           remaining -= 1;
@@ -508,11 +601,11 @@ export default function ChatPage() {
             retryIntervalRef.current = null;
             resolve();
           } else {
-            setThinkingText(`Retrying in ${remaining}s…`);
+            setThinkingDom(`Retrying in ${remaining}s…`);
           }
         }, 1000);
         // Initial countdown display
-        setThinkingText(`Retrying in ${remaining}s…`);
+        setThinkingDom(`Retrying in ${remaining}s…`);
       });
     };
 
@@ -576,15 +669,9 @@ export default function ChatPage() {
 
     setLoading(false);
     if (isEmbedded) window.parent.postMessage({ type: 'rules_loading', value: false }, '*');
-    setTimeout(() => inputRef.current?.focus(), 100);
+    chatInputRef.current?.focus();
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
 
   const savePattern = async (pattern: RulesPattern) => {
     setSavingPattern(true);
@@ -638,7 +725,7 @@ export default function ChatPage() {
   };
 
   // Suggestions: game-aware if context available, otherwise pattern-based
-  const suggestions: string[] = (() => {
+  const suggestions = useMemo((): string[] => {
     if (gameContext && gameContext.players.length > 0) {
       return buildGameSuggestions(gameContext);
     }
@@ -664,7 +751,158 @@ export default function ChatPage() {
       'How does the legend rule work?',
       'What is the layer system?',
     ];
-  })();
+  }, [gameContext, patterns]);
+
+  const renderedMessages = useMemo(() => messages.map((msg, i) => (
+    <Box
+      key={i}
+      sx={{
+        display: 'flex',
+        justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+        gap: 1,
+      }}
+    >
+      <Paper
+        elevation={1}
+        sx={{
+          p: 1.5,
+          maxWidth: '80%',
+          bgcolor: msg.role === 'user' ? 'primary.main' : 'background.paper',
+          color: msg.role === 'user' ? 'primary.contrastText' : 'text.primary',
+          borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+        }}
+      >
+        {msg.role === 'assistant' ? (() => {
+          const { cleaned, cards } = parseCardManifest(msg.content);
+          return (
+            <>
+              <Box sx={{
+                '& p': { m: 0, mb: 1, lineHeight: 1.6, fontSize: '0.875rem' },
+                '& p:last-child': { mb: 0 },
+                '& ul, & ol': { mt: 0.5, mb: 1, pl: 2.5 },
+                '& li': { fontSize: '0.875rem', lineHeight: 1.6 },
+                '& strong': { fontWeight: 600 },
+                '& code': { fontFamily: 'monospace', fontSize: '0.8rem', bgcolor: 'action.hover', px: 0.5, borderRadius: 0.5 },
+                '& table': { borderCollapse: 'collapse', width: '100%', fontSize: '0.8rem', mb: 1 },
+                '& th, & td': { border: '1px solid', borderColor: 'divider', px: 1, py: 0.5, textAlign: 'left' },
+                '& th': { bgcolor: 'action.hover', fontWeight: 600 },
+                '& tr:nth-of-type(even)': { bgcolor: 'action.hover' },
+              }}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{cleaned}</ReactMarkdown>
+              </Box>
+              {/* Card chip bar */}
+              {cards.length > 0 && (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+                  {cards.map(name => (
+                    <CardTooltip key={name} name={name}>
+                      <Chip
+                        label={name}
+                        size="small"
+                        variant="outlined"
+                        sx={{ fontSize: '0.7rem', height: 20, cursor: 'default', '& .MuiChip-label': { px: 0.75 } }}
+                      />
+                    </CardTooltip>
+                  ))}
+                </Box>
+              )}
+              {/* Action row: save-to-notes + flag incorrect */}
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mt: 0.5, gap: 0.5 }}>
+                {isEmbedded && (
+                  <Tooltip title={savedNoteIndices.has(i) ? 'Saved to game notes' : 'Save to game notes'}>
+                    <span>
+                      <IconButton
+                        size="small"
+                        disabled={savedNoteIndices.has(i)}
+                        onClick={() => {
+                          saveToGameNotes(cleaned);
+                          setSavedNoteIndices(prev => new Set(prev).add(i));
+                        }}
+                        sx={{
+                          opacity: savedNoteIndices.has(i) ? 1 : 0.5,
+                          color: savedNoteIndices.has(i) ? 'success.main' : 'inherit',
+                          '&:hover': { opacity: 1 },
+                        }}
+                      >
+                        {savedNoteIndices.has(i) ? <CheckIcon sx={{ fontSize: 16 }} /> : <NoteAddIcon sx={{ fontSize: 16 }} />}
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                )}
+                {msg.qa_log_id && (
+                  <Tooltip title={flaggedIndices.has(i) ? 'Correction saved' : 'Flag as incorrect'}>
+                    <span>
+                      <IconButton
+                        size="small"
+                        disabled={flaggedIndices.has(i)}
+                        onClick={() => setFlaggedIdx(prev => prev === i ? null : i)}
+                        sx={{
+                          opacity: flaggedIndices.has(i) ? 1 : 0.5,
+                          color: flaggedIndices.has(i) ? 'error.main' : flaggedIdx === i ? 'error.main' : 'inherit',
+                          '&:hover': { opacity: 1 },
+                        }}
+                      >
+                        {flaggedIndices.has(i) ? <ThumbDownIcon sx={{ fontSize: 16 }} /> : <ThumbDownIcon sx={{ fontSize: 16 }} />}
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                )}
+              </Box>
+              {/* Inline correction form */}
+              {flaggedIdx === i && msg.qa_log_id && (
+                <CorrectionForm
+                  qaLogId={msg.qa_log_id}
+                  msgIndex={i}
+                  onSubmitted={(idx) => {
+                    setFlaggedIndices(prev => new Set(prev).add(idx));
+                    setFlaggedIdx(null);
+                  }}
+                  onCancel={() => setFlaggedIdx(null)}
+                />
+              )}
+            </>
+          );
+        })() : renderUserContent(msg.content)}
+
+        {/* Pending pattern proposal */}
+        {msg.pending_pattern && (
+          <Box
+            sx={{
+              mt: 1.5,
+              p: 1.5,
+              borderRadius: 1,
+              bgcolor: 'action.selected',
+              border: '1px solid',
+              borderColor: 'warning.main',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+              <AutoStoriesIcon fontSize="small" color="warning" />
+              <Typography variant="caption" fontWeight={600} color="warning.main">
+                New Pattern Proposed
+              </Typography>
+            </Box>
+            <Typography variant="body2" fontWeight={500}>
+              {msg.pending_pattern.pattern_id.toUpperCase()} — {msg.pending_pattern.name}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Category: {msg.pending_pattern.category}
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+              <Button
+                size="small"
+                variant="outlined"
+                color="warning"
+                startIcon={<SaveIcon />}
+                onClick={() => setPatternDialog(msg.pending_pattern!)}
+              >
+                Review & Save
+              </Button>
+            </Box>
+          </Box>
+        )}
+      </Paper>
+    </Box>
+  )), [messages, flaggedIdx, flaggedIndices, savedNoteIndices, isEmbedded, saveToGameNotes]);
 
   return (
     <Box sx={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
@@ -848,7 +1086,7 @@ export default function ChatPage() {
                       label={`${p.playerName}: ${cmd}`}
                       size="small"
                       clickable
-                      onClick={() => { setInput(question); setTimeout(() => inputRef.current?.focus(), 100); }}
+                      onClick={() => { chatInputRef.current?.setValue(question); chatInputRef.current?.focus(); }}
                       sx={{ fontSize: '0.65rem', height: 18, bgcolor: 'rgba(255,255,255,0.2)', color: 'success.contrastText', cursor: 'pointer', '&:hover': { bgcolor: 'rgba(255,255,255,0.35)' } }}
                     />
                   </Tooltip>
@@ -875,193 +1113,14 @@ export default function ChatPage() {
                     label={q}
                     variant="outlined"
                     clickable
-                    onClick={() => { setInput(q); inputRef.current?.focus(); }}
+                    onClick={() => { chatInputRef.current?.setValue(q); chatInputRef.current?.focus(); }}
                   />
                 ))}
               </Box>
             </Box>
           )}
 
-          {messages.map((msg, i) => (
-            <Box
-              key={i}
-              sx={{
-                display: 'flex',
-                justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                gap: 1,
-              }}
-            >
-              <Paper
-                elevation={1}
-                sx={{
-                  p: 1.5,
-                  maxWidth: '80%',
-                  bgcolor: msg.role === 'user' ? 'primary.main' : 'background.paper',
-                  color: msg.role === 'user' ? 'primary.contrastText' : 'text.primary',
-                  borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                }}
-              >
-                {msg.role === 'assistant' ? (() => {
-                  const { cleaned, cards } = parseCardManifest(msg.content);
-                  return (
-                    <>
-                      <Box sx={{
-                        '& p': { m: 0, mb: 1, lineHeight: 1.6, fontSize: '0.875rem' },
-                        '& p:last-child': { mb: 0 },
-                        '& ul, & ol': { mt: 0.5, mb: 1, pl: 2.5 },
-                        '& li': { fontSize: '0.875rem', lineHeight: 1.6 },
-                        '& strong': { fontWeight: 600 },
-                        '& code': { fontFamily: 'monospace', fontSize: '0.8rem', bgcolor: 'action.hover', px: 0.5, borderRadius: 0.5 },
-                        '& table': { borderCollapse: 'collapse', width: '100%', fontSize: '0.8rem', mb: 1 },
-                        '& th, & td': { border: '1px solid', borderColor: 'divider', px: 1, py: 0.5, textAlign: 'left' },
-                        '& th': { bgcolor: 'action.hover', fontWeight: 600 },
-                        '& tr:nth-of-type(even)': { bgcolor: 'action.hover' },
-                      }}>
-                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{cleaned}</ReactMarkdown>
-                      </Box>
-                      {/* Card chip bar */}
-                      {cards.length > 0 && (
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-                          {cards.map(name => (
-                            <CardTooltip key={name} name={name}>
-                              <Chip
-                                label={name}
-                                size="small"
-                                variant="outlined"
-                                sx={{ fontSize: '0.7rem', height: 20, cursor: 'default', '& .MuiChip-label': { px: 0.75 } }}
-                              />
-                            </CardTooltip>
-                          ))}
-                        </Box>
-                      )}
-                      {/* Action row: save-to-notes + flag incorrect */}
-                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mt: 0.5, gap: 0.5 }}>
-                        {isEmbedded && (
-                          <Tooltip title={savedNoteIndices.has(i) ? 'Saved to game notes' : 'Save to game notes'}>
-                            <span>
-                              <IconButton
-                                size="small"
-                                disabled={savedNoteIndices.has(i)}
-                                onClick={() => {
-                                  saveToGameNotes(cleaned);
-                                  setSavedNoteIndices(prev => new Set(prev).add(i));
-                                }}
-                                sx={{
-                                  opacity: savedNoteIndices.has(i) ? 1 : 0.5,
-                                  color: savedNoteIndices.has(i) ? 'success.main' : 'inherit',
-                                  '&:hover': { opacity: 1 },
-                                }}
-                              >
-                                {savedNoteIndices.has(i) ? <CheckIcon sx={{ fontSize: 16 }} /> : <NoteAddIcon sx={{ fontSize: 16 }} />}
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                        )}
-                        {msg.qa_log_id && (
-                          <Tooltip title={flaggedIndices.has(i) ? 'Correction saved' : 'Flag as incorrect'}>
-                            <span>
-                              <IconButton
-                                size="small"
-                                disabled={flaggedIndices.has(i)}
-                                onClick={() => {
-                                  if (flaggedIdx === i) {
-                                    setFlaggedIdx(null);
-                                    setCorrectionText('');
-                                  } else {
-                                    setFlaggedIdx(i);
-                                    setCorrectionText('');
-                                  }
-                                }}
-                                sx={{
-                                  opacity: flaggedIndices.has(i) ? 1 : 0.5,
-                                  color: flaggedIndices.has(i) ? 'error.main' : flaggedIdx === i ? 'error.main' : 'inherit',
-                                  '&:hover': { opacity: 1 },
-                                }}
-                              >
-                                {flaggedIndices.has(i) ? <ThumbDownIcon sx={{ fontSize: 16 }} /> : <ThumbDownIcon sx={{ fontSize: 16 }} />}
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                        )}
-                      </Box>
-                      {/* Inline correction form */}
-                      {flaggedIdx === i && (
-                        <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-                          <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'error.main', mb: 0.75 }}>
-                            What's the correct ruling?
-                          </Typography>
-                          <TextField
-                            multiline
-                            minRows={2}
-                            maxRows={6}
-                            fullWidth
-                            size="small"
-                            placeholder="Describe the correction or cite the rule…"
-                            value={correctionText}
-                            onChange={(e) => setCorrectionText(e.target.value)}
-                            sx={{ fontSize: 12, mb: 0.75 }}
-                          />
-                          <Box sx={{ display: 'flex', gap: 0.75, justifyContent: 'flex-end' }}>
-                            <Button size="small" onClick={() => { setFlaggedIdx(null); setCorrectionText(''); }} sx={{ fontSize: 11 }}>
-                              Cancel
-                            </Button>
-                            <Button
-                              size="small"
-                              variant="contained"
-                              color="error"
-                              disabled={!correctionText.trim() || submittingFlag}
-                              onClick={() => submitCorrection(i)}
-                              sx={{ fontSize: 11 }}
-                            >
-                              {submittingFlag ? 'Saving…' : 'Save Correction'}
-                            </Button>
-                          </Box>
-                        </Box>
-                      )}
-                    </>
-                  );
-                })() : renderUserContent(msg.content)}
-
-                {/* Pending pattern proposal */}
-                {msg.pending_pattern && (
-                  <Box
-                    sx={{
-                      mt: 1.5,
-                      p: 1.5,
-                      borderRadius: 1,
-                      bgcolor: 'action.selected',
-                      border: '1px solid',
-                      borderColor: 'warning.main',
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <AutoStoriesIcon fontSize="small" color="warning" />
-                      <Typography variant="caption" fontWeight={600} color="warning.main">
-                        New Pattern Proposed
-                      </Typography>
-                    </Box>
-                    <Typography variant="body2" fontWeight={500}>
-                      {msg.pending_pattern.pattern_id.toUpperCase()} — {msg.pending_pattern.name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Category: {msg.pending_pattern.category}
-                    </Typography>
-                    <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        color="warning"
-                        startIcon={<SaveIcon />}
-                        onClick={() => setPatternDialog(msg.pending_pattern!)}
-                      >
-                        Review & Save
-                      </Button>
-                    </Box>
-                  </Box>
-                )}
-              </Paper>
-            </Box>
-          ))}
+          {renderedMessages}
 
           {loading && (
             <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
@@ -1104,34 +1163,12 @@ export default function ChatPage() {
         </Box>
 
         {/* Input */}
-        <Paper
-          elevation={3}
-          square
-          sx={{ p: 1.5, display: 'flex', gap: 1, alignItems: 'flex-end' }}
-        >
-          <TextField
-            inputRef={inputRef}
-            fullWidth
-            multiline
-            maxRows={6}
-            placeholder={gameContext ? 'Ask about your game…' : 'Ask a rules question…'}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={loading}
-            size="small"
-            variant="outlined"
-            autoFocus
-          />
-          <IconButton
-            color="primary"
-            onClick={handleSend}
-            disabled={!input.trim() || loading}
-            sx={{ mb: 0.25 }}
-          >
-            <SendIcon />
-          </IconButton>
-        </Paper>
+        <ChatInput
+          ref={chatInputRef}
+          onSend={handleSend}
+          loading={loading}
+          placeholder={gameContext ? 'Ask about your game…' : 'Ask a rules question…'}
+        />
       </Box>
 
       {/* ── Pattern Review Dialog ────────────────────────────────── */}
