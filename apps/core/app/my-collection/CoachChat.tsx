@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
+import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef, memo } from 'react';
 import {
   Collapse,
   Drawer,
@@ -60,8 +60,8 @@ function saveHistory(sessions: ChatSession[]) {
   } catch {}
 }
 
-function upsertSession(id: string, messages: CoachMessage[]) {
-  if (messages.length === 0) return;
+function upsertSession(id: string, messages: CoachMessage[]): ChatSession[] {
+  if (messages.length === 0) return loadHistory();
   const sessions = loadHistory();
   const title = (messages.find(m => m.role === 'user')?.content ?? 'New conversation').slice(0, 60);
   const now = new Date().toISOString();
@@ -76,6 +76,7 @@ function upsertSession(id: string, messages: CoachMessage[]) {
   if (idx >= 0) sessions[idx] = session;
   else sessions.unshift(session);
   saveHistory(sessions);
+  return sessions;
 }
 
 function relativeDate(iso: string): string {
@@ -167,6 +168,83 @@ export interface ActiveListContext {
   cardCount: number;
 }
 
+// ── CoachInput — isolated so typing only re-renders this component ────────────
+
+interface CoachInputHandle {
+  setValue(text: string): void;
+  appendText(text: string): void;
+  focus(): void;
+}
+
+const CoachInput = forwardRef<CoachInputHandle, {
+  onSend: (text: string) => void;
+  onStop: () => void;
+  loading: boolean;
+}>(function CoachInput({ onSend, onStop, loading }, ref) {
+  const [value, setValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    setValue,
+    appendText: (text) => setValue(prev => {
+      const trimmed = prev.trimEnd();
+      return trimmed ? `${trimmed} ${text}` : text;
+    }),
+    focus: () => setTimeout(() => inputRef.current?.focus(), 50),
+  }));
+
+  const submit = () => {
+    const text = value.trim();
+    if (!text) return;
+    setValue('');
+    onSend(text);
+  };
+
+  return (
+    <>
+      {loading && (
+        <Typography variant="caption" color="text.secondary" sx={{ px: 1.5, fontStyle: 'italic' }}>
+          Type to interrupt the coach...
+        </Typography>
+      )}
+      <Stack direction="row" spacing={1} sx={{ p: 1.5, pt: loading ? 0.5 : 1.5, flexShrink: 0 }}>
+        <TextField
+          fullWidth
+          size="small"
+          placeholder={loading ? 'Add more details...' : 'Ask the coach...'}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
+          multiline
+          maxRows={3}
+          inputRef={inputRef}
+        />
+        {loading && !value.trim() ? (
+          <Tooltip title="Stop">
+            <IconButton onClick={onStop} color="default">
+              <StopCircleIcon />
+            </IconButton>
+          </Tooltip>
+        ) : (
+          <Tooltip title={loading ? 'Interrupt and send' : 'Send'}>
+            <span>
+              <IconButton
+                onClick={submit}
+                disabled={!value.trim()}
+                color={loading ? 'warning' : 'primary'}
+              >
+                <SendIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
+      </Stack>
+    </>
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface CoachChatHandle {
   appendToInput: (text: string) => void;
   setActiveDeck: (data: ActiveDeckContext | null) => void;
@@ -185,9 +263,7 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
 
   const [initialized, setInitialized] = useState(false);
   const [messages, setMessages] = useState<CoachMessage[]>([]);
-  const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [thinkingMsg, setThinkingMsg] = useState('');
   const [partialResponse, setPartialResponse] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [notes, setNotes] = useState<CoachNote[]>(initialNotes);
@@ -199,16 +275,14 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const thinkingInterval = useRef<ReturnType<typeof setInterval>>(null);
   const thinkingMessagesRef = useRef<string[]>([]);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const thinkingMsgRef = useRef<HTMLSpanElement>(null);
+  const coachInputRef = useRef<CoachInputHandle>(null);
   const abortCtrlRef = useRef<AbortController | null>(null);
 
   useImperativeHandle(ref, () => ({
     appendToInput: (text: string) => {
-      setInput((prev) => {
-        const trimmed = prev.trimEnd();
-        return trimmed ? `${trimmed} ${text}` : text;
-      });
-      setTimeout(() => inputRef.current?.focus(), 50);
+      coachInputRef.current?.appendText(text);
+      coachInputRef.current?.focus();
     },
     setActiveDeck: (data: ActiveDeckContext | null) => {
       setActiveDeck(data);
@@ -231,14 +305,14 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
     if (loading) {
       const msgs = thinkingMessagesRef.current;
       let idx = 0;
-      setThinkingMsg(msgs[0] ?? '');
+      if (thinkingMsgRef.current) thinkingMsgRef.current.textContent = msgs[0] ?? '';
       thinkingInterval.current = setInterval(() => {
         idx = (idx + 1) % msgs.length;
-        setThinkingMsg(msgs[idx]);
+        if (thinkingMsgRef.current) thinkingMsgRef.current.textContent = msgs[idx];
       }, 3000);
     } else {
       if (thinkingInterval.current) clearInterval(thinkingInterval.current);
-      setThinkingMsg('');
+      if (thinkingMsgRef.current) thinkingMsgRef.current.textContent = '';
     }
     return () => {
       if (thinkingInterval.current) clearInterval(thinkingInterval.current);
@@ -262,15 +336,14 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
   // Auto-save current session whenever messages change
   useEffect(() => {
     if (messages.length > 0) {
-      upsertSession(sessionIdRef.current, messages);
-      setHistory(loadHistory());
+      setHistory(upsertSession(sessionIdRef.current, messages));
     }
   }, [messages]);
 
   // Focus input when drawer opens
   useEffect(() => {
     if (open && initialized) {
-      setTimeout(() => inputRef.current?.focus(), 200);
+      coachInputRef.current?.focus();
     }
   }, [open, initialized]);
 
@@ -285,20 +358,20 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
     sessionIdRef.current = Date.now().toString();
     setMessages([]);
     setError(null);
-    setInput('');
+    coachInputRef.current?.setValue('');
     setLoading(false);
     setPartialResponse('');
     setActiveDeck(null);
     setActiveList(null);
     setShowHistory(false);
-    setTimeout(() => inputRef.current?.focus(), 100);
+    coachInputRef.current?.focus();
   };
 
   const loadSession = (session: ChatSession) => {
     sessionIdRef.current = session.id;
     setMessages(session.messages);
     setShowHistory(false);
-    setTimeout(() => inputRef.current?.focus(), 100);
+    coachInputRef.current?.focus();
   };
 
   const deleteSession = (id: string, e: React.MouseEvent) => {
@@ -315,8 +388,7 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
     setPartialResponse('');
   };
 
-  const handleSend = async () => {
-    const text = input.trim();
+  const handleSend = async (text: string) => {
     if (!text) return;
 
     // Abort any in-flight request so new message takes over
@@ -324,7 +396,6 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
     const ctrl = new AbortController();
     abortCtrlRef.current = ctrl;
 
-    setInput('');
     setError(null);
     setPartialResponse('');
 
@@ -360,13 +431,6 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
         setLoading(false);
         abortCtrlRef.current = null;
       }
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
     }
   };
 
@@ -500,7 +564,7 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
                       size="small"
                       variant="outlined"
                       clickable
-                      onClick={() => setInput(q)}
+                      onClick={() => { coachInputRef.current?.setValue(q); coachInputRef.current?.focus(); }}
                       sx={{ width: 'fit-content' }}
                     />
                   ))}
@@ -522,7 +586,7 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: partialResponse ? 1 : 0 }}>
                   <CircularProgress size={16} />
                   <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                    {thinkingMsg}
+                    <span ref={thinkingMsgRef} />
                   </Typography>
                 </Box>
               </Box>
@@ -564,43 +628,7 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
           )}
 
           {/* Input */}
-          {loading && (
-            <Typography variant="caption" color="text.secondary" sx={{ px: 1.5, fontStyle: 'italic' }}>
-              Type to interrupt the coach...
-            </Typography>
-          )}
-          <Stack direction="row" spacing={1} sx={{ p: 1.5, pt: loading ? 0.5 : 1.5, flexShrink: 0 }}>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder={loading ? 'Add more details...' : 'Ask the coach...'}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              multiline
-              maxRows={3}
-              inputRef={inputRef}
-            />
-            {loading && !input.trim() ? (
-              <Tooltip title="Stop">
-                <IconButton onClick={handleStop} color="default">
-                  <StopCircleIcon />
-                </IconButton>
-              </Tooltip>
-            ) : (
-              <Tooltip title={loading ? 'Interrupt and send' : 'Send'}>
-                <span>
-                  <IconButton
-                    onClick={handleSend}
-                    disabled={!input.trim()}
-                    color={loading ? 'warning' : 'primary'}
-                  >
-                    <SendIcon />
-                  </IconButton>
-                </span>
-              </Tooltip>
-            )}
-          </Stack>
+          <CoachInput ref={coachInputRef} onSend={handleSend} onStop={handleStop} loading={loading} />
         </>
       )}
     </Box>
@@ -711,7 +739,7 @@ function toolLabel(tool: CoachToolCall): string {
 
 // ── Chat bubble with basic markdown rendering ─────────────────────────────
 
-function ChatBubble({ message }: { message: CoachMessage }) {
+const ChatBubble = memo(function ChatBubble({ message }: { message: CoachMessage }) {
   const isUser = message.role === 'user';
   const displayContent = message.content
     .replace(/\nCARDS:.*$/m, '')
@@ -773,7 +801,7 @@ function ChatBubble({ message }: { message: CoachMessage }) {
       </Box>
     </Box>
   );
-}
+});
 
 /** Render markdown text as React elements with CardTooltip on bold card names and [[Card Name]] chips */
 function renderMarkdown(text: string): React.ReactNode {

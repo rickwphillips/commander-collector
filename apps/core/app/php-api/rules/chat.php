@@ -97,15 +97,24 @@ if (function_exists('fastcgi_finish_request')) {
 
 // ── Continue processing in background ────────────────────────────────────
 
-// Load recent conversation history (last 8 messages to stay within token budget)
+// Load recent conversation history (last 11 messages — odd so window always starts with user turn)
 $stmt = $db->prepare("
     SELECT role, content FROM rules_messages
     WHERE conversation_id = ?
     ORDER BY id DESC
-    LIMIT 6
+    LIMIT 11
 ");
 $stmt->execute([$conversationId]);
-$history = array_reverse($stmt->fetchAll());
+// Filter empty or CARDS-only messages — they poison subsequent turns
+$history = array_filter(array_reverse($stmt->fetchAll()), function($m) {
+    $c = trim($m['content']);
+    return $c !== '' && !preg_match('/^\s*CARDS:\s*\[\[/i', $c);
+});
+$history = array_values($history);
+// Anthropic requires messages to start with role=user; drop any leading assistant turns
+while (!empty($history) && $history[0]['role'] === 'assistant') {
+    array_shift($history);
+}
 
 // ── Pre-match patterns server-side, inject top 3 distilled (no index dump) ─
 $allPatterns = $db->query("SELECT pattern_id, name, category, tags, content FROM rules_patterns ORDER BY pattern_id")->fetchAll();
@@ -775,7 +784,13 @@ while ($iter < $maxIter) {
 
     if ($status !== 200) {
         $err = json_decode($body, true);
-        sendError('Claude API error: ' . ($err['error']['message'] ?? $body), 502);
+        $errMsg = $err['error']['message'] ?? "HTTP $status";
+        error_log("[rules/chat.php] Anthropic API error on iter $iter: $errMsg");
+        // Early response already sent — save a fallback message so the poll completes
+        $fallbackId = $db->query("SELECT UUID()")->fetchColumn();
+        $db->prepare("INSERT INTO rules_messages (id, conversation_id, role, content) VALUES (?, ?, 'assistant', ?)")
+           ->execute([$fallbackId, $conversationId, "I hit an error trying to answer that ($errMsg). Please try again."]);
+        exit;
     }
 
     $response    = json_decode($body, true);
@@ -827,6 +842,12 @@ while ($iter < $maxIter) {
 }
 
 // ── Save assistant message to DB ───────────────────────────────────────────
+// Guard: if the loop produced no text (all tool_use, maxIter exhausted, etc.), log and substitute a fallback
+if (!trim($assistantContent)) {
+    error_log("[rules/chat.php] Empty assistant content after $iter iter(s) for conversation $conversationId — question: " . substr($userMessage, 0, 100));
+    $assistantContent = "I wasn't able to generate a response for that question. Please try rephrasing or ask again.";
+}
+
 $pendingJson = $pendingPattern ? json_encode($pendingPattern) : null;
 
 $messageId = $db->query("SELECT UUID()")->fetchColumn();

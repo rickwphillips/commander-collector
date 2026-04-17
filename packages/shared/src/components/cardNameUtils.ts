@@ -2,9 +2,12 @@
 export function looksLikeCardName(text: string): boolean {
   if (!text || text.length < 2) return false;
   if (text.includes(':')) return false;           // CR refs, labels
+  if (text.startsWith('"') || text.startsWith("'")) return false; // quoted questions/phrases
   if (/^\d/.test(text)) return false;             // "7c", "117.3"
   if (text === text.toUpperCase()) return false;  // "APNAP", "SBA"
   if (text.split(' ').length > 7) return false;   // no real card has 8+ words
+  // Section headers ending in common category nouns
+  if (/\b(Questions|Examples|Interactions|Scenarios|Cases|Notes|Topics|Concepts|Mechanics|Strategies|Techniques|Methods|Types|Levels|Tricks)$/i.test(text)) return false;
   if (/^(Note|Example|Important|Warning|Summary|Result|Step|Phase|Rule|Effect|Trigger|Action|Cost|Event|Zone|Stack|Turn|Ability|Creature|Spell|Permanent|Player|Target|Source|Object|Card)s?$/.test(text)) return false;
   return true;
 }
