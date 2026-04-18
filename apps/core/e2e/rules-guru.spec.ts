@@ -47,6 +47,49 @@ test.describe('Rules Guru — Chat', () => {
   });
 });
 
+test.describe('Rules Guru — Chat flow', () => {
+  test('sends a question and receives a non-empty response', async ({ page }) => {
+    test.setTimeout(60_000);
+
+    await goto(page, '/rules/chat/');
+    await page.waitForLoadState('networkidle');
+
+    const postResult = await page.evaluate(async () => {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch('https://rickwphillips.com/php-api/rules/chat.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ message: 'What does the keyword vigilance do?', conversation_id: null }),
+      });
+      return res.json();
+    });
+
+    expect(postResult.status).toBe('processing');
+    expect(typeof postResult.user_message_id).toBe('string');
+
+    const pollResult = await page.evaluate(async (msgId: string) => {
+      const token = localStorage.getItem('auth_token');
+      for (let i = 0; i < 30; i++) {
+        const res = await fetch(
+          `https://rickwphillips.com/php-api/rules/chat.php?poll=${encodeURIComponent(msgId)}`,
+          { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+        );
+        const data = await res.json();
+        if (data.status === 'complete') return data;
+        await new Promise(r => setTimeout(r, 1500));
+      }
+      return { status: 'timeout', response: null };
+    }, postResult.user_message_id);
+
+    expect(pollResult.status).toBe('complete');
+    expect(typeof pollResult.response).toBe('string');
+    expect(pollResult.response.trim().length).toBeGreaterThan(0);
+  });
+});
+
 test.describe('Rules Guru — API connectivity', () => {
   test('conversations endpoint returns 200', async ({ page }) => {
     await goto(page, '/rules/chat/');
