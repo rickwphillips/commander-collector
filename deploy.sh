@@ -98,15 +98,13 @@ if [ "$PHP_ONLY" = false ] && [ "$SKIP_BUILD" = false ]; then
     echo ""
   fi
 
-  if [ "$GURU_ONLY" = false ]; then
-    echo "═══════════════════════════════════════════"
-    echo "  Building apps/rules-guru..."
-    echo "═══════════════════════════════════════════"
-    (cd "$GURU_DIR" && npm run build)
-    echo ""
-    echo "apps/rules-guru build complete."
-    echo ""
-  fi
+  echo "═══════════════════════════════════════════"
+  echo "  Building apps/rules-guru..."
+  echo "═══════════════════════════════════════════"
+  (cd "$GURU_DIR" && npm run build)
+  echo ""
+  echo "apps/rules-guru build complete."
+  echo ""
 fi
 
 # ── Step 2: Deploy static files via lftp ───────────────────────
@@ -129,19 +127,17 @@ if [ "$PHP_ONLY" = false ]; then
     echo ""
   fi
 
-  if [ "$GURU_ONLY" = false ]; then
-    echo "═══════════════════════════════════════════"
-    echo "  Deploying apps/rules-guru static files..."
-    echo "═══════════════════════════════════════════"
-    lftp -u "$FTP_USER,$FTP_PASS" "$FTP_HOST" -e "
-      set ssl:verify-certificate no
-      mirror -R --verbose --delete $GURU_OUT/ $REMOTE_GURU
-      bye
-    "
-    echo ""
-    echo "apps/rules-guru static deploy complete."
-    echo ""
-  fi
+  echo "═══════════════════════════════════════════"
+  echo "  Deploying apps/rules-guru static files..."
+  echo "═══════════════════════════════════════════"
+  lftp -u "$FTP_USER,$FTP_PASS" "$FTP_HOST" -e "
+    set ssl:verify-certificate no
+    mirror -R --verbose --delete $GURU_OUT/ $REMOTE_GURU
+    bye
+  "
+  echo ""
+  echo "apps/rules-guru static deploy complete."
+  echo ""
 fi
 
 # ── Step 3: DB Migrations — apply pending to dev and prod ──────
