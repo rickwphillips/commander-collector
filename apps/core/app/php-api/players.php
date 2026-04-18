@@ -33,6 +33,7 @@ switch ($method) {
                     $_wr
                 FROM players p
                 LEFT JOIN game_results gr ON gr.player_id = p.id
+                WHERE p.name NOT LIKE '\\_\\_pw\\_%'
                 GROUP BY p.id
                 ORDER BY p.name ASC
             ");
