@@ -56,8 +56,8 @@ fi
 SKIP_BUILD=false
 PHP_ONLY=false
 STATIC_ONLY=false
-
 GURU_ONLY=false
+SKIP_TESTS=false
 
 # Parse flags
 for arg in "$@"; do
@@ -65,7 +65,7 @@ for arg in "$@"; do
     --skip-build)  SKIP_BUILD=true ;;
     --php-only)    PHP_ONLY=true ;;
     --static-only) STATIC_ONLY=true ;;
-
+    --skip-tests)  SKIP_TESTS=true ;;
     --guru-only)   GURU_ONLY=true ;;
     --help|-h)
       echo "Usage: bash deploy.sh [OPTIONS]"
@@ -274,6 +274,30 @@ HTEOF'
 
   echo ".htaccess files restored."
   echo ""
+fi
+
+# ── Step 6: Playwright smoke tests ─────────────────────────────
+if [ "$SKIP_TESTS" != "true" ]; then
+  echo "═══════════════════════════════════════════"
+  echo "  Running Playwright smoke tests..."
+  echo "═══════════════════════════════════════════"
+  cd "$CORE_DIR"
+  if [ "$GURU_ONLY" = true ]; then
+    npx playwright test e2e/rules-guru.spec.ts --reporter=list
+  else
+    npx playwright test --reporter=list
+  fi
+  TEST_EXIT=$?
+  cd "$PROJECT_DIR"
+  if [ $TEST_EXIT -ne 0 ]; then
+    echo ""
+    echo "⚠️  Playwright tests failed — deploy is live but regressions detected."
+    echo "   Run: cd apps/core && npx playwright test --reporter=html"
+    echo ""
+  else
+    echo "  All tests passed."
+    echo ""
+  fi
 fi
 
 echo "═══════════════════════════════════════════"
