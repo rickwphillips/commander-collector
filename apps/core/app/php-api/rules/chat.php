@@ -101,7 +101,7 @@ if (function_exists('fastcgi_finish_request')) {
 $stmt = $db->prepare("
     SELECT role, content FROM rules_messages
     WHERE conversation_id = ?
-    ORDER BY id DESC
+    ORDER BY created_at DESC
     LIMIT 11
 ");
 $stmt->execute([$conversationId]);
