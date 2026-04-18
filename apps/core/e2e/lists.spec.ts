@@ -93,5 +93,60 @@ test.describe('Lists', () => {
       const deleteBtn = page.getByRole('button', { name: /delete/i }).first();
       await expect(deleteBtn).toBeVisible();
     });
+
+    test.describe('Export Panel', () => {
+      test.beforeEach(async ({ page }) => {
+        // Open the export popover
+        const exportBtn = page.getByRole('button', { name: /export cards/i }).first();
+        await expect(exportBtn).toBeVisible();
+        await exportBtn.click();
+        await page.waitForTimeout(300);
+      });
+
+      test('export popover opens', async ({ page }) => {
+        await expect(page.getByText(/export/i).first()).toBeVisible();
+      });
+
+      test('TCGPlayer copy button is present', async ({ page }) => {
+        const btn = page.getByRole('button', { name: /copy tcgplayer text to clipboard/i });
+        await expect(btn).toBeVisible();
+      });
+
+      test('TCGPlayer download .txt button is present', async ({ page }) => {
+        const btn = page.getByRole('button', { name: /download tcgplayer text file/i });
+        await expect(btn).toBeVisible();
+      });
+
+      test('CSV copy button is present', async ({ page }) => {
+        const btn = page.getByRole('button', { name: /copy csv to clipboard/i });
+        await expect(btn).toBeVisible();
+      });
+
+      test('CSV download .csv button is present', async ({ page }) => {
+        const btn = page.getByRole('button', { name: /download csv file/i });
+        await expect(btn).toBeVisible();
+      });
+
+      test('TTS download button is present', async ({ page }) => {
+        const btn = page.getByRole('button', { name: /download tabletop simulator json/i });
+        await expect(btn).toBeVisible();
+      });
+
+      test('TCGPlayer download triggers a file download', async ({ page }) => {
+        const [download] = await Promise.all([
+          page.waitForEvent('download'),
+          page.getByRole('button', { name: /download tcgplayer text file/i }).click(),
+        ]);
+        expect(download.suggestedFilename()).toBe('decklist.txt');
+      });
+
+      test('CSV download triggers a file download', async ({ page }) => {
+        const [download] = await Promise.all([
+          page.waitForEvent('download'),
+          page.getByRole('button', { name: /download csv file/i }).click(),
+        ]);
+        expect(download.suggestedFilename()).toBe('decklist.csv');
+      });
+    });
   });
 });
