@@ -1,10 +1,6 @@
 import type { ActiveGameContext, ChatResponse, ChatProcessingResponse, ChatPollResponse, RulesConversation, RulesMessage, RulesPattern } from './types';
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE ||
-  (process.env.NODE_ENV === 'production'
-    ? '/app/php-api'
-    : '/php-api');
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '/php-api';
 
 const LOGIN_URL =
   process.env.NODE_ENV === 'development' ? 'http://localhost:3000/app/login/' : '/app/login/';
