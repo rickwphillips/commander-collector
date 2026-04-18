@@ -36,9 +36,8 @@ print(f'{h}.{p}.{sig}')
 setup('authenticate', async ({ page }) => {
   const token = mintJWT();
 
-  await page.goto(BASE + '/');
-  await page.evaluate((t) => localStorage.setItem('auth_token', t), token);
-  // Navigate again so the app picks up the token
+  // Inject token before page load so the app sees it on first render
+  await page.addInitScript((t) => localStorage.setItem('auth_token', t), token);
   await page.goto(BASE + '/');
   await page.waitForLoadState('networkidle');
 
