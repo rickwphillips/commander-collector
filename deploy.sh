@@ -303,3 +303,7 @@ fi
 echo "═══════════════════════════════════════════"
 echo "  Commander Collector deploy complete!"
 echo "═══════════════════════════════════════════"
+
+# Propagate test failures as the script exit code.
+# Deploy is already live; this signals regressions to the caller.
+exit "${TEST_EXIT:-0}"
