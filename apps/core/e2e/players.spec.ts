@@ -27,6 +27,22 @@ test.describe('Players', () => {
     await goto(page, '/players/');
   });
 
+  test.afterAll(async ({ browser }) => {
+    const page = await browser.newPage();
+    try {
+      await goto(page, '/players/');
+      const result = await apiCall(page, 'GET', '/players.php');
+      const testPlayers = (result ?? []).filter((p: { name: string }) =>
+        p.name.startsWith('__pw_player')
+      );
+      for (const p of testPlayers) {
+        await apiCall(page, 'DELETE', `/players.php?id=${p.id}`);
+      }
+    } finally {
+      await page.close();
+    }
+  });
+
   test('page loads with heading', async ({ page }) => {
     await expect(page.getByRole('heading', { name: /players/i })).toBeVisible();
   });
