@@ -15,4 +15,5 @@ INSERT INTO changelog_changes (id, release_id, type, text, sort_order) VALUES
   (UUID(), @rid, 'improved', 'Existing chat bubbles in Commander Coach skip re-renders when new messages arrive or loading state changes', 3),
   (UUID(), @rid, 'fixed',    'Card preview tooltips now retry on hover if a previous lookup failed transiently, instead of staying broken for the session', 4),
   (UUID(), @rid, 'fixed',    'Card preview tooltips no longer show a card cursor on non-card bold text such as section headers and labels', 5),
-  (UUID(), @rid, 'fixed',    'Rules Guru mid-conversation failures caused by the history window starting on an assistant turn', 6);
+  (UUID(), @rid, 'fixed',    'Rules Guru mid-conversation failures caused by the history window starting on an assistant turn', 6),
+  (UUID(), @rid, 'improved', 'TTS export button shows a loading indicator while building and displays an error message if the export fails', 7);

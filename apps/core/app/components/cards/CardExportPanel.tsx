@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import {
+  Alert,
   Box,
   Button,
   Divider,
@@ -74,6 +76,8 @@ async function copyToClipboard(text: string): Promise<void> {
 
 export function CardExportPanel({ cards, listId, onExport }: CardExportPanelProps) {
   const hasCards = cards.length > 0;
+  const [ttsError, setTtsError] = useState<string | null>(null);
+  const [ttsBusy,  setTtsBusy]  = useState(false);
 
   // ── TCGPlayer ──────────────────────────────────────────────────────────────
 
@@ -103,13 +107,21 @@ export function CardExportPanel({ cards, listId, onExport }: CardExportPanelProp
 
   const handleTTSDownload = async () => {
     if (!listId) return;
-    const ttsData = await api.exportTTS({ listId });
-    triggerDownload(
-      JSON.stringify(ttsData, null, 2),
-      'decklist_TTS.json',
-      'application/json',
-    );
-    onExport?.('tts');
+    setTtsError(null);
+    setTtsBusy(true);
+    try {
+      const ttsData = await api.exportTTS({ listId });
+      triggerDownload(
+        JSON.stringify(ttsData, null, 2),
+        'decklist_TTS.json',
+        'application/json',
+      );
+      onExport?.('tts');
+    } catch (err) {
+      setTtsError(err instanceof Error ? err.message : 'TTS export failed');
+    } finally {
+      setTtsBusy(false);
+    }
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -119,12 +131,12 @@ export function CardExportPanel({ cards, listId, onExport }: CardExportPanelProp
       variant="outlined"
       startIcon={<TableChartIcon />}
       onClick={handleTTSDownload}
-      disabled={!listId || !hasCards}
+      disabled={!listId || !hasCards || ttsBusy}
       aria-label="Download Tabletop Simulator JSON"
       fullWidth
       sx={{ justifyContent: 'flex-start' }}
     >
-      Download .json (TTS)
+      {ttsBusy ? 'Building…' : 'Download .json (TTS)'}
     </Button>
   );
 
@@ -216,6 +228,11 @@ export function CardExportPanel({ cards, listId, onExport }: CardExportPanelProp
             {/* Tooltip requires a focusable child even when disabled — wrap in span */}
             <span style={{ display: 'block' }}>{ttsButton}</span>
           </Tooltip>
+        )}
+        {ttsError && (
+          <Alert severity="error" sx={{ mt: 1 }} onClose={() => setTtsError(null)}>
+            {ttsError}
+          </Alert>
         )}
       </Box>
     </Box>
