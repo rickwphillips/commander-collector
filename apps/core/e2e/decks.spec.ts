@@ -21,6 +21,7 @@ import { goto } from './helpers';
 test.describe('Decks', () => {
   test.beforeEach(async ({ page }) => {
     await goto(page, '/decks/');
+    await page.waitForLoadState('networkidle');
   });
 
   test('page loads with heading', async ({ page }) => {
