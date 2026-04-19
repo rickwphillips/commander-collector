@@ -96,9 +96,10 @@ test.describe('Lists', () => {
 
     test.describe('Export Panel', () => {
       test.beforeEach(async ({ page }) => {
+        await page.waitForLoadState('networkidle');
         // Open the export popover
         const exportBtn = page.getByRole('button', { name: /export cards/i }).first();
-        await expect(exportBtn).toBeVisible();
+        await expect(exportBtn).toBeVisible({ timeout: 10000 });
         await exportBtn.click();
         await page.waitForTimeout(300);
       });

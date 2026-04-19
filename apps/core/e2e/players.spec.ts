@@ -25,6 +25,7 @@ const TEST_PLAYER_NAME = `__pw_player_${Date.now()}`;
 test.describe('Players', () => {
   test.beforeEach(async ({ page }) => {
     await goto(page, '/players/');
+    await page.waitForLoadState('networkidle');
   });
 
   test.afterAll(async ({ browser }) => {
