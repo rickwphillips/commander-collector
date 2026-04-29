@@ -278,7 +278,7 @@ describe('REGRESSION: failed lookups must not be permanently cached', () => {
     expect(second).toBe('data:image/png;base64,fixed');
   });
 
-  it('DOES cache genuinely-not-found cards (no scryfall_id)', async () => {
+  it('does NOT cache cards with no scryfall_id — retries on next call', async () => {
     const name = uniqueName('Truly Missing');
 
     mockLookupCard.mockResolvedValue({ scryfall_id: null, image_uri: null, back_image_uri: null });
@@ -289,8 +289,8 @@ describe('REGRESSION: failed lookups must not be permanently cached', () => {
     const second = await getCardImageByName(name);
     expect(second).toBeNull();
 
-    // Only one API call — the null was legitimately cached
-    expect(mockLookupCard).toHaveBeenCalledTimes(1);
+    // Two API calls — null scryfall_id is not cached (could be transient Scryfall error)
+    expect(mockLookupCard).toHaveBeenCalledTimes(2);
   });
 
   it('burst of 20 cards does not permanently lose any (simulates list page)', async () => {

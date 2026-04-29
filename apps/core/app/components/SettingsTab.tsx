@@ -4,8 +4,10 @@ import { Box, IconButton, Tooltip } from '@mui/material';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import LogoutIcon from '@mui/icons-material/Logout';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useThemeMode } from './ThemeProvider';
 import { useAuth } from './AuthGuard';
 
@@ -16,6 +18,8 @@ const AUTO_CLOSE_MS = 3000;
 export function SettingsTab() {
   const { mode, toggleTheme } = useThemeMode();
   const { user, logout } = useAuth();
+  const router = useRouter();
+  const isAdmin = user?.role === 'admin';
   const [open, setOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -36,7 +40,7 @@ export function SettingsTab() {
 
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
 
-  const buttonCount = user ? 2 : 1;
+  const buttonCount = (user ? 2 : 1) + (isAdmin ? 1 : 0);
   const expandedW = HANDLE_W + buttonCount * BUTTON_W;
 
   return (
@@ -111,6 +115,19 @@ export function SettingsTab() {
               sx={{ flexShrink: 0, width: BUTTON_W, height: HANDLE_W, borderRadius: 0 }}
             >
               <LogoutIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+
+        {isAdmin && (
+          <Tooltip title="Admin" placement="left">
+            <IconButton
+              onClick={() => { router.push('/admin'); scheduleClose(); }}
+              color="inherit"
+              aria-label="admin"
+              sx={{ flexShrink: 0, width: BUTTON_W, height: HANDLE_W, borderRadius: 0 }}
+            >
+              <AdminPanelSettingsIcon />
             </IconButton>
           </Tooltip>
         )}
