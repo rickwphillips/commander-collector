@@ -366,8 +366,8 @@ export default function DecksPage() {
                   <CardActionArea component={Link} href={`/decks/detail?id=${deck.id}`}>
                     <CardContent>
                       <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        <Box sx={{ flex: 1, minWidth: 0, mr: 1 }}>
+                          <Typography variant="h6" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
                             {deck.name}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
@@ -377,7 +377,7 @@ export default function DecksPage() {
                             Piloted by {deck.player_name}
                           </Typography>
                         </Box>
-                        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0, ml: -30 }}>
+                        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0 }}>
                           <Tooltip title="Edit cards">
                             <IconButton
                               size="small"

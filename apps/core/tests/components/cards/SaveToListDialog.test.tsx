@@ -76,13 +76,19 @@ describe('SaveToListDialog', () => {
     vi.clearAllMocks();
   });
 
-  it('renders 5 destination tabs', () => {
+  it('renders visible destination tabs (into-deck hidden without deckContext)', () => {
     render(<SaveToListDialog {...defaultProps} />);
     expect(screen.getByText('New list')).toBeInTheDocument();
     expect(screen.getByText('New deck')).toBeInTheDocument();
     expect(screen.getByText('Attach to deck')).toBeInTheDocument();
-    expect(screen.getByText('Into deck')).toBeInTheDocument();
     expect(screen.getByText('Append to list')).toBeInTheDocument();
+    // into-deck tab is hidden when no deckContext
+    expect(screen.queryByText('Into deck')).not.toBeInTheDocument();
+  });
+
+  it('renders Into deck tab when deckContext is provided', () => {
+    render(<SaveToListDialog {...defaultProps} deckContext={{ id: 'deck-1', name: 'Test Deck' }} />);
+    expect(screen.getByText('Into deck')).toBeInTheDocument();
   });
 
   it('confirm button emits new-list destination when New list tab is active', async () => {
@@ -118,17 +124,15 @@ describe('SaveToListDialog', () => {
     expect(screen.getByText('Create deck')).not.toBeDisabled();
   });
 
-  it('into-deck panel shows disabled message when no deckContext', () => {
-    // When deckContext is null the tab is disabled (pointer-events: none).
-    // Use defaultDestination to activate the panel without clicking the tab.
+  it('into-deck tab is hidden when no deckContext', () => {
     render(
       <SaveToListDialog
         {...defaultProps}
         deckContext={null}
-        defaultDestination="into-deck"
       />
     );
-    expect(screen.getByText(/No deck context is active/)).toBeInTheDocument();
+    // Tab is filtered out entirely, not rendered as disabled
+    expect(screen.queryByText('Into deck')).not.toBeInTheDocument();
   });
 
   it('auto-names list using commander row from buffer', () => {

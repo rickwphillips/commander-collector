@@ -26,7 +26,6 @@ import AddCircleIcon from '@mui/icons-material/AddCircle';
 import AddIcon from '@mui/icons-material/Add';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import CollectionsIcon from '@mui/icons-material/Collections';
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import { SettingsTab } from './components/SettingsTab';
 import { StatsCard } from './components/StatsCard';
 import { ColorIdentityChips } from './components/ColorIdentityChips';
@@ -213,13 +212,7 @@ export default function Dashboard() {
 
         {/* Navigation Cards */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
-          {[...navItems, ...(user?.role === 'admin' ? [{
-            title: 'Admin',
-            description: 'Coach notes and management tools',
-            href: '/admin',
-            icon: <AdminPanelSettingsIcon sx={{ fontSize: 40 }} />,
-            color: '#8B4513',
-          }] : [])].map((item, index) => (
+          {navItems.map((item, index) => (
             <Grid key={item.title} size={{ xs: 6, md: 3 }}>
               <Grow in={mounted} timeout={800 + index * 150}>
                 <Card className={styles.navCard}>
