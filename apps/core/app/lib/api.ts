@@ -220,7 +220,7 @@ export const api = {
       return rows.map((r) => ({ ...fromApiCard(r), deck_id: deckId })) as unknown as import('./types').DeckCard[];
     } catch (err) {
       // 404 = deck has no main list yet (valid empty state). Return [].
-      if (err instanceof Error && err.message.toLowerCase().includes('not found')) return [];
+      if (err instanceof Error && /not found|no list found/i.test(err.message)) return [];
       throw err;
     }
   },

@@ -224,6 +224,11 @@ export default function DeckDetailPage() {
   if (!deck) {
     return (
       <PageContainer title="Deck Not Found" backHref="/decks" backLabel="Back to Decks">
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
         <EmptyState title="Deck not found" description="This deck doesn't exist" />
       </PageContainer>
     );
