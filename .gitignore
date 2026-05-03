@@ -17,6 +17,9 @@ tsconfig.tsbuildinfo
 .env.local
 .env*.local
 
+# macOS metadata
+**/.DS_Store
+
 # Vitest coverage reports (generated)
 apps/core/coverage
 

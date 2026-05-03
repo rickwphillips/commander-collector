@@ -54,21 +54,21 @@ switch ($method) {
             ');
             $games = $stmt->fetchAll();
 
-            // Get results for each game
+            // Get results for each game — prepare once, execute per game
+            $resultStmt = $pdo->prepare('
+                SELECT
+                    gr.*,
+                    d.name as deck_name,
+                    d.commander,
+                    d.colors,
+                    p.name as player_name
+                FROM game_results gr
+                JOIN decks d ON gr.deck_id = d.id
+                JOIN players p ON gr.player_id = p.id
+                WHERE gr.game_id = ?
+                ORDER BY gr.finish_position ASC
+            ');
             foreach ($games as &$game) {
-                $resultStmt = $pdo->prepare('
-                    SELECT
-                        gr.*,
-                        d.name as deck_name,
-                        d.commander,
-                        d.colors,
-                        p.name as player_name
-                    FROM game_results gr
-                    JOIN decks d ON gr.deck_id = d.id
-                    JOIN players p ON gr.player_id = p.id
-                    WHERE gr.game_id = ?
-                    ORDER BY gr.finish_position ASC
-                ');
                 $resultStmt->execute([$game['id']]);
                 $game['results'] = $resultStmt->fetchAll();
             }
@@ -282,7 +282,7 @@ switch ($method) {
 
         } catch (Exception $e) {
             $pdo->rollBack();
-            sendError('Failed to update game: ' . $e->getMessage(), 500);
+            sendError('Failed to update game', 500);
         }
         break;
 
