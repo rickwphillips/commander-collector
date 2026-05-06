@@ -2,6 +2,7 @@
   "name": "commander-workspace",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "npm@10.9.4",
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "build": "turbo run build",
