@@ -50,7 +50,11 @@ jobs:
           cache: 'npm'
 
       - name: Install
-        run: npm ci
+        # npm install (not ci) to work around npm/cli#4828: macOS-generated
+        # lockfiles do not include rollup's linux-x64-gnu native binary as an
+        # optional dependency, so npm ci on Linux fails at runtime when vitest
+        # tries to load the native rollup binary.
+        run: npm install --no-audit --no-fund
 
       - name: Lint (Turbo, informational, does not block)
         run: npm run lint
