@@ -32,3 +32,6 @@ apps/core/app/tts-sheets
 
 # Synced pattern files (source of truth is mtg-rules repo)
 apps/core/app/php-api/rules/p[0-9]*.md
+
+# macOS metadata
+**/.DS_Store
