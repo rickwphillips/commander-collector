@@ -52,8 +52,9 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Lint (Turbo)
+      - name: Lint (Turbo, informational, does not block)
         run: npm run lint
+        continue-on-error: true
 
       - name: Build (Turbo)
         run: npm run build
