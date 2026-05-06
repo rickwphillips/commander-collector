@@ -44,7 +44,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   const { players, commanderDamage, currentPlayerIdx, turnNumber, turnTimerSeconds, turnStartTime, startingLife } = state;
 
   const [rollState, setRollState] = useState<RollState>(IDLE_ROLL_STATE);
-  const [firstPlayerSet, setFirstPlayerSet] = useState(!!state.firstPlayerIdx);
+  const [firstPlayerSet, setFirstPlayerSet] = useState(state.firstPlayerIdx != null);
   const [firstPlayerIdx, setFirstPlayerIdx] = useState(state.firstPlayerIdx ?? 0);
   const [winner, setWinner] = useState<PlayerState | null>(null);
   const [winnerCountdown, setWinnerCountdown] = useState<number | null>(null);
@@ -61,7 +61,7 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
 
   // Sync local firstPlayerIdx/firstPlayerSet with game state when loaded from DB
   useEffect(() => {
-    if (state.firstPlayerIdx && !firstPlayerSet) {
+    if (state.firstPlayerIdx != null && !firstPlayerSet) {
       setFirstPlayerIdx(state.firstPlayerIdx);
       setFirstPlayerSet(true);
     }
