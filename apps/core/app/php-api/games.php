@@ -149,8 +149,8 @@ switch ($method) {
 
             // Insert results
             $resultStmt = $pdo->prepare('
-                INSERT INTO game_results (game_id, deck_id, player_id, finish_position, eliminated_turn, team_number)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO game_results (id, game_id, deck_id, player_id, finish_position, eliminated_turn, team_number)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ');
 
             foreach ($data['results'] as $result) {
@@ -173,6 +173,7 @@ switch ($method) {
                 }
 
                 $resultStmt->execute([
+                    $pdo->query('SELECT UUID()')->fetchColumn(),
                     $gameId,
                     (string)$result['deck_id'],
                     $playerId,
@@ -245,8 +246,8 @@ switch ($method) {
 
                 // Insert new results
                 $resultStmt = $pdo->prepare('
-                    INSERT INTO game_results (game_id, deck_id, player_id, finish_position, eliminated_turn, team_number)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO game_results (id, game_id, deck_id, player_id, finish_position, eliminated_turn, team_number)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                 ');
 
                 foreach ($data['results'] as $result) {
@@ -267,6 +268,7 @@ switch ($method) {
                     }
 
                     $resultStmt->execute([
+                        $pdo->query('SELECT UUID()')->fetchColumn(),
                         $id,
                         (string)$result['deck_id'],
                         $playerId,
