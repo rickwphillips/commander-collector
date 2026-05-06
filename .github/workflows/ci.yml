@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches-ignore:
+      - 'gh-readonly-queue/**'
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: Repo guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Migrations must live at repo root, not under apps/core/migrations
+        run: |
+          if compgen -G "apps/core/migrations/*.sql" > /dev/null; then
+            echo "::error::Found .sql files under apps/core/migrations/. Migrations must live at the repo root migrations/ directory because deploy.sh only reads root."
+            ls -la apps/core/migrations/
+            exit 1
+          fi
+          echo "OK: no migrations/ under apps/core/"
+
+  build:
+    name: Lint + Build + Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: guard
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint (Turbo)
+        run: npm run lint
+
+      - name: Build (Turbo)
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Test (Turbo)
+        run: npm test
