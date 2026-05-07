@@ -22,6 +22,7 @@ apps/core/coverage
 
 # Playwright auth state (contains JWT tokens) and output
 apps/core/e2e/.auth/
+apps/core/e2e/scratch/
 apps/core/playwright-report/
 apps/core/test-results/
 test-results/
