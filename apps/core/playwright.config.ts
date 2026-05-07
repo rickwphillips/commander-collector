@@ -4,6 +4,7 @@ const BASE = 'https://rickwphillips.com/app/projects/commander';
 
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: ['**/scratch/**'],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,
