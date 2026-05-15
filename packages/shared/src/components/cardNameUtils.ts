@@ -1,6 +1,21 @@
-/** Check if bold text looks like an MTG card name (not a keyword, CR ref, or section header) */
+/** Check if bold text looks like a Comprehensive Rules reference, e.g. "CR 117.3c", "117.3c", "903.6". */
+export function looksLikeCRReference(text: string): boolean {
+  if (!text) return false;
+  const t = text.trim();
+  return /^(CR\s+)?\d{3}(\.\d+[a-z]?)?$/i.test(t);
+}
+
+/** Check if bold text looks like a pattern-library reference, e.g. "P523", "#P523", "p523". */
+export function looksLikePNumber(text: string): boolean {
+  if (!text) return false;
+  return /^#?P\d{1,4}$/i.test(text.trim());
+}
+
+/** Check if bold text looks like an MTG card name (not a keyword, CR ref, P-ref, or section header) */
 export function looksLikeCardName(text: string): boolean {
   if (!text || text.length < 2) return false;
+  if (looksLikeCRReference(text)) return false;   // "CR 117.3c", "903.6"
+  if (looksLikePNumber(text)) return false;       // "P523", "#P523"
   if (text.includes(':')) return false;           // CR refs, labels
   if (text.startsWith('"') || text.startsWith("'")) return false; // quoted questions/phrases
   if (/^\d/.test(text)) return false;             // "7c", "117.3"
