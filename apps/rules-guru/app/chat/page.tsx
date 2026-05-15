@@ -44,7 +44,14 @@ import CheckIcon from '@mui/icons-material/Check';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import { rulesApi } from '../lib/api';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
-import { looksLikeCardName, parseCardManifest } from '@commander/shared/components/cardNameUtils';
+import { RuleTooltip } from '@commander/shared/components/RuleTooltip';
+import { PatternTooltip } from '@commander/shared/components/PatternTooltip';
+import {
+  looksLikeCardName,
+  looksLikeCRReference,
+  looksLikePNumber,
+  parseCardManifest,
+} from '@commander/shared/components/cardNameUtils';
 import type { ActiveGameContext, RulesConversation, RulesMessage, RulesPattern } from '../lib/types';
 
 // ── Local message type (includes pending_pattern for new messages) ──────────
@@ -104,12 +111,33 @@ function nodeText(node: React.ReactNode): string {
 const mdComponents = {
   strong: ({ children }: { children?: React.ReactNode }) => {
     const text = nodeText(children).trim();
-    if (!text || !looksLikeCardName(text)) return <strong>{children}</strong>;
-    return (
-      <CardTooltip name={text} style={{ borderBottom: '1px dotted currentColor' }}>
-        <strong>{children}</strong>
-      </CardTooltip>
-    );
+    if (!text) return <strong>{children}</strong>;
+
+    if (looksLikePNumber(text)) {
+      return (
+        <PatternTooltip reference={text}>
+          <strong>{children}</strong>
+        </PatternTooltip>
+      );
+    }
+
+    if (looksLikeCRReference(text)) {
+      return (
+        <RuleTooltip reference={text}>
+          <strong>{children}</strong>
+        </RuleTooltip>
+      );
+    }
+
+    if (looksLikeCardName(text)) {
+      return (
+        <CardTooltip name={text} style={{ borderBottom: '1px dotted currentColor' }}>
+          <strong>{children}</strong>
+        </CardTooltip>
+      );
+    }
+
+    return <strong>{children}</strong>;
   },
 };
 
