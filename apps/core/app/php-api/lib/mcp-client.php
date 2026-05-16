@@ -71,13 +71,16 @@ function mcpCallTool(string $toolName, array $arguments): ?array {
     }
 
     // Step 2: tools/call with session id.
+    // Empty assoc arrays encode as JSON `[]` but MCP requires `arguments` to
+    // be a JSON object; cast empty input to stdClass so json_encode emits `{}`.
+    $args = empty($arguments) ? new stdClass() : $arguments;
     $callBody = json_encode([
         'jsonrpc' => '2.0',
         'id'      => 2,
         'method'  => 'tools/call',
         'params'  => [
             'name'      => $toolName,
-            'arguments' => $arguments,
+            'arguments' => $args,
         ],
     ]);
 
