@@ -1098,7 +1098,7 @@ export default function ChatPage() {
         )}
 
         {/* Messages */}
-        <Box sx={{ flex: 1, overflow: 'auto', px: 2, py: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+        <Box sx={{ flex: 1, overflow: 'auto', pl: 2, pr: sessionFeedbackOpen ? 0.5 : 2, py: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           {messages.length === 0 && (
             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, opacity: 0.6 }}>
               <AutoStoriesIcon sx={{ fontSize: 64 }} color="primary" />
