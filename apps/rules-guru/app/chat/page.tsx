@@ -50,6 +50,9 @@ import { RateableCardChip } from '../components/RateableCardChip';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import { RuleTooltip } from '@commander/shared/components/RuleTooltip';
 import { PatternTooltip } from '@commander/shared/components/PatternTooltip';
+import { ChatInput, type ChatInputHandle } from '@commander/shared/components/ChatInput';
+import { ThinkingIndicator } from '@commander/shared/components/ThinkingIndicator';
+import { useChatKeys } from '@commander/shared/lib/useChatKeys';
 import {
   looksLikeCRReference,
   looksLikePNumber,
@@ -178,59 +181,7 @@ const mdComponents = {
   },
 };
 
-// ── ChatInput — isolated so typing only re-renders this component ────────────
-
-export interface ChatInputHandle {
-  setValue(text: string): void;
-  appendText(text: string): void;
-  focus(): void;
-}
-
-const ChatInput = React.forwardRef<ChatInputHandle, {
-  onSend: (text: string) => void;
-  loading: boolean;
-  placeholder: string;
-}>(function ChatInput({ onSend, loading, placeholder }, ref) {
-  const [value, setValue] = useState('');
-  const innerRef = useRef<HTMLInputElement>(null);
-
-  useImperativeHandle(ref, () => ({
-    setValue,
-    appendText: (text) => setValue(prev =>
-      prev.endsWith(' ') || prev === '' ? prev + text : prev + ' ' + text
-    ),
-    focus: () => setTimeout(() => innerRef.current?.focus(), 100),
-  }));
-
-  const submit = () => {
-    const trimmed = value.trim();
-    if (!trimmed || loading) return;
-    setValue('');
-    onSend(trimmed);
-  };
-
-  return (
-    <Paper elevation={3} square sx={{ p: 1.5, display: 'flex', gap: 1, alignItems: 'flex-end' }}>
-      <TextField
-        inputRef={innerRef}
-        fullWidth
-        multiline
-        maxRows={6}
-        placeholder={placeholder}
-        value={value}
-        onChange={e => setValue(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
-        disabled={loading}
-        size="small"
-        variant="outlined"
-        autoFocus
-      />
-      <IconButton color="primary" onClick={submit} disabled={!value.trim() || loading} sx={{ mb: 0.25 }}>
-        <SendIcon />
-      </IconButton>
-    </Paper>
-  );
-});
+// ChatInput and ChatInputHandle are imported from @commander/shared/components/ChatInput
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -252,6 +203,7 @@ export default function ChatPage() {
   const [patternsLoading, setPatternsLoading] = useState(true);
 
   const [sessionFeedbackOpen, setSessionFeedbackOpen] = useState(false);
+  const [showToolDetails, setShowToolDetails] = useState(false);
 
   const [gameContext, setGameContext] = useState<ActiveGameContext | null>(null);
   const [isEmbedded, setIsEmbedded] = useState(false);
@@ -260,6 +212,19 @@ export default function ChatPage() {
   const thinkingRef = useRef<HTMLSpanElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const retryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const abortRef = useRef<(() => void) | null>(null);
+  const loadingRef = useRef(false);
+  loadingRef.current = loading;
+
+  useChatKeys({
+    onToggleToolDetails: () => setShowToolDetails(v => !v),
+    onEscCancel: () => {
+      if (!loadingRef.current) return;
+      abortRef.current?.();
+      setLoading(false);
+      if (isEmbedded) window.parent.postMessage({ type: 'rules_loading', value: false }, '*');
+    },
+  });
 
   const THINKING_MESSAGES = [
     // Core rules flow
@@ -1124,36 +1089,12 @@ export default function ChatPage() {
           {renderedMessages}
 
           {loading && (
-            <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
-              <Paper elevation={1} sx={{ p: 1.5, borderRadius: '16px 16px 16px 4px' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <CircularProgress size={16} />
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ minWidth: 220, fontFamily: 'monospace', fontSize: '0.8rem' }}
-                  >
-                    <span ref={thinkingRef} />
-                    <Box
-                      component="span"
-                      sx={{
-                        display: 'inline-block',
-                        width: '1ch',
-                        height: '0.9em',
-                        bgcolor: 'text.secondary',
-                        verticalAlign: 'text-bottom',
-                        ml: '1px',
-                        animation: 'blink-cursor 1s step-end infinite',
-                        '@keyframes blink-cursor': {
-                          '0%, 100%': { opacity: 1 },
-                          '50%': { opacity: 0 },
-                        },
-                      }}
-                    />
-                  </Typography>
-                </Box>
-              </Paper>
-            </Box>
+            <ThinkingIndicator
+              messages={THINKING_MESSAGES}
+              intervalMs={3000}
+              showCursor
+              paperStyle
+            />
           )}
 
           {error && (
@@ -1167,8 +1108,14 @@ export default function ChatPage() {
         <ChatInput
           ref={chatInputRef}
           onSend={handleSend}
+          onStop={() => {
+            abortRef.current?.();
+            setLoading(false);
+            if (isEmbedded) window.parent.postMessage({ type: 'rules_loading', value: false }, '*');
+          }}
           loading={loading}
           placeholder={gameContext ? 'Ask about your game…' : 'Ask a rules question…'}
+          steeringHint="Type to steer · Esc to cancel"
         />
       </Box>
 

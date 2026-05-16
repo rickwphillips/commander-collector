@@ -6,20 +6,16 @@ import {
   Drawer,
   Typography,
   Box,
-  TextField,
-  IconButton,
   Stack,
-  CircularProgress,
-  Paper,
   Chip,
   Fab,
   Divider,
+  IconButton,
+  Paper,
   Tooltip,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
-import SendIcon from '@mui/icons-material/Send';
-import StopCircleIcon from '@mui/icons-material/StopCircle';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import CloseIcon from '@mui/icons-material/Close';
 import AddCommentIcon from '@mui/icons-material/AddComment';
@@ -29,6 +25,9 @@ import { api } from '@/lib/api';
 import type { CoachMessage, CoachNote, CoachToolCall } from '@/lib/types';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import { looksLikeCardName } from '@commander/shared/components/cardNameUtils';
+import { ChatInput, type ChatInputHandle } from '@commander/shared/components/ChatInput';
+import { ThinkingIndicator } from '@commander/shared/components/ThinkingIndicator';
+import { useChatKeys } from '@commander/shared/lib/useChatKeys';
 
 export const COACH_DRAWER_WIDTH = 420;
 
@@ -168,80 +167,7 @@ export interface ActiveListContext {
   cardCount: number;
 }
 
-// ── CoachInput — isolated so typing only re-renders this component ────────────
-
-interface CoachInputHandle {
-  setValue(text: string): void;
-  appendText(text: string): void;
-  focus(): void;
-}
-
-const CoachInput = forwardRef<CoachInputHandle, {
-  onSend: (text: string) => void;
-  onStop: () => void;
-  loading: boolean;
-}>(function CoachInput({ onSend, onStop, loading }, ref) {
-  const [value, setValue] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useImperativeHandle(ref, () => ({
-    setValue,
-    appendText: (text) => setValue(prev => {
-      const trimmed = prev.trimEnd();
-      return trimmed ? `${trimmed} ${text}` : text;
-    }),
-    focus: () => setTimeout(() => inputRef.current?.focus(), 50),
-  }));
-
-  const submit = () => {
-    const text = value.trim();
-    if (!text) return;
-    setValue('');
-    onSend(text);
-  };
-
-  return (
-    <>
-      {loading && (
-        <Typography variant="caption" color="text.secondary" sx={{ px: 1.5, fontStyle: 'italic' }}>
-          Type to steer · Esc to cancel
-        </Typography>
-      )}
-      <Stack direction="row" spacing={1} sx={{ p: 1.5, pt: loading ? 0.5 : 1.5, flexShrink: 0 }}>
-        <TextField
-          fullWidth
-          size="small"
-          placeholder={loading ? 'Add more details...' : 'Ask the coach...'}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
-          multiline
-          maxRows={3}
-          inputRef={inputRef}
-        />
-        {loading && !value.trim() ? (
-          <Tooltip title="Stop">
-            <IconButton onClick={onStop} color="default">
-              <StopCircleIcon />
-            </IconButton>
-          </Tooltip>
-        ) : (
-          <Tooltip title={loading ? 'Interrupt and send' : 'Send'}>
-            <span>
-              <IconButton
-                onClick={submit}
-                disabled={!value.trim()}
-                color={loading ? 'warning' : 'primary'}
-              >
-                <SendIcon />
-              </IconButton>
-            </span>
-          </Tooltip>
-        )}
-      </Stack>
-    </>
-  );
-});
+// ChatInput is imported from @commander/shared/components/ChatInput
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -274,10 +200,8 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
   const [history, setHistory] = useState<ChatSession[]>([]);
   const sessionIdRef = useRef<string>(Date.now().toString());
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const thinkingInterval = useRef<ReturnType<typeof setInterval>>(null);
   const thinkingMessagesRef = useRef<string[]>([]);
-  const thinkingMsgRef = useRef<HTMLSpanElement>(null);
-  const coachInputRef = useRef<CoachInputHandle>(null);
+  const coachInputRef = useRef<ChatInputHandle>(null);
   const abortCtrlRef = useRef<AbortController | null>(null);
   const loadingRef = useRef(false);
   loadingRef.current = loading;
@@ -303,31 +227,11 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
     scrollToBottom();
   }, [messages, loading, scrollToBottom]);
 
-  // Rotate thinking message while loading
-  useEffect(() => {
-    if (loading) {
-      const msgs = thinkingMessagesRef.current;
-      let idx = 0;
-      if (thinkingMsgRef.current) thinkingMsgRef.current.textContent = msgs[0] ?? '';
-      thinkingInterval.current = setInterval(() => {
-        idx = (idx + 1) % msgs.length;
-        if (thinkingMsgRef.current) thinkingMsgRef.current.textContent = msgs[idx];
-      }, 3000);
-    } else {
-      if (thinkingInterval.current) clearInterval(thinkingInterval.current);
-      if (thinkingMsgRef.current) thinkingMsgRef.current.textContent = '';
-    }
-    return () => {
-      if (thinkingInterval.current) clearInterval(thinkingInterval.current);
-    };
-  }, [loading]);
-
   // Load history and restore last session once initialized
   useEffect(() => {
     if (!initialized) return;
     const sessions = loadHistory();
     setHistory(sessions);
-    // Restore most recent session automatically
     if (sessions.length > 0 && messages.length === 0) {
       const latest = sessions[0];
       sessionIdRef.current = latest.id;
@@ -350,24 +254,16 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
     }
   }, [open, initialized]);
 
-  // Keyboard shortcuts: Ctrl/Cmd+O toggles tool details, Escape cancels in-flight response
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
-        e.preventDefault();
-        setShowToolDetails(v => !v);
-        return;
-      }
-      if (e.key === 'Escape' && loadingRef.current) {
-        abortCtrlRef.current?.abort();
-        abortCtrlRef.current = null;
-        setLoading(false);
-        setPartialResponse('');
-      }
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, []);
+  useChatKeys({
+    onToggleToolDetails: () => setShowToolDetails(v => !v),
+    onEscCancel: () => {
+      if (!loadingRef.current) return;
+      abortCtrlRef.current?.abort();
+      abortCtrlRef.current = null;
+      setLoading(false);
+      setPartialResponse('');
+    },
+  });
 
   const handleOpen = () => {
     onToggle(true);
@@ -616,12 +512,7 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
                     <ChatBubble message={{ role: 'assistant', content: partialResponse }} />
                   </Box>
                 )}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: partialResponse ? 1 : 0 }}>
-                  <CircularProgress size={16} />
-                  <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                    <span ref={thinkingMsgRef} />
-                  </Typography>
-                </Box>
+                <ThinkingIndicator messages={thinkingMessagesRef.current} />
               </Box>
             )}
 
@@ -661,7 +552,14 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
           )}
 
           {/* Input */}
-          <CoachInput ref={coachInputRef} onSend={handleSend} onStop={handleStop} loading={loading} />
+          <ChatInput
+            ref={coachInputRef}
+            onSend={handleSend}
+            onStop={handleStop}
+            loading={loading}
+            placeholder="Ask the coach…"
+            elevation={0}
+          />
         </>
       )}
     </Box>
