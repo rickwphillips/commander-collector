@@ -36,3 +36,6 @@ apps/core/app/php-api/rules/p[0-9]*.md
 
 # macOS metadata
 **/.DS_Store
+
+# External services (own repos)
+services/
