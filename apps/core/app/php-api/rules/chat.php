@@ -473,8 +473,8 @@ $tools = [
             'properties' => [
                 'deck_ids' => [
                     'type'        => 'array',
-                    'items'       => ['type' => 'integer'],
-                    'description' => 'Array of deck IDs to compare (from the active game context)',
+                    'items'       => ['type' => 'string'],
+                    'description' => 'Array of deck IDs to compare (UUIDs from the active game context)',
                 ],
             ],
             'required' => ['deck_ids'],
@@ -487,8 +487,8 @@ $tools = [
             'type'       => 'object',
             'properties' => [
                 'deck_id' => [
-                    'type'        => 'integer',
-                    'description' => 'The deck ID from the active game context',
+                    'type'        => 'string',
+                    'description' => 'The deck ID (UUID) from the active game context',
                 ],
                 'player_name' => [
                     'type'        => 'string',
@@ -668,8 +668,8 @@ function executeTool(string $name, array $input): string {
 
     if ($name === 'lookup_decklist') {
         global $db;
-        $deckId = (int)($input['deck_id'] ?? 0);
-        if (!$deckId) return json_encode(['error' => 'deck_id is required']);
+        $deckId = trim((string)($input['deck_id'] ?? ''));
+        if ($deckId === '') return json_encode(['error' => 'deck_id is required']);
 
         $stmt = $db->prepare("
             SELECT lc.card_name, lc.quantity,
