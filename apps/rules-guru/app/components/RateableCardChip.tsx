@@ -48,7 +48,7 @@ export function RateableCardChip({ name, conversationId, messageId }: Props) {
   const isIrrelevant = rating === 'irrelevant';
 
   return (
-    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25 }}>
+    <Box sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
       <CardTooltip name={name}>
         <Chip
           label={name}
@@ -65,39 +65,41 @@ export function RateableCardChip({ name, conversationId, messageId }: Props) {
         />
       </CardTooltip>
 
-      <Tooltip title={isRelevant ? 'Marked relevant (click to undo)' : 'Relevant example'}>
-        <IconButton
-          size="small"
-          aria-label={`${name} relevant`}
-          onClick={() => rate('relevant')}
-          sx={{
-            p: 0.2,
-            color: isRelevant ? 'success.main' : 'text.disabled',
-            '&:hover': { color: 'success.main' },
-          }}
-        >
-          {isRelevant
-            ? <ThumbUpIcon sx={{ fontSize: 11 }} />
-            : <ThumbUpOutlinedIcon sx={{ fontSize: 11 }} />}
-        </IconButton>
-      </Tooltip>
+      <Box sx={{ display: 'flex', gap: 0 }}>
+        <Tooltip title={isRelevant ? 'Marked relevant (click to undo)' : 'Relevant example'}>
+          <IconButton
+            size="small"
+            aria-label={`${name} relevant`}
+            onClick={() => rate('relevant')}
+            sx={{
+              p: 0.15,
+              color: isRelevant ? 'success.main' : 'text.disabled',
+              '&:hover': { color: 'success.main' },
+            }}
+          >
+            {isRelevant
+              ? <ThumbUpIcon sx={{ fontSize: 10 }} />
+              : <ThumbUpOutlinedIcon sx={{ fontSize: 10 }} />}
+          </IconButton>
+        </Tooltip>
 
-      <Tooltip title={isIrrelevant ? 'Marked not relevant (click to undo)' : 'Not relevant'}>
-        <IconButton
-          size="small"
-          aria-label={`${name} not relevant`}
-          onClick={() => rate('irrelevant')}
-          sx={{
-            p: 0.2,
-            color: isIrrelevant ? 'error.main' : 'text.disabled',
-            '&:hover': { color: 'error.main' },
-          }}
-        >
-          {isIrrelevant
-            ? <ThumbDownIcon sx={{ fontSize: 11 }} />
-            : <ThumbDownOutlinedIcon sx={{ fontSize: 11 }} />}
-        </IconButton>
-      </Tooltip>
+        <Tooltip title={isIrrelevant ? 'Marked not relevant (click to undo)' : 'Not relevant'}>
+          <IconButton
+            size="small"
+            aria-label={`${name} not relevant`}
+            onClick={() => rate('irrelevant')}
+            sx={{
+              p: 0.15,
+              color: isIrrelevant ? 'error.main' : 'text.disabled',
+              '&:hover': { color: 'error.main' },
+            }}
+          >
+            {isIrrelevant
+              ? <ThumbDownIcon sx={{ fontSize: 10 }} />
+              : <ThumbDownOutlinedIcon sx={{ fontSize: 10 }} />}
+          </IconButton>
+        </Tooltip>
+      </Box>
     </Box>
   );
 }
