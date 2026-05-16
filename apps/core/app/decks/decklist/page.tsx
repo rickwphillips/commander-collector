@@ -1,21 +1,25 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Alert,
   Box,
   Button,
   CircularProgress,
+  IconButton,
   Link as MuiLink,
   Stack,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 import Link from 'next/link';
 import { PageContainer } from '@/components/PageContainer';
 import { ColorIdentityChips } from '@/components/ColorIdentityChips';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import { ListEditor } from '@/components/cards/ListEditor';
+import { CoachChat, type CoachChatHandle } from '@/my-collection/CoachChat';
 import { useList } from '@/lib/lists/useList';
 import { useConfirm } from '@/lib/useConfirm';
 import { api } from '@/lib/api';
@@ -31,10 +35,23 @@ function DeckListPageInner() {
   const [deckLoading, setDeckLoading] = useState(true);
   const [deckError,   setDeckError]   = useState<string | null>(null);
 
+  // ── Discuss Deck coach ────────────────────────────────────────────────────
+  const [coachOpen, setCoachOpen] = useState(false);
+  const coachRef = useRef<CoachChatHandle>(null);
+
   useEffect(() => {
     if (!deckId) { setDeckLoading(false); return; }
     api.getDeck(deckId)
-      .then(setDeck)
+      .then(d => {
+        setDeck(d);
+        coachRef.current?.setActiveDeck({
+          deckId: d.id,
+          deckName: d.name,
+          cardCount: 0,
+          commander: d.commander ?? '',
+          colors: d.colors ?? '',
+        });
+      })
       .catch(() => setDeckError('Deck not found.'))
       .finally(() => setDeckLoading(false));
   }, [deckId]);
@@ -145,6 +162,13 @@ function DeckListPageInner() {
       backHref={`/decks/detail?id=${deckId}`}
       backLabel="Back to Deck"
       onBackClick={confirmLeaveIfDirty}
+      actions={
+        <Tooltip title="Discuss this deck with the Coach">
+          <IconButton onClick={() => setCoachOpen(true)} sx={{ color: '#6B8E6B' }}>
+            <SmartToyIcon />
+          </IconButton>
+        </Tooltip>
+      }
     >
       {/* Errors */}
       {listError && (
@@ -180,6 +204,8 @@ function DeckListPageInner() {
       </Box>
 
       {confirmDialog}
+
+      <CoachChat ref={coachRef} notes={[]} open={coachOpen} onToggle={setCoachOpen} />
     </PageContainer>
   );
 }
