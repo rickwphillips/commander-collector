@@ -142,7 +142,9 @@ export function SessionFeedbackDrawer({ open, onClose, conversationId, messages,
       open={open}
       onClose={handleClose}
       keepMounted
-      slotProps={{ paper: { sx: { width: { xs: '95vw', sm: 480 }, p: 3, display: 'flex', flexDirection: 'column' } } }}
+      hideBackdrop
+      disableScrollLock
+      slotProps={{ paper: { sx: { width: { xs: '95vw', sm: 480 }, p: 3, display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 12px rgba(0,0,0,0.3)' } } }}
     >
       {/* Header */}
       <Stack direction="row" alignItems="center" sx={{ mb: 2, flexShrink: 0 }}>
