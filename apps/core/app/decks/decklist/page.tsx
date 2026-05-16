@@ -19,7 +19,7 @@ import { PageContainer } from '@/components/PageContainer';
 import { ColorIdentityChips } from '@/components/ColorIdentityChips';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import { ListEditor } from '@/components/cards/ListEditor';
-import { CoachChat, type CoachChatHandle } from '@/my-collection/CoachChat';
+import { GuruChat, type GuruChatHandle } from '@/components/GuruChat';
 import { useList } from '@/lib/lists/useList';
 import { useConfirm } from '@/lib/useConfirm';
 import { api } from '@/lib/api';
@@ -37,7 +37,7 @@ function DeckListPageInner() {
 
   // ── Discuss Deck coach ────────────────────────────────────────────────────
   const [coachOpen, setCoachOpen] = useState(false);
-  const coachRef = useRef<CoachChatHandle>(null);
+  const coachRef = useRef<GuruChatHandle>(null);
 
   useEffect(() => {
     if (!deckId) { setDeckLoading(false); return; }
@@ -205,7 +205,13 @@ function DeckListPageInner() {
 
       {confirmDialog}
 
-      <CoachChat ref={coachRef} notes={[]} open={coachOpen} onToggle={setCoachOpen} />
+      <GuruChat
+        ref={coachRef}
+        notes={[]}
+        open={coachOpen}
+        onToggle={setCoachOpen}
+        autoGreet={deck ? `I want to discuss my ${deck.name} deck (commander: ${deck.commander}). Give me a focused overview — key synergies, win conditions, and anything you'd flag as a weakness.` : undefined}
+      />
     </PageContainer>
   );
 }

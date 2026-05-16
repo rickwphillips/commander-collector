@@ -29,7 +29,7 @@ import { ChatInput, type ChatInputHandle } from '@commander/shared/components/Ch
 import { ThinkingIndicator } from '@commander/shared/components/ThinkingIndicator';
 import { useChatKeys } from '@commander/shared/lib/useChatKeys';
 
-export const COACH_DRAWER_WIDTH = 420;
+export const GURU_DRAWER_WIDTH = 420;
 
 // ── Chat history (localStorage) ───────────────────────────────────────────────
 
@@ -171,19 +171,20 @@ export interface ActiveListContext {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface CoachChatHandle {
+export interface GuruChatHandle {
   appendToInput: (text: string) => void;
   setActiveDeck: (data: ActiveDeckContext | null) => void;
   setActiveList: (data: ActiveListContext | null) => void;
 }
 
-interface CoachChatProps {
+interface GuruChatProps {
   notes: CoachNote[];
   open: boolean;
   onToggle: (open: boolean) => void;
+  autoGreet?: string;
 }
 
-export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function CoachChat({ notes: initialNotes, open, onToggle }, ref) {
+export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruChat({ notes: initialNotes, open, onToggle, autoGreet }, ref) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -269,6 +270,15 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
     onToggle(true);
     if (!initialized) setInitialized(true);
   };
+
+  // Auto-greet when opened with no history and an autoGreet message is set
+  useEffect(() => {
+    if (open && initialized && autoGreet && messages.length === 0 && !loading) {
+      handleSend(autoGreet);
+    }
+  // handleSend changes identity each render; only trigger on open/initialized change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialized]);
 
   const handleNewChat = () => {
     abortCtrlRef.current?.abort();
@@ -609,10 +619,10 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
           open={open}
           variant="persistent"
           sx={{
-            width: open ? COACH_DRAWER_WIDTH : 0,
+            width: open ? GURU_DRAWER_WIDTH : 0,
             flexShrink: 0,
             '& .MuiDrawer-paper': {
-              width: COACH_DRAWER_WIDTH,
+              width: GURU_DRAWER_WIDTH,
               boxSizing: 'border-box',
             },
           }}

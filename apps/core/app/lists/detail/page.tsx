@@ -21,7 +21,7 @@ import { ListEditor } from '@/components/cards/ListEditor';
 import { useList } from '@/lib/lists/useList';
 import { useConfirm } from '@/lib/useConfirm';
 import { api } from '@/lib/api';
-import { CoachChat, type CoachChatHandle } from '@/my-collection/CoachChat';
+import { GuruChat, type GuruChatHandle } from '@/components/GuruChat';
 
 // ── Inner component (uses useSearchParams) ────────────────────────────────────
 
