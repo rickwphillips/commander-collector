@@ -3,7 +3,7 @@ export interface GameContextPlayer {
   deckName: string;
   commander: string | null;
   partner: string | null;
-  deckId: number | null;
+  deckId: string | null;
   cards: string[];
 }
 

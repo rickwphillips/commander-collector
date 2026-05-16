@@ -35,7 +35,7 @@ if (empty($players)) {
 $deckIds = [];
 foreach ($players as $p) {
     if (!empty($p['deckId'])) {
-        $deckIds[] = (int)$p['deckId'];
+        $deckIds[] = (string)$p['deckId'];
     }
 }
 $deckIds = array_values(array_unique($deckIds));
