@@ -32,6 +32,7 @@ import ChatIcon from '@mui/icons-material/Chat';
 import MinimizeIcon from '@mui/icons-material/Minimize';
 import Badge from '@mui/material/Badge';
 import { useThemeMode } from '@/components/ThemeProvider';
+import { RulesQuickLookup } from '@/components/RulesQuickLookup';
 import type { PlayerState, CommanderDamageMap } from '../types';
 
 function D20Icon({ size = 16 }: { size?: number }) {
@@ -669,6 +670,11 @@ export function CenterZone({
               <ChatIcon sx={{ fontSize: 24 }} />
             </Badge>
           </IconButton>
+
+          {/* Quick rules/pattern/card lookup (no AI; direct MCP fetch) */}
+          <Box sx={{ position: 'absolute', bottom: 6, left: 48 }}>
+            <RulesQuickLookup />
+          </Box>
         </CardContent>
 
         {/* Settings overlay */}
