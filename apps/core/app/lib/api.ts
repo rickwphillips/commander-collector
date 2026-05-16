@@ -531,6 +531,102 @@ export const api = {
     console.error('[coach] timed out after 120 polls');
     throw new Error('Coach chat response timed out');
   },
+
+  // ── commander-mcp brain (proxied through /rules/*.php) ──────────────────
+  // Each method returns the MCP Confidence envelope:
+  //   { band: 'certain' | 'unknown', data, sources, caveats }
+  // Callers should check band before trusting data.
+
+  lookupCRRule: (number: string) =>
+    apiFetch<{
+      band: 'certain' | 'unknown';
+      data: { rule_number: string; body: string; examples: string[] } | null;
+      sources: string[];
+      caveats: string[];
+    }>(`/rules/cr-rule.php?n=${encodeURIComponent(number)}`),
+
+  getPattern: (patternId: string) =>
+    apiFetch<{
+      band: 'certain' | 'unknown';
+      data: { pattern_id: string; name: string; abstract?: string; cr_refs?: string[]; tags?: string[] } | null;
+      sources: string[];
+      caveats: string[];
+    }>(`/rules/pattern.php?id=${encodeURIComponent(patternId)}`),
+
+  lookupInteraction: (cardA: string, cardB: string, context?: string) => {
+    const params = new URLSearchParams({ a: cardA, b: cardB });
+    if (context) params.set('context', context);
+    return apiFetch<{
+      band: 'certain' | 'unknown';
+      data: {
+        card_a: string;
+        card_b: string;
+        patterns: Array<{ pattern_id: string; name: string; abstract?: string }>;
+        cr_refs_cited: string[];
+        learned_weight: { weight: number; sample_size: number } | null;
+      } | null;
+      sources: string[];
+      caveats: string[];
+    }>(`/rules/interaction.php?${params.toString()}`);
+  },
+
+  scoreDeck: (decklist: string[], commander?: string) =>
+    apiFetch<{
+      band: 'high' | 'moderate' | 'unknown';
+      data: {
+        bracket: 1 | 2 | 3 | 4 | 5;
+        bracket_name: string;
+        strength_score: number;
+        signals: Array<{ name: string; contribution: number; reason: string; data?: Record<string, unknown> }>;
+        warnings: string[];
+        color_identity: string[];
+        missing: string[];
+      } | null;
+      sources: string[];
+      caveats: string[];
+    }>('/rules/score-deck.php', {
+      method: 'POST',
+      body: JSON.stringify({ decklist, commander }),
+    }),
+
+  getCardNote: (name: string, format = 'commander', archetype?: string) => {
+    const params = new URLSearchParams({ name, format });
+    if (archetype) params.set('archetype', archetype);
+    return apiFetch<{
+      band: 'certain' | 'unknown';
+      data: {
+        name: string;
+        format: string;
+        kind: 'banned' | 'trap' | 'staple' | 'situational' | 'requirement' | null;
+        weight: number | null;
+        reason: string | null;
+        short_circuit: boolean;
+        source: string | null;
+      };
+      sources: string[];
+      caveats: string[];
+    }>(`/rules/card-note.php?${params.toString()}`);
+  },
+
+  discussStrength: (decklist: string[], commander?: string) =>
+    apiFetch<{
+      band: 'high' | 'moderate' | 'unknown';
+      data: {
+        bracket: 1 | 2 | 3 | 4 | 5;
+        bracket_name: string;
+        strength_score: number;
+        signals: Array<{ name: string; contribution: number; reason: string; data?: Record<string, unknown> }>;
+        warnings: string[];
+        color_identity: string[];
+        missing: string[];
+        narrative: string;
+      } | null;
+      sources: string[];
+      caveats: string[];
+    }>('/rules/discuss-strength.php', {
+      method: 'POST',
+      body: JSON.stringify({ decklist, commander }),
+    }),
 };
 
 function buildComparisonParams(config: import('./types').ComparisonConfig): string {
