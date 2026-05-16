@@ -8,6 +8,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import { ManaCost } from '@/components/ManaCost';
 import { ColorSymbols } from '@/components/ManaSymbol';
+import { BannedCardBadge } from '@/components/BannedCardBadge';
 import { getTypeCategory, sortCards, TYPE_CATEGORIES } from '@/components/DeckFilters';
 import type { SortDirection, SortOrder } from '@/components/DeckFilters';
 
@@ -27,12 +28,14 @@ interface Props<T extends CardListEntry> {
   sortDirection?: SortDirection;
   /** When true, shows color identity pips instead of mana cost for all cards */
   useColorIdentity?: boolean;
-  /** Called when a card name is clicked — e.g. to send it to coach input */
+  /** Called when a card name is clicked, e.g. to send it to coach input */
   onCardClick?: (name: string) => void;
   /** When true, render inline qty stepper + remove button per row */
   editMode?: boolean;
   /** Required when editMode is true. Receives the new full cards array. */
   onChange?: (next: T[]) => void;
+  /** Format string for per-card lookups (banned badges etc.). Defaults to none. */
+  format?: string;
 }
 
 /**
@@ -49,6 +52,7 @@ export function CardListDisplay<T extends CardListEntry>({
   onCardClick,
   editMode = false,
   onChange,
+  format,
 }: Props<T>) {
   const sections = useMemo(() => {
     const commanders: T[] = [];
@@ -167,6 +171,11 @@ export function CardListDisplay<T extends CardListEntry>({
                     {c.card_name}
                   </Typography>
                 </CardTooltip>
+                {format && (
+                  <Box component="span" sx={{ ml: 0.5, verticalAlign: 'middle' }}>
+                    <BannedCardBadge name={c.card_name} format={format} />
+                  </Box>
+                )}
               </Box>
               {(c.type_line?.includes('Land') ?? false)
                 ? (useColorIdentity ? <ColorSymbols colors={c.color_identity || 'C'} size={12} /> : null)

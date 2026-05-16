@@ -280,6 +280,7 @@ export function ListEditor({
                 useColorIdentity={filters.useColorIdentity}
                 editMode={editMode}
                 onChange={handleVisibleChange}
+                format={list?.format}
               />
             )}
           </>

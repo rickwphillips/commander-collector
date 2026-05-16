@@ -5,6 +5,7 @@ import { Box, Button, Typography, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { PlayerPanel } from './PlayerPanel';
 import { CenterZone } from './CenterZone';
+import { CommanderInteractionAlert } from '@/components/CommanderInteractionAlert';
 import { api } from '@/lib/api';
 import type { GameManagerState, PlayerState } from '../types';
 import {
@@ -452,6 +453,10 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
         py: 0,
       }}
     >
+      <CommanderInteractionAlert
+        commanders={players.flatMap((p) => [p.commander.name, p.partner?.name ?? ''].filter(Boolean))}
+        storageKey="commander-interaction-alert"
+      />
       {players.map((player, idx) => {
         const effectivePosition = getEffectivePos(idx);
         const placement = getGridPlacement(effectivePosition);
