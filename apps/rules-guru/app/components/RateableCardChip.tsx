@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { Box, Chip, Tooltip, IconButton } from '@mui/material';
-import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
-import ThumbDownOutlinedIcon from '@mui/icons-material/ThumbDownOutlined';
+import { Chip, Tooltip } from '@mui/material';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import RemoveCircleIcon from '@mui/icons-material/RemoveCircle';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import { rulesApi } from '../lib/api';
+
+export type CardRatingValue = 'good' | 'not_relevant' | 'bad' | null;
 
 interface Props {
   name: string;
@@ -15,91 +16,66 @@ interface Props {
   messageId?: number;
 }
 
-type CardRating = 'relevant' | 'irrelevant' | null;
+const CYCLE: CardRatingValue[] = [null, 'good', 'not_relevant', 'bad'];
+
+const STATE: Record<Exclude<CardRatingValue, null>, {
+  color: 'success' | 'default' | 'error';
+  icon: React.ReactElement;
+  tip: string;
+}> = {
+  good:         { color: 'success', icon: <ThumbUpIcon       sx={{ fontSize: '11px !important' }} />, tip: 'Click: mark not relevant' },
+  not_relevant: { color: 'default', icon: <RemoveCircleIcon  sx={{ fontSize: '11px !important' }} />, tip: 'Click: mark bad' },
+  bad:          { color: 'error',   icon: <ThumbDownIcon     sx={{ fontSize: '11px !important' }} />, tip: 'Click: clear rating' },
+};
 
 /**
- * Card chip with always-visible inline relevance buttons.
- * Submits immediately on rating; subsequent clicks toggle the rating off.
+ * Card chip that cycles through three states on click:
+ *   unrated → good (green ↑) → not relevant (gray –) → bad (red ↓) → unrated
  */
 export function RateableCardChip({ name, conversationId, messageId }: Props) {
-  const [rating, setRating] = useState<CardRating>(null);
-  const [submitted, setSubmitted] = useState(false);
+  const [rating, setRating] = useState<CardRatingValue>(null);
 
-  const rate = async (value: 'relevant' | 'irrelevant') => {
-    const next: CardRating = rating === value ? null : value;
+  const handleClick = async () => {
+    const next = CYCLE[(CYCLE.indexOf(rating) + 1) % CYCLE.length];
     setRating(next);
-
-    if (next === null) return; // toggled off — nothing to submit
-
+    if (!next) return;
     try {
       await rulesApi.submitMessageFeedback({
         conversation_id: conversationId,
         message_id: messageId,
         rating: 'up',
-        card_feedback: { [name]: next === 'relevant' },
+        card_feedback: { [name]: next },
       });
-      setSubmitted(true);
     } catch {
-      // silent — card rating is best-effort
+      // silent
     }
   };
 
-  const isRelevant   = rating === 'relevant';
-  const isIrrelevant = rating === 'irrelevant';
+  const state = rating ? STATE[rating] : null;
+  const tip = state?.tip ?? 'Click: mark good';
 
   return (
-    <Box sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
-      <CardTooltip name={name}>
-        <Chip
-          label={name}
-          size="small"
-          variant="outlined"
-          sx={{
-            fontSize: '0.7rem',
-            height: 20,
-            cursor: 'default',
-            '& .MuiChip-label': { px: 0.75 },
-            borderColor: isRelevant ? 'success.main' : isIrrelevant ? 'error.main' : undefined,
-            color: isRelevant ? 'success.main' : isIrrelevant ? 'error.main' : undefined,
-          }}
-        />
-      </CardTooltip>
-
-      <Box sx={{ display: 'flex', gap: 0 }}>
-        <Tooltip title={isRelevant ? 'Marked relevant (click to undo)' : 'Relevant example'}>
-          <IconButton
+    <Tooltip title={tip} placement="top">
+      <span>
+        <CardTooltip name={name}>
+          <Chip
+            label={name}
+            icon={state?.icon}
             size="small"
-            aria-label={`${name} relevant`}
-            onClick={() => rate('relevant')}
+            variant={state ? 'filled' : 'outlined'}
+            color={state?.color ?? 'default'}
+            onClick={handleClick}
             sx={{
-              p: 0.15,
-              color: isRelevant ? 'success.main' : 'text.disabled',
-              '&:hover': { color: 'success.main' },
+              fontSize: '0.7rem',
+              height: 20,
+              cursor: 'pointer',
+              '& .MuiChip-label': { px: 0.75 },
+              '& .MuiChip-icon': { ml: 0.5 },
+              transition: 'all 0.15s',
             }}
-          >
-            {isRelevant
-              ? <ThumbUpIcon sx={{ fontSize: 10 }} />
-              : <ThumbUpOutlinedIcon sx={{ fontSize: 10 }} />}
-          </IconButton>
-        </Tooltip>
-
-        <Tooltip title={isIrrelevant ? 'Marked not relevant (click to undo)' : 'Not relevant'}>
-          <IconButton
-            size="small"
-            aria-label={`${name} not relevant`}
-            onClick={() => rate('irrelevant')}
-            sx={{
-              p: 0.15,
-              color: isIrrelevant ? 'error.main' : 'text.disabled',
-              '&:hover': { color: 'error.main' },
-            }}
-          >
-            {isIrrelevant
-              ? <ThumbDownIcon sx={{ fontSize: 10 }} />
-              : <ThumbDownOutlinedIcon sx={{ fontSize: 10 }} />}
-          </IconButton>
-        </Tooltip>
-      </Box>
-    </Box>
+          />
+        </CardTooltip>
+      </span>
+    </Tooltip>
   );
 }

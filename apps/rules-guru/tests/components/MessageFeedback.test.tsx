@@ -71,14 +71,18 @@ describe('MessageFeedback', () => {
     expect(payload.message_id).toBe(5);
   });
 
-  it('submits card_feedback when a card is rated not relevant', async () => {
+  it('submits card_feedback when a card is cycled to bad', async () => {
     const spy = vi.spyOn(apiModule.rulesApi, 'submitMessageFeedback').mockResolvedValue(OK as never);
     render(<MessageFeedback conversationId={1} cards={['Sol Ring']} />);
     await userEvent.click(screen.getByRole('button', { name: 'Not helpful' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Not relevant' }));
+    // Cycle chip: null → good → not_relevant → bad (3 clicks)
+    const chip = screen.getByRole('button', { name: /sol ring/i });
+    await userEvent.click(chip); // good
+    await userEvent.click(chip); // not_relevant
+    await userEvent.click(chip); // bad
     await userEvent.click(screen.getByRole('button', { name: 'Submit' }));
     await waitFor(() => expect(spy).toHaveBeenCalled());
-    expect(spy.mock.calls[0][0].card_feedback).toEqual({ 'Sol Ring': false });
+    expect(spy.mock.calls[0][0].card_feedback).toEqual({ 'Sol Ring': 'bad' });
   });
 
   it('omits card_feedback from payload when no cards rated', async () => {

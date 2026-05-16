@@ -85,7 +85,7 @@ export const rulesApi = {
     off_topic?: boolean;
     hard_to_apply?: boolean;
     cards_not_relevant?: boolean;
-    card_feedback?: Record<string, boolean>;
+    card_feedback?: Record<string, 'good' | 'not_relevant' | 'bad'>;
     notes?: string;
     flag_pattern?: boolean;
   }) =>

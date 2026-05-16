@@ -57,10 +57,10 @@ describe('rulesApi — feedback methods', () => {
     await rulesApi.submitMessageFeedback({
       conversation_id: 1,
       rating: 'up',
-      card_feedback: { 'Sol Ring': true, 'Brainstorm': false },
+      card_feedback: { 'Sol Ring': 'good', 'Brainstorm': 'bad' },
     });
     const body = JSON.parse(mock.mock.calls[0][1].body);
-    expect(body.card_feedback).toEqual({ 'Sol Ring': true, 'Brainstorm': false });
+    expect(body.card_feedback).toEqual({ 'Sol Ring': 'good', 'Brainstorm': 'bad' });
   });
 
   it('submitSessionFeedback POSTs to session-feedback.php with rating and indices', async () => {

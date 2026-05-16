@@ -2,16 +2,18 @@
 
 import { useState } from 'react';
 import {
-  Box, IconButton, Tooltip, Popover, Stack, Typography,
+  Box, Chip, IconButton, Tooltip, Popover, Stack, Typography,
   FormControlLabel, Checkbox, TextField, Button, Divider, Switch,
 } from '@mui/material';
 import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
 import ThumbDownOutlinedIcon from '@mui/icons-material/ThumbDownOutlined';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
+import RemoveCircleIcon from '@mui/icons-material/RemoveCircle';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import FlagIcon from '@mui/icons-material/Flag';
 import { rulesApi } from '../lib/api';
+import { type CardRatingValue } from './RateableCardChip';
 
 interface Props {
   conversationId: number;
@@ -22,37 +24,41 @@ interface Props {
 
 type Rating = 'up' | 'down' | null;
 
-function CardRatingRow({
-  name, value, onRate,
-}: { name: string; value: boolean | undefined; onRate: (v: boolean) => void }) {
+const CARD_CYCLE: CardRatingValue[] = [null, 'good', 'not_relevant', 'bad'];
+
+const CARD_STATE: Record<Exclude<CardRatingValue, null>, {
+  color: 'success' | 'default' | 'error';
+  icon: React.ReactElement;
+}> = {
+  good:         { color: 'success', icon: <ThumbUpIcon      sx={{ fontSize: '11px !important' }} /> },
+  not_relevant: { color: 'default', icon: <RemoveCircleIcon sx={{ fontSize: '11px !important' }} /> },
+  bad:          { color: 'error',   icon: <ThumbDownIcon    sx={{ fontSize: '11px !important' }} /> },
+};
+
+function CardRatingChip({
+  name, value, onChange,
+}: { name: string; value: CardRatingValue; onChange: (next: CardRatingValue) => void }) {
+  const handleClick = () => {
+    const idx = CARD_CYCLE.indexOf(value);
+    onChange(CARD_CYCLE[(idx + 1) % CARD_CYCLE.length]);
+  };
+  const state = value ? CARD_STATE[value] : null;
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-      <Typography
-        variant="body2"
-        sx={{
-          flex: 1,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          color: value === true ? 'success.main' : value === false ? 'error.main' : 'text.primary',
-          fontWeight: value != null ? 600 : 400,
-        }}
-      >
-        {name}
-      </Typography>
-      <Box sx={{ display: 'flex', flexShrink: 0 }}>
-        <Tooltip title="Relevant">
-          <IconButton size="small" aria-label="Relevant" sx={{ p: 0.25, opacity: value === true ? 1 : 0.35, '&:hover': { opacity: 1 } }} onClick={() => onRate(true)}>
-            <ThumbUpOutlinedIcon sx={{ fontSize: 13 }} />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Not relevant">
-          <IconButton size="small" aria-label="Not relevant" sx={{ p: 0.25, opacity: value === false ? 1 : 0.35, '&:hover': { opacity: 1 } }} onClick={() => onRate(false)}>
-            <ThumbDownOutlinedIcon sx={{ fontSize: 13 }} />
-          </IconButton>
-        </Tooltip>
-      </Box>
-    </Box>
+    <Chip
+      label={name}
+      icon={state?.icon}
+      size="small"
+      variant={state ? 'filled' : 'outlined'}
+      color={state?.color ?? 'default'}
+      onClick={handleClick}
+      sx={{
+        fontSize: '0.7rem',
+        height: 22,
+        cursor: 'pointer',
+        '& .MuiChip-icon': { ml: 0.5 },
+        transition: 'all 0.15s',
+      }}
+    />
   );
 }
 
@@ -84,15 +90,14 @@ export function MessageFeedback({ conversationId, messageId, messageSnippet, car
   const [notes, setNotes] = useState('');
   const [flagPattern, setFlagPattern] = useState(false);
 
-  // Per-card relevance: true = relevant, false = not relevant, undefined = unrated
-  const [cardRatings, setCardRatings] = useState<Record<string, boolean>>({});
+  const [cardRatings, setCardRatings] = useState<Record<string, CardRatingValue>>({});
 
   // Up-vote optional note
   const [upNotes, setUpNotes] = useState('');
 
-  const toggleCardRating = (name: string, value: boolean) => {
+  const setCardRating = (name: string, value: CardRatingValue) => {
     setCardRatings((prev) => {
-      if (prev[name] === value) {
+      if (!value) {
         const next = { ...prev };
         delete next[name];
         return next;
@@ -118,7 +123,10 @@ export function MessageFeedback({ conversationId, messageId, messageSnippet, car
   const submit = async () => {
     if (!rating || submitting) return;
     setSubmitting(true);
-    const ratedCards = Object.keys(cardRatings);
+    // Strip null entries so the payload only contains actual ratings
+    const cardFeedback = Object.fromEntries(
+      Object.entries(cardRatings).filter(([, v]) => v !== null)
+    ) as Record<string, 'good' | 'not_relevant' | 'bad'>;
     try {
       await rulesApi.submitMessageFeedback({
         conversation_id: conversationId,
@@ -131,7 +139,7 @@ export function MessageFeedback({ conversationId, messageId, messageSnippet, car
         off_topic: offTopic || undefined,
         hard_to_apply: hardToApply || undefined,
         cards_not_relevant: cardsNotRelevant || undefined,
-        card_feedback: ratedCards.length ? cardRatings : undefined,
+        card_feedback: Object.keys(cardFeedback).length ? cardFeedback : undefined,
         notes: notes || upNotes || undefined,
         flag_pattern: flagPattern || undefined,
       });
@@ -218,11 +226,11 @@ export function MessageFeedback({ conversationId, messageId, messageSnippet, car
                   </Typography>
                   <Stack spacing={0.25}>
                     {cards.map((name) => (
-                      <CardRatingRow
+                      <CardRatingChip
                         key={name}
                         name={name}
-                        value={cardRatings[name]}
-                        onRate={(v) => toggleCardRating(name, v)}
+                        value={cardRatings[name] ?? null}
+                        onChange={(v) => setCardRating(name, v)}
                       />
                     ))}
                   </Stack>
@@ -266,13 +274,13 @@ export function MessageFeedback({ conversationId, messageId, messageSnippet, car
                 <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 0.75 }}>
                   Were these example cards relevant?
                 </Typography>
-                <Stack spacing={0.25}>
+                <Stack direction="row" flexWrap="wrap" gap={0.75} useFlexGap>
                   {cards.map((name) => (
-                    <CardRatingRow
+                    <CardRatingChip
                       key={name}
                       name={name}
-                      value={cardRatings[name]}
-                      onRate={(v) => toggleCardRating(name, v)}
+                      value={cardRatings[name] ?? null}
+                      onChange={(v) => setCardRating(name, v)}
                     />
                   ))}
                 </Stack>
