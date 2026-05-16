@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import {
   Box, IconButton, Tooltip, Popover, Stack, Typography,
-  FormControlLabel, Checkbox, TextField, Button, Divider, Switch, Chip,
+  FormControlLabel, Checkbox, TextField, Button, Divider, Switch,
 } from '@mui/material';
 import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
 import ThumbDownOutlinedIcon from '@mui/icons-material/ThumbDownOutlined';
@@ -21,6 +21,40 @@ interface Props {
 }
 
 type Rating = 'up' | 'down' | null;
+
+function CardRatingRow({
+  name, value, onRate,
+}: { name: string; value: boolean | undefined; onRate: (v: boolean) => void }) {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+      <Typography
+        variant="body2"
+        sx={{
+          flex: 1,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          color: value === true ? 'success.main' : value === false ? 'error.main' : 'text.primary',
+          fontWeight: value != null ? 600 : 400,
+        }}
+      >
+        {name}
+      </Typography>
+      <Box sx={{ display: 'flex', flexShrink: 0 }}>
+        <Tooltip title="Relevant">
+          <IconButton size="small" aria-label="Relevant" sx={{ p: 0.25, opacity: value === true ? 1 : 0.35, '&:hover': { opacity: 1 } }} onClick={() => onRate(true)}>
+            <ThumbUpOutlinedIcon sx={{ fontSize: 13 }} />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Not relevant">
+          <IconButton size="small" aria-label="Not relevant" sx={{ p: 0.25, opacity: value === false ? 1 : 0.35, '&:hover': { opacity: 1 } }} onClick={() => onRate(false)}>
+            <ThumbDownOutlinedIcon sx={{ fontSize: 13 }} />
+          </IconButton>
+        </Tooltip>
+      </Box>
+    </Box>
+  );
+}
 
 function BoolField({
   label, checked, onChange,
@@ -182,31 +216,15 @@ export function MessageFeedback({ conversationId, messageId, messageSnippet, car
                   <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 0.75 }}>
                     Rate each example card
                   </Typography>
-                  <Stack direction="row" flexWrap="wrap" gap={0.75} useFlexGap>
-                    {cards.map((name) => {
-                      const rv = cardRatings[name];
-                      return (
-                        <Box key={name} sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-                          <Chip
-                            label={name}
-                            size="small"
-                            variant={rv === true ? 'filled' : 'outlined'}
-                            color={rv === true ? 'success' : rv === false ? 'error' : 'default'}
-                            sx={{ fontSize: '0.7rem', height: 22 }}
-                          />
-                          <Tooltip title="Relevant">
-                            <IconButton size="small" aria-label="Relevant" sx={{ p: 0.25, opacity: rv === true ? 1 : 0.4 }} onClick={() => toggleCardRating(name, true)}>
-                              <ThumbUpOutlinedIcon sx={{ fontSize: 11 }} />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Not relevant">
-                            <IconButton size="small" aria-label="Not relevant" sx={{ p: 0.25, opacity: rv === false ? 1 : 0.4 }} onClick={() => toggleCardRating(name, false)}>
-                              <ThumbDownOutlinedIcon sx={{ fontSize: 11 }} />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      );
-                    })}
+                  <Stack spacing={0.25}>
+                    {cards.map((name) => (
+                      <CardRatingRow
+                        key={name}
+                        name={name}
+                        value={cardRatings[name]}
+                        onRate={(v) => toggleCardRating(name, v)}
+                      />
+                    ))}
                   </Stack>
                 </Box>
               </>
@@ -248,31 +266,15 @@ export function MessageFeedback({ conversationId, messageId, messageSnippet, car
                 <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 0.75 }}>
                   Were these example cards relevant?
                 </Typography>
-                <Stack direction="row" flexWrap="wrap" gap={0.75} useFlexGap>
-                  {cards.map((name) => {
-                    const rv = cardRatings[name];
-                    return (
-                      <Box key={name} sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-                        <Chip
-                          label={name}
-                          size="small"
-                          variant={rv === true ? 'filled' : 'outlined'}
-                          color={rv === true ? 'success' : rv === false ? 'error' : 'default'}
-                          sx={{ fontSize: '0.7rem', height: 22 }}
-                        />
-                        <Tooltip title="Relevant">
-                          <IconButton size="small" sx={{ p: 0.25, opacity: rv === true ? 1 : 0.4 }} onClick={() => toggleCardRating(name, true)}>
-                            <ThumbUpOutlinedIcon sx={{ fontSize: 11 }} />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Not relevant">
-                          <IconButton size="small" sx={{ p: 0.25, opacity: rv === false ? 1 : 0.4 }} onClick={() => toggleCardRating(name, false)}>
-                            <ThumbDownOutlinedIcon sx={{ fontSize: 11 }} />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    );
-                  })}
+                <Stack spacing={0.25}>
+                  {cards.map((name) => (
+                    <CardRatingRow
+                      key={name}
+                      name={name}
+                      value={cardRatings[name]}
+                      onRate={(v) => toggleCardRating(name, v)}
+                    />
+                  ))}
                 </Stack>
               </Box>
             )}

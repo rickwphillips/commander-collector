@@ -24,6 +24,7 @@ import MenuBookIcon from '@mui/icons-material/MenuBook';
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import AddIcon from '@mui/icons-material/Add';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import CollectionsIcon from '@mui/icons-material/Collections';
 import { SettingsTab } from './components/SettingsTab';
@@ -185,29 +186,56 @@ export default function Dashboard() {
           </Alert>
         )}
 
-        {/* Quick Action */}
+        {/* Quick Actions */}
         <Fade in={mounted} timeout={1100}>
-          <Card
-            sx={{
-              mb: 4,
-              background: (theme) =>
-                theme.palette.mode === 'dark'
-                  ? 'linear-gradient(135deg, #FF8C0020 0%, #DAA52010 100%)'
-                  : 'linear-gradient(135deg, #D2691E10 0%, #8B451308 100%)',
-            }}
-          >
-            <CardActionArea component={Link} href="/games/new">
-              <CardContent sx={{ textAlign: 'center', py: 4 }}>
-                <AddIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
-                <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                  Log New Game
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Record the results of your latest Commander match
-                </Typography>
-              </CardContent>
-            </CardActionArea>
-          </Card>
+          <Grid container spacing={2} sx={{ mb: 4 }}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Card
+                sx={{
+                  height: '100%',
+                  background: (theme) =>
+                    theme.palette.mode === 'dark'
+                      ? 'linear-gradient(135deg, #FF8C0020 0%, #DAA52010 100%)'
+                      : 'linear-gradient(135deg, #D2691E10 0%, #8B451308 100%)',
+                }}
+              >
+                <CardActionArea component={Link} href="/game-manager" sx={{ height: '100%' }}>
+                  <CardContent sx={{ textAlign: 'center', py: 4 }}>
+                    <PlayArrowIcon sx={{ fontSize: 48, color: 'success.main', mb: 1 }} />
+                    <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                      Play New Game
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Launch the live game board and track a match in real time
+                    </Typography>
+                  </CardContent>
+                </CardActionArea>
+              </Card>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Card
+                sx={{
+                  height: '100%',
+                  background: (theme) =>
+                    theme.palette.mode === 'dark'
+                      ? 'linear-gradient(135deg, #DAA52020 0%, #CD853F10 100%)'
+                      : 'linear-gradient(135deg, #8B451310 0%, #D2691E08 100%)',
+                }}
+              >
+                <CardActionArea component={Link} href="/games/new" sx={{ height: '100%' }}>
+                  <CardContent sx={{ textAlign: 'center', py: 4 }}>
+                    <AddIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
+                    <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                      Log New Game
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Record the results of a completed Commander match
+                    </Typography>
+                  </CardContent>
+                </CardActionArea>
+              </Card>
+            </Grid>
+          </Grid>
         </Fade>
 
         {/* Navigation Cards */}
