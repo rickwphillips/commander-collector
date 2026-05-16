@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState, useCallback } from 'react';
+import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Alert,
@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import RestoreIcon from '@mui/icons-material/Restore';
 import LinkIcon from '@mui/icons-material/Link';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 
 import { PageContainer } from '@/components/PageContainer';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -20,6 +21,7 @@ import { ListEditor } from '@/components/cards/ListEditor';
 import { useList } from '@/lib/lists/useList';
 import { useConfirm } from '@/lib/useConfirm';
 import { api } from '@/lib/api';
+import { CoachChat, type CoachChatHandle } from '@/my-collection/CoachChat';
 
 // ── Inner component (uses useSearchParams) ────────────────────────────────────
 

@@ -12,6 +12,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SaveIcon from '@mui/icons-material/Save';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 import TableChartIcon from '@mui/icons-material/TableChart';
 
 export interface DeckActionsProps {
@@ -34,6 +35,8 @@ export interface DeckActionsProps {
   onImport?: () => void;
   /** Delete the deck */
   onDelete?: () => void;
+  /** Open the Coach to discuss this deck */
+  onDiscuss?: () => void;
   /** Attach this list to a deck */
   onAttach?: () => void;
 
@@ -53,7 +56,7 @@ export interface DeckActionsProps {
 export function DeckActions({
   onExport, onTTS, ttsBusy = false, decklistHref,
   onEdit, editLabel = 'Edit',
-  onRefresh, onDetach, onImport, onDelete, onAttach,
+  onRefresh, onDetach, onImport, onDelete, onAttach, onDiscuss,
   onCancel, onSaveAndContinue, onSave,
   hasCards = true, saving = false, refreshing = false,
 }: DeckActionsProps) {
@@ -126,6 +129,11 @@ export function DeckActions({
       {onAttach && (
         <Button variant="contained" startIcon={<LinkIcon />} onClick={onAttach} disabled={!hasCards}>
           Attach to Deck
+        </Button>
+      )}
+      {onDiscuss && (
+        <Button startIcon={<SmartToyIcon />} onClick={onDiscuss} sx={{ color: '#6B8E6B' }}>
+          Discuss
         </Button>
       )}
       {onDelete && (
