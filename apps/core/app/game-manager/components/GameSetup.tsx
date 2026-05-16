@@ -28,6 +28,8 @@ import WestIcon from '@mui/icons-material/West';
 import StyleIcon from '@mui/icons-material/Style';
 import ListSubheader from '@mui/material/ListSubheader';
 import { api } from '@/lib/api';
+import { BracketChip } from '@/components/BracketChip';
+import { BracketMismatchBanner } from '@/components/BracketMismatchBanner';
 import type { Player, DeckWithPlayer } from '@/lib/types';
 import { scryfallAutocomplete, scryfallGetCard, getCardArtCrop } from '@/lib/scryfall';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -499,6 +501,15 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
 
             {renderCommanderField(idx, 'commander', 'Commander')}
 
+            {slot.deckId && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <BracketChip
+                  deckId={slot.deckId}
+                  commander={slot.commander.name || undefined}
+                />
+              </Box>
+            )}
+
             <FormControlLabel
               control={
                 <Checkbox
@@ -611,6 +622,13 @@ export function GameSetup({ onStart, prefillPlayers }: GameSetupProps) {
         <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
           Players
         </Typography>
+        <BracketMismatchBanner
+          slots={slots.slice(0, playerCount).map((s, i) => ({
+            deckId: s.deckId || null,
+            commander: s.commander.name || null,
+            playerName: players.find((p) => p.id === s.playerId)?.name ?? `Player ${i + 1}`,
+          }))}
+        />
         {Array.from({ length: playerCount }, (_, i) => renderSlot(i))}
 
         {error && (
