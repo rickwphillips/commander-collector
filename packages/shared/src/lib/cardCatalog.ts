@@ -55,7 +55,10 @@ export function loadCardCatalog(url: string): Promise<Set<string> | null> {
  */
 export function isKnownCardName(text: string): boolean {
   if (!catalog || !text) return false;
-  return catalog.has(text.trim().toLowerCase());
+  // Normalize typographic apostrophes (U+2019 ' and U+02BC ʼ) to straight (U+0027 ')
+  // so LLM output like "Teferi’s Protection" matches the catalog entry.
+  const normalized = text.trim().toLowerCase().replace(/[’ʼ]/g, "'");
+  return catalog.has(normalized);
 }
 
 /** Exposed for testing / inspection. */
