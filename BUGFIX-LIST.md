@@ -16,6 +16,10 @@ Track bugs here. Fix them in dedicated sessions, not on the fly.
 
 ## Fixed (log for reference)
 
+- **Card lookup fails on apostrophe names (e.g. "Teferi's Protection"):** `isKnownCardName` did an exact Set lookup but LLM output uses curly/right apostrophe (U+2019) while the catalog stores straight apostrophes (U+0027). Fixed by normalizing U+2019 and U+02BC to U+0027 before lookup in `cardCatalog.ts`.
+- **MCP endpoint double `.php` extension:** `apiFetch` appends `.php` automatically, but new MCP proxy endpoints were passed with `.php` already in the path (e.g. `/rules/score-deck.php` → `score-deck.php.php`). Fixed by stripping `.php` from all six endpoint strings in `api.ts`.
+- **PHP dev server wrong working directory:** Local PHP server (port 8081) was started from the workspace root instead of `apps/core/app/`, causing all `/php-api/*` requests to 404. Fix: `kill <pid>` and restart from `apps/core/app/`.
+
 - **Nav guard (lists/decks):** Back buttons and in-page links guarded via `confirmLeaveIfDirty` + `onBackClick`. No unprotected escape routes exist (app has no persistent header nav).
 - **Playwright MCP tools not loading:** Moved config from project-level `.mcp.json` to global user config with `--headless` flag. Tools now surface as `mcp__playwright__*` on session start.
 
