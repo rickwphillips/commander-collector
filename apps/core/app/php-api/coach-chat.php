@@ -133,192 +133,34 @@ $playerId = $player ? (string)$player['id'] : '';
 if ($player) {
     $playerName = $player['name'];
 
-    // Decks with stats
+    // Deck index — minimal: id, name, commander, colors only.
+    // Stats are fetched on demand via get_deck_stats / get_player_stats.
     $stmt = $db->prepare("
-        SELECT d.id, d.name, d.commander, d.colors,
-            COUNT(gr.id) AS total_games,
-            COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) AS wins,
-            ROUND(COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 / NULLIF(COUNT(gr.id), 0), 1) AS win_rate,
-            ROUND(AVG(gr.finish_position), 2) AS avg_finish
+        SELECT d.id, d.name, d.commander, d.colors
         FROM decks d
-        LEFT JOIN game_results gr ON gr.deck_id = d.id
         WHERE d.player_id = ?
-        GROUP BY d.id ORDER BY total_games DESC
+        ORDER BY d.name ASC
     ");
     $stmt->execute([$playerId]);
     $decks = $stmt->fetchAll();
 
-    // Overall stats
-    $stmt = $db->prepare("
-        SELECT COUNT(DISTINCT gr.game_id) AS total_games,
-            COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) AS wins,
-            ROUND(COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 / NULLIF(COUNT(DISTINCT gr.game_id), 0), 1) AS win_rate,
-            ROUND(AVG(gr.finish_position), 2) AS avg_finish
-        FROM game_results gr WHERE gr.player_id = ?
-    ");
-    $stmt->execute([$playerId]);
-    $overall = $stmt->fetch();
-
-    // Nemeses (players)
-    $stmt = $db->prepare("
-        SELECT p2.name AS opponent,
-            COUNT(DISTINCT g.id) AS games,
-            SUM(CASE WHEN opp.finish_position = 1 THEN 1 ELSE 0 END) AS their_wins,
-            SUM(CASE WHEN my.finish_position = 1 THEN 1 ELSE 0 END) AS my_wins
-        FROM game_results my
-        JOIN games g ON g.id = my.game_id
-        JOIN game_results opp ON opp.game_id = g.id AND opp.player_id != ?
-        JOIN players p2 ON p2.id = opp.player_id
-        WHERE my.player_id = ?
-        GROUP BY p2.id HAVING games >= 2
-        ORDER BY their_wins DESC LIMIT 10
-    ");
-    $stmt->execute([$playerId, $playerId]);
-    $nemeses = $stmt->fetchAll();
-
-    // Nemesis commanders
-    $stmt = $db->prepare("
-        SELECT d2.commander,
-            COUNT(DISTINCT g.id) AS games,
-            SUM(CASE WHEN opp.finish_position = 1 THEN 1 ELSE 0 END) AS their_wins,
-            SUM(CASE WHEN my.finish_position = 1 THEN 1 ELSE 0 END) AS my_wins
-        FROM game_results my
-        JOIN games g ON g.id = my.game_id
-        JOIN game_results opp ON opp.game_id = g.id AND opp.player_id != ?
-        JOIN decks d2 ON d2.id = opp.deck_id
-        WHERE my.player_id = ?
-        GROUP BY d2.commander HAVING games >= 2
-        ORDER BY their_wins DESC LIMIT 10
-    ");
-    $stmt->execute([$playerId, $playerId]);
-    $nemesisCommanders = $stmt->fetchAll();
-
-    // Color performance
-    $stmt = $db->prepare("
-        SELECT d.colors,
-            COUNT(gr.id) AS total_games,
-            COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) AS wins,
-            ROUND(COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 / NULLIF(COUNT(gr.id), 0), 1) AS win_rate
-        FROM game_results gr JOIN decks d ON d.id = gr.deck_id
-        WHERE gr.player_id = ? GROUP BY d.colors ORDER BY total_games DESC
-    ");
-    $stmt->execute([$playerId]);
-    $colorStats = $stmt->fetchAll();
-
-    // Pod size performance
-    $stmt = $db->prepare("
-        SELECT pod.pod_size,
-            COUNT(*) AS total_games,
-            SUM(CASE WHEN gr.finish_position = 1 THEN 1 ELSE 0 END) AS wins,
-            ROUND(SUM(CASE WHEN gr.finish_position = 1 THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0), 1) AS win_rate
-        FROM game_results gr
-        JOIN (SELECT game_id, COUNT(*) AS pod_size FROM game_results GROUP BY game_id) pod ON pod.game_id = gr.game_id
-        WHERE gr.player_id = ? GROUP BY pod.pod_size ORDER BY pod.pod_size
-    ");
-    $stmt->execute([$playerId]);
-    $podStats = $stmt->fetchAll();
-
-    // Recent streaks
-    $stmt = $db->prepare("
-        SELECT gr.finish_position FROM game_results gr
-        JOIN games g ON g.id = gr.game_id
-        WHERE gr.player_id = ? ORDER BY g.played_at DESC, g.id DESC LIMIT 20
-    ");
-    $stmt->execute([$playerId]);
-    $recentResults = $stmt->fetchAll();
-
-    $currentStreak = 0;
-    $currentStreakType = null;
-    foreach ($recentResults as $r) {
-        $type = ((int)$r['finish_position'] === 1) ? 'win' : 'loss';
-        if ($currentStreakType === null) { $currentStreakType = $type; $currentStreak = 1; }
-        elseif ($currentStreakType === $type) { $currentStreak++; }
-        else { break; }
-    }
-
-    // Load existing coach notes for context
+    // Coach notes — persistent memory, always included.
     $stmt = $db->prepare("SELECT topic, observation, reasoning, updated_at FROM coach_notes WHERE player_id = ? ORDER BY updated_at DESC LIMIT 20");
     $stmt->execute([$playerId]);
     $existingNotes = $stmt->fetchAll();
 
-    // Load player's lists (names + card counts)
-    $stmt = $db->prepare("
-        SELECT l.id, l.name, l.description, l.updated_at, COALESCE(SUM(lc.quantity), 0) AS card_count
-        FROM lists l
-        LEFT JOIN list_cards lc ON lc.list_id = l.id
-        WHERE l.user_id = ?
-        GROUP BY l.id
-        ORDER BY l.updated_at DESC
-    ");
-    $stmt->execute([$userId]);
-    $playerLists = $stmt->fetchAll();
-
-    // Build data prompt
+    // Build minimal data prompt — deck index + notes only.
+    // Everything else (stats, nemeses, color/pod breakdowns, card lists) is
+    // fetched on demand via tools: get_player_stats, get_player_lists,
+    // get_deck_stats, lookup_decklist, search_deck_cards, etc.
     $playerDataPrompt = "\n\n---\n\n## Player Profile: {$playerName}\n\n";
-    $playerDataPrompt .= "**Overall:** {$overall['total_games']} games, {$overall['wins']} wins, {$overall['win_rate']}% win rate, avg finish: {$overall['avg_finish']}\n";
-    $playerDataPrompt .= "**Current streak:** {$currentStreak} {$currentStreakType}" . ($currentStreak > 1 ? 's' : '') . "\n\n";
-
-    // Get card counts for each deck via the main list
-    $cardCountStmt = $db->prepare(
-        "SELECT l.deck_id, COALESCE(SUM(lc.quantity), 0) AS cnt
-         FROM lists l
-         LEFT JOIN list_cards lc ON lc.list_id = l.id
-         WHERE l.deck_id IN (" . implode(',', array_map(fn($d) => $db->quote($d['id']), $decks)) . ")
-           AND l.role = 'main' AND l.deleted_at IS NULL
-         GROUP BY l.deck_id"
-    );
-    $cardCountStmt->execute();
-    $cardCounts = [];
-    while ($row = $cardCountStmt->fetch()) {
-        $cardCounts[$row['deck_id']] = (int)$row['cnt'];
-    }
 
     $playerDataPrompt .= "### Decks\n\n";
-    $playerDataPrompt .= "You can see deck names and stats below. Use `check_card_in_deck`, `search_deck_cards`, `get_deck_stats`, or `lookup_decklist` to query a deck's cards and history on demand — do not guess at contents.\n\n";
-    $playerDataPrompt .= "| deck_id | Deck | Commander | Colors | Cards | Games | Wins | Win Rate | Avg Finish |\n";
-    $playerDataPrompt .= "|---------|------|-----------|--------|-------|-------|------|----------|------------|\n";
+    $playerDataPrompt .= "Use `get_deck_stats` for per-deck records, `lookup_decklist` / `search_deck_cards` / `check_card_in_deck` for card data, and `get_player_stats` for overall record, nemeses, and color/pod breakdowns. Do not guess at deck contents — call a tool.\n\n";
+    $playerDataPrompt .= "| deck_id | Deck | Commander | Colors |\n";
+    $playerDataPrompt .= "|---------|------|-----------|--------|\n";
     foreach ($decks as $d) {
-        $cc = $cardCounts[(string)$d['id']] ?? 0;
-        $playerDataPrompt .= "| {$d['id']} | {$d['name']} | {$d['commander']} | {$d['colors']} | {$cc} | {$d['total_games']} | {$d['wins']} | {$d['win_rate']}% | {$d['avg_finish']} |\n";
-    }
-
-    $playerDataPrompt .= "\n### Player Matchups (Nemeses)\n\n";
-    $playerDataPrompt .= "| Opponent | Games Together | Their Wins | Your Wins |\n";
-    $playerDataPrompt .= "|----------|---------------|------------|----------|\n";
-    foreach ($nemeses as $n) {
-        $playerDataPrompt .= "| {$n['opponent']} | {$n['games']} | {$n['their_wins']} | {$n['my_wins']} |\n";
-    }
-
-    $playerDataPrompt .= "\n### Commander Nemeses (commanders that beat you)\n\n";
-    $playerDataPrompt .= "| Commander | Games Against | Their Wins | Your Wins |\n";
-    $playerDataPrompt .= "|-----------|--------------|------------|----------|\n";
-    foreach ($nemesisCommanders as $nc) {
-        $playerDataPrompt .= "| {$nc['commander']} | {$nc['games']} | {$nc['their_wins']} | {$nc['my_wins']} |\n";
-    }
-
-    $playerDataPrompt .= "\n### Color Identity Performance\n\n";
-    $playerDataPrompt .= "| Colors | Games | Wins | Win Rate |\n";
-    $playerDataPrompt .= "|--------|-------|------|----------|\n";
-    foreach ($colorStats as $cs) {
-        $playerDataPrompt .= "| {$cs['colors']} | {$cs['total_games']} | {$cs['wins']} | {$cs['win_rate']}% |\n";
-    }
-
-    $playerDataPrompt .= "\n### Pod Size Performance\n\n";
-    $playerDataPrompt .= "| Pod Size | Games | Wins | Win Rate |\n";
-    $playerDataPrompt .= "|----------|-------|------|----------|\n";
-    foreach ($podStats as $ps) {
-        $playerDataPrompt .= "| {$ps['pod_size']}-player | {$ps['total_games']} | {$ps['wins']} | {$ps['win_rate']}% |\n";
-    }
-
-    if (!empty($playerLists)) {
-        $playerDataPrompt .= "\n### Card Lists\n\n";
-        $playerDataPrompt .= "Standalone card collections (separate from decks). The player can ask you to create new lists — use `create_list` only when explicitly requested.\n\n";
-        $playerDataPrompt .= "| list_id | Name | Cards | Description | Updated |\n";
-        $playerDataPrompt .= "|---------|------|-------|-------------|--------|\n";
-        foreach ($playerLists as $l) {
-            $desc = $l['description'] ? substr($l['description'], 0, 50) : '—';
-            $playerDataPrompt .= "| {$l['id']} | {$l['name']} | {$l['card_count']} | {$desc} | {$l['updated_at']} |\n";
-        }
+        $playerDataPrompt .= "| {$d['id']} | {$d['name']} | {$d['commander']} | {$d['colors']} |\n";
     }
 
     if (!empty($existingNotes)) {
@@ -633,8 +475,8 @@ $tools = [
             'type'       => 'object',
             'properties' => [
                 'deck_id' => [
-                    'type'        => 'integer',
-                    'description' => 'The deck ID from the player\'s deck list',
+                    'type'        => 'string',
+                    'description' => 'The deck ID (UUID) from the player\'s deck list',
                 ],
             ],
             'required' => ['deck_id'],
@@ -660,7 +502,7 @@ $tools = [
         'input_schema' => [
             'type'       => 'object',
             'properties' => [
-                'deck_id'   => ['type' => 'integer', 'description' => 'The deck ID'],
+                'deck_id'   => ['type' => 'string', 'description' => 'The deck ID (UUID)'],
                 'card_name' => ['type' => 'string',  'description' => 'Card name to search for (partial match supported)'],
             ],
             'required' => ['deck_id', 'card_name'],
@@ -685,7 +527,7 @@ $tools = [
         'input_schema' => [
             'type'       => 'object',
             'properties' => [
-                'deck_id' => ['type' => 'integer', 'description' => 'The deck ID'],
+                'deck_id' => ['type' => 'string', 'description' => 'The deck ID (UUID)'],
             ],
             'required' => ['deck_id'],
         ],
@@ -827,13 +669,31 @@ $tools = [
         ],
     ],
     [
+        'name'        => 'get_player_stats',
+        'description' => 'Fetch overall player stats: total games, win rate, avg finish, current streak, nemesis players, nemesis commanders, color identity breakdown, and pod size breakdown. Call this when you need aggregate performance data rather than per-deck details.',
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => new stdClass(),
+            'required'   => [],
+        ],
+    ],
+    [
+        'name'        => 'get_player_lists',
+        'description' => 'Fetch the index of standalone card lists belonging to this player (list_id, name, card count, description). Use get_list_cards to retrieve the actual cards for a specific list.',
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => new stdClass(),
+            'required'   => [],
+        ],
+    ],
+    [
         'name'        => 'get_game_notes',
         'description' => 'Fetch the notes field from saved games involving this player. Returns games that have non-empty notes, with the deck used and finish position. Use this to recall what happened in specific games or sessions.',
         'input_schema' => [
             'type'       => 'object',
             'properties' => [
                 'limit'   => ['type' => 'integer', 'description' => 'Max number of games to return (default 10, max 30)'],
-                'deck_id' => ['type' => 'integer', 'description' => 'Filter to a specific deck (optional)'],
+                'deck_id' => ['type' => 'string', 'description' => 'Filter to a specific deck UUID (optional)'],
             ],
             'required' => [],
         ],
@@ -845,7 +705,7 @@ $tools = [
             'type'       => 'object',
             'properties' => [
                 'limit'     => ['type' => 'integer', 'description' => 'Number of games to return (default 30, max 100)'],
-                'deck_id'   => ['type' => 'integer', 'description' => 'Filter to a specific deck (optional)'],
+                'deck_id'   => ['type' => 'string', 'description' => 'Filter to a specific deck UUID (optional)'],
                 'date_from' => ['type' => 'string',  'description' => 'Start date filter YYYY-MM-DD (optional)'],
                 'date_to'   => ['type' => 'string',  'description' => 'End date filter YYYY-MM-DD (optional)'],
             ],
@@ -1320,6 +1180,107 @@ function executeTool(string $name, array $input): string {
             $db->rollBack();
             return json_encode(['error' => 'Failed to create list: ' . $e->getMessage()]);
         }
+    }
+
+    if ($name === 'get_player_stats') {
+        global $db, $playerId;
+
+        $overall = $db->prepare("
+            SELECT COUNT(DISTINCT gr.game_id) AS total_games,
+                COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) AS wins,
+                ROUND(COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 / NULLIF(COUNT(DISTINCT gr.game_id), 0), 1) AS win_rate,
+                ROUND(AVG(gr.finish_position), 2) AS avg_finish
+            FROM game_results gr WHERE gr.player_id = ?
+        ");
+        $overall->execute([$playerId]);
+        $overallRow = $overall->fetch();
+
+        $recentStmt = $db->prepare("
+            SELECT gr.finish_position FROM game_results gr
+            JOIN games g ON g.id = gr.game_id
+            WHERE gr.player_id = ? ORDER BY g.played_at DESC, g.id DESC LIMIT 20
+        ");
+        $recentStmt->execute([$playerId]);
+        $recentResults = $recentStmt->fetchAll();
+        $streak = 0; $streakType = null;
+        foreach ($recentResults as $r) {
+            $t = ((int)$r['finish_position'] === 1) ? 'win' : 'loss';
+            if ($streakType === null) { $streakType = $t; $streak = 1; }
+            elseif ($streakType === $t) { $streak++; }
+            else { break; }
+        }
+
+        $nemStmt = $db->prepare("
+            SELECT p2.name AS opponent, COUNT(DISTINCT g.id) AS games,
+                SUM(CASE WHEN opp.finish_position = 1 THEN 1 ELSE 0 END) AS their_wins,
+                SUM(CASE WHEN my.finish_position = 1 THEN 1 ELSE 0 END) AS my_wins
+            FROM game_results my
+            JOIN games g ON g.id = my.game_id
+            JOIN game_results opp ON opp.game_id = g.id AND opp.player_id != ?
+            JOIN players p2 ON p2.id = opp.player_id
+            WHERE my.player_id = ?
+            GROUP BY p2.id HAVING games >= 2
+            ORDER BY their_wins DESC LIMIT 10
+        ");
+        $nemStmt->execute([$playerId, $playerId]);
+
+        $nemCmdStmt = $db->prepare("
+            SELECT d2.commander, COUNT(DISTINCT g.id) AS games,
+                SUM(CASE WHEN opp.finish_position = 1 THEN 1 ELSE 0 END) AS their_wins,
+                SUM(CASE WHEN my.finish_position = 1 THEN 1 ELSE 0 END) AS my_wins
+            FROM game_results my
+            JOIN games g ON g.id = my.game_id
+            JOIN game_results opp ON opp.game_id = g.id AND opp.player_id != ?
+            JOIN decks d2 ON d2.id = opp.deck_id
+            WHERE my.player_id = ?
+            GROUP BY d2.commander HAVING games >= 2
+            ORDER BY their_wins DESC LIMIT 10
+        ");
+        $nemCmdStmt->execute([$playerId, $playerId]);
+
+        $colorStmt = $db->prepare("
+            SELECT d.colors, COUNT(gr.id) AS total_games,
+                COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) AS wins,
+                ROUND(COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 / NULLIF(COUNT(gr.id), 0), 1) AS win_rate
+            FROM game_results gr JOIN decks d ON d.id = gr.deck_id
+            WHERE gr.player_id = ? GROUP BY d.colors ORDER BY total_games DESC
+        ");
+        $colorStmt->execute([$playerId]);
+
+        $podStmt = $db->prepare("
+            SELECT pod.pod_size, COUNT(*) AS total_games,
+                SUM(CASE WHEN gr.finish_position = 1 THEN 1 ELSE 0 END) AS wins,
+                ROUND(SUM(CASE WHEN gr.finish_position = 1 THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0), 1) AS win_rate
+            FROM game_results gr
+            JOIN (SELECT game_id, COUNT(*) AS pod_size FROM game_results GROUP BY game_id) pod ON pod.game_id = gr.game_id
+            WHERE gr.player_id = ? GROUP BY pod.pod_size ORDER BY pod.pod_size
+        ");
+        $podStmt->execute([$playerId]);
+
+        return json_encode([
+            'overall'             => $overallRow,
+            'streak'              => ['count' => $streak, 'type' => $streakType],
+            'nemesis_players'     => $nemStmt->fetchAll(),
+            'nemesis_commanders'  => $nemCmdStmt->fetchAll(),
+            'color_performance'   => $colorStmt->fetchAll(),
+            'pod_size_performance'=> $podStmt->fetchAll(),
+        ]);
+    }
+
+    if ($name === 'get_player_lists') {
+        global $db, $userId;
+        $stmt = $db->prepare("
+            SELECT l.id, l.name, l.description, l.updated_at,
+                COALESCE(SUM(lc.quantity), 0) AS card_count
+            FROM lists l
+            LEFT JOIN list_cards lc ON lc.list_id = l.id
+            WHERE l.user_id = ? AND l.deck_id IS NULL
+            GROUP BY l.id
+            ORDER BY l.updated_at DESC
+        ");
+        $stmt->execute([$userId]);
+        $lists = $stmt->fetchAll();
+        return json_encode(['lists' => $lists, 'count' => count($lists)]);
     }
 
     if ($name === 'get_game_notes') {
