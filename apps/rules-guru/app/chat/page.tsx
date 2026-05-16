@@ -47,11 +47,11 @@ import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import { RuleTooltip } from '@commander/shared/components/RuleTooltip';
 import { PatternTooltip } from '@commander/shared/components/PatternTooltip';
 import {
-  looksLikeCardName,
   looksLikeCRReference,
   looksLikePNumber,
   parseCardManifest,
 } from '@commander/shared/components/cardNameUtils';
+import { loadCardCatalog, isKnownCardName } from '@commander/shared/lib/cardCatalog';
 import type { ActiveGameContext, RulesConversation, RulesMessage, RulesPattern } from '../lib/types';
 
 // ── Local message type (includes pending_pattern for new messages) ──────────
@@ -129,7 +129,7 @@ const mdComponents = {
       );
     }
 
-    if (looksLikeCardName(text)) {
+    if (isKnownCardName(text)) {
       return (
         <CardTooltip name={text} style={{ borderBottom: '1px dotted currentColor' }}>
           <strong>{children}</strong>
@@ -427,6 +427,13 @@ export default function ChatPage() {
 
   // Load conversations, patterns, and active game on mount
   useEffect(() => {
+    // Warm the card-name catalog so isKnownCardName() returns true matches.
+    // basePath is empty in dev and /app/projects/commander/rules in prod;
+    // the public asset is served under whichever applies.
+    const basePath = process.env.NODE_ENV === 'development'
+      ? ''
+      : '/app/projects/commander/rules';
+    loadCardCatalog(`${basePath}/card-names.json`);
     rulesApi.getConversations().then(r => setConversations(r.conversations)).catch(() => {});
     rulesApi.getPatterns()
       .then(r => {
