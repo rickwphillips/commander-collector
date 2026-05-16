@@ -131,12 +131,12 @@ export function MessageFeedback({ conversationId, messageId, messageSnippet, car
   return (
     <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25 }}>
       <Tooltip title="Helpful">
-        <IconButton size="small" onClick={handleThumbUp} sx={{ opacity: 0.5, '&:hover': { opacity: 1 } }}>
+        <IconButton size="small" aria-label="Helpful" onClick={handleThumbUp} sx={{ opacity: 0.5, '&:hover': { opacity: 1 } }}>
           <ThumbUpOutlinedIcon sx={{ fontSize: 14 }} />
         </IconButton>
       </Tooltip>
       <Tooltip title="Not helpful">
-        <IconButton size="small" onClick={handleThumbDown} sx={{ opacity: 0.5, '&:hover': { opacity: 1 } }}>
+        <IconButton size="small" aria-label="Not helpful" onClick={handleThumbDown} sx={{ opacity: 0.5, '&:hover': { opacity: 1 } }}>
           <ThumbDownOutlinedIcon sx={{ fontSize: 14 }} />
         </IconButton>
       </Tooltip>
@@ -195,12 +195,12 @@ export function MessageFeedback({ conversationId, messageId, messageSnippet, car
                             sx={{ fontSize: '0.7rem', height: 22 }}
                           />
                           <Tooltip title="Relevant">
-                            <IconButton size="small" sx={{ p: 0.25, opacity: rv === true ? 1 : 0.4 }} onClick={() => toggleCardRating(name, true)}>
+                            <IconButton size="small" aria-label="Relevant" sx={{ p: 0.25, opacity: rv === true ? 1 : 0.4 }} onClick={() => toggleCardRating(name, true)}>
                               <ThumbUpOutlinedIcon sx={{ fontSize: 11 }} />
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="Not relevant">
-                            <IconButton size="small" sx={{ p: 0.25, opacity: rv === false ? 1 : 0.4 }} onClick={() => toggleCardRating(name, false)}>
+                            <IconButton size="small" aria-label="Not relevant" sx={{ p: 0.25, opacity: rv === false ? 1 : 0.4 }} onClick={() => toggleCardRating(name, false)}>
                               <ThumbDownOutlinedIcon sx={{ fontSize: 11 }} />
                             </IconButton>
                           </Tooltip>
