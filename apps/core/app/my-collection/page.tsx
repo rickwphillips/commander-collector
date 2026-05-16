@@ -555,7 +555,13 @@ export default function MyCollectionPage() {
       </Accordion>
 
       {/* Coach Chat — side drawer with FAB toggle */}
-      <GuruChat ref={coachRef} notes={coachNotes} open={coachOpen} onToggle={setCoachOpen} />
+      <GuruChat
+        ref={coachRef}
+        notes={coachNotes}
+        open={coachOpen}
+        onToggle={setCoachOpen}
+        autoGreet="Give me a coaching overview based on my recent performance — what patterns do you see, what should I focus on, and which deck deserves the most attention right now?"
+      />
 
       <Snackbar
         open={refreshed}
