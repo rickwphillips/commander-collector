@@ -25,6 +25,7 @@ import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import AddIcon from '@mui/icons-material/Add';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import RestoreIcon from '@mui/icons-material/Restore';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import CollectionsIcon from '@mui/icons-material/Collections';
 import { SettingsTab } from './components/SettingsTab';
@@ -34,7 +35,7 @@ import { LoadingSpinner } from './components/LoadingSpinner';
 import { useAuth } from './components/AuthGuard';
 import { api } from './lib/api';
 import { APP_VERSION } from './lib/version';
-import type { StatsResponse, RecentGame } from './lib/types';
+import type { StatsResponse, RecentGame, GameManagerState } from './lib/types';
 import styles from './page.module.scss';
 
 const navItems = [
@@ -103,10 +104,12 @@ export default function Dashboard() {
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeGame, setActiveGame] = useState<GameManagerState | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 0);
     fetchStats();
+    fetchActiveGame();
     return () => clearTimeout(timer);
   }, []);
 
@@ -118,6 +121,15 @@ export default function Dashboard() {
       setError('Unable to load stats. Make sure the database is set up.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchActiveGame = async () => {
+    try {
+      const data = await api.getActiveGame();
+      if (data.is_active && data.state) setActiveGame(data.state);
+    } catch {
+      // silently ignore — just show Play New Game
     }
   };
 
@@ -194,20 +206,41 @@ export default function Dashboard() {
                 sx={{
                   height: '100%',
                   background: (theme) =>
-                    theme.palette.mode === 'dark'
-                      ? 'linear-gradient(135deg, #FF8C0020 0%, #DAA52010 100%)'
-                      : 'linear-gradient(135deg, #D2691E10 0%, #8B451308 100%)',
+                    activeGame
+                      ? theme.palette.mode === 'dark'
+                        ? 'linear-gradient(135deg, #6B8E6B30 0%, #4A7A4A15 100%)'
+                        : 'linear-gradient(135deg, #6B8E6B15 0%, #4A7A4A08 100%)'
+                      : theme.palette.mode === 'dark'
+                        ? 'linear-gradient(135deg, #FF8C0020 0%, #DAA52010 100%)'
+                        : 'linear-gradient(135deg, #D2691E10 0%, #8B451308 100%)',
                 }}
               >
                 <CardActionArea component={Link} href="/game-manager" sx={{ height: '100%' }}>
                   <CardContent sx={{ textAlign: 'center', py: 4 }}>
-                    <PlayArrowIcon sx={{ fontSize: 48, color: 'success.main', mb: 1 }} />
-                    <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                      Play New Game
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Launch the live game board and track a match in real time
-                    </Typography>
+                    {activeGame ? (
+                      <>
+                        <RestoreIcon sx={{ fontSize: 48, color: 'success.main', mb: 1 }} />
+                        <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                          Resume Game
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                          Turn {activeGame.turnNumber} · {activeGame.players.length} players
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                          {activeGame.players.map(p => p.commander?.name ?? p.playerName).join(' · ')}
+                        </Typography>
+                      </>
+                    ) : (
+                      <>
+                        <PlayArrowIcon sx={{ fontSize: 48, color: 'success.main', mb: 1 }} />
+                        <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                          Play New Game
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Launch the live game board and track a match in real time
+                        </Typography>
+                      </>
+                    )}
                   </CardContent>
                 </CardActionArea>
               </Card>
