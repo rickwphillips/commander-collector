@@ -551,6 +551,11 @@ export default function ChatPage() {
   const handleSend = async (raw: string) => {
     if (!raw || loading) return;
 
+    // Cancel any in-flight request before starting a new one
+    abortRef.current?.();
+    const ctrl = new AbortController();
+    abortRef.current = () => ctrl.abort();
+
     // Resolve #P### refs so Claude sees the pattern name inline
     const resolved = resolvePatternRefs(raw, patterns);
 
@@ -603,7 +608,7 @@ export default function ChatPage() {
           conversation_id: conversationId ?? undefined,
           new_conversation_title: !conversationId ? raw.slice(0, 80) : undefined,
           game_context: contextWithTimer,
-        });
+        }, ctrl.signal);
         lastErr = null;
         break; // success
       } catch (err) {
@@ -647,9 +652,12 @@ export default function ChatPage() {
       // Keep the user's question visible so they can retry without retyping
     }
 
-    setLoading(false);
-    if (isEmbedded) window.parent.postMessage({ type: 'rules_loading', value: false }, '*');
-    chatInputRef.current?.focus();
+    if (!ctrl.signal.aborted) {
+      setLoading(false);
+      abortRef.current = null;
+      if (isEmbedded) window.parent.postMessage({ type: 'rules_loading', value: false }, '*');
+      chatInputRef.current?.focus();
+    }
   };
 
 

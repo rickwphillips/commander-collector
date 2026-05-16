@@ -134,24 +134,31 @@ export const rulesApi = {
   },
 
   // Chat — async: POST submits, then SSE stream delivers the result
-  sendMessage: async (payload: {
-    message: string;
-    conversation_id?: number;
-    new_conversation_title?: string;
-    game_context?: ActiveGameContext | null;
-  }): Promise<ChatResponse> => {
+  sendMessage: async (
+    payload: {
+      message: string;
+      conversation_id?: number;
+      new_conversation_title?: string;
+      game_context?: ActiveGameContext | null;
+    },
+    signal?: AbortSignal,
+  ): Promise<ChatResponse> => {
     // Step 1: submit — returns { status: 'processing', conversation_id, user_message_id }
     const submit = await apiFetch<ChatProcessingResponse>('/rules/chat.php', {
       method: 'POST',
       body: JSON.stringify(payload),
+      signal,
     });
 
     // Step 2: open SSE stream — server pushes one 'complete' event when ready
     return new Promise<ChatResponse>((resolve, reject) => {
+      if (signal?.aborted) { reject(new DOMException('Aborted', 'AbortError')); return; }
+
       const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
       const url = `${API_BASE}/rules/chat-stream.php?id=${submit.user_message_id}`;
 
       fetch(url, {
+        signal,
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
