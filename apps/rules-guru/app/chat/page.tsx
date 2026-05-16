@@ -778,7 +778,7 @@ export default function ChatPage() {
         elevation={1}
         sx={{
           p: 1.5,
-          maxWidth: '80%',
+          maxWidth: sessionFeedbackOpen ? '100%' : '80%',
           bgcolor: msg.role === 'user' ? 'primary.main' : 'background.paper',
           color: msg.role === 'user' ? 'primary.contrastText' : 'text.primary',
           borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
