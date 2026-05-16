@@ -46,6 +46,7 @@ import RateReviewIcon from '@mui/icons-material/RateReview';
 import { rulesApi } from '../lib/api';
 import { MessageFeedback } from '../components/MessageFeedback';
 import { SessionFeedbackDrawer } from '../components/SessionFeedbackDrawer';
+import { RateableCardChip } from '../components/RateableCardChip';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import { RuleTooltip } from '@commander/shared/components/RuleTooltip';
 import { PatternTooltip } from '@commander/shared/components/PatternTooltip';
@@ -799,18 +800,16 @@ export default function ChatPage() {
               }}>
                 <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{cleaned}</ReactMarkdown>
               </Box>
-              {/* Card chip bar */}
+              {/* Card chip bar — with inline relevance rating */}
               {cards.length > 0 && (
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
                   {cards.map(name => (
-                    <CardTooltip key={name} name={name}>
-                      <Chip
-                        label={name}
-                        size="small"
-                        variant="outlined"
-                        sx={{ fontSize: '0.7rem', height: 20, cursor: 'default', '& .MuiChip-label': { px: 0.75 } }}
-                      />
-                    </CardTooltip>
+                    <RateableCardChip
+                      key={name}
+                      name={name}
+                      conversationId={conversationId ?? 0}
+                      messageId={msg.id}
+                    />
                   ))}
                 </Box>
               )}
