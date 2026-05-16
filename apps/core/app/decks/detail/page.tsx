@@ -28,6 +28,7 @@ import Link from 'next/link';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import { DeckActions } from '@/components/DeckActions';
 import { PageContainer } from '@/components/PageContainer';
+import { CoachChat, type CoachChatHandle } from '@/my-collection/CoachChat';
 import { StatsCard } from '@/components/StatsCard';
 import { ColorIdentityChips } from '@/components/ColorIdentityChips';
 import { ManaSymbol } from '@/components/ManaSymbol';
@@ -74,6 +75,10 @@ export default function DeckDetailPage() {
   // TTS export
   const [ttsBusy, setTtsBusy] = useState(false);
 
+  // Discuss Deck coach
+  const [coachOpen, setCoachOpen] = useState(false);
+  const coachRef = useRef<CoachChatHandle>(null);
+
   const fetchData = useCallback(async () => {
     try {
       const [deckData, gamesData, cardsData] = await Promise.all([
@@ -83,6 +88,13 @@ export default function DeckDetailPage() {
       ]);
       setDeckCards(cardsData);
       setDeck(deckData);
+      coachRef.current?.setActiveDeck({
+        deckId: deckData.id,
+        deckName: deckData.name,
+        cardCount: cardsData.length,
+        commander: deckData.commander ?? '',
+        colors: deckData.colors ?? '',
+      });
       setEditName(deckData.name);
       setEditCommander(deckData.commander);
       setEditColors(deckData.colors ? deckData.colors.split('') : []);
@@ -255,6 +267,7 @@ export default function DeckDetailPage() {
           decklistHref={`/decks/decklist?id=${encodeURIComponent(deckId)}`}
           onEdit={handleEdit}
           onDelete={() => setDeleteDialogOpen(true)}
+          onDiscuss={() => setCoachOpen(true)}
           hasCards={deckCards.length > 0}
         />
       }
@@ -533,6 +546,13 @@ export default function DeckDetailPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <CoachChat
+        ref={coachRef}
+        notes={[]}
+        open={coachOpen}
+        onToggle={setCoachOpen}
+      />
     </PageContainer>
   );
 }
