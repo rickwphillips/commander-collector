@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import type { PlayerState, CommanderDamageMap, GameManagerPrefill } from '../types';
 import { GAME_MANAGER_PREFILL_KEY } from '../types';
+import { BracketChip } from '@/components/BracketChip';
 
 interface GameEndSummaryProps {
   players: PlayerState[];
@@ -98,9 +99,16 @@ export function GameEndSummary({
                   <Stack spacing={1.5}>
                     <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                       <Box>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                          {player.playerName}
-                        </Typography>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                            {player.playerName}
+                          </Typography>
+                          <BracketChip
+                            deckId={player.deckId}
+                            commander={player.commander.name}
+                            size="small"
+                          />
+                        </Stack>
                         <Typography variant="caption" color="text.secondary">
                           {player.deckName} · {player.commander.name}
                           {player.partner ? ` / ${player.partner.name}` : ''}
