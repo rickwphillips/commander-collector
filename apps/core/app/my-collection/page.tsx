@@ -45,8 +45,8 @@ import { CardListDisplay } from '@/components/CardListDisplay';
 import type { CardListEntry } from '@/components/CardListDisplay';
 import { api } from '@/lib/api';
 import type { MyCollectionResponse } from '@/lib/types';
-import { CoachChat, COACH_DRAWER_WIDTH } from './CoachChat';
-import type { CoachChatHandle, ActiveListContext } from './CoachChat';
+import { GuruChat, GURU_DRAWER_WIDTH } from '@/components/GuruChat';
+import type { GuruChatHandle, ActiveListContext } from '@/components/GuruChat';
 
 export default function MyCollectionPage() {
   const theme = useTheme();
@@ -59,7 +59,7 @@ export default function MyCollectionPage() {
   const [expandedDeckId, setExpandedDeckId] = useState<string | null>(null);
   const [expandedListId, setExpandedListId] = useState<string | null>(null);
   const [refreshed, setRefreshed] = useState(false);
-  const coachRef = useRef<CoachChatHandle>(null);
+  const coachRef = useRef<GuruChatHandle>(null);
 
   // Collapse other section when one expands
   const handleDeckToggle = useCallback((id: string | null) => {
@@ -113,7 +113,7 @@ export default function MyCollectionPage() {
         easing: theme.transitions.easing.easeOut,
         duration: theme.transitions.duration.enteringScreen,
       }),
-      marginRight: `${COACH_DRAWER_WIDTH}px`,
+      marginRight: `${GURU_DRAWER_WIDTH}px`,
     }),
   };
 
@@ -123,7 +123,7 @@ export default function MyCollectionPage() {
         <PageContainer title="My Collection">
           <LoadingSpinner message="Loading your collection..." />
         </PageContainer>
-        <CoachChat ref={coachRef} notes={[]} open={coachOpen} onToggle={setCoachOpen} />
+        <GuruChat ref={coachRef} notes={[]} open={coachOpen} onToggle={setCoachOpen} />
       </Box>
     );
   }
@@ -134,7 +134,7 @@ export default function MyCollectionPage() {
         <PageContainer title="My Collection">
           <Alert severity="error">{error || 'Failed to load data.'}</Alert>
         </PageContainer>
-        <CoachChat ref={coachRef} notes={[]} open={coachOpen} onToggle={setCoachOpen} />
+        <GuruChat ref={coachRef} notes={[]} open={coachOpen} onToggle={setCoachOpen} />
       </Box>
     );
   }
@@ -148,7 +148,7 @@ export default function MyCollectionPage() {
             account to see your collection.
           </Alert>
         </PageContainer>
-        <CoachChat ref={coachRef} notes={[]} open={coachOpen} onToggle={setCoachOpen} />
+        <GuruChat ref={coachRef} notes={[]} open={coachOpen} onToggle={setCoachOpen} />
       </Box>
     );
   }
@@ -555,7 +555,7 @@ export default function MyCollectionPage() {
       </Accordion>
 
       {/* Coach Chat — side drawer with FAB toggle */}
-      <CoachChat ref={coachRef} notes={coachNotes} open={coachOpen} onToggle={setCoachOpen} />
+      <GuruChat ref={coachRef} notes={coachNotes} open={coachOpen} onToggle={setCoachOpen} />
 
       <Snackbar
         open={refreshed}
@@ -617,7 +617,7 @@ function DeckRow({
   expanded: boolean;
   onToggle: (id: string | null) => void;
   onCardClick: (name: string) => void;
-  coachRef: React.RefObject<CoachChatHandle | null>;
+  coachRef: React.RefObject<GuruChatHandle | null>;
 }) {
   const [profile, setProfile] = useState<import('@/lib/types').DeckProfile | null>(null);
   const [loadingCards, setLoadingCards] = useState(false);
@@ -738,7 +738,7 @@ function ListRow({
   expanded: boolean;
   onToggle: (id: string | null) => void;
   onCardClick: (name: string) => void;
-  coachRef: React.RefObject<CoachChatHandle | null>;
+  coachRef: React.RefObject<GuruChatHandle | null>;
 }) {
   const [cards, setCards] = useState<ExpandableCard[] | null>(null);
   const [loadingCards, setLoadingCards] = useState(false);

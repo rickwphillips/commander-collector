@@ -28,7 +28,7 @@ import Link from 'next/link';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import { DeckActions } from '@/components/DeckActions';
 import { PageContainer } from '@/components/PageContainer';
-import { CoachChat, type CoachChatHandle } from '@/my-collection/CoachChat';
+import { GuruChat, type GuruChatHandle } from '@/components/GuruChat';
 import { StatsCard } from '@/components/StatsCard';
 import { ColorIdentityChips } from '@/components/ColorIdentityChips';
 import { ManaSymbol } from '@/components/ManaSymbol';
@@ -77,7 +77,7 @@ export default function DeckDetailPage() {
 
   // Discuss Deck coach
   const [coachOpen, setCoachOpen] = useState(false);
-  const coachRef = useRef<CoachChatHandle>(null);
+  const coachRef = useRef<GuruChatHandle>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -547,11 +547,12 @@ export default function DeckDetailPage() {
         </DialogActions>
       </Dialog>
 
-      <CoachChat
+      <GuruChat
         ref={coachRef}
         notes={[]}
         open={coachOpen}
         onToggle={setCoachOpen}
+        autoGreet={deck ? `I want to discuss my ${deck.name} deck (commander: ${deck.commander}). Give me a focused overview — key synergies, win conditions, and anything you'd flag as a weakness.` : undefined}
       />
     </PageContainer>
   );
