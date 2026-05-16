@@ -42,7 +42,10 @@ import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import NoteAddIcon from '@mui/icons-material/NoteAdd';
 import CheckIcon from '@mui/icons-material/Check';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import { rulesApi } from '../lib/api';
+import { MessageFeedback } from '../components/MessageFeedback';
+import { SessionFeedbackDrawer } from '../components/SessionFeedbackDrawer';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import { RuleTooltip } from '@commander/shared/components/RuleTooltip';
 import { PatternTooltip } from '@commander/shared/components/PatternTooltip';
@@ -71,6 +74,39 @@ function resolvePatternRefs(text: string, patterns: RulesPattern[]): string {
     const p = patterns.find(x => x.pattern_id.toLowerCase() === id.toLowerCase());
     return p ? `#${p.pattern_id.toUpperCase()} (${p.name})` : match;
   });
+}
+
+// ── Fallback suggestion pool — shuffled each mount so suggestions vary ────────
+const FALLBACK_QUESTIONS = [
+  'Does deathtouch work with trample?',
+  'Can I respond to a mana ability?',
+  'How does the legend rule work?',
+  'What is the layer system?',
+  'How does first strike interact with deathtouch?',
+  'What are state-based actions and when do they apply?',
+  'How does commander damage work across multiple combats?',
+  'When can I cast instants during the combat phase?',
+  'How does proliferate interact with planeswalkers?',
+  'What is the difference between "destroy" and "exile"?',
+  'How does the stack resolve with multiple triggered abilities?',
+  'What does protection from a color actually prevent?',
+  'How does split second affect priority?',
+  'What is the difference between a triggered and an activated ability?',
+  'How does flash interact with the priority system?',
+  'What happens when a creature with a death trigger is exiled instead?',
+  'How does indestructible interact with "destroy" effects?',
+  'When does the "dies" trigger actually go on the stack?',
+  'What happens if both players draw the last card at the same time?',
+  'How does lifelink work in Commander with multiple opponents?',
+  'Can I activate a planeswalker ability the turn it enters the battlefield?',
+  'How does damage prevention interact with lifelink?',
+  'What is the difference between "copy" and "token copy"?',
+  'How does the cascade mechanic resolve?',
+];
+
+function sampleFallbackQuestions(): string[] {
+  const shuffled = [...FALLBACK_QUESTIONS].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, 4);
 }
 
 // ── Generate deck-aware suggestions from active game context ─────────────────
@@ -195,61 +231,6 @@ const ChatInput = React.forwardRef<ChatInputHandle, {
   );
 });
 
-// ── CorrectionForm — isolated so typing only re-renders this component ────────
-
-function CorrectionForm({ qaLogId, msgIndex, onSubmitted, onCancel }: {
-  qaLogId: number;
-  msgIndex: number;
-  onSubmitted: (idx: number) => void;
-  onCancel: () => void;
-}) {
-  const [text, setText] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  const submit = async () => {
-    if (!text.trim() || submitting) return;
-    setSubmitting(true);
-    try {
-      await rulesApi.rateQaLog({ qa_log_id: qaLogId, correctness: 1, rating_notes: text.trim() });
-      onSubmitted(msgIndex);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-      <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'error.main', mb: 0.75 }}>
-        What's the correct ruling?
-      </Typography>
-      <TextField
-        multiline
-        minRows={2}
-        maxRows={6}
-        fullWidth
-        size="small"
-        placeholder="Describe the correction or cite the rule…"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        sx={{ fontSize: 12, mb: 0.75 }}
-      />
-      <Box sx={{ display: 'flex', gap: 0.75, justifyContent: 'flex-end' }}>
-        <Button size="small" onClick={onCancel} sx={{ fontSize: 11 }}>Cancel</Button>
-        <Button
-          size="small"
-          variant="contained"
-          color="error"
-          disabled={!text.trim() || submitting}
-          onClick={submit}
-          sx={{ fontSize: 11 }}
-        >
-          {submitting ? 'Saving…' : 'Save Correction'}
-        </Button>
-      </Box>
-    </Box>
-  );
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function ChatPage() {
@@ -269,13 +250,11 @@ export default function ChatPage() {
   const [savingPattern, setSavingPattern] = useState(false);
   const [patternsLoading, setPatternsLoading] = useState(true);
 
+  const [sessionFeedbackOpen, setSessionFeedbackOpen] = useState(false);
+
   const [gameContext, setGameContext] = useState<ActiveGameContext | null>(null);
   const [isEmbedded, setIsEmbedded] = useState(false);
   const [savedNoteIndices, setSavedNoteIndices] = useState<Set<number>>(new Set());
-
-  // Correction flagging
-  const [flaggedIdx, setFlaggedIdx] = useState<number | null>(null);
-  const [flaggedIndices, setFlaggedIndices] = useState<Set<number>>(new Set());
 
   const thinkingRef = useRef<HTMLSpanElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -780,12 +759,7 @@ export default function ChatPage() {
         return [`How ${verb} ${firstTag} work?`];
       });
     }
-    return [
-      'Does deathtouch work with trample?',
-      'Can I respond to a mana ability?',
-      'How does the legend rule work?',
-      'What is the layer system?',
-    ];
+    return sampleFallbackQuestions();
   }, [gameContext, patterns]);
 
   const renderedMessages = useMemo(() => messages.map((msg, i) => (
@@ -840,8 +814,16 @@ export default function ChatPage() {
                   ))}
                 </Box>
               )}
-              {/* Action row: save-to-notes + flag incorrect */}
+              {/* Action row: feedback + save-to-notes + flag incorrect */}
               <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mt: 0.5, gap: 0.5 }}>
+                {conversationId && (
+                  <MessageFeedback
+                    conversationId={conversationId}
+                    messageId={msg.id}
+                    messageSnippet={msg.content.slice(0, 500)}
+                    cards={cards}
+                  />
+                )}
                 {isEmbedded && (
                   <Tooltip title={savedNoteIndices.has(i) ? 'Saved to game notes' : 'Save to game notes'}>
                     <span>
@@ -863,37 +845,7 @@ export default function ChatPage() {
                     </span>
                   </Tooltip>
                 )}
-                {msg.qa_log_id && (
-                  <Tooltip title={flaggedIndices.has(i) ? 'Correction saved' : 'Flag as incorrect'}>
-                    <span>
-                      <IconButton
-                        size="small"
-                        disabled={flaggedIndices.has(i)}
-                        onClick={() => setFlaggedIdx(prev => prev === i ? null : i)}
-                        sx={{
-                          opacity: flaggedIndices.has(i) ? 1 : 0.5,
-                          color: flaggedIndices.has(i) ? 'error.main' : flaggedIdx === i ? 'error.main' : 'inherit',
-                          '&:hover': { opacity: 1 },
-                        }}
-                      >
-                        {flaggedIndices.has(i) ? <ThumbDownIcon sx={{ fontSize: 16 }} /> : <ThumbDownIcon sx={{ fontSize: 16 }} />}
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                )}
               </Box>
-              {/* Inline correction form */}
-              {flaggedIdx === i && msg.qa_log_id && (
-                <CorrectionForm
-                  qaLogId={msg.qa_log_id}
-                  msgIndex={i}
-                  onSubmitted={(idx) => {
-                    setFlaggedIndices(prev => new Set(prev).add(idx));
-                    setFlaggedIdx(null);
-                  }}
-                  onCancel={() => setFlaggedIdx(null)}
-                />
-              )}
             </>
           );
         })() : renderUserContent(msg.content)}
@@ -937,7 +889,7 @@ export default function ChatPage() {
         )}
       </Paper>
     </Box>
-  )), [messages, flaggedIdx, flaggedIndices, savedNoteIndices, isEmbedded, saveToGameNotes]);
+  )), [messages, savedNoteIndices, isEmbedded, saveToGameNotes, conversationId, sessionFeedbackOpen]);
 
   return (
     <Box sx={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
@@ -1082,6 +1034,13 @@ export default function ChatPage() {
           <Typography variant="h6" sx={{ flex: 1, fontWeight: 600 }}>
             MTG Rules Guru
           </Typography>
+          {conversationId && messages.some(m => m.role === 'assistant') && (
+            <Tooltip title="Rate this session">
+              <IconButton onClick={() => setSessionFeedbackOpen(true)} size="small">
+                <ThumbUpIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Tooltip>
+          )}
           <Tooltip title="Pattern Library">
             <IconButton onClick={() => setPatternsOpen(true)} size="small">
               <MenuBookIcon />
@@ -1264,6 +1223,16 @@ export default function ChatPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* ── Session Feedback Drawer ───────────────────────────────── */}
+      {conversationId && (
+        <SessionFeedbackDrawer
+          open={sessionFeedbackOpen}
+          onClose={() => setSessionFeedbackOpen(false)}
+          conversationId={conversationId}
+          messages={messages.filter((m): m is LocalMessage & { id: number } => m.id != null) as import('../lib/types').RulesMessage[]}
+        />
+      )}
 
     </Box>
   );

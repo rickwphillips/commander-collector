@@ -74,7 +74,66 @@ export const rulesApi = {
       body: JSON.stringify(payload),
     }),
 
-  // Chat — async: POST returns immediately with user_message_id, then poll for result
+  submitMessageFeedback: (payload: {
+    conversation_id: number;
+    message_id?: number;
+    message_snippet?: string;
+    rating: 'up' | 'down';
+    wrong_conclusion?: boolean;
+    wrong_cr_cite?: boolean;
+    missing_cr_rules?: boolean;
+    off_topic?: boolean;
+    hard_to_apply?: boolean;
+    cards_not_relevant?: boolean;
+    card_feedback?: Record<string, boolean>;
+    notes?: string;
+    flag_pattern?: boolean;
+  }) =>
+    apiFetch<{ id: string; success: boolean }>('/rules/message-feedback.php', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  submitSessionFeedback: (payload: {
+    conversation_id: number;
+    rating: number;
+    helpful_indices?: number[];
+    notes?: string;
+  }) =>
+    apiFetch<{ id: string; success: boolean }>('/rules/session-feedback.php', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getFeedbackReview: (params?: { flagged?: boolean; rating?: 'up' | 'down'; limit?: number; offset?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.flagged) qs.set('flagged', '1');
+    if (params?.rating) qs.set('rating', params.rating);
+    if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.offset) qs.set('offset', String(params.offset));
+    const q = qs.toString();
+    return apiFetch<{
+      items: Array<{
+        id: string;
+        conversation_id: number;
+        message_id: number | null;
+        message_snippet: string | null;
+        rating: 'up' | 'down';
+        wrong_ruling: number;
+        wrong_cr_cite: number;
+        incomplete: number;
+        unclear: number;
+        notes: string | null;
+        flag_pattern: number;
+        created_at: string;
+      }>;
+      total: number;
+      limit: number;
+      offset: number;
+    }>(`/rules/feedback-review.php${q ? `?${q}` : ''}`);
+  },
+
+  // Chat — async: POST submits, then SSE stream delivers the result
   sendMessage: async (payload: {
     message: string;
     conversation_id?: number;
@@ -87,23 +146,66 @@ export const rulesApi = {
       body: JSON.stringify(payload),
     });
 
-    // Step 2: poll until assistant response is ready (max ~5 min)
-    const maxAttempts = 100; // 100 × 3s = 5 min
-    for (let i = 0; i < maxAttempts; i++) {
-      await new Promise(r => setTimeout(r, 3000));
-      const poll = await apiFetch<ChatPollResponse>(
-        `/rules/chat.php?poll=${submit.user_message_id}`
-      );
-      if (poll.status === 'complete') {
-        return {
-          conversation_id: poll.conversation_id!,
-          message_id: poll.message_id!,
-          qa_log_id: poll.qa_log_id ?? null,
-          response: poll.response!,
-          pending_pattern: poll.pending_pattern ?? null,
-        };
-      }
-    }
-    throw new Error('Chat response timed out');
+    // Step 2: open SSE stream — server pushes one 'complete' event when ready
+    return new Promise<ChatResponse>((resolve, reject) => {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const url = `${API_BASE}/rules/chat-stream.php?id=${submit.user_message_id}`;
+
+      fetch(url, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      }).then(async (res) => {
+        if (!res.ok || !res.body) {
+          reject(new Error(`Stream error ${res.status}`));
+          return;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const blocks = buffer.split('\n\n');
+          buffer = blocks.pop() ?? '';
+
+          for (const block of blocks) {
+            const lines = block.split('\n');
+            let eventName = 'message';
+            let dataLine = '';
+
+            for (const line of lines) {
+              if (line.startsWith('event:')) eventName = line.slice(6).trim();
+              else if (line.startsWith('data:')) dataLine = line.slice(5).trim();
+            }
+
+            if (eventName === 'complete' && dataLine) {
+              const data = JSON.parse(dataLine) as ChatPollResponse;
+              reader.cancel();
+              resolve({
+                conversation_id: data.conversation_id!,
+                message_id: data.message_id!,
+                qa_log_id: data.qa_log_id ?? null,
+                response: data.response!,
+                pending_pattern: data.pending_pattern ?? null,
+              });
+              return;
+            }
+
+            if (eventName === 'error' && dataLine) {
+              reader.cancel();
+              reject(new Error(JSON.parse(dataLine).error ?? 'Stream error'));
+              return;
+            }
+          }
+        }
+
+        reject(new Error('Stream ended without a response'));
+      }).catch(reject);
+    });
   },
 };
