@@ -569,7 +569,7 @@ $tools = [
         'input_schema' => [
             'type'       => 'object',
             'properties' => [
-                'list_id' => ['type' => 'integer', 'description' => 'The list ID from the player\'s lists'],
+                'list_id' => ['type' => 'string', 'description' => 'The list ID (UUID) from the player\'s lists'],
             ],
             'required' => ['list_id'],
         ],
@@ -581,8 +581,8 @@ $tools = [
             'type'       => 'object',
             'properties' => [
                 'list_id' => [
-                    'type'        => 'integer',
-                    'description' => 'The list ID to update',
+                    'type'        => 'string',
+                    'description' => 'The list ID (UUID) to update',
                 ],
                 'name' => [
                     'type'        => 'string',
@@ -1045,7 +1045,7 @@ function executeTool(string $name, array $input): string {
 
     if ($name === 'get_list_cards') {
         global $db;
-        $listId = (int)($input['list_id'] ?? 0);
+        $listId = trim((string)($input['list_id'] ?? ''));
         if (!$listId) return json_encode(['error' => 'list_id is required']);
 
         $stmt = $db->prepare("
@@ -1096,7 +1096,7 @@ function executeTool(string $name, array $input): string {
 
     if ($name === 'update_list') {
         global $db, $userId;
-        $listId      = (int)($input['list_id'] ?? 0);
+        $listId      = trim((string)($input['list_id'] ?? ''));
         if (!$listId) return json_encode(['error' => 'list_id is required']);
 
         // Verify ownership

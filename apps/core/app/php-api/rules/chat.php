@@ -368,7 +368,7 @@ if (!empty($gameContext['players'])) {
         $partner     = !empty($player['partner']) ? htmlspecialchars($player['partner'], ENT_QUOTES) : null;
         $cards       = is_array($player['cards']) ? $player['cards'] : [];
 
-        $deckId       = isset($player['deckId']) ? (int)$player['deckId'] : null;
+        $deckId       = isset($player['deckId']) ? (string)$player['deckId'] : null;
         $commanderStr = $partner ? "{$commander} + {$partner} (Partner)" : $commander;
         $deckIdStr    = $deckId ? " (deck_id: {$deckId})" : '';
         $systemPrompt .= "**{$playerName}** — \"{$deckName}\" — Commander: *{$commanderStr}*{$deckIdStr}\n";

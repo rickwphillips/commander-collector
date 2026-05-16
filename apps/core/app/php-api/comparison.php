@@ -88,7 +88,7 @@ if (!in_array($groupBy, $validGroupBys, true)) {
 $perspectivePlayerId = null;
 if (in_array($groupBy, ['opponent_player', 'opponent_commander'], true)) {
     if ($myGamesOnly && !empty($user['player_id'])) {
-        $perspectivePlayerId = (int)$user['player_id'];
+        $perspectivePlayerId = (string)$user['player_id'];
     } elseif (!empty($reqPlayerIds)) {
         $perspectivePlayerId = $reqPlayerIds[0];
     } else {
@@ -194,13 +194,13 @@ if (!empty($filterColors)) {
 // My games only — restrict to games where the authenticated user's player was present
 if ($myGamesOnly) {
     $where[] = 'g.id IN (SELECT game_id FROM game_results WHERE player_id = ?)';
-    $params[] = (int)$user['player_id'];
+    $params[] = (string)$user['player_id'];
 }
 
 // My decks only — restrict to game results using a deck owned by the authenticated user's player
 if ($myDecksOnly) {
     $where[] = 'd.player_id = ?';
-    $params[] = (int)$user['player_id'];
+    $params[] = (string)$user['player_id'];
 }
 
 // Opponent players — ALL listed players must be in the same game
@@ -553,11 +553,11 @@ function computeRecentWinRate(
         switch ($groupBy) {
             case 'player':
                 $localWhere[] = 'gr.player_id = ?';
-                $localParams[] = (int)$entityId;
+                $localParams[] = (string)$entityId;
                 break;
             case 'deck':
                 $localWhere[] = 'gr.deck_id = ?';
-                $localParams[] = (int)$entityId;
+                $localParams[] = (string)$entityId;
                 break;
             case 'commander':
                 $localWhere[] = 'd.commander = ?';

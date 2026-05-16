@@ -339,10 +339,10 @@ function computeStreaks(array $rows, string $mode): array {
         ];
 
         if ($mode === 'player') {
-            $entry['player_id'] = (int)$first['player_id'];
+            $entry['player_id'] = (string)$first['player_id'];
             $entry['player_name'] = $first['player_name'];
         } else {
-            $entry['deck_id'] = (int)$first['deck_id'];
+            $entry['deck_id'] = (string)$first['deck_id'];
             $entry['deck_name'] = $first['deck_name'];
             $entry['commander'] = $first['commander'];
             $entry['colors'] = $first['colors'];

@@ -6,11 +6,11 @@ requireAuth();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') sendError('Method not allowed', 405);
 
 $input      = getJSONInput();
-$id         = (int)($input['qa_log_id']   ?? 0);
+$id         = trim((string)($input['qa_log_id'] ?? ''));
 $correctness = (int)($input['correctness']  ?? 1);
 $notes      = trim($input['rating_notes'] ?? '');
 
-if (!$id)                              sendError('qa_log_id required');
+if (!$id)                                 sendError('qa_log_id required');
 if ($correctness < 1 || $correctness > 5) sendError('correctness must be 1–5');
 
 $db = getDB();
