@@ -805,7 +805,7 @@ export default function ChatPage() {
               {/* Card chip bar — with inline relevance rating */}
               {cards.length > 0 && (
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-                  {cards.map(name => (
+                  {[...new Set(cards)].map(name => (
                     <RateableCardChip
                       key={name}
                       name={name}
