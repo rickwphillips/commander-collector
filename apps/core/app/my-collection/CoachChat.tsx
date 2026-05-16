@@ -204,7 +204,7 @@ const CoachInput = forwardRef<CoachInputHandle, {
     <>
       {loading && (
         <Typography variant="caption" color="text.secondary" sx={{ px: 1.5, fontStyle: 'italic' }}>
-          Type to interrupt the coach...
+          Type to steer · Esc to cancel
         </Typography>
       )}
       <Stack direction="row" spacing={1} sx={{ p: 1.5, pt: loading ? 0.5 : 1.5, flexShrink: 0 }}>
@@ -270,6 +270,7 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
   const [activeDeck, setActiveDeck] = useState<ActiveDeckContext | null>(null);
   const [activeList, setActiveList] = useState<ActiveListContext | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [showToolDetails, setShowToolDetails] = useState(false);
   const [history, setHistory] = useState<ChatSession[]>([]);
   const sessionIdRef = useRef<string>(Date.now().toString());
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -278,6 +279,8 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
   const thinkingMsgRef = useRef<HTMLSpanElement>(null);
   const coachInputRef = useRef<CoachInputHandle>(null);
   const abortCtrlRef = useRef<AbortController | null>(null);
+  const loadingRef = useRef(false);
+  loadingRef.current = loading;
 
   useImperativeHandle(ref, () => ({
     appendToInput: (text: string) => {
@@ -346,6 +349,25 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
       coachInputRef.current?.focus();
     }
   }, [open, initialized]);
+
+  // Keyboard shortcuts: Ctrl/Cmd+O toggles tool details, Escape cancels in-flight response
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+        e.preventDefault();
+        setShowToolDetails(v => !v);
+        return;
+      }
+      if (e.key === 'Escape' && loadingRef.current) {
+        abortCtrlRef.current?.abort();
+        abortCtrlRef.current = null;
+        setLoading(false);
+        setPartialResponse('');
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
 
   const handleOpen = () => {
     onToggle(true);
@@ -450,6 +472,17 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
           </Typography>
         </Stack>
         <Stack direction="row" spacing={0.5}>
+          <Tooltip title={showToolDetails ? 'Hide tool details (Ctrl+O)' : 'Show tool details (Ctrl+O)'}>
+            <IconButton
+              size="small"
+              onClick={() => setShowToolDetails(v => !v)}
+              sx={{ color: showToolDetails ? 'primary.main' : 'inherit' }}
+            >
+              <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.65rem', lineHeight: 1, px: 0.25 }}>
+                {'</>'}
+              </Typography>
+            </IconButton>
+          </Tooltip>
           <Tooltip title={showHistory ? 'Hide history' : 'Chat history'}>
             <IconButton
               size="small"
@@ -573,7 +606,7 @@ export const CoachChat = forwardRef<CoachChatHandle, CoachChatProps>(function Co
             )}
 
             {messages.map((msg, i) => (
-              <ChatBubble key={i} message={msg} />
+              <ChatBubble key={i} message={msg} showToolDetails={showToolDetails} />
             ))}
 
             {loading && (
@@ -704,6 +737,8 @@ const TOOL_LABELS: Record<string, string> = {
   save_coach_note:      'Saved note',
   get_pattern:          'Checked rules pattern',
   lookup_opponent_deck: 'Looked up opponent deck',
+  get_player_stats:     'Fetched player stats',
+  get_player_lists:     'Fetched list index',
   get_game_notes:       'Read game notes',
   get_game_history:     'Queried game history',
   create_list:          'Saved list',
@@ -739,11 +774,12 @@ function toolLabel(tool: CoachToolCall): string {
 
 // ── Chat bubble with basic markdown rendering ─────────────────────────────
 
-const ChatBubble = memo(function ChatBubble({ message }: { message: CoachMessage }) {
+const ChatBubble = memo(function ChatBubble({ message, showToolDetails }: { message: CoachMessage; showToolDetails?: boolean }) {
   const isUser = message.role === 'user';
   const displayContent = message.content
     .replace(/\nCARDS:.*$/m, '')
     .trim();
+  const hasTools = !isUser && message.toolsUsed && message.toolsUsed.length > 0;
 
   return (
     <Box
@@ -754,18 +790,27 @@ const ChatBubble = memo(function ChatBubble({ message }: { message: CoachMessage
       }}
     >
       <Box sx={{ maxWidth: '85%' }}>
-        {!isUser && message.toolsUsed && message.toolsUsed.length > 0 && (
-          <Stack direction="row" flexWrap="wrap" spacing={0.5} sx={{ mb: 0.5 }}>
-            {message.toolsUsed.map((t, i) => (
-              <Chip
-                key={i}
-                label={toolLabel(t)}
-                size="small"
-                variant="outlined"
-                sx={{ fontSize: '0.65rem', height: 18, borderColor: '#6B8E6B60', color: '#6B8E6B' }}
-              />
-            ))}
-          </Stack>
+        {hasTools && (
+          <>
+            <Collapse in={showToolDetails}>
+              <Stack direction="row" flexWrap="wrap" spacing={0.5} sx={{ mb: 0.5 }}>
+                {message.toolsUsed!.map((t, i) => (
+                  <Chip
+                    key={i}
+                    label={toolLabel(t)}
+                    size="small"
+                    variant="outlined"
+                    sx={{ fontSize: '0.65rem', height: 18, borderColor: '#6B8E6B60', color: '#6B8E6B' }}
+                  />
+                ))}
+              </Stack>
+            </Collapse>
+            {!showToolDetails && (
+              <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mb: 0.25, fontSize: '0.6rem' }}>
+                {message.toolsUsed!.length} tool{message.toolsUsed!.length !== 1 ? 's' : ''} used
+              </Typography>
+            )}
+          </>
         )}
         <Paper
           elevation={0}
