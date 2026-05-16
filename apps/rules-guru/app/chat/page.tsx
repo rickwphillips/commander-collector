@@ -42,7 +42,7 @@ import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import NoteAddIcon from '@mui/icons-material/NoteAdd';
 import CheckIcon from '@mui/icons-material/Check';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
-import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import RateReviewIcon from '@mui/icons-material/RateReview';
 import { rulesApi } from '../lib/api';
 import { MessageFeedback } from '../components/MessageFeedback';
 import { SessionFeedbackDrawer } from '../components/SessionFeedbackDrawer';
@@ -1036,8 +1036,8 @@ export default function ChatPage() {
           </Typography>
           {conversationId && messages.some(m => m.role === 'assistant') && (
             <Tooltip title="Rate this session">
-              <IconButton onClick={() => setSessionFeedbackOpen(true)} size="small">
-                <ThumbUpIcon sx={{ fontSize: 18 }} />
+              <IconButton onClick={() => setSessionFeedbackOpen(true)} size="small" aria-label="Rate this session">
+                <RateReviewIcon sx={{ fontSize: 18 }} />
               </IconButton>
             </Tooltip>
           )}

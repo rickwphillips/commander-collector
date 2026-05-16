@@ -92,8 +92,8 @@ describe('CommanderInteractionAlert', () => {
     render(
       <CommanderInteractionAlert commanders={['Atraxa', 'Doubling Season']} storageKey="dismiss-test" />
     );
-    await waitFor(() => expect(screen.getByLabelText('dismiss', { hidden: true })).toBeInTheDocument());
-    await userEvent.click(screen.getByLabelText('dismiss', { hidden: true }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'dismiss', hidden: true })).toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: 'dismiss', hidden: true }));
     expect(sessionStorage.getItem('dismiss-test:Atraxa|Doubling Season')).toBe('1');
   });
 });
