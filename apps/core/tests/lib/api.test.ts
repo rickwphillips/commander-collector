@@ -460,3 +460,83 @@ describe('buildComparisonParams via api.getComparison', () => {
     expect(url).not.toContain('filter_deck_ids');
   });
 });
+
+describe('api — commander-mcp brain', () => {
+  beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  const envelope = { band: 'certain', data: null, sources: [], caveats: [] };
+
+  it('api.lookupCRRule(n) hits rules/cr-rule.php with no double extension', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, envelope));
+    await api.lookupCRRule('116.1');
+    const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toContain('rules/cr-rule.php');
+    expect(url).not.toContain('cr-rule.php.php');
+    expect(url).toContain('n=116.1');
+  });
+
+  it('api.getPattern(id) hits rules/pattern.php with no double extension', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, envelope));
+    await api.getPattern('P001');
+    const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toContain('rules/pattern.php');
+    expect(url).not.toContain('pattern.php.php');
+    expect(url).toContain('id=P001');
+  });
+
+  it('api.lookupInteraction(a, b) hits rules/interaction.php with no double extension', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, envelope));
+    await api.lookupInteraction('Sol Ring', 'Atraxa');
+    const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toContain('rules/interaction.php');
+    expect(url).not.toContain('interaction.php.php');
+    expect(url).toContain('a=Sol+Ring');
+    expect(url).toContain('b=Atraxa');
+  });
+
+  it('api.lookupInteraction(a, b, context) includes context param', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, envelope));
+    await api.lookupInteraction('Sol Ring', 'Atraxa', 'combat');
+    const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toContain('context=combat');
+  });
+
+  it('api.scoreDeck(list) POSTs to rules/score-deck.php with no double extension', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, envelope));
+    await api.scoreDeck(['Sol Ring', 'Lightning Bolt'], 'Atraxa');
+    const [url, opts] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toContain('rules/score-deck.php');
+    expect(url).not.toContain('score-deck.php.php');
+    expect(opts.method).toBe('POST');
+    const body = JSON.parse(opts.body);
+    expect(body.decklist).toEqual(['Sol Ring', 'Lightning Bolt']);
+    expect(body.commander).toBe('Atraxa');
+  });
+
+  it('api.getCardNote(name) hits rules/card-note.php with no double extension', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, envelope));
+    await api.getCardNote('Sol Ring');
+    const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toContain('rules/card-note.php');
+    expect(url).not.toContain('card-note.php.php');
+    expect(url).toContain('name=Sol+Ring');
+  });
+
+  it('api.getCardNote(name, format) includes format param', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, envelope));
+    await api.getCardNote('Brainstorm', 'legacy');
+    const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toContain('format=legacy');
+  });
+
+  it('api.discussStrength(list) POSTs to rules/discuss-strength.php with no double extension', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, envelope));
+    await api.discussStrength(['Sol Ring']);
+    const [url, opts] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toContain('rules/discuss-strength.php');
+    expect(url).not.toContain('discuss-strength.php.php');
+    expect(opts.method).toBe('POST');
+    expect(JSON.parse(opts.body).decklist).toEqual(['Sol Ring']);
+  });
+});
