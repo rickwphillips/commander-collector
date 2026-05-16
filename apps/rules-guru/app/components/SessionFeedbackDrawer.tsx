@@ -17,6 +17,7 @@ interface Props {
   onClose: () => void;
   conversationId: number;
   messages: RulesMessage[];
+  onPointHover?: (msgIdx: number) => void;
 }
 
 interface Point {
@@ -68,7 +69,7 @@ const EMPTY_STATE = { rating: 0, selected: new Set<string>(), notes: '' };
 // Cycle: undefined → 'helpful' (green) → 'incorrect' (red) → undefined
 type PointState = 'helpful' | 'incorrect';
 
-export function SessionFeedbackDrawer({ open, onClose, conversationId, messages }: Props) {
+export function SessionFeedbackDrawer({ open, onClose, conversationId, messages, onPointHover }: Props) {
   const [rating, setRating] = useState(0);
   const [pointRatings, setPointRatings] = useState<Map<string, PointState>>(new Map());
   const [notes, setNotes] = useState('');
@@ -209,6 +210,7 @@ export function SessionFeedbackDrawer({ open, onClose, conversationId, messages 
                       key={pt.key}
                       variant="outlined"
                       onClick={() => cyclePoint(pt.key)}
+                      onMouseEnter={() => onPointHover?.(pt.msgIdx)}
                       sx={{
                         p: 1.25,
                         cursor: 'pointer',

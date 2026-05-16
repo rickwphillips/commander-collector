@@ -766,10 +766,12 @@ export default function ChatPage() {
   const renderedMessages = useMemo(() => messages.map((msg, i) => (
     <Box
       key={i}
+      id={msg.role === 'assistant' ? `chat-msg-${i}` : undefined}
       sx={{
         display: 'flex',
         justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
         gap: 1,
+        scrollMarginTop: 8,
       }}
     >
       <Paper
@@ -1009,7 +1011,13 @@ export default function ChatPage() {
       </Drawer>
 
       {/* ── Main layout ─────────────────────────────────────────── */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <Box sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        minWidth: 0,
+        width: sessionFeedbackOpen ? 'calc(100% - 480px)' : '100%',
+        transition: 'width 0.3s ease',
+      }}>
 
         {/* Header */}
         <Paper
@@ -1230,6 +1238,9 @@ export default function ChatPage() {
           onClose={() => setSessionFeedbackOpen(false)}
           conversationId={conversationId}
           messages={messages.filter((m): m is LocalMessage & { id: number } => m.id != null) as import('../lib/types').RulesMessage[]}
+          onPointHover={(msgIdx) => {
+            document.getElementById(`chat-msg-${msgIdx}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }}
         />
       )}
 
