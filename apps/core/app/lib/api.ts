@@ -543,7 +543,7 @@ export const api = {
       data: { rule_number: string; body: string; examples: string[] } | null;
       sources: string[];
       caveats: string[];
-    }>(`/rules/cr-rule.php?n=${encodeURIComponent(number)}`),
+    }>(`/rules/cr-rule?n=${encodeURIComponent(number)}`),
 
   getPattern: (patternId: string) =>
     apiFetch<{
@@ -551,7 +551,7 @@ export const api = {
       data: { pattern_id: string; name: string; abstract?: string; cr_refs?: string[]; tags?: string[] } | null;
       sources: string[];
       caveats: string[];
-    }>(`/rules/pattern.php?id=${encodeURIComponent(patternId)}`),
+    }>(`/rules/pattern?id=${encodeURIComponent(patternId)}`),
 
   lookupInteraction: (cardA: string, cardB: string, context?: string) => {
     const params = new URLSearchParams({ a: cardA, b: cardB });
@@ -567,7 +567,7 @@ export const api = {
       } | null;
       sources: string[];
       caveats: string[];
-    }>(`/rules/interaction.php?${params.toString()}`);
+    }>(`/rules/interaction?${params.toString()}`);
   },
 
   scoreDeck: (decklist: string[], commander?: string) =>
@@ -584,7 +584,7 @@ export const api = {
       } | null;
       sources: string[];
       caveats: string[];
-    }>('/rules/score-deck.php', {
+    }>('/rules/score-deck', {
       method: 'POST',
       body: JSON.stringify({ decklist, commander }),
     }),
@@ -605,7 +605,7 @@ export const api = {
       };
       sources: string[];
       caveats: string[];
-    }>(`/rules/card-note.php?${params.toString()}`);
+    }>(`/rules/card-note?${params.toString()}`);
   },
 
   discussStrength: (decklist: string[], commander?: string) =>
@@ -623,7 +623,7 @@ export const api = {
       } | null;
       sources: string[];
       caveats: string[];
-    }>('/rules/discuss-strength.php', {
+    }>('/rules/discuss-strength', {
       method: 'POST',
       body: JSON.stringify({ decklist, commander }),
     }),
