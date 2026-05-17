@@ -26,15 +26,5 @@ if (!is_array($decklist) || count($decklist) === 0) {
     sendError('Missing required field: decklist (non-empty array of strings)');
 }
 
-$args = ['decklist' => array_values(array_filter(array_map('strval', $decklist), 'strlen'))];
-if (!empty($body['commander'])) {
-    $args['commander'] = (string) $body['commander'];
-}
-
-$envelope = mcpCallToolOrUnknown(
-    'score_deck',
-    $args,
-    'commander-mcp HTTP transport unreachable'
-);
-
-sendJSON($envelope);
+$commander = !empty($body['commander']) ? (string) $body['commander'] : null;
+sendJSON(mcpScoreDeck($decklist, $commander));
