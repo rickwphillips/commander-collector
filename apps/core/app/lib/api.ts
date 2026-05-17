@@ -502,35 +502,59 @@ export const api = {
         card_count: activeList.cardCount,
       };
     }
-    // Step 1: POST to submit message — returns request_id
-    const submit = await apiFetch<{ status: string; request_id: string }>('/coach-chat', {
-      method: 'POST',
-      body: JSON.stringify(body),
-      signal,
-    });
 
-    // Abort-aware delay
-    const wait = (ms: number) => new Promise<void>((resolve, reject) => {
-      const t = setTimeout(resolve, ms);
-      signal?.addEventListener('abort', () => { clearTimeout(t); reject(new DOMException('Aborted', 'AbortError')); }, { once: true });
-    });
+    const url = `${API_BASE}coach-chat.php`;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    // Step 2: Poll with progressive backoff: 1s, 1.5s, 2s, 2.5s, 3s (cap at 3s)
-    const pollDelay = (attempt: number) => Math.min(1000 + attempt * 500, 3000);
-    for (let i = 0; i < 120; i++) {
-      await wait(pollDelay(i));
-      const poll = await apiFetch<{ status: string; response?: string; partial?: string; tools_used?: { name: string; input: Record<string, unknown> }[]; _debug?: Record<string, unknown>; _php_output?: string }>(
-        `/coach-chat?poll=${submit.request_id}`, { signal }
-      );
-      if (poll.status === 'complete') {
-        if (poll._debug) console.log('[coach] complete debug:', poll._debug);
-        return { response: poll.response ?? '', toolsUsed: poll.tools_used ?? [] };
-      }
-      if (poll._php_output) console.warn('[coach] PHP output leaked:', poll._php_output);
-      if (poll.partial && onPartial) onPartial(poll.partial);
+    const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({})) as Record<string, unknown>;
+      throw new Error((errData.error as string) ?? `Coach error ${res.status}`);
     }
-    console.error('[coach] timed out after 120 polls');
-    throw new Error('Coach chat response timed out');
+
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    // Parse complete SSE event blocks separated by blank lines
+    const readEvents = (chunk: string): { event: string; data: string }[] => {
+      buffer += chunk;
+      const events: { event: string; data: string }[] = [];
+      const blocks = buffer.split('\n\n');
+      buffer = blocks.pop()!;
+      for (const block of blocks) {
+        let event = '', data = '';
+        for (const line of block.split('\n')) {
+          if (line.startsWith('event: ')) event = line.slice(7).trim();
+          else if (line.startsWith('data: ')) data = line.slice(6).trim();
+        }
+        if (event && data) events.push({ event, data });
+      }
+      return events;
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      for (const { event, data } of readEvents(decoder.decode(value, { stream: true }))) {
+        let parsed: Record<string, unknown>;
+        try { parsed = JSON.parse(data); } catch { continue; }
+        if (event === 'tool_start' && onPartial) {
+          onPartial(`Looking up ${parsed.tool}...`);
+        } else if (event === 'done') {
+          if (parsed._debug) console.log('[coach] done:', parsed._debug);
+          return {
+            response: (parsed.response as string) ?? '',
+            toolsUsed: (parsed.tools_used as { name: string; input: Record<string, unknown> }[]) ?? [],
+          };
+        } else if (event === 'error') {
+          throw new Error((parsed.error as string) ?? 'Coach error');
+        }
+      }
+    }
+    throw new Error('Coach stream ended without done event');
   },
 
   // Chat feedback (rateable chip toggle) — proxies to commander-mcp.
