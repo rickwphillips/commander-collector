@@ -12,7 +12,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SaveIcon from '@mui/icons-material/Save';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
+import PsychologyIcon from '@mui/icons-material/Psychology';
 import TableChartIcon from '@mui/icons-material/TableChart';
 
 export interface DeckActionsProps {
@@ -132,7 +132,7 @@ export function DeckActions({
         </Button>
       )}
       {onDiscuss && (
-        <Button startIcon={<SmartToyIcon />} onClick={onDiscuss} sx={{ color: '#6B8E6B' }}>
+        <Button startIcon={<PsychologyIcon />} onClick={onDiscuss} sx={{ color: '#6B8E6B' }}>
           Discuss
         </Button>
       )}

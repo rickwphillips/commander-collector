@@ -389,6 +389,9 @@ if ($activeDeck) {
     $systemPrompt .= "The player currently has **{$activeDeck['name']}** (deck_id: {$activeDeck['id']}) open on the page. ";
     $systemPrompt .= "Commander: {$activeDeck['commander']} | Colors: {$activeDeck['colors']} | Cards: {$activeDeck['card_count']}\n\n";
     $systemPrompt .= "Deck data tools available for this deck: `check_card_in_deck`, `search_deck_cards`, `get_deck_stats` (includes match history, matchups, recent games), `lookup_decklist` (full card list — use only when you need everything). Prefer the targeted tools over the full list to minimize token usage.\n\n";
+    if (!empty($activeDeck['list_id'])) {
+        $systemPrompt .= "The deck's main card list has list_id: {$activeDeck['list_id']}. Use this id for any list-scoped tool (`get_list_cards`, `update_list`, etc.) — the deck and its main list are the same content here, do not look the list up separately.\n\n";
+    }
     if (!empty($activeDeck['commander'])) {
         $systemPrompt .= "## STOP STATE: Commander Card Lookup Required\n\n";
         $systemPrompt .= "**Before doing anything else with this deck — before reading stats, before answering any question, before any analysis — you must call `lookup_card` for the commander: {$activeDeck['commander']}.**\n\n";
