@@ -1,85 +1,46 @@
 <?php
-// Suppress deprecated/notice output that would corrupt JSON responses.
-// Capture any unexpected output and report it in the response instead.
+// ob_start() intentionally omitted — SSE streaming requires direct flush.
 ini_set('display_errors', '0');
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE);
-ob_start();
 
 define('COACH_LOG', sys_get_temp_dir() . '/coach_chat_debug.log');
 function coachLog(string $msg): void {
     file_put_contents(COACH_LOG, date('[Y-m-d H:i:s] ') . $msg . "\n", FILE_APPEND | LOCK_EX);
 }
 
-/**
- * Like sendJSON() but drains the output buffer first.
- * Any unexpected PHP output is logged and included as '_php_output' in the response.
- */
-function coachJSON(array $payload, int $status = 200): never {
-    $leaked = trim((string) ob_get_clean());
-    if ($leaked !== '') {
-        coachLog('Unexpected PHP output: ' . $leaked);
-        $payload['_php_output'] = $leaked;
-    }
+/** Send a JSON error response before SSE headers have been committed. */
+function coachError(int $status, string $message): never {
     http_response_code($status);
     header('Content-Type: application/json');
-    echo json_encode($payload);
+    echo json_encode(['error' => $message]);
     exit();
+}
+
+/** Emit one SSE event and flush immediately. */
+function sseEmit(string $event, array $data): void {
+    echo "event: $event\n";
+    echo 'data: ' . json_encode($data) . "\n\n";
+    flush();
 }
 
 /**
  * Coach Chat — AI coaching endpoint for My Collection page.
  *
- * POST: Submit a message with conversation history. Returns { status: 'processing', request_id }.
- * GET:  Poll with ?poll=REQUEST_ID. Returns { status: 'processing' } or { status: 'complete', response }.
- *
- * The system prompt is built server-side from the user's data and is never exposed to the client.
- * Includes Rules Guru tools (lookup_card, get_pattern) for MTG rules knowledge.
+ * POST: Submit a message with conversation history. Streams SSE events:
+ *   event: tool_start  — a tool call is about to execute
+ *   event: tool_result — tool call completed
+ *   event: done        — final response ready; data has response + tools_used
+ *   event: error       — unrecoverable error
  */
 require_once 'config.php';
 require_once __DIR__ . '/auth/middleware.php';
 require_once __DIR__ . '/lib/mcp-client.php';
 $user = requireAuth();
 
-$method = $_SERVER['REQUEST_METHOD'];
-
-// ── GET: poll for response ────────────────────────────────────────────────
-if ($method === 'GET') {
-    $requestId = $_GET['poll'] ?? '';
-    if (!$requestId) coachJSON(['error' => 'poll parameter required'], 400);
-
-    $cacheFile = sys_get_temp_dir() . '/coach_chat_' . preg_replace('/[^a-zA-Z0-9_-]/', '', $requestId) . '.json';
-
-    if (!file_exists($cacheFile)) {
-        coachJSON(['status' => 'processing', 'partial' => '']);
-    }
-
-    $data = json_decode(file_get_contents($cacheFile), true);
-    if (!$data || empty($data['complete'])) {
-        coachJSON(['status' => 'processing', 'partial' => $data['partial'] ?? '']);
-    }
-
-    // Clean up temp file
-    @unlink($cacheFile);
-
-    $payload = [
-        'status'      => 'complete',
-        'response'    => $data['response'] ?? '',
-        'tools_used'  => $data['tools_used'] ?? [],
-    ];
-    if (!empty($data['_debug'])) {
-        $payload['_debug'] = $data['_debug'];
-        coachLog('Complete — ' . json_encode($data['_debug']));
-    }
-    coachJSON($payload);
-}
-
-if ($method !== 'POST') coachJSON(['error' => 'Method not allowed'], 405);
-
-set_time_limit(300);
-ignore_user_abort(true);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') coachError(405, 'Method not allowed');
 
 $apiKey = defined('ANTHROPIC_API_KEY') ? ANTHROPIC_API_KEY : null;
-if (!$apiKey) coachJSON(['error' => 'Anthropic API key not configured'], 500);
+if (!$apiKey) coachError(500, 'Anthropic API key not configured');
 
 $input              = getJSONInput();
 $userMessage        = trim($input['message'] ?? '');
@@ -88,36 +49,24 @@ $activeDeck         = $input['active_deck'] ?? null; // { id, name, commander, c
 $activeList         = $input['active_list'] ?? null; // { id, name, card_count }
 $isNewConversation  = empty($history);
 
-if (!$userMessage) coachJSON(['error' => 'message is required'], 400);
+if (!$userMessage) coachError(400, 'message is required');
 
-// Generate a unique request ID for polling
-$requestId = bin2hex(random_bytes(16));
-$cacheFile = sys_get_temp_dir() . '/coach_chat_' . $requestId . '.json';
+// ── Start SSE stream ──────────────────────────────────────────────────────
+set_time_limit(300);
+ignore_user_abort(false);
 
-// Write placeholder so poll knows it's in progress
-file_put_contents($cacheFile, json_encode(['complete' => false]));
+header('Content-Type: text/event-stream');
+header('Cache-Control: no-cache');
+header('X-Accel-Buffering: no');
+header('Connection: keep-alive');
 
-// ── Return immediately — client will poll ─────────────────────────────────
-// Drain output buffer — log any leaked PHP warnings before sending response
-$leaked = trim((string) ob_get_clean());
-if ($leaked !== '') {
-    coachLog('PHP output before early response: ' . $leaked);
-}
+if (ob_get_level()) ob_end_clean();
+ini_set('output_buffering', 'off');
+ini_set('zlib.output_compression', 0);
+ob_implicit_flush(true);
 
-$earlyResponse = json_encode([
-    'status'     => 'processing',
-    'request_id' => $requestId,
-]);
-header('Content-Type: application/json');
-header('Content-Length: ' . strlen($earlyResponse));
-header('Connection: close');
-http_response_code(202);
-echo $earlyResponse;
-if (function_exists('fastcgi_finish_request')) {
-    fastcgi_finish_request();
-} else {
-    flush();
-}
+echo ": keepalive\n\n";
+flush();
 
 // ── Background: build system prompt from user data ────────────────────────
 $db = getDB();
@@ -1794,10 +1743,10 @@ while ($iter < $maxIter) {
 
     if ($status !== 200) {
         $apiError = json_decode($body, true);
-        $errorMsg = $apiError['error']['message'] ?? $body;
+        $errorMsg = $apiError['error']['message'] ?? 'HTTP ' . $status;
         coachLog('Anthropic API error (iter ' . $iter . '): HTTP ' . $status . ' — ' . $errorMsg);
-        $assistantContent = 'I encountered an API error: ' . ($apiError['error']['message'] ?? 'HTTP ' . $status . '. Check server logs for details.');
-        break;
+        sseEmit('error', ['error' => 'API error: ' . $errorMsg]);
+        exit();
     }
 
     $response   = json_decode($body, true);
@@ -1826,10 +1775,9 @@ while ($iter < $maxIter) {
         break;
     }
 
-    // Still in tool-use — accumulate intermediate text for partial display only
+    // Still in tool-use — accumulate intermediate text (not streamed, only used for iter-cap fallback)
     if ($iterText) {
         $partialContent .= $iterText;
-        file_put_contents($cacheFile, json_encode(['complete' => false, 'partial' => $partialContent]));
     }
 
     // If this is the last allowed iteration and Claude still wants tools,
@@ -1850,10 +1798,13 @@ while ($iter < $maxIter) {
     foreach ($content as $block) {
         if ($block['type'] !== 'tool_use') continue;
         $toolsUsed[] = ['name' => $block['name'], 'input' => $block['input'] ?? []];
+        sseEmit('tool_start', ['tool' => $block['name']]);
+        $result = executeTool($block['name'], $block['input'] ?? []);
+        sseEmit('tool_result', ['tool' => $block['name'], 'ok' => true]);
         $toolResults[] = [
             'type'        => 'tool_result',
             'tool_use_id' => $block['id'],
-            'content'     => executeTool($block['name'], $block['input'] ?? []),
+            'content'     => $result,
         ];
     }
     $messages[] = ['role' => 'user', 'content' => $toolResults];
@@ -1905,15 +1856,13 @@ if (!$assistantContent) {
     $assistantContent = $partialContent ?: "I ran into a limit while working through that — it required more analysis steps than I'm allowed in one go. Try asking me to continue or to focus on one specific aspect.";
 }
 
-// ── Write result to temp file for polling ─────────────────────────────────
-file_put_contents($cacheFile, json_encode([
-    'complete'    => true,
-    'response'    => $assistantContent,
-    'tools_used'  => $toolsUsed,
-    '_debug'      => [
-        'iter'          => $iter,
-        'hit_iter_cap'  => $hitIterCap ?? false,
-        'stop_reason'   => $stopReason ?? 'unknown',
-        'had_partial'   => !empty($partialContent),
+// ── Stream final response to client ──────────────────────────────────────
+sseEmit('done', [
+    'response'   => $assistantContent,
+    'tools_used' => $toolsUsed,
+    '_debug'     => [
+        'iter'         => $iter,
+        'hit_iter_cap' => $hitIterCap ?? false,
+        'stop_reason'  => $stopReason ?? 'unknown',
     ],
-]));
+]);

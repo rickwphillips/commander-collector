@@ -1,5 +1,9 @@
 # Changelog
 
+## [5.6.0] - 2026-05-17
+
+- Coach chat SSE streaming replaces fire-and-forget polling
+
 ## [5.5.0] - 2026-05-16
 
 - Commander MCP integration: hover tooltips for **CR rule refs** and **P-numbers** in Rules Guru, PHP proxy (`/rules/cr-rule.php`, `/rules/pattern.php`) talking to the FastMCP streamable-HTTP transport, deck bracket scoring, banned-card badges, quick-lookup rules UI components
