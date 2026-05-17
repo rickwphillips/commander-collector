@@ -147,3 +147,26 @@ function mcpCallToolOrUnknown(string $toolName, array $arguments, string $unreac
     }
     return $result;
 }
+
+// ── Per-tool shared helpers ──────────────────────────────────────────────
+// These wrap mcpCallToolOrUnknown for tools with multiple PHP consumers so
+// arg shaping and unreachable-caveat wording stay aligned. Add a helper here
+// whenever a second caller appears for the same tool.
+
+/**
+ * Call the MCP `score_deck` tool. Consumed by both the UI's /rules/score-deck.php
+ * endpoint (via useDeckBracket → BracketChip) and the coach AI's tool channel
+ * (coach-chat.php executeTool). Single source of truth for the call shape so the
+ * UI chip and the AI's bracket citations can never disagree.
+ */
+function mcpScoreDeck(array $decklist, ?string $commander = null): array {
+    $args = ['decklist' => array_values(array_filter(array_map('strval', $decklist), 'strlen'))];
+    if ($commander !== null && $commander !== '') {
+        $args['commander'] = $commander;
+    }
+    return mcpCallToolOrUnknown(
+        'score_deck',
+        $args,
+        'commander-mcp HTTP transport unreachable; bracket unavailable'
+    );
+}

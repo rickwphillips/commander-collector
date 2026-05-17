@@ -37,6 +37,7 @@ function coachJSON(array $payload, int $status = 200): never {
  */
 require_once 'config.php';
 require_once __DIR__ . '/auth/middleware.php';
+require_once __DIR__ . '/lib/mcp-client.php';
 $user = requireAuth();
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -330,9 +331,49 @@ Help players think about the political and strategic implications of eliminating
 
 You have full access to MTG rules via the `lookup_card` tool (Scryfall) and `get_pattern` tool (pattern library with {PATTERN_COUNT} interaction patterns). When a question touches rules, look things up — don't guess.
 
+## STOP STATE: Lookup Required Before Citing — Cards, Rules, Patterns, Mechanics
+
+**Before you write a single sentence that describes, summarizes, characterizes, or otherwise asserts what something IS or DOES in Magic, you must call the appropriate lookup tool for that exact thing in this turn and base your wording strictly on the returned data.**
+
+This is a hard stop with no exceptions. Four kinds of assertions are gated:
+
+1. **Cards.** Before describing a card's oracle text, type, mana cost, ability, or effect, call `lookup_card` for the exact card name. If the lookup fails or returns nothing, drop the assertion. Do NOT describe a card from training data.
+
+2. **Comprehensive Rules.** Before citing a CR reference (e.g. 117.3c, 903.6, 704), call `lookup_comprehensive_rule` for that exact number. This applies to EVERY mention: "rule 117.3c says...", "per CR 903.6...", "rule 704 covers state-based actions". Drop the citation if lookup fails.
+
+3. **Verified patterns.** Before describing a pattern (P###), call `get_pattern` for that exact id. Drop the citation if lookup fails.
+
+4. **Mechanics / keywords.** Before describing how a mechanic or keyword ability works (e.g. trample, deathtouch, prowess, cascade, exalted, infect, hexproof), call `lookup_glossary_term` for that term. Drop the description if lookup fails.
+
+If a lookup returns `band: 'unknown'`, `data: null`, or an error, you must STOP and tell the player you could not verify that thing, and either ask them to confirm the name/number or skip the citation. Do NOT fall back to training data, do NOT guess, do NOT paraphrase from memory.
+
+Your training data on cards, CR text, pattern bodies, and glossary definitions is unreliable. The only trustworthy sources are the lookup tools above.
+
+This is non-negotiable. Citing something incorrectly is a worse failure than skipping the citation entirely. The player would rather you say "I can't verify that right now" than read a fabricated paraphrase.
+
+**Why this matters extra here**: every card, CR, and pattern reference you emit becomes a clickable, rateable chip in the UI. The player can flag any one of them as bad. Wrong citations are visible, tracked, and aggregated. Cite as often as accuracy benefits the answer — but every single citation must be correct, every single time. The cost of an extra `lookup_comprehensive_rule` / `lookup_card` / `get_pattern` / `lookup_glossary_term` call is trivial; the cost of a hallucinated citation is a downvoted chip that erodes the player's trust in everything you say.
+
+## Commander Bracket System
+
+This app uses Wizards' official Bracket 1-5 system for Commander deck power. The MCP knows this system end-to-end via the `score_deck`, `discuss_strength`, `analyze_deck`, and `suggest_cards_for_deck` tools. Use them — do NOT estimate bracket from intuition or training data.
+
+**Bracket targeting workflow** for any deckbuilding conversation:
+
+1. **Ask the player their target bracket early** if not already known for this deck. Suggested phrasing: "What bracket are you aiming this deck at — Bracket 2 (Core), 3 (Upgraded), 4 (Optimized), or 5 (cEDH)? That changes which suggestions are appropriate." Remember the answer for the rest of the conversation.
+
+2. **Score the current deck** with `score_deck` before making structural recommendations, so your baseline is verified. Surface the bracket name and the signals that drove the verdict.
+
+3. **Project change impact**: after you've drafted a set of additions and/or cuts, call `score_deck` again on the projected post-change list. Tell the player whether the change keeps the deck in their target bracket, raises it, or lowers it. If a suggestion would push the deck above the target bracket (e.g. adding a Game Changer or fast mana piece into a Bracket 2 deck), flag it explicitly — don't sneak it in.
+
+4. **Cite signals**: when explaining why a deck sits at a particular bracket, surface specific signals from `score_deck`'s output ("3 fast-mana pieces, 2 tutors, 1 MLD effect — that's why this lands at Bracket 3, not Bracket 2"). This is auditable; vague verdicts ("feels like a 3") are not.
+
+The bracket framework is non-negotiable like the rule lookup: never assert a deck's bracket without `score_deck` having run on the current list this turn.
+
 ## CRITICAL: Lists — Explicit Permission Only
 
-The player has standalone card lists — named collections separate from decks (e.g. "trade binder", "upgrade targets", "wishlist"). You can see their existing lists in the player data below.
+The player's collection in this app is exactly two things: their decks and their lists. A "list" is a named card list that may or may not be attached to a deck. You can see the player's existing lists in the player data below. Do NOT invent other collection categories (no "trade binder", "wishlist", "binder", etc.) — those are not part of this app's data model.
+
+Note: "upgrade target" is a legitimate analytical CONCEPT (a card you'd suggest as a swap-in to replace a weaker card already in the deck) and you may use the phrase that way in recommendations. Just don't propose creating a list NAMED "upgrade targets" — describe the upgrade inline ("[[Three Visits]] as an upgrade for [[Rampant Growth]]") rather than treating it as a saved category.
 
 **NEVER call `create_list` unless the player explicitly asks you to save or create a list.** Do not create lists:
 - Proactively, as a suggestion, or as a "helpful" next step
@@ -391,6 +432,7 @@ if ($activeDeck) {
     $systemPrompt .= "Deck data tools available for this deck: `check_card_in_deck`, `search_deck_cards`, `get_deck_stats` (includes match history, matchups, recent games), `lookup_decklist` (full card list — use only when you need everything). Prefer the targeted tools over the full list to minimize token usage.\n\n";
     if (!empty($activeDeck['list_id'])) {
         $systemPrompt .= "The deck's main card list has list_id: {$activeDeck['list_id']}. Use this id for any list-scoped tool (`get_list_cards`, `update_list`, etc.) — the deck and its main list are the same content here, do not look the list up separately.\n\n";
+        $systemPrompt .= "**You may edit this open deck's card list during the conversation.** The strict 'explicit-only' rule above applies to general list creation/modification; for the deck the player has open RIGHT NOW it does not. When making recommendations, proactively offer to add the suggested cards to the deck (e.g. \"Want me to add these three to the deck?\"). On confirmation: (1) call `lookup_card` for every card you intend to add and confirm each one returns valid Oracle data — only verified cards may be added, (2) call `get_list_cards` with list_id {$activeDeck['list_id']} to fetch the current contents, (3) merge the verified additions onto the full card array, (4) call `update_list` with the complete merged list. If `lookup_card` fails or returns ambiguous results for a candidate, drop that card from the batch and tell the player which ones were skipped and why.\n\n";
     }
     if (!empty($activeDeck['commander'])) {
         $systemPrompt .= "## STOP STATE: Commander Card Lookup Required\n\n";
@@ -410,8 +452,21 @@ if ($activeDeck) {
 if ($activeList) {
     $systemPrompt .= "\n\n## Currently Viewed List\n\n";
     $systemPrompt .= "The player currently has the card list **{$activeList['name']}** (list_id: {$activeList['id']}, {$activeList['card_count']} cards) open. ";
-    $systemPrompt .= "This is a standalone card list — not a Commander deck. Use `lookup_card` or the Scryfall search tools to discuss individual cards from it.";
+    $systemPrompt .= "This is a standalone card list — not a Commander deck. Use `lookup_card` or the Scryfall search tools to discuss individual cards from it.\n\n";
+    $systemPrompt .= "**You may edit this open list during the conversation.** The strict 'explicit-only' rule above applies to general list creation/modification; for the list the player has open RIGHT NOW it does not. When making recommendations, proactively offer to add suggested cards to the list. On confirmation: (1) call `lookup_card` for every card you intend to add and confirm each one returns valid Oracle data — only verified cards may be added, (2) call `get_list_cards` with list_id {$activeList['id']} to fetch the current contents, (3) merge the verified additions onto the full card array, (4) call `update_list` with the complete merged list. Drop any card that fails `lookup_card` and tell the player which ones were skipped.";
 }
+
+// Rateable-chip formatting rules. The chat UI wraps card mentions, CR refs,
+// pattern refs, and explicitly-marked claims in three-state rating chips so
+// the player can flag good / not_relevant / bad. The agent's job is to make
+// those wraps possible by formatting consistently.
+$systemPrompt .= "\n\n## Response formatting for rateable chips\n\n";
+$systemPrompt .= "The chat UI renders these patterns as interactive chips the player can rate. Format your responses so they're well-formed:\n\n";
+$systemPrompt .= "- Card names: wrap in double brackets, always using the FULL canonical Scryfall name, e.g. [[Sol Ring]], [[Ixhel, Scion of Atraxa]]. Do NOT abbreviate (don't write [[Ixhel]] or [[Bolt]]). The UI wraps known names in a CardTooltip; cards not already in the player's active deck/list also get a rating chip (recommendation). In-deck mentions render plain (reference).\n";
+$systemPrompt .= "- Comprehensive Rules refs: bold the rule number, e.g. **117.3c** or **903.6**. The UI wraps them in a RuleTooltip + rating chip.\n";
+$systemPrompt .= "- Verified pattern refs: bold the pattern id, e.g. **P523**. The UI wraps them in a PatternTooltip + rating chip.\n";
+$systemPrompt .= "- Non-cited analytical claims (your judgments, suggestions, evaluations that aren't backed by a specific card, rule, or pattern): wrap each in `[!claim topic=\"short-kebab-tag\"]your claim here[/claim]`. The topic tag groups related claims across messages for aggregation. Pick a stable, descriptive tag (e.g. `deck-needs-more-removal`, `commander-too-fragile`, `mana-base-too-greedy`).\n\n";
+$systemPrompt .= "Only mark a claim when it's a discrete assertion worth rating. Don't wrap whole paragraphs, don't wrap factual restatements of cards/rules (those already get chips on their own), and don't wrap conversational filler.";
 
 // ── Tool definitions (shared with Rules Guru) ─────────────────────────────
 $tools = [
@@ -433,7 +488,7 @@ $tools = [
     ],
     [
         'name'        => 'get_pattern',
-        'description' => 'Fetch a rules interaction pattern by ID from the pattern library. Returns a distilled summary by default.',
+        'description' => 'Fetch a rules interaction pattern by ID. Returns the full pattern including name, category, CR refs, abstract, and body. REQUIRED before describing any pattern (P###) to the player.',
         'input_schema' => [
             'type'       => 'object',
             'properties' => [
@@ -447,6 +502,141 @@ $tools = [
                 ],
             ],
             'required' => ['pattern_id'],
+        ],
+    ],
+    [
+        'name'        => 'create_verified_pattern',
+        'description' => 'Create a new verified pattern in the interaction library. Use when you and the player discover or articulate a rules interaction worth preserving for future reference. Every CR ref in cr_refs must have been verified via lookup_comprehensive_rule in this turn. Every card in cards must have been verified via lookup_card in this turn.',
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => [
+                'name'       => ['type' => 'string', 'description' => 'Short descriptive name.'],
+                'body'       => ['type' => 'string', 'description' => 'Full markdown body.'],
+                'abstract'   => ['type' => 'string', 'description' => 'One-sentence summary.'],
+                'category'   => ['type' => 'string', 'description' => 'combat, triggered, costs, replacement, etc.'],
+                'cr_refs'    => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'CR rule numbers.'],
+                'tags'       => ['type' => 'array', 'items' => ['type' => 'string']],
+                'cards'      => ['type' => 'array', 'items' => ['type' => 'object'], 'description' => '[{card_name, role}] role: subject|example|foil|mentioned.'],
+                'xrefs'      => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Pattern ids this cross-references.'],
+                'pattern_id' => ['type' => 'string', 'description' => 'Optional explicit id. Auto-assigned if omitted.'],
+            ],
+            'required' => ['name', 'body'],
+        ],
+    ],
+    [
+        'name'        => 'update_verified_pattern',
+        'description' => 'Update one or more fields on an existing verified pattern. Pass only the fields you want to change; others are preserved. Same verification requirements as create_verified_pattern.',
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => [
+                'pattern_id' => ['type' => 'string'],
+                'name'       => ['type' => 'string'],
+                'body'       => ['type' => 'string'],
+                'abstract'   => ['type' => 'string'],
+                'category'   => ['type' => 'string'],
+                'cr_refs'    => ['type' => 'array', 'items' => ['type' => 'string']],
+                'tags'       => ['type' => 'array', 'items' => ['type' => 'string']],
+                'cards'      => ['type' => 'array', 'items' => ['type' => 'object']],
+                'xrefs'      => ['type' => 'array', 'items' => ['type' => 'string']],
+            ],
+            'required' => ['pattern_id'],
+        ],
+    ],
+    [
+        'name'        => 'delete_verified_pattern',
+        'description' => 'Permanently delete a pattern from the library. Requires confirm=true. Use only when the pattern is factually wrong or fully superseded by another.',
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => [
+                'pattern_id' => ['type' => 'string'],
+                'confirm'    => ['type' => 'boolean', 'description' => 'Must be true to proceed.'],
+            ],
+            'required' => ['pattern_id', 'confirm'],
+        ],
+    ],
+    [
+        'name'        => 'lookup_comprehensive_rule',
+        'description' => 'Look up a Comprehensive Rules rule by number from the authoritative ingested CR text. REQUIRED before citing or describing any CR reference (e.g. 117.3c, 903.6, 704). Returns the rule body verbatim plus any examples. Returns band="unknown" if the rule does not exist.',
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => [
+                'rule_number' => [
+                    'type'        => 'string',
+                    'description' => 'Rule number, e.g. "117.3c", "903.6", "704.5". Case-insensitive on the letter suffix.',
+                ],
+            ],
+            'required' => ['rule_number'],
+        ],
+    ],
+    [
+        'name'        => 'score_deck',
+        'description' => "Score a Commander deck and assign Wizards' Bracket 1-5. Returns {bracket, bracket_name, strength_score, signals[], warnings[]}. Each signal traces the contribution (fast mana, tutors, Game Changers, MLD, stax, combos, etc.) so you can explain the verdict. REQUIRED before claiming a deck's bracket and REQUIRED after proposing a set of additions/cuts so you can tell the player whether the change shifts brackets.",
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => [
+                'decklist'  => [
+                    'type'        => 'array',
+                    'items'       => ['type' => 'string'],
+                    'description' => 'One card name per entry.',
+                ],
+                'commander' => [
+                    'type'        => 'string',
+                    'description' => 'Optional commander name.',
+                ],
+            ],
+            'required' => ['decklist'],
+        ],
+    ],
+    [
+        'name'        => 'discuss_strength',
+        'description' => "Same bracket evaluation as score_deck, returned with a prose 'narrative' field suitable for direct conversation about deck power. Use when discussing strength qualitatively.",
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => [
+                'decklist'  => ['type' => 'array', 'items' => ['type' => 'string']],
+                'commander' => ['type' => 'string'],
+            ],
+            'required' => ['decklist'],
+        ],
+    ],
+    [
+        'name'        => 'analyze_deck',
+        'description' => "Structural analysis of a Commander deck: color identity, mana curve, type counts, role distribution (ramp, draw, removal, threats), gaps. Use to ground recommendations in the deck's actual composition before suggesting changes.",
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => [
+                'decklist'  => ['type' => 'array', 'items' => ['type' => 'string']],
+                'commander' => ['type' => 'string'],
+            ],
+            'required' => ['decklist'],
+        ],
+    ],
+    [
+        'name'        => 'suggest_cards_for_deck',
+        'description' => "Recommend cards that fit the deck's color identity and a target role. Returns full card data so you can justify each pick from Oracle text. Use for sourcing candidate additions, then run score_deck on the deck + additions to verify bracket impact before presenting them.",
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => [
+                'decklist'        => ['type' => 'array', 'items' => ['type' => 'string']],
+                'role'            => ['type' => 'string', 'enum' => ['ramp', 'draw', 'removal', 'theme']],
+                'strategy_hint'   => ['type' => 'string', 'description' => "Optional theme like 'toxic', 'aristocrats', 'tokens'."],
+                'max_suggestions' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50],
+            ],
+            'required' => ['decklist', 'role'],
+        ],
+    ],
+    [
+        'name'        => 'lookup_glossary_term',
+        'description' => 'Look up a Magic mechanic or keyword from the Comprehensive Rules glossary (e.g. "trample", "deathtouch", "prowess", "cascade"). REQUIRED before describing how any mechanic works. Returns the glossary definition verbatim. Returns band="unknown" if the term is not in the glossary.',
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => [
+                'term' => [
+                    'type'        => 'string',
+                    'description' => 'Glossary term, e.g. "trample", "deathtouch". Case-insensitive.',
+                ],
+            ],
+            'required' => ['term'],
         ],
     ],
     [
@@ -786,6 +976,62 @@ function executeTool(string $name, array $input): string {
         }
 
         return json_encode($results);
+    }
+
+    if (in_array($name, ['create_verified_pattern', 'update_verified_pattern', 'delete_verified_pattern'], true)) {
+        $args = [];
+        $stringFields = ['name', 'body', 'abstract', 'category', 'pattern_id'];
+        foreach ($stringFields as $f) {
+            if (isset($input[$f]) && is_string($input[$f])) $args[$f] = $input[$f];
+        }
+        $arrayFields = ['cr_refs', 'tags', 'cards', 'xrefs'];
+        foreach ($arrayFields as $f) {
+            if (isset($input[$f]) && is_array($input[$f])) $args[$f] = $input[$f];
+        }
+        if ($name === 'delete_verified_pattern') {
+            $args['confirm'] = !empty($input['confirm']);
+        }
+        $envelope = mcpCallToolOrUnknown($name, $args, "commander-mcp HTTP transport unreachable; cannot run {$name}");
+        return json_encode($envelope);
+    }
+
+    if ($name === 'lookup_comprehensive_rule') {
+        $ruleNumber = strtolower(trim($input['rule_number'] ?? ''));
+        if ($ruleNumber === '') return json_encode(['error' => 'Missing rule_number']);
+        $envelope = mcpCallToolOrUnknown(
+            'lookup_comprehensive_rule',
+            ['rule_number' => $ruleNumber],
+            'commander-mcp HTTP transport unreachable; do not cite this rule'
+        );
+        return json_encode($envelope);
+    }
+
+    if ($name === 'score_deck') {
+        $decklist  = is_array($input['decklist'] ?? null) ? $input['decklist'] : [];
+        $commander = (isset($input['commander']) && is_string($input['commander'])) ? $input['commander'] : null;
+        return json_encode(mcpScoreDeck($decklist, $commander));
+    }
+
+    if ($name === 'discuss_strength' || $name === 'analyze_deck' || $name === 'suggest_cards_for_deck') {
+        $args = [];
+        if (isset($input['decklist']) && is_array($input['decklist'])) $args['decklist'] = $input['decklist'];
+        if (isset($input['commander']) && is_string($input['commander']) && $input['commander'] !== '') $args['commander'] = $input['commander'];
+        if (isset($input['role']) && is_string($input['role'])) $args['role'] = $input['role'];
+        if (isset($input['strategy_hint']) && is_string($input['strategy_hint'])) $args['strategy_hint'] = $input['strategy_hint'];
+        if (isset($input['max_suggestions']) && is_int($input['max_suggestions'])) $args['max_suggestions'] = $input['max_suggestions'];
+        $envelope = mcpCallToolOrUnknown($name, $args, "commander-mcp HTTP transport unreachable; cannot run {$name}");
+        return json_encode($envelope);
+    }
+
+    if ($name === 'lookup_glossary_term') {
+        $term = trim($input['term'] ?? '');
+        if ($term === '') return json_encode(['error' => 'Missing term']);
+        $envelope = mcpCallToolOrUnknown(
+            'lookup_glossary_term',
+            ['term' => $term],
+            'commander-mcp HTTP transport unreachable; do not describe this mechanic'
+        );
+        return json_encode($envelope);
     }
 
     if ($name === 'get_pattern') {
@@ -1523,7 +1769,7 @@ while ($iter < $maxIter) {
     $iter++;
 
     $payload = [
-        'model'      => 'claude-haiku-4-5-20251001',
+        'model'      => 'claude-opus-4-7',
         'max_tokens' => 8192,
         'system'     => $systemPrompt,
         'tools'      => $tools,
@@ -1590,7 +1836,15 @@ while ($iter < $maxIter) {
     // process the tools but then force a final text-only reply.
     $isLastIter = ($iter >= $maxIter);
 
-    $messages[] = ['role' => 'assistant', 'content' => $content];
+    // Normalize tool_use blocks so empty input encodes as JSON `{}` (object),
+    // not `[]` (array). Anthropic rejects `[]` with "Input should be an object".
+    $normalizedContent = array_map(function ($block) {
+        if (is_array($block) && ($block['type'] ?? null) === 'tool_use' && empty($block['input'])) {
+            $block['input'] = new stdClass();
+        }
+        return $block;
+    }, $content);
+    $messages[] = ['role' => 'assistant', 'content' => $normalizedContent];
 
     $toolResults = [];
     foreach ($content as $block) {
@@ -1613,7 +1867,7 @@ while ($iter < $maxIter) {
 // If we hit the iteration cap, make one final call without tools to force a summary.
 if ($hitIterCap) {
     $finalPayload = [
-        'model'      => 'claude-haiku-4-5-20251001',
+        'model'      => 'claude-opus-4-7',
         'max_tokens' => 8192,
         'system'     => $systemPrompt,
         'messages'   => $messages,
