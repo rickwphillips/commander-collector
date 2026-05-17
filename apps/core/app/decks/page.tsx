@@ -391,14 +391,14 @@ export default function DecksPage() {
                             </IconButton>
                           </Tooltip>
                           {deck.card_count > 0 && (
-                            <Tooltip title={`${deck.card_count} cards — scan art`}>
+                            <Tooltip title={`${deck.card_count} cards`}>
                               <IconButton
                                 size="small"
                                 color="primary"
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  router.push(`/decks/scan?edit=${deck.id}`);
+                                  router.push(`/decks/decklist?id=${encodeURIComponent(deck.id)}`);
                                 }}
                               >
                                 <StyleIcon fontSize="small" />

@@ -479,7 +479,7 @@ export const api = {
   sendCoachMessage: async (
     message: string,
     history: import('./types').CoachMessage[],
-    activeDeck?: { deckId: string; deckName: string; commander: string; cardCount: number; colors: string },
+    activeDeck?: { deckId: string; deckName: string; commander: string; cardCount: number; colors: string; listId?: string },
     activeList?: { listId: string; listName: string; cardCount: number },
     onPartial?: (text: string) => void,
     signal?: AbortSignal,
@@ -492,6 +492,7 @@ export const api = {
         commander: activeDeck.commander,
         card_count: activeDeck.cardCount,
         colors: activeDeck.colors,
+        ...(activeDeck.listId ? { list_id: activeDeck.listId } : {}),
       };
     }
     if (activeList) {

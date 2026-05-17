@@ -16,7 +16,7 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
+import PsychologyIcon from '@mui/icons-material/Psychology';
 import CloseIcon from '@mui/icons-material/Close';
 import AddCommentIcon from '@mui/icons-material/AddComment';
 import HistoryIcon from '@mui/icons-material/History';
@@ -159,6 +159,10 @@ export interface ActiveDeckContext {
   cardCount: number;
   commander: string;
   colors: string;
+  // Set when the deck's main list is loaded on the same page so tools that
+  // need list_id (saveListCards, resolveListImages, ...) can find it without
+  // a second "List:" chip duplicating the same info.
+  listId?: string;
 }
 
 export interface ActiveListContext {
@@ -271,14 +275,10 @@ export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruC
     if (!initialized) setInitialized(true);
   };
 
-  // Auto-greet when opened with no history and an autoGreet message is set
-  useEffect(() => {
-    if (open && initialized && autoGreet && messages.length === 0 && !loading) {
-      handleSend(autoGreet);
-    }
-  // handleSend changes identity each render; only trigger on open/initialized change
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialized]);
+  // No auto-greet: opening the drawer with a deck/list active should attach
+  // context and show suggested questions, not fire off a canned prompt.
+  // (autoGreet prop kept for back-compat; intentionally unused.)
+  void autoGreet;
 
   const handleNewChat = () => {
     abortCtrlRef.current?.abort();
@@ -372,7 +372,7 @@ export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruC
         sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider', flexShrink: 0 }}
       >
         <Stack direction="row" alignItems="center" spacing={1}>
-          <SmartToyIcon sx={{ color: '#6B8E6B' }} />
+          <PsychologyIcon sx={{ color: '#6B8E6B' }} />
           <Typography variant="h6" sx={{ fontWeight: 600 }}>
             Commander Coach
           </Typography>
@@ -486,17 +486,32 @@ export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruC
           >
             {messages.length === 0 && !loading && (
               <Box sx={{ textAlign: 'center', mt: 8 }}>
-                <SmartToyIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
+                <PsychologyIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
                 <Typography color="text.secondary" variant="body2" sx={{ mb: 2 }}>
                   Ask me anything about your Commander performance.
                 </Typography>
                 <Stack spacing={1} alignItems="center">
-                  {[
-                    'How can I improve?',
-                    'Which deck should I retire?',
-                    'What beats my nemesis?',
-                    activeDeck ? `Suggest cards for ${activeDeck.deckName}` : 'Suggest cards for my best deck',
-                  ].map((q) => (
+                  {(activeDeck
+                    ? [
+                        `Give me a focused overview of ${activeDeck.deckName}`,
+                        `What are the key synergies in ${activeDeck.deckName}?`,
+                        `What are this deck's win conditions and biggest weaknesses?`,
+                        `Suggest cuts and additions for ${activeDeck.deckName}`,
+                      ]
+                    : activeList
+                    ? [
+                        `Give me an overview of "${activeList.listName}"`,
+                        `What are the notable synergies in this list?`,
+                        `What's missing — any obvious gaps?`,
+                        `Suggest cuts and additions for "${activeList.listName}"`,
+                      ]
+                    : [
+                        'How can I improve?',
+                        'Which deck should I retire?',
+                        'What beats my nemesis?',
+                        'Suggest cards for my best deck',
+                      ]
+                  ).map((q) => (
                     <Chip
                       key={q}
                       label={q}
@@ -592,7 +607,7 @@ export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruC
             display: open ? 'none' : 'flex',
           }}
         >
-          <SmartToyIcon />
+          <PsychologyIcon />
         </Fab>
       </Tooltip>
 

@@ -512,7 +512,7 @@ export default function DeckDetailPage() {
             variant="outlined"
             onClick={() => {
               setEditDialogOpen(false);
-              router.push(`/decks/scan?edit=${deckId}`);
+              router.push(`/decks/decklist?id=${deckId}`);
             }}
           >
             Edit Cards

@@ -8,12 +8,14 @@ import {
   Button,
   Chip,
   CircularProgress,
+  IconButton,
   Stack,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import RestoreIcon from '@mui/icons-material/Restore';
 import LinkIcon from '@mui/icons-material/Link';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
+import PsychologyIcon from '@mui/icons-material/Psychology';
 
 import { PageContainer } from '@/components/PageContainer';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -45,6 +47,10 @@ function ListPageInner() {
   // ── Deck name (only fetched when list is attached to a deck) ──────────────
   const [deckName, setDeckName] = useState<string | null>(null);
   const [deckNameLoading, setDeckNameLoading] = useState(false);
+
+  // ── Guru chat ─────────────────────────────────────────────────────────────
+  const [coachOpen, setCoachOpen] = useState(false);
+  const coachRef = useRef<GuruChatHandle>(null);
 
   // ── Local UI state ────────────────────────────────────────────────────────
   const [error, setError] = useState<string | null>(null);
@@ -93,6 +99,17 @@ function ListPageInner() {
       });
     return () => { cancelled = true; };
   }, [list?.deck_id]);
+
+  // ── Seed guru context once list + cards load ──────────────────────────────
+
+  useEffect(() => {
+    if (!list) return;
+    coachRef.current?.setActiveList({
+      listId:    list.id,
+      listName:  list.name,
+      cardCount: cards.length,
+    });
+  }, [list, cards.length]);
 
   // ── Redirect to /lists on 404 (list not found after load completes) ────────
 
@@ -205,6 +222,10 @@ function ListPageInner() {
     </Stack>
   );
 
+  const autoGreet = list
+    ? `I want to discuss my "${list.name}" list (${cards.length} cards${list.format ? `, format: ${list.format}` : ''}). Give me a focused overview — key synergies, notable gaps, and anything you'd flag as worth improving.`
+    : undefined;
+
   return (
     <PageContainer
       title={list.name}
@@ -212,6 +233,13 @@ function ListPageInner() {
       backHref="/lists"
       backLabel="Lists"
       onBackClick={confirmLeaveIfDirty}
+      actions={
+        <Tooltip title="Discuss this list with the Guru">
+          <IconButton onClick={() => setCoachOpen(true)} sx={{ color: '#6B8E6B' }}>
+            <PsychologyIcon />
+          </IconButton>
+        </Tooltip>
+      }
     >
       {/* Error banner */}
       {(error || listError) && (
@@ -253,6 +281,14 @@ function ListPageInner() {
       />
 
       {confirmDialog}
+
+      <GuruChat
+        ref={coachRef}
+        notes={[]}
+        open={coachOpen}
+        onToggle={setCoachOpen}
+        autoGreet={autoGreet}
+      />
     </PageContainer>
   );
 }

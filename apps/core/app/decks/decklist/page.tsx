@@ -7,13 +7,10 @@ import {
   Box,
   Button,
   CircularProgress,
-  IconButton,
   Link as MuiLink,
   Stack,
-  Tooltip,
   Typography,
 } from '@mui/material';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
 import Link from 'next/link';
 import { PageContainer } from '@/components/PageContainer';
 import { ColorIdentityChips } from '@/components/ColorIdentityChips';
@@ -61,6 +58,22 @@ function DeckListPageInner() {
     list, cards, loading: listLoading, error: listError, conflict,
     save, detachFromDeck, refresh,
   } = useList({ deckId });
+
+  // Refresh the coach context once list + cards are loaded so the system
+  // prompt has the list UUID and the real card count, not the placeholder.
+  // On this page the deck and its main list are the same thing — we attach
+  // list_id to the deck context instead of emitting a second "List:" chip.
+  useEffect(() => {
+    if (!deck || !list) return;
+    coachRef.current?.setActiveDeck({
+      deckId:    deck.id,
+      deckName:  deck.name,
+      cardCount: cards.length,
+      commander: deck.commander ?? '',
+      colors:    deck.colors ?? '',
+      listId:    list.id,
+    });
+  }, [deck, list, cards.length]);
 
   // ── Dirty guard ───────────────────────────────────────────────────────────
   const [dirty, setDirty] = useState(false);
@@ -162,13 +175,6 @@ function DeckListPageInner() {
       backHref={`/decks/detail?id=${deckId}`}
       backLabel="Back to Deck"
       onBackClick={confirmLeaveIfDirty}
-      actions={
-        <Tooltip title="Discuss this deck with the Coach">
-          <IconButton onClick={() => setCoachOpen(true)} sx={{ color: '#6B8E6B' }}>
-            <SmartToyIcon />
-          </IconButton>
-        </Tooltip>
-      }
     >
       {/* Errors */}
       {listError && (
@@ -210,7 +216,6 @@ function DeckListPageInner() {
         notes={[]}
         open={coachOpen}
         onToggle={setCoachOpen}
-        autoGreet={deck ? `I want to discuss my ${deck.name} deck (commander: ${deck.commander}). Give me a focused overview — key synergies, win conditions, and anything you'd flag as a weakness.` : undefined}
       />
     </PageContainer>
   );
