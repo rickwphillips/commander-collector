@@ -83,7 +83,7 @@ switch ($method) {
                 sendJSON(['ok' => true], 201);
             } catch (Exception $e) {
                 $pdo->rollBack();
-                sendError('Failed to append event: ' . $e->getMessage(), 500);
+                sendError('Failed to append event', 500);
             }
         }
 
@@ -151,7 +151,7 @@ switch ($method) {
 
         } catch (Exception $e) {
             $pdo->rollBack();
-            sendError('Failed to create session: ' . $e->getMessage(), 500);
+            sendError('Failed to create session', 500);
         }
         break;
 
@@ -190,7 +190,7 @@ switch ($method) {
                 $pdo->commit();
             } catch (Exception $e) {
                 $pdo->rollBack();
-                sendError('Failed to consume events: ' . $e->getMessage(), 500);
+                sendError('Failed to consume events', 500);
             }
         } else {
             $row = resolveSession($pdo, $code);
