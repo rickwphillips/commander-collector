@@ -104,12 +104,14 @@ function ListPageInner() {
 
   useEffect(() => {
     if (!list) return;
+    const cardNames = new Set(cards.map((c) => c.card_name.trim().toLowerCase()));
     coachRef.current?.setActiveList({
       listId:    list.id,
       listName:  list.name,
       cardCount: cards.length,
+      cardNames,
     });
-  }, [list, cards.length]);
+  }, [list, cards]);
 
   // ── Redirect to /lists on 404 (list not found after load completes) ────────
 

@@ -80,7 +80,7 @@ export function RuleTooltip({ reference, children, placement = 'top', style }: P
     >
       <span
         style={{ cursor: 'help', borderBottom: '1px dotted currentColor', ...style }}
-        onMouseEnter={() => setHovered(true)}
+        onMouseOver={() => setHovered(true)}
       >
         {children}
       </span>

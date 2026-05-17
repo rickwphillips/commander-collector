@@ -100,7 +100,7 @@ export function PatternTooltip({ reference, children, placement = 'top', style }
     >
       <span
         style={{ cursor: 'help', borderBottom: '1px dotted currentColor', ...style }}
-        onMouseEnter={() => setHovered(true)}
+        onMouseOver={() => setHovered(true)}
       >
         {children}
       </span>

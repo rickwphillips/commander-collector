@@ -24,10 +24,22 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { api } from '@/lib/api';
 import type { CoachMessage, CoachNote, CoachToolCall } from '@/lib/types';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
-import { looksLikeCardName } from '@commander/shared/components/cardNameUtils';
+import { RuleTooltip } from '@commander/shared/components/RuleTooltip';
+import { PatternTooltip } from '@commander/shared/components/PatternTooltip';
+import { RatingChip, type RatingChipSubmit } from '@commander/shared/components/RatingChip';
+import { looksLikeCRReference, looksLikePNumber } from '@commander/shared/components/cardNameUtils';
+import { loadCardCatalog, isKnownCardName } from '@commander/shared/lib/cardCatalog';
 import { ChatInput, type ChatInputHandle } from '@commander/shared/components/ChatInput';
 import { ThinkingIndicator } from '@commander/shared/components/ThinkingIndicator';
 import { useChatKeys } from '@commander/shared/lib/useChatKeys';
+
+// basePath is empty in dev and /app/projects/commander in prod for the core app.
+const BASE_PATH = process.env.NODE_ENV === 'development' ? '' : '/app/projects/commander';
+
+// Style applied to lookup-tooltip wrappers when the child is a chip. The chip
+// is its own visual cue, so we drop the dotted-underline and help-cursor that
+// the tooltip components apply by default.
+const CHIP_TOOLTIP_STYLE: React.CSSProperties = { borderBottom: 'none', cursor: 'inherit' };
 
 export const GURU_DRAWER_WIDTH = 420;
 
@@ -163,12 +175,18 @@ export interface ActiveDeckContext {
   // need list_id (saveListCards, resolveListImages, ...) can find it without
   // a second "List:" chip duplicating the same info.
   listId?: string;
+  // Lowercase set of card names in the active deck. When a chat response
+  // mentions a card that's already in the deck, the chip renders as a
+  // tooltip-only reference (no rating). Cards outside this set are
+  // recommendations and get a rateable chip.
+  cardNames?: Set<string>;
 }
 
 export interface ActiveListContext {
   listId: string;
   listName: string;
   cardCount: number;
+  cardNames?: Set<string>;
 }
 
 // ChatInput is imported from @commander/shared/components/ChatInput
@@ -240,7 +258,14 @@ export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruC
     if (sessions.length > 0 && messages.length === 0) {
       const latest = sessions[0];
       sessionIdRef.current = latest.id;
-      setMessages(latest.messages);
+      // Backfill uuids for messages saved before the rating-chip system landed
+      // so re-renders have stable keys for the chips.
+      const backfilled = latest.messages.map((m) =>
+        m.role === 'assistant' && !m.uuid
+          ? { ...m, uuid: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `m-${Date.now()}-${Math.random()}` }
+          : m
+      );
+      setMessages(backfilled);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialized]);
@@ -258,6 +283,14 @@ export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruC
       coachInputRef.current?.focus();
     }
   }, [open, initialized]);
+
+  // Warm the card-name catalog once the drawer mounts so isKnownCardName()
+  // returns true matches by the time the first response renders.
+  useEffect(() => {
+    if (initialized) {
+      void loadCardCatalog(`${BASE_PATH}/card-names.json`);
+    }
+  }, [initialized]);
 
   useChatKeys({
     onToggleToolDetails: () => setShowToolDetails(v => !v),
@@ -289,8 +322,10 @@ export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruC
     coachInputRef.current?.setValue('');
     setLoading(false);
     setPartialResponse('');
-    setActiveDeck(null);
-    setActiveList(null);
+    // Intentionally do NOT clear activeDeck/activeList: deck/list context is
+    // a property of the page the user is on, not the conversation. Clearing
+    // it here drops the chips back to the meta set even though the parent
+    // page still has the same deck loaded.
     setShowHistory(false);
     coachInputRef.current?.focus();
   };
@@ -315,6 +350,31 @@ export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruC
     setLoading(false);
     setPartialResponse('');
   };
+
+  // Fired once per settled chip toggle. Forwards to the chat-feedback MCP tool
+  // via the PHP proxy. Failures are swallowed; user-visible signal is the chip
+  // state itself.
+  const handleRate = useCallback(async (payload: RatingChipSubmit) => {
+    try {
+      await api.submitChatFeedback({
+        surface:     'coach',
+        messageUuid: payload.messageUuid,
+        kind:        payload.kind,
+        targetId:    payload.targetId,
+        rating:      payload.rating,
+        contentText: payload.contentText,
+        deckId:      activeDeck?.deckId,
+        listId:      activeDeck?.listId ?? activeList?.listId,
+      });
+    } catch (e) {
+      console.warn('[coach] submitChatFeedback failed', e);
+    }
+  }, [activeDeck, activeList]);
+
+  // Union of card-name sets from the active deck/list, lowercased. Used by
+  // renderMarkdown to decide whether a card mention is a reference (no chip)
+  // or a recommendation (rateable chip).
+  const cardsInContext = (activeDeck?.cardNames || activeList?.cardNames) ?? null;
 
   const handleSend = async (text: string) => {
     if (!text) return;
@@ -347,7 +407,12 @@ export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruC
       if (ctrl.signal.aborted) return;
       console.log('[coach] response received', { len: response.length, tools: toolsUsed.length, empty: response === '' });
       setPartialResponse('');
-      const assistantMsg: CoachMessage = { role: 'assistant', content: response, toolsUsed };
+      const assistantMsg: CoachMessage = {
+        role: 'assistant',
+        content: response,
+        toolsUsed,
+        uuid: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `m-${Date.now()}`,
+      };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (err) {
       if (ctrl.signal.aborted) return;
@@ -527,14 +592,24 @@ export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruC
             )}
 
             {messages.map((msg, i) => (
-              <ChatBubble key={i} message={msg} showToolDetails={showToolDetails} />
+              <ChatBubble
+                key={msg.uuid ?? i}
+                message={msg}
+                showToolDetails={showToolDetails}
+                onRate={handleRate}
+                cardsInContext={cardsInContext}
+              />
             ))}
 
             {loading && (
               <Box sx={{ mt: 1 }}>
                 {partialResponse && (
                   <Box sx={{ opacity: 0.7 }}>
-                    <ChatBubble message={{ role: 'assistant', content: partialResponse }} />
+                    <ChatBubble
+                      message={{ role: 'assistant', content: partialResponse }}
+                      onRate={handleRate}
+                      cardsInContext={cardsInContext}
+                    />
                   </Box>
                 )}
                 <ThinkingIndicator messages={thinkingMessagesRef.current} />
@@ -697,7 +772,14 @@ function toolLabel(tool: CoachToolCall): string {
 
 // ── Chat bubble with basic markdown rendering ─────────────────────────────
 
-const ChatBubble = memo(function ChatBubble({ message, showToolDetails }: { message: CoachMessage; showToolDetails?: boolean }) {
+const ChatBubble = memo(function ChatBubble({
+  message, showToolDetails, onRate, cardsInContext,
+}: {
+  message: CoachMessage;
+  showToolDetails?: boolean;
+  onRate?: (payload: RatingChipSubmit) => void | Promise<void>;
+  cardsInContext?: Set<string> | null;
+}) {
   const isUser = message.role === 'user';
   const displayContent = message.content
     .replace(/\nCARDS:.*$/m, '')
@@ -763,7 +845,7 @@ const ChatBubble = memo(function ChatBubble({ message, showToolDetails }: { mess
               '& code': { background: 'rgba(0,0,0,0.1)', padding: '1px 4px', borderRadius: '3px' },
             }}
           >
-            {renderMarkdown(displayContent)}
+            {renderMarkdown(displayContent, message.uuid, onRate, cardsInContext ?? null)}
           </Typography>
         </Paper>
       </Box>
@@ -771,58 +853,238 @@ const ChatBubble = memo(function ChatBubble({ message, showToolDetails }: { mess
   );
 });
 
-/** Render markdown text as React elements with CardTooltip on bold card names and [[Card Name]] chips */
-function renderMarkdown(text: string): React.ReactNode {
+/**
+ * Render assistant markdown with the four-kind rating-chip matrix:
+ *   - card in active deck/list → CardTooltip + plain bold (no chip)
+ *   - card NOT in active deck/list → CardTooltip + RatingChip(kind=card)
+ *   - CR ref (e.g. **117.3c**) → RuleTooltip + RatingChip(kind=cr_rule)
+ *   - P ref  (e.g. **P523**)   → PatternTooltip + RatingChip(kind=pattern)
+ *   - [!claim topic="..."]body[/claim] → RatingChip(kind=claim), no tooltip
+ *   - everything else: plain bold / italic / code
+ *
+ * messageUuid is the per-message client UUID; when missing (e.g. the streaming
+ * partial bubble), all chips fall back to noop (no submission).
+ */
+function renderMarkdown(
+  text: string,
+  messageUuid: string | undefined,
+  onRate: ((p: RatingChipSubmit) => void | Promise<void>) | undefined,
+  cardsInContext: Set<string> | null,
+): React.ReactNode {
   const lines = text.split('\n');
   const result: React.ReactNode[] = [];
+  const canRate = !!(messageUuid && onRate);
+  const cardInCtx = (name: string) => !!cardsInContext && cardsInContext.has(name.trim().toLowerCase());
+
+  // Split tokens we recognize: [[chip]], [!claim ...]...[/claim], **bold**, *em*, `code`.
+  const splitRe = /(\[\[.*?\]\]|\[!claim\s+topic="[^"]*"\][\s\S]*?\[\/claim\]|\*\*.*?\*\*|\*.*?\*|`.*?`)/g;
 
   lines.forEach((line, lineIdx) => {
     if (lineIdx > 0) result.push(<br key={`br-${lineIdx}`} />);
-
-    const parts = line.split(/(\[\[.*?\]\]|\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
+    const parts = line.split(splitRe);
 
     parts.forEach((part, partIdx) => {
       const key = `${lineIdx}-${partIdx}`;
 
+      // [[Card Name]] explicit author markup → chip (no underline; chip is the cue)
       if (part.startsWith('[[') && part.endsWith(']]')) {
         const name = part.slice(2, -2).trim();
-        result.push(
-          <CardTooltip key={key} name={name}>
-            <Chip
-              label={name}
-              size="small"
-              variant="outlined"
-              sx={{
-                fontSize: '0.7rem',
-                height: 20,
-                cursor: 'default',
-                verticalAlign: 'middle',
-                mx: 0.25,
-                borderColor: 'primary.main',
-                color: 'primary.main',
-                '& .MuiChip-label': { px: 0.75 },
-              }}
-            />
-          </CardTooltip>
-        );
-      } else if (part.startsWith('**') && part.endsWith('**')) {
-        const inner = part.slice(2, -2);
-        if (looksLikeCardName(inner)) {
+        if (canRate && !cardInCtx(name)) {
           result.push(
-            <CardTooltip key={key} name={inner} style={{ borderBottom: '1px dotted currentColor' }}>
-              <strong>{inner}</strong>
+            <CardTooltip key={key} name={name} style={CHIP_TOOLTIP_STYLE}>
+              <RatingChip
+                kind="card"
+                targetId={name.toLowerCase()}
+                messageUuid={messageUuid!}
+                contentText={name}
+                onSubmit={onRate!}
+              >
+                {name}
+              </RatingChip>
             </CardTooltip>
           );
         } else {
-          result.push(<strong key={key}>{inner}</strong>);
+          result.push(
+            <CardTooltip key={key} name={name} style={CHIP_TOOLTIP_STYLE}>
+              <Chip
+                label={name}
+                size="small"
+                variant="outlined"
+                sx={{
+                  fontSize: '0.7rem', height: 20, cursor: 'default', verticalAlign: 'middle', mx: 0.25,
+                  borderColor: 'primary.main', color: 'primary.main', '& .MuiChip-label': { px: 0.75 },
+                }}
+              />
+            </CardTooltip>
+          );
         }
-      } else if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
-        result.push(<em key={key}>{part.slice(1, -1)}</em>);
-      } else if (part.startsWith('`') && part.endsWith('`')) {
-        result.push(<code key={key}>{part.slice(1, -1)}</code>);
-      } else {
-        result.push(<span key={key}>{part}</span>);
+        return;
       }
+
+      // [!claim topic="..."]body[/claim] → rateable claim chip, no tooltip
+      const claimMatch = /^\[!claim\s+topic="([^"]*)"\]([\s\S]*?)\[\/claim\]$/.exec(part);
+      if (claimMatch) {
+        const topic = claimMatch[1].trim();
+        const body  = claimMatch[2].trim();
+        if (canRate && topic) {
+          result.push(
+            <RatingChip
+              key={key}
+              kind="claim"
+              targetId={topic}
+              messageUuid={messageUuid!}
+              contentText={body}
+              onSubmit={onRate!}
+            >
+              {body}
+            </RatingChip>
+          );
+        } else {
+          result.push(<span key={key}>{body}</span>);
+        }
+        return;
+      }
+
+      // **bold** → dispatch by content
+      if (part.startsWith('**') && part.endsWith('**')) {
+        const inner = part.slice(2, -2);
+
+        // AI commonly emits `**Baseline: [[Sol Ring]] — ...**`, wrapping a
+        // [[Card]] chip inside bold. The outer regex matched the bold first
+        // and would otherwise render the brackets as literal text. Re-split
+        // the bold's interior on [[...]] so the chips render inside <strong>.
+        if (inner.includes('[[') && inner.includes(']]')) {
+          const subRe = /(\[\[.*?\]\])/g;
+          const subParts = inner.split(subRe);
+          const rendered: React.ReactNode[] = subParts.map((sp, i) => {
+            const subKey = `${key}-s${i}`;
+            if (sp.startsWith('[[') && sp.endsWith(']]')) {
+              const n = sp.slice(2, -2).trim();
+              if (canRate && !cardInCtx(n)) {
+                return (
+                  <CardTooltip key={subKey} name={n} style={CHIP_TOOLTIP_STYLE}>
+                    <RatingChip
+                      kind="card"
+                      targetId={n.toLowerCase()}
+                      messageUuid={messageUuid!}
+                      contentText={n}
+                      onSubmit={onRate!}
+                    >
+                      {n}
+                    </RatingChip>
+                  </CardTooltip>
+                );
+              }
+              return (
+                <CardTooltip key={subKey} name={n} style={CHIP_TOOLTIP_STYLE}>
+                  <Chip
+                    label={n}
+                    size="small"
+                    variant="outlined"
+                    sx={{
+                      fontSize: '0.7rem', height: 20, cursor: 'default', verticalAlign: 'middle', mx: 0.25,
+                      borderColor: 'primary.main', color: 'primary.main', '& .MuiChip-label': { px: 0.75 },
+                    }}
+                  />
+                </CardTooltip>
+              );
+            }
+            return <span key={subKey}>{sp}</span>;
+          });
+          result.push(<strong key={key}>{rendered}</strong>);
+          return;
+        }
+
+        if (looksLikePNumber(inner)) {
+          if (canRate) {
+            result.push(
+              <PatternTooltip key={key} reference={inner} style={CHIP_TOOLTIP_STYLE}>
+                <RatingChip
+                  kind="pattern"
+                  targetId={inner.toLowerCase().replace(/^#/, '')}
+                  messageUuid={messageUuid!}
+                  contentText={inner}
+                  onSubmit={onRate!}
+                >
+                  {inner}
+                </RatingChip>
+              </PatternTooltip>
+            );
+          } else {
+            result.push(
+              <PatternTooltip key={key} reference={inner}>
+                <strong>{inner}</strong>
+              </PatternTooltip>
+            );
+          }
+          return;
+        }
+
+        if (looksLikeCRReference(inner)) {
+          if (canRate) {
+            result.push(
+              <RuleTooltip key={key} reference={inner} style={CHIP_TOOLTIP_STYLE}>
+                <RatingChip
+                  kind="cr_rule"
+                  targetId={inner.toLowerCase().replace(/^cr\s+/i, '')}
+                  messageUuid={messageUuid!}
+                  contentText={inner}
+                  onSubmit={onRate!}
+                >
+                  {inner}
+                </RatingChip>
+              </RuleTooltip>
+            );
+          } else {
+            result.push(
+              <RuleTooltip key={key} reference={inner}>
+                <strong>{inner}</strong>
+              </RuleTooltip>
+            );
+          }
+          return;
+        }
+
+        if (isKnownCardName(inner)) {
+          if (canRate && !cardInCtx(inner)) {
+            // Out-of-deck recommendation: chip handles the visual cue, no underline.
+            result.push(
+              <CardTooltip key={key} name={inner} style={CHIP_TOOLTIP_STYLE}>
+                <RatingChip
+                  kind="card"
+                  targetId={inner.toLowerCase()}
+                  messageUuid={messageUuid!}
+                  contentText={inner}
+                  onSubmit={onRate!}
+                >
+                  {inner}
+                </RatingChip>
+              </CardTooltip>
+            );
+          } else {
+            // In-deck reference: plain bold with the dotted underline cue.
+            result.push(
+              <CardTooltip key={key} name={inner} style={{ borderBottom: '1px dotted currentColor' }}>
+                <strong>{inner}</strong>
+              </CardTooltip>
+            );
+          }
+          return;
+        }
+
+        result.push(<strong key={key}>{inner}</strong>);
+        return;
+      }
+
+      if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
+        result.push(<em key={key}>{part.slice(1, -1)}</em>);
+        return;
+      }
+      if (part.startsWith('`') && part.endsWith('`')) {
+        result.push(<code key={key}>{part.slice(1, -1)}</code>);
+        return;
+      }
+      result.push(<span key={key}>{part}</span>);
     });
   });
 
