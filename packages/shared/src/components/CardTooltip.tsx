@@ -88,7 +88,7 @@ export function CardTooltip({ name, children, previewWidth = 220, placement = 't
     >
       <span
         style={{ cursor: onClick ? 'pointer' : CARD_CURSOR, ...style }}
-        onMouseEnter={() => setHovered(true)}
+        onMouseOver={() => setHovered(true)}
         onClick={onClick ? (e) => { e.stopPropagation(); onClick(name); } : undefined}
       >
         {children}

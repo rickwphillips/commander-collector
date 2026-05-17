@@ -745,6 +745,8 @@ export interface CoachMessage {
   role: 'user' | 'assistant';
   content: string;
   toolsUsed?: CoachToolCall[];
+  /** Client-assigned UUID per assistant message, used to key rating chips. */
+  uuid?: string;
 }
 
 // Form input types

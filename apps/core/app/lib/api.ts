@@ -533,6 +533,40 @@ export const api = {
     throw new Error('Coach chat response timed out');
   },
 
+  // Chat feedback (rateable chip toggle) — proxies to commander-mcp.
+  submitChatFeedback: (payload: {
+    surface:      'rules_guru' | 'coach';
+    messageUuid:  string;
+    kind:         'card' | 'cr_rule' | 'pattern' | 'claim';
+    targetId:     string;
+    rating:       'good' | 'not_relevant' | 'bad';
+    contentText?: string;
+    notes?:       string;
+    deckId?:      string;
+    listId?:      string;
+    format?:      string;
+  }) =>
+    apiFetch<{
+      band: 'certain' | 'unknown';
+      data: { id: number; kind: string; target_id: string; rating: string; content_hash: string | null } | null;
+      sources: string[];
+      caveats: string[];
+    }>('/chat-feedback', {
+      method: 'POST',
+      body: JSON.stringify({
+        surface:       payload.surface,
+        message_uuid:  payload.messageUuid,
+        kind:          payload.kind,
+        target_id:     payload.targetId,
+        rating:        payload.rating,
+        content_text:  payload.contentText,
+        notes:         payload.notes,
+        deck_id:       payload.deckId,
+        list_id:       payload.listId,
+        format:        payload.format,
+      }),
+    }),
+
   // ── commander-mcp brain (proxied through /rules/*.php) ──────────────────
   // Each method returns the MCP Confidence envelope:
   //   { band: 'certain' | 'unknown', data, sources, caveats }

@@ -63,8 +63,11 @@ function DeckListPageInner() {
   // prompt has the list UUID and the real card count, not the placeholder.
   // On this page the deck and its main list are the same thing — we attach
   // list_id to the deck context instead of emitting a second "List:" chip.
+  // cardNames lets the chat renderer distinguish in-deck references (no
+  // rating chip) from new recommendations (rateable chip).
   useEffect(() => {
     if (!deck || !list) return;
+    const cardNames = new Set(cards.map((c) => c.card_name.trim().toLowerCase()));
     coachRef.current?.setActiveDeck({
       deckId:    deck.id,
       deckName:  deck.name,
@@ -72,8 +75,9 @@ function DeckListPageInner() {
       commander: deck.commander ?? '',
       colors:    deck.colors ?? '',
       listId:    list.id,
+      cardNames,
     });
-  }, [deck, list, cards.length]);
+  }, [deck, list, cards]);
 
   // ── Dirty guard ───────────────────────────────────────────────────────────
   const [dirty, setDirty] = useState(false);
