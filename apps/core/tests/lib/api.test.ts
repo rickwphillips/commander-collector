@@ -540,3 +540,183 @@ describe('api — commander-mcp brain', () => {
     expect(JSON.parse(opts.body).decklist).toEqual(['Sol Ring']);
   });
 });
+
+// ── Helpers for SSE stream mocking ────────────────────────────────────────────
+
+/**
+ * Encode a sequence of SSE event blocks into Uint8Array chunks.
+ * Each event becomes one chunk so the reader loop processes them one at a time.
+ */
+function sseChunks(events: { event: string; data: unknown }[]): Uint8Array[] {
+  return events.map(({ event, data }) => {
+    const text = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    return new TextEncoder().encode(text);
+  });
+}
+
+/**
+ * Build a ReadableStream from an array of Uint8Array chunks.
+ */
+function makeReadableStream(chunks: Uint8Array[]): ReadableStream<Uint8Array> {
+  let i = 0;
+  return new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (i < chunks.length) {
+        controller.enqueue(chunks[i++]);
+      } else {
+        controller.close();
+      }
+    },
+  });
+}
+
+/**
+ * Mock global fetch to return an SSE response with the given events.
+ */
+function mockSseFetch(events: { event: string; data: unknown }[], status = 200) {
+  const chunks = sseChunks(events);
+  const stream = makeReadableStream(chunks);
+  const fetchMock = vi.fn().mockResolvedValue({
+    status,
+    ok: status >= 200 && status < 300,
+    body: stream,
+    json: () => Promise.resolve({}),
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
+// ── sendCoachMessage (SSE) ────────────────────────────────────────────────────
+
+describe('api.sendCoachMessage — SSE stream', () => {
+  beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('happy path: resolves with response and toolsUsed from done event', async () => {
+    mockSseFetch([
+      { event: 'tool_start', data: { tool: 'lookup_card' } },
+      { event: 'tool_result', data: { result: 'ok' } },
+      { event: 'done', data: { response: 'Here is my answer', tools_used: [{ name: 'lookup_card', input: {} }] } },
+    ]);
+
+    const result = await api.sendCoachMessage('What is Sol Ring?', []);
+    expect(result.response).toBe('Here is my answer');
+    expect(result.toolsUsed).toHaveLength(1);
+    expect(result.toolsUsed[0].name).toBe('lookup_card');
+  });
+
+  it('calls onPartial with tool name when tool_start event is received', async () => {
+    mockSseFetch([
+      { event: 'tool_start', data: { tool: 'lookup_card' } },
+      { event: 'done', data: { response: 'Done', tools_used: [] } },
+    ]);
+
+    const onPartial = vi.fn();
+    await api.sendCoachMessage('Hello', [], undefined, undefined, onPartial);
+    expect(onPartial).toHaveBeenCalledWith('Looking up lookup_card...');
+  });
+
+  it('throws with the error message when an error event is received in the stream', async () => {
+    mockSseFetch([
+      { event: 'error', data: { error: 'Coach is unavailable' } },
+    ]);
+
+    await expect(api.sendCoachMessage('Hello', [])).rejects.toThrow('Coach is unavailable');
+  });
+
+  it('throws "No response body from coach stream" when res.body is null', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+      body: null,
+      json: () => Promise.resolve({}),
+    }));
+
+    await expect(api.sendCoachMessage('Hello', [])).rejects.toThrow(
+      'No response body from coach stream'
+    );
+  });
+
+  it('propagates AbortError when signal is aborted', async () => {
+    const controller = new AbortController();
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(
+      Object.assign(new Error('The operation was aborted'), { name: 'AbortError' })
+    ));
+
+    await expect(
+      api.sendCoachMessage('Hello', [], undefined, undefined, undefined, controller.signal)
+    ).rejects.toThrow('The operation was aborted');
+  });
+
+  it('warns and continues on malformed JSON in SSE data (does not throw)', async () => {
+    // Construct a stream with one bad chunk followed by a valid done event
+    const badChunk = new TextEncoder().encode('event: partial\ndata: NOT_VALID_JSON\n\n');
+    const goodChunk = new TextEncoder().encode(
+      `event: done\ndata: ${JSON.stringify({ response: 'ok', tools_used: [] })}\n\n`
+    );
+    const stream = makeReadableStream([badChunk, goodChunk]);
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+      body: stream,
+      json: () => Promise.resolve({}),
+    }));
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const result = await api.sendCoachMessage('Hello', []);
+    expect(result.response).toBe('ok');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[coach] malformed SSE event:'),
+      expect.any(String),
+      expect.any(String),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('throws when stream ends without a done event', async () => {
+    mockSseFetch([
+      { event: 'tool_start', data: { tool: 'something' } },
+      // No done event — stream just ends
+    ]);
+
+    await expect(api.sendCoachMessage('Hello', [])).rejects.toThrow(
+      'Coach stream ended without done event'
+    );
+  });
+
+  it('POSTs to coach-chat.php with message and history in body', async () => {
+    const fetchMock = mockSseFetch([
+      { event: 'done', data: { response: 'reply', tools_used: [] } },
+    ]);
+
+    const history = [{ role: 'user' as const, content: 'hi' }];
+    await api.sendCoachMessage('My question', history);
+
+    const [url, opts] = fetchMock.mock.calls[0];
+    expect(url).toContain('coach-chat.php');
+    expect(opts.method).toBe('POST');
+    const body = JSON.parse(opts.body);
+    expect(body.message).toBe('My question');
+    expect(body.history).toEqual(history);
+  });
+
+  it('includes active_deck in POST body when provided', async () => {
+    const fetchMock = mockSseFetch([
+      { event: 'done', data: { response: 'reply', tools_used: [] } },
+    ]);
+
+    await api.sendCoachMessage('Hello', [], {
+      deckId: 'deck-1',
+      deckName: 'My Deck',
+      commander: 'Atraxa',
+      cardCount: 99,
+      colors: 'WUBG',
+    });
+
+    const [, opts] = fetchMock.mock.calls[0];
+    const body = JSON.parse(opts.body);
+    expect(body.active_deck.id).toBe('deck-1');
+    expect(body.active_deck.commander).toBe('Atraxa');
+  });
+});

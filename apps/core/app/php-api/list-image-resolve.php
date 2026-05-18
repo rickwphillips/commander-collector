@@ -14,32 +14,46 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') sendError('Method not allowed', 405);
 
 $input  = getJSONInput();
 $listId = (string)($input['list_id'] ?? '');
+$limit  = isset($input['limit']) ? max(1, min(75, (int)$input['limit'])) : 75;
 if (!$listId) sendError('list_id required');
 
 $db = getDB();
 
-// Find cards missing scryfall_id, missing from cache, or cached without an image
+// Count total still unresolved (for progress tracking)
+$totalStmt = $db->prepare("
+    SELECT COUNT(*) FROM list_cards lc
+    LEFT JOIN scryfall_card_cache sc ON sc.scryfall_id = lc.scryfall_id
+    WHERE lc.list_id = ?
+      AND (lc.scryfall_id IS NULL OR sc.scryfall_id IS NULL)
+");
+$totalStmt->execute([$listId]);
+$totalMissing = (int)$totalStmt->fetchColumn();
+
+// Find the next batch of cards missing scryfall_id, missing from cache, or cached without an image
 $stmt = $db->prepare("
     SELECT lc.id, lc.card_name, lc.scryfall_id
     FROM list_cards lc
     LEFT JOIN scryfall_card_cache sc ON sc.scryfall_id = lc.scryfall_id
     WHERE lc.list_id = ?
-      AND (lc.scryfall_id IS NULL OR sc.scryfall_id IS NULL OR sc.image_uri IS NULL)
+      AND (lc.scryfall_id IS NULL OR sc.scryfall_id IS NULL)
+    LIMIT ?
 ");
-$stmt->execute([$listId]);
+$stmt->execute([$listId, $limit]);
 $missing = $stmt->fetchAll();
 
 if (empty($missing)) {
-    sendJSON(['updated' => []]);
+    sendJSON(['updated' => [], 'remaining' => 0]);
 }
 
-// Batch fetch from Scryfall /cards/collection (max 75 per request)
-$names   = array_column($missing, 'card_name');
-$fetched = []; // canonical Scryfall name => normalised row
+// Split missing cards: those with a known scryfall_id use ID lookup (reliable),
+// those without use name lookup (fallback for newly imported cards).
+$byId   = array_filter($missing, fn($r) => !empty($r['scryfall_id']));
+$byName = array_filter($missing, fn($r) =>  empty($r['scryfall_id']));
 
-foreach (array_chunk($names, 75) as $chunk) {
-    $identifiers = array_map(fn($n) => ['name' => $n], $chunk);
+// fetched[scryfall_id] => normalised cache row
+$fetched = [];
 
+function scryfallBatch(array $identifiers): array {
     $ch = curl_init('https://api.scryfall.com/cards/collection');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
@@ -53,43 +67,64 @@ foreach (array_chunk($names, 75) as $chunk) {
     ]);
     $raw  = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    if (!$raw || $code !== 200) continue;
+    return ($raw && $code === 200) ? (json_decode($raw, true)['data'] ?? []) : [];
+}
 
-    foreach (json_decode($raw, true)['data'] ?? [] as $card) {
-        $imageUri     = $card['image_uris']['normal']
-            ?? $card['card_faces'][0]['image_uris']['normal']
-            ?? null;
-        $backImageUri = $card['card_faces'][1]['image_uris']['normal'] ?? null;
+function normaliseCard(array $card): array {
+    return [
+        'scryfall_id'    => $card['id'],
+        'name'           => $card['name'],
+        'image_uri'      => $card['image_uris']['normal']
+                            ?? $card['card_faces'][0]['image_uris']['normal']
+                            ?? null,
+        'back_image_uri' => $card['card_faces'][1]['image_uris']['normal'] ?? null,
+        'colors'         => implode('', $card['colors'] ?? []),
+        'color_identity' => implode('', $card['color_identity'] ?? []),
+        'type_line'      => $card['type_line'] ?? null,
+        'mana_cost'      => $card['mana_cost'] ?? null,
+    ];
+}
 
-        $row = [
-            'scryfall_id'    => $card['id'],
-            'name'           => $card['name'],
-            'image_uri'      => $imageUri,
-            'back_image_uri' => $backImageUri,
-            'colors'         => implode('', $card['colors'] ?? []),
-            'color_identity' => implode('', $card['color_identity'] ?? []),
-            'type_line'      => $card['type_line'] ?? null,
-            'mana_cost'      => $card['mana_cost'] ?? null,
-        ];
+$cacheStmt = $db->prepare(
+    'INSERT INTO scryfall_card_cache
+        (id, scryfall_id, name, image_uri, back_image_uri, colors, color_identity, type_line, mana_cost)
+     VALUES (UUID(),?,?,?,?,?,?,?,?)
+     ON DUPLICATE KEY UPDATE
+        name=VALUES(name), image_uri=VALUES(image_uri), back_image_uri=VALUES(back_image_uri),
+        colors=VALUES(colors), color_identity=VALUES(color_identity),
+        type_line=VALUES(type_line), mana_cost=VALUES(mana_cost),
+        cached_at=CURRENT_TIMESTAMP'
+);
 
-        $db->prepare(
-            'INSERT INTO scryfall_card_cache
-                (scryfall_id, name, image_uri, back_image_uri, colors, color_identity, type_line, mana_cost)
-             VALUES (?,?,?,?,?,?,?,?)
-             ON DUPLICATE KEY UPDATE
-                name=VALUES(name), image_uri=VALUES(image_uri), back_image_uri=VALUES(back_image_uri),
-                colors=VALUES(colors), color_identity=VALUES(color_identity),
-                type_line=VALUES(type_line), mana_cost=VALUES(mana_cost),
-                cached_at=CURRENT_TIMESTAMP'
-        )->execute([
-            $row['scryfall_id'], $row['name'], $row['image_uri'], $row['back_image_uri'],
-            $row['colors'], $row['color_identity'], $row['type_line'], $row['mana_cost'],
-        ]);
+function cacheAndStore(array $row, PDOStatement $stmt, array &$fetched): void {
+    $stmt->execute([
+        $row['scryfall_id'], $row['name'], $row['image_uri'], $row['back_image_uri'],
+        $row['colors'], $row['color_identity'], $row['type_line'], $row['mana_cost'],
+    ]);
+    $fetched[$row['scryfall_id']] = $row;
+}
 
-        $fetched[$card['name']] = $row;
+// Fetch by known scryfall_id — guaranteed match, handles DFC names correctly.
+$idChunks = array_chunk(array_values($byId), 75);
+foreach ($idChunks as $i => $chunk) {
+    $identifiers = array_map(fn($r) => ['id' => $r['scryfall_id']], $chunk);
+    foreach (scryfallBatch($identifiers) as $card) {
+        cacheAndStore(normaliseCard($card), $cacheStmt, $fetched);
     }
+    if ($i < count($idChunks) - 1) usleep(100000);
+}
 
-    if (count($names) > 75) usleep(100000); // Scryfall rate limit between chunks
+// Fetch by name for cards with no scryfall_id yet — keyed by name temporarily.
+$fetchedByName = [];
+$nameChunks = array_chunk(array_values($byName), 75);
+foreach ($nameChunks as $i => $chunk) {
+    $identifiers = array_map(fn($r) => ['name' => $r['card_name']], $chunk);
+    foreach (scryfallBatch($identifiers) as $card) {
+        $row = normaliseCard($card);
+        cacheAndStore($row, $cacheStmt, $fetched);
+        $fetchedByName[strtolower($card['name'])] = $row;
+    }
+    if ($i < count($nameChunks) - 1) usleep(100000);
 }
 
 // Update list_cards.scryfall_id and return updated card data
@@ -97,15 +132,12 @@ $updated = [];
 $updateStmt = $db->prepare('UPDATE list_cards SET scryfall_id = ? WHERE id = ?');
 
 foreach ($missing as $row) {
-    $match = $fetched[$row['card_name']] ?? null;
-    if (!$match) {
-        // Case-insensitive fallback
-        foreach ($fetched as $canonicalName => $r) {
-            if (strcasecmp($canonicalName, $row['card_name']) === 0) {
-                $match = $r;
-                break;
-            }
-        }
+    // Cards with a known scryfall_id: look up by id in fetched.
+    if (!empty($row['scryfall_id'])) {
+        $match = $fetched[$row['scryfall_id']] ?? null;
+    } else {
+        // Cards without: match by name (case-insensitive).
+        $match = $fetchedByName[strtolower($row['card_name'])] ?? null;
     }
     if (!$match) continue;
 
@@ -124,4 +156,4 @@ foreach ($missing as $row) {
     ];
 }
 
-sendJSON(['updated' => $updated]);
+sendJSON(['updated' => $updated, 'remaining' => max(0, $totalMissing - count($updated))]);
