@@ -1,5 +1,9 @@
 # Changelog
 
+## [5.7.0] - 2026-05-18
+
+- Card metadata resolver, coach list editing, security fixes, and test coverage
+
 ## [5.6.0] - 2026-05-17
 
 - Coach chat SSE streaming replaces fire-and-forget polling

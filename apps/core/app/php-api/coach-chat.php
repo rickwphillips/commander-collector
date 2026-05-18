@@ -10,9 +10,13 @@ function coachLog(string $msg): void {
 
 /** Send a JSON error response before SSE headers have been committed. */
 function coachError(int $status, string $message): never {
-    http_response_code($status);
-    header('Content-Type: application/json');
-    echo json_encode(['error' => $message]);
+    if (headers_sent()) {
+        sseEmit('error', ['error' => $message]);
+    } else {
+        http_response_code($status);
+        header('Content-Type: application/json');
+        echo json_encode(['error' => $message]);
+    }
     exit();
 }
 
@@ -53,7 +57,7 @@ if (!$userMessage) coachError(400, 'message is required');
 
 // ── Start SSE stream ──────────────────────────────────────────────────────
 set_time_limit(300);
-ignore_user_abort(false);
+ignore_user_abort(true);
 
 header('Content-Type: text/event-stream');
 header('Cache-Control: no-cache');
@@ -336,6 +340,10 @@ When creating or updating a list, confirm what you're about to save before calli
 If the list appears to be deck-based and you can conclusively identify the commander (from a deck's commander slot, the player naming one, or a prior `lookup_decklist` result showing `is_commander`), mark it in the cards array. If it's unclear whether the list has a commander at all, or which card it is, ask the player before saving — e.g. "Is there a commander for this list, or is it just a collection?"
 
 To **modify** an existing list: call `get_list_cards` first to retrieve the current contents, make the requested changes to the array, then call `update_list` with the full modified array. `update_list` replaces the entire card list — never call it without sending the complete intended contents. Apply the same "explicit request only" rule as create_list.
+
+**Card metadata preservation:** when building a cards array for `update_list` or `create_list`:
+- For **existing cards** from `get_list_cards`: always pass through the `scryfall_id` value from the raw array as-is, even if it is null.
+- For **new cards** you are adding: `lookup_card` returns a `scryfall_id` field — include it in the card object you send. This keeps images and type data intact without requiring a page reload.
 
 ## Card Name Formatting
 
@@ -858,6 +866,10 @@ $tools = [
 
 // ── Tool execution ────────────────────────────────────────────────────────
 function executeTool(string $name, array $input): string {
+    // Re-ping the DB connection — long agentic loops (5+ minutes) can outlive MySQL wait_timeout.
+    // getDB() sets PDO::ERRMODE_EXCEPTION, so a stale connection throws rather than returning false.
+    global $db;
+    try { $db->query('SELECT 1'); } catch (PDOException $e) { $db = getDB(); }
     if ($name === 'lookup_card') {
         // Support both legacy single-name and new batch names array
         $names = $input['names'] ?? (isset($input['name']) ? [$input['name']] : []);
@@ -865,11 +877,19 @@ function executeTool(string $name, array $input): string {
         if (empty($names)) return json_encode(['error' => 'No card names provided']);
 
         $extractCard = function(array $card): array {
+            // DFCs store oracle text per face; fall back to concatenating faces when top-level is absent.
+            $oracleText = $card['oracle_text'] ?? '';
+            if ($oracleText === '' && !empty($card['card_faces'])) {
+                $oracleText = implode("\n//\n", array_filter(array_map(
+                    fn($f) => $f['oracle_text'] ?? '', $card['card_faces']
+                )));
+            }
             return [
+                'scryfall_id' => $card['id'] ?? null,
                 'name'        => $card['name'] ?? '',
-                'mana_cost'   => $card['mana_cost'] ?? '',
+                'mana_cost'   => $card['mana_cost'] ?? ($card['card_faces'][0]['mana_cost'] ?? ''),
                 'type_line'   => $card['type_line'] ?? '',
-                'oracle_text' => $card['oracle_text'] ?? '',
+                'oracle_text' => $oracleText,
                 'power'       => $card['power'] ?? null,
                 'toughness'   => $card['toughness'] ?? null,
                 'keywords'    => $card['keywords'] ?? [],
@@ -1247,19 +1267,20 @@ function executeTool(string $name, array $input): string {
         if (!$listId) return json_encode(['error' => 'list_id is required']);
 
         $stmt = $db->prepare("
-            SELECT lc.id, lc.card_name, lc.quantity,
+            SELECT lc.id, lc.scryfall_id, lc.card_name, lc.quantity,
                    (lc.role = 'commander') AS is_commander,
                    lc.is_proxy, lc.role,
                    sc.type_line, sc.mana_cost, sc.colors, sc.color_identity
             FROM list_cards lc
+            JOIN lists l ON l.id = lc.list_id AND l.user_id = ?
             LEFT JOIN scryfall_card_cache sc ON sc.scryfall_id = lc.scryfall_id
             WHERE lc.list_id = ?
             ORDER BY (lc.role = 'commander') DESC, lc.card_name ASC
         ");
-        $stmt->execute([$listId]);
+        $stmt->execute([$userId, $listId]);
         $rows = $stmt->fetchAll();
 
-        if (empty($rows)) return json_encode(['error' => "No cards found for list {$listId}"]);
+        if (empty($rows)) return json_encode(['list_id' => $listId, 'cards_by_type' => (object)[], 'raw' => [], 'total' => 0]);
 
         // Group by type for readability
         $groups = ['Commander' => [], 'Creature' => [], 'Instant' => [], 'Sorcery' => [],
@@ -1282,11 +1303,12 @@ function executeTool(string $name, array $input): string {
             if (!empty($cards)) $out[$label] = $cards;
         }
 
-        // Also return raw for easy update_list construction
+        // Also return raw for easy update_list construction — scryfall_id preserved so metadata survives round-trips
         $raw = array_map(fn($r) => [
             'card_name'    => $r['card_name'],
             'quantity'     => (int)$r['quantity'],
             'is_commander' => (bool)$r['is_commander'],
+            'scryfall_id'  => $r['scryfall_id'] ?? null,
         ], $rows);
 
         return json_encode(['list_id' => $listId, 'cards_by_type' => $out, 'raw' => $raw, 'total' => count($rows)]);
@@ -1315,14 +1337,15 @@ function executeTool(string $name, array $input): string {
             $cardsUpdated = 0;
             if ($cards !== null) {
                 $db->prepare("DELETE FROM list_cards WHERE list_id = ?")->execute([$listId]);
-                $ins = $db->prepare("INSERT INTO list_cards (id, list_id, card_name, quantity, role) VALUES (UUID(), ?, ?, ?, ?)");
+                $ins = $db->prepare("INSERT INTO list_cards (id, list_id, scryfall_id, card_name, quantity, role, is_proxy) VALUES (UUID(), ?, ?, ?, ?, ?, 0)");
                 foreach ($cards as $card) {
                     $cardName    = trim($card['card_name'] ?? '');
+                    $scryfallId  = $card['scryfall_id'] ?? null;
                     $quantity    = max(1, (int)($card['quantity'] ?? 1));
                     $isCommander = empty($card['is_commander']) ? 0 : 1;
                     $role        = $isCommander ? 'commander' : null;
                     if (!$cardName) continue;
-                    $ins->execute([$listId, $cardName, $quantity, $role]);
+                    $ins->execute([$listId, $scryfallId ?: null, $cardName, $quantity, $role]);
                     $cardsUpdated++;
                 }
             }
@@ -1353,16 +1376,17 @@ function executeTool(string $name, array $input): string {
             $stmt->execute([$listId, $listName, $description ?: null, $userId]);
 
             $cardIns = $db->prepare(
-                "INSERT INTO list_cards (id, list_id, card_name, quantity, role) VALUES (UUID(), ?, ?, ?, ?)"
+                "INSERT INTO list_cards (id, list_id, scryfall_id, card_name, quantity, role, is_proxy) VALUES (UUID(), ?, ?, ?, ?, ?, 0)"
             );
             $inserted = 0;
             foreach ($cards as $card) {
                 $cardName    = trim($card['card_name'] ?? '');
+                $scryfallId  = $card['scryfall_id'] ?? null;
                 $quantity    = max(1, (int)($card['quantity'] ?? 1));
                 $isCommander = empty($card['is_commander']) ? 0 : 1;
                 $role        = $isCommander ? 'commander' : null;
                 if (!$cardName) continue;
-                $cardIns->execute([$listId, $cardName, $quantity, $role]);
+                $cardIns->execute([$listId, $scryfallId ?: null, $cardName, $quantity, $role]);
                 $inserted++;
             }
 
@@ -1559,7 +1583,7 @@ function executeTool(string $name, array $input): string {
         if ($name === 'search_oracle') {
             $text   = trim($input['text'] ?? '');
             if (!$text) return json_encode(['error' => 'text is required']);
-            $q = 'o:"' . addslashes($text) . '"';
+            $q = 'o:"' . str_replace('"', '\\"', $text) . '"';
             if (!empty($input['type_filter'])) $q .= ' t:' . trim($input['type_filter']);
             if (!empty($input['colors']))      $q .= ' id<=' . trim($input['colors']);
             $order = 'edhrec';
@@ -1799,7 +1823,13 @@ while ($iter < $maxIter) {
         if ($block['type'] !== 'tool_use') continue;
         $toolsUsed[] = ['name' => $block['name'], 'input' => $block['input'] ?? []];
         sseEmit('tool_start', ['tool' => $block['name']]);
-        $result = executeTool($block['name'], $block['input'] ?? []);
+        try {
+            $result = executeTool($block['name'], $block['input'] ?? []);
+        } catch (Throwable $e) {
+            coachLog('executeTool exception [' . $block['name'] . ']: ' . $e->getMessage());
+            sseEmit('error', ['error' => 'Tool execution failed: ' . $e->getMessage()]);
+            exit();
+        }
         sseEmit('tool_result', ['tool' => $block['name'], 'ok' => true]);
         $toolResults[] = [
             'type'        => 'tool_result',

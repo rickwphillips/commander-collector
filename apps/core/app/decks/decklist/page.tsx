@@ -7,7 +7,9 @@ import {
   Box,
   Button,
   CircularProgress,
+  LinearProgress,
   Link as MuiLink,
+  Snackbar,
   Stack,
   Typography,
 } from '@mui/material';
@@ -56,7 +58,7 @@ function DeckListPageInner() {
   // ── List data (list-native: cards, version, role) ────────────────────────
   const {
     list, cards, loading: listLoading, error: listError, conflict,
-    save, detachFromDeck, refresh,
+    save, detachFromDeck, refresh, resolving, resolvingTotal, resolvedCount, resolveError, clearResolved,
   } = useList({ deckId });
 
   // Refresh the coach context once list + cards are loaded so the system
@@ -116,8 +118,12 @@ function DeckListPageInner() {
       });
       if (!ok) return;
     }
-    await detachFromDeck();
-    await refresh();
+    try {
+      await detachFromDeck();
+      await refresh();
+    } catch {
+      return;
+    }
     router.push('/decks');
   }, [dirty, confirm, detachFromDeck, refresh, router]);
 
@@ -220,7 +226,42 @@ function DeckListPageInner() {
         notes={[]}
         open={coachOpen}
         onToggle={setCoachOpen}
+        onListUpdated={refresh}
       />
+
+      {/* Background metadata resolution feedback */}
+      <Snackbar open={resolving} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert severity="info" icon={<CircularProgress size={16} />} sx={{ alignItems: 'center', minWidth: 280 }}>
+          <Box sx={{ width: '100%' }}>
+            Resolving card metadata… {resolvingTotal > 0 ? `${Math.min(100, Math.round((resolvedCount / resolvingTotal) * 100))}%` : ''}
+            <LinearProgress
+              variant={resolvingTotal > 0 ? 'determinate' : 'indeterminate'}
+              value={resolvingTotal > 0 ? Math.min(100, Math.round((resolvedCount / resolvingTotal) * 100)) : undefined}
+              sx={{ mt: 0.5, borderRadius: 1 }}
+            />
+          </Box>
+        </Alert>
+      </Snackbar>
+      <Snackbar
+        open={!resolving && resolvedCount > 0 && !resolveError}
+        autoHideDuration={4000}
+        onClose={clearResolved}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="success" onClose={clearResolved}>
+          Metadata resolved for {resolvedCount} card{resolvedCount !== 1 ? 's' : ''}.
+        </Alert>
+      </Snackbar>
+      <Snackbar
+        open={!resolving && !!resolveError}
+        autoHideDuration={6000}
+        onClose={clearResolved}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="warning" onClose={clearResolved}>
+          {resolveError}
+        </Alert>
+      </Snackbar>
     </PageContainer>
   );
 }

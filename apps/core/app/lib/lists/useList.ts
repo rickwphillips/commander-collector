@@ -101,6 +101,16 @@ export interface UseListResult {
   detachFromDeck: () => Promise<void>;
   /** Re-fetch list metadata and cards from the server. */
   refresh: () => Promise<void>;
+  /** True while a background scryfall metadata resolution is in progress. */
+  resolving: boolean;
+  /** Total cards queued for resolution in the current run. */
+  resolvingTotal: number;
+  /** Number of cards resolved so far in the current run. */
+  resolvedCount: number;
+  /** Call on success toast close to reset resolvedCount and dismiss the toast. */
+  clearResolved: () => void;
+  /** Non-null when the resolver stopped early due to a Scryfall or network failure. */
+  resolveError: string | null;
 }
 
 // ── Wire shape from the /lists endpoint ───────────────────────────────────────
@@ -151,6 +161,62 @@ export function useList(opts: UseListOptions): UseListResult {
   const [loading, setLoading] = useState<boolean>(Boolean(opts.id || opts.deckId));
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
+  const [resolving, setResolving] = useState(false);
+  const [resolvingTotal, setResolvingTotal] = useState(0);
+  const [resolvedCount, setResolvedCount] = useState(0);
+  const [resolveError, setResolveError] = useState<string | null>(null);
+
+  // ── Internal: background metadata resolver with progress tracking ────────
+
+  const resolveMetadata = useCallback(async (listId: string, total: number) => {
+    setResolving(true);
+    setResolvingTotal(total);
+    setResolvedCount(0);
+    setResolveError(null);
+    let resolved = 0;
+    const BATCH = 25;
+    try {
+      while (true) {
+        const { updated, remaining } = await apiFetch<{ updated: ApiCardRow[]; remaining: number }>(
+          '/list-image-resolve',
+          { method: 'POST', body: JSON.stringify({ list_id: listId, limit: BATCH }) }
+        );
+        console.log(`[useList] batch resolved ${updated.length}, remaining ${remaining}`);
+        if (updated.length > 0) {
+          const patchMap = new Map(updated.map((u) => [u.id, u]));
+          setCards((prev) =>
+            prev.map((c) => {
+              const patch = patchMap.get(c.id);
+              if (!patch) return c;
+              return {
+                ...c,
+                scryfall_id:    patch.scryfall_id    ?? c.scryfall_id,
+                image_uri:      patch.image_uri      ?? c.image_uri,
+                back_image_uri: patch.back_image_uri ?? c.back_image_uri,
+                type_line:      patch.type_line      ?? c.type_line,
+                mana_cost:      patch.mana_cost      ?? c.mana_cost,
+                colors:         patch.colors         ?? c.colors,
+                color_identity: patch.color_identity ?? c.color_identity,
+              };
+            })
+          );
+        }
+        resolved += updated.length;
+        setResolvedCount(resolved);
+        if (remaining === 0) break;
+        if (updated.length === 0) {
+          // No progress made — Scryfall likely unreachable or card names unresolvable.
+          setResolveError(`${remaining} card${remaining !== 1 ? 's' : ''} could not be resolved.`);
+          break;
+        }
+      }
+    } catch (err) {
+      console.warn('[useList] image resolve failed:', err);
+      setResolveError(err instanceof Error ? err.message : 'Metadata resolve failed.');
+    } finally {
+      setResolving(false);
+    }
+  }, []);
 
   // ── Internal: fetch and normalize a list detail response ─────────────────
 
@@ -177,12 +243,24 @@ export function useList(opts: UseListOptions): UseListResult {
     try {
       const raw = await apiFetch<ApiListDetailRow>(`/lists?id=${encodeURIComponent(id)}`);
       loadFromDetail(raw);
+      // Background: resolve scryfall metadata for any cards that are missing it.
+      // Happens after text-import or coach update_list where scryfall_id is null.
+      // Trigger resolver if any Scryfall metadata is missing.
+      // type_line: always present on real cards — null means cache join returned nothing.
+      // image_uri: may legitimately be null for some cards; PHP handles the no-infinite-loop case.
+      const unresolvedCount = (raw.cards ?? []).filter(
+        (c) => !c.scryfall_id || !c.type_line || !c.image_uri || c.colors === undefined || !c.color_identity
+      ).length;
+      if (unresolvedCount > 0) {
+        console.log(`[useList] ${unresolvedCount} cards missing metadata — resolving…`);
+        resolveMetadata(id, unresolvedCount);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load list');
     } finally {
       setLoading(false);
     }
-  }, [loadFromDetail]);
+  }, [loadFromDetail, resolveMetadata]);
 
   // ── Internal: fetch by deck UUID (finds role='main' list) ─────────────────
 
@@ -206,6 +284,13 @@ export function useList(opts: UseListOptions): UseListResult {
 
       if (raw) {
         loadFromDetail(raw);
+        const unresolvedCount = (raw.cards ?? []).filter(
+          (c) => !c.scryfall_id || !c.type_line || !c.image_uri || c.colors === undefined || !c.color_identity
+        ).length;
+        if (unresolvedCount > 0) {
+          console.log(`[useList] ${unresolvedCount} cards missing metadata — resolving…`);
+          resolveMetadata(raw.id, unresolvedCount);
+        }
       } else {
         // No main list exists yet — not an error condition; caller handles null.
         setList(null);
@@ -218,7 +303,7 @@ export function useList(opts: UseListOptions): UseListResult {
     } finally {
       setLoading(false);
     }
-  }, [loadFromDetail]);
+  }, [loadFromDetail, resolveMetadata]);
 
   // ── Effect: initial load ─────────────────────────────────────────────────
 
@@ -343,8 +428,9 @@ export function useList(opts: UseListOptions): UseListResult {
 
   const detachFromDeck = useCallback(async () => {
     if (!list) {
-      setError('Cannot detach: list not loaded');
-      return;
+      const msg = 'Cannot detach: list not loaded';
+      setError(msg);
+      throw new Error(msg);
     }
     try {
       // TODO(Step 6): This is a no-op shim until Step 6 makes the SQL functional.
@@ -356,7 +442,9 @@ export function useList(opts: UseListOptions): UseListResult {
       );
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to detach list from deck');
+      const msg = err instanceof Error ? err.message : 'Failed to detach list from deck';
+      setError(msg);
+      throw new Error(msg);
     }
   }, [list]);
 
@@ -375,5 +463,10 @@ export function useList(opts: UseListOptions): UseListResult {
     attachToDeck,
     detachFromDeck,
     refresh,
+    resolving,
+    resolvingTotal,
+    resolvedCount,
+    resolveError,
+    clearResolved: useCallback(() => { setResolvedCount(0); setResolvingTotal(0); setResolveError(null); }, []),
   };
 }

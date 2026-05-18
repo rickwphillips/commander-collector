@@ -514,7 +514,8 @@ export const api = {
       throw new Error((errData.error as string) ?? `Coach error ${res.status}`);
     }
 
-    const reader = res.body!.getReader();
+    if (!res.body) throw new Error('No response body from coach stream');
+    const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
 
@@ -540,7 +541,7 @@ export const api = {
       if (done) break;
       for (const { event, data } of readEvents(decoder.decode(value, { stream: true }))) {
         let parsed: Record<string, unknown>;
-        try { parsed = JSON.parse(data); } catch { continue; }
+        try { parsed = JSON.parse(data); } catch { console.warn('[coach] malformed SSE event:', event, data); continue; }
         if (event === 'tool_start' && onPartial) {
           onPartial(`Looking up ${parsed.tool}...`);
         } else if (event === 'done') {

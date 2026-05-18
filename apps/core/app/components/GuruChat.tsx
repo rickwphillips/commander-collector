@@ -204,9 +204,11 @@ interface GuruChatProps {
   open: boolean;
   onToggle: (open: boolean) => void;
   autoGreet?: string;
+  /** Called when the coach writes to the active list (update_list or create_list tool used). */
+  onListUpdated?: () => void;
 }
 
-export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruChat({ notes: initialNotes, open, onToggle, autoGreet }, ref) {
+export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruChat({ notes: initialNotes, open, onToggle, autoGreet, onListUpdated }, ref) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -414,6 +416,8 @@ export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruC
         uuid: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `m-${Date.now()}`,
       };
       setMessages((prev) => [...prev, assistantMsg]);
+      const wroteToList = toolsUsed.some(t => t.name === 'update_list' || t.name === 'create_list');
+      if (wroteToList) onListUpdated?.();
     } catch (err) {
       if (ctrl.signal.aborted) return;
       console.error('[coach] sendCoachMessage threw:', err);

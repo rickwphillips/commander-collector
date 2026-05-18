@@ -8,14 +8,14 @@ import {
   Button,
   Chip,
   CircularProgress,
-  IconButton,
+  LinearProgress,
+  Snackbar,
   Stack,
   Tooltip,
   Typography,
 } from '@mui/material';
 import RestoreIcon from '@mui/icons-material/Restore';
 import LinkIcon from '@mui/icons-material/Link';
-import PsychologyIcon from '@mui/icons-material/Psychology';
 
 import { PageContainer } from '@/components/PageContainer';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -42,6 +42,11 @@ function ListPageInner() {
     save,
     detachFromDeck,
     refresh,
+    resolving,
+    resolvingTotal,
+    resolvedCount,
+    resolveError,
+    clearResolved,
   } = useList({ id: listId });
 
   // ── Deck name (only fetched when list is attached to a deck) ──────────────
@@ -235,13 +240,6 @@ function ListPageInner() {
       backHref="/lists"
       backLabel="Lists"
       onBackClick={confirmLeaveIfDirty}
-      actions={
-        <Tooltip title="Discuss this list with the Guru">
-          <IconButton onClick={() => setCoachOpen(true)} sx={{ color: '#6B8E6B' }}>
-            <PsychologyIcon />
-          </IconButton>
-        </Tooltip>
-      }
     >
       {/* Error banner */}
       {(error || listError) && (
@@ -290,7 +288,42 @@ function ListPageInner() {
         open={coachOpen}
         onToggle={setCoachOpen}
         autoGreet={autoGreet}
+        onListUpdated={refresh}
       />
+
+      {/* Background metadata resolution feedback */}
+      <Snackbar open={resolving} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert severity="info" icon={<CircularProgress size={16} />} sx={{ alignItems: 'center', minWidth: 280 }}>
+          <Box sx={{ width: '100%' }}>
+            Resolving card metadata… {resolvingTotal > 0 ? `${Math.min(100, Math.round((resolvedCount / resolvingTotal) * 100))}%` : ''}
+            <LinearProgress
+              variant={resolvingTotal > 0 ? 'determinate' : 'indeterminate'}
+              value={resolvingTotal > 0 ? Math.min(100, Math.round((resolvedCount / resolvingTotal) * 100)) : undefined}
+              sx={{ mt: 0.5, borderRadius: 1 }}
+            />
+          </Box>
+        </Alert>
+      </Snackbar>
+      <Snackbar
+        open={!resolving && resolvedCount > 0 && !resolveError}
+        autoHideDuration={4000}
+        onClose={clearResolved}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="success" onClose={clearResolved}>
+          Metadata resolved for {resolvedCount} card{resolvedCount !== 1 ? 's' : ''}.
+        </Alert>
+      </Snackbar>
+      <Snackbar
+        open={!resolving && !!resolveError}
+        autoHideDuration={6000}
+        onClose={clearResolved}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="warning" onClose={clearResolved}>
+          {resolveError}
+        </Alert>
+      </Snackbar>
     </PageContainer>
   );
 }
