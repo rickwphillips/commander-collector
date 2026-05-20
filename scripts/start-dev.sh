@@ -16,7 +16,10 @@ sleep 2
 
 echo "Starting PHP server on port 8081..."
 cd "$PROJECT_DIR/apps/core/app"
-php -S localhost:8081 -t "$PROJECT_DIR/apps/core/app" > /tmp/php-server.log 2>&1 &
+# PHP_CLI_SERVER_WORKERS: SSE holds one worker per open stream (1 per player).
+# 10 workers prevents API calls from queueing behind open SSE connections.
+# 127.0.0.1 matches the next.config.ts rewrite target (avoids IPv6 mismatch).
+PHP_CLI_SERVER_WORKERS=10 php -S 127.0.0.1:8081 -t "$PROJECT_DIR/apps/core/app" > /tmp/php-server.log 2>&1 &
 PHP_PID=$!
 echo "PHP server PID: $PHP_PID"
 

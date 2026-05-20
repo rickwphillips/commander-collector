@@ -25,7 +25,7 @@ test.describe('Games', () => {
   });
 
   test('at least one game entry renders', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     const row = page.locator('.MuiCard-root, .MuiTableRow-root').first();
     await expect(row).toBeVisible();
   });
@@ -46,14 +46,14 @@ test.describe('Games', () => {
   });
 
   test('game entries show dates', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     // Dates in various formats (YYYY-MM-DD, M/D/YYYY, or "Month D, YYYY")
     const dateEl = page.getByText(/\d{4}[-/]\d{2}[-/]\d{2}|\d{1,2}\/\d{1,2}\/\d{4}|january|february|march|april|may|june|july|august|september|october|november|december/i).first();
     await expect(dateEl).toBeVisible();
   });
 
   test('clicking a game opens detail page (?id= URL)', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     const firstGame = page.locator('.MuiCardActionArea-root').first();
     await firstGame.click();
     await expect(page).toHaveURL(/games\/detail\/\?id=/);
@@ -87,10 +87,10 @@ test.describe('Games', () => {
   test.describe('Game Detail', () => {
     test.beforeEach(async ({ page }) => {
       await goto(page, '/games/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       const firstGame = page.locator('.MuiCardActionArea-root').first();
       await firstGame.click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     });
 
     test('detail page is visible', async ({ page }) => {

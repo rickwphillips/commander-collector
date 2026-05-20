@@ -25,7 +25,7 @@ test.describe('Lists', () => {
   });
 
   test('at least one list card renders', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     const card = page.locator('.MuiCard-root').first();
     await expect(card).toBeVisible();
   });
@@ -59,7 +59,7 @@ test.describe('Lists', () => {
   });
 
   test('clicking a list opens detail page (?id= URL)', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     const firstList = page.locator('.MuiCardActionArea-root').first();
     await firstList.click();
     await expect(page).toHaveURL(/lists\/detail\/\?id=/);
@@ -68,10 +68,10 @@ test.describe('Lists', () => {
   test.describe('List Detail / Editor', () => {
     test.beforeEach(async ({ page }) => {
       await goto(page, '/lists/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       const firstList = page.locator('.MuiCardActionArea-root').first();
       await firstList.click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     });
 
     test('editor heading is visible', async ({ page }) => {
@@ -96,7 +96,7 @@ test.describe('Lists', () => {
 
     test.describe('Export Panel', () => {
       test.beforeEach(async ({ page }) => {
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
         // Open the export popover
         const exportBtn = page.getByRole('button', { name: /export cards/i }).first();
         await expect(exportBtn).toBeVisible({ timeout: 10000 });

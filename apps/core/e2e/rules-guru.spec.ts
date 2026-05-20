@@ -16,7 +16,7 @@ import { goto, apiCall } from './helpers';
 test.describe('Rules Guru — Landing', () => {
   test('/ redirects to /chat/', async ({ page }) => {
     await goto(page, '/rules/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await expect(page).toHaveURL(/\/rules\/chat\//);
   });
 });
@@ -24,7 +24,7 @@ test.describe('Rules Guru — Landing', () => {
 test.describe('Rules Guru — Chat', () => {
   test.beforeEach(async ({ page }) => {
     await goto(page, '/rules/chat/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('chat page loads without 404', async ({ page }) => {
@@ -52,7 +52,7 @@ test.describe('Rules Guru — Chat flow', () => {
     test.setTimeout(60_000);
 
     await goto(page, '/rules/chat/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const postResult = await page.evaluate(async () => {
       const token = localStorage.getItem('auth_token');

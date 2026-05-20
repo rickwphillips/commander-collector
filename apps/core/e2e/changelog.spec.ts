@@ -17,7 +17,7 @@ import { goto } from './helpers';
 test.describe('Changelog', () => {
   test.beforeEach(async ({ page }) => {
     await goto(page, '/changelog/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('page loads and heading is visible', async ({ page }) => {

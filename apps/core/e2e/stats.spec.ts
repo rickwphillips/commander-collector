@@ -22,22 +22,22 @@ test.describe('Stats', () => {
   });
 
   test('Total Games stat card is visible', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await expect(page.getByText('Total Games')).toBeVisible();
   });
 
   test('Players stat is visible', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await expect(page.getByText('Players').first()).toBeVisible();
   });
 
   test('Decks stat is visible', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await expect(page.getByText('Decks').first()).toBeVisible();
   });
 
   test('Avg. Game Length stat is visible', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await expect(page.getByText('Avg. Game Length')).toBeVisible();
   });
 
@@ -74,7 +74,7 @@ test.describe('Stats', () => {
     });
 
     test('panel cards have action icon buttons (edit + delete via tooltip)', async ({ page }) => {
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       // PanelCard has IconButtons with Tooltip title="Edit" and title="Delete"
       // They render as icon-only buttons (no text) — check by tooltip or just count
       const panels = page.locator('.MuiCard-root');

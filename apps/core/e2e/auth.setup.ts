@@ -39,7 +39,7 @@ setup('authenticate', async ({ page }) => {
   // Inject token before page load so the app sees it on first render
   await page.addInitScript((t) => localStorage.setItem('auth_token', t), token);
   await page.goto(BASE + '/');
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('load');
 
   // Confirm not redirected to login
   await expect(page).not.toHaveURL(/login/);

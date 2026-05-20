@@ -9,7 +9,7 @@ export const API  = 'https://rickwphillips.com/php-api';
 
 /** Navigate relative to the commander base path */
 export async function goto(page: Page, path: string) {
-  await page.goto(BASE + path);
+  await page.goto(BASE + path, { waitUntil: 'domcontentloaded' });
 }
 
 /** Call the PHP API directly from the test (with auth from storage state) */

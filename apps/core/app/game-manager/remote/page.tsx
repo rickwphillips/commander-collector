@@ -10,9 +10,8 @@ import type { GameManagerState, PlayerState, LiveGameEvent } from '@/lib/types';
 import { applyEvent } from '../remoteTransforms';
 import { useThemeMode } from '@/components/ThemeProvider';
 
-const POLL_INTERVAL_MS = 1000;
-// After sending an event, suppress DB state application for this long.
-// The host polls at 500ms — so within ~600ms the event is processed and
+// After sending an event, suppress incoming SSE state for this long.
+// The host polls at 500ms, so within ~600ms the event is processed and
 // written to DB. 1500ms gives 2+ host cycles of margin before we re-sync.
 const POST_EVENT_GRACE_MS = 1500;
 // Heartbeat interval — sends a checkin event so the host knows we're still here
@@ -144,34 +143,37 @@ function RemotePageInner() {
     connect(codeInput);
   };
 
-  // ── Polling ───────────────────────────────────────────────────────────────
+  // ── SSE state stream ─────────────────────────────────────────────────────
+  // Replaces the previous 1s setInterval poll. The server pushes state
+  // whenever the host writes a change, so the remote only receives data when
+  // something actually changed. The EventSource reconnects automatically
+  // after the server's planned 270s close (retry:100 = 100ms reconnect delay).
   useEffect(() => {
     if (phase !== 'connected' || !code) return;
 
-    const poll = async () => {
-      try {
-        const res = await api.getLiveGame(code); // remote never passes consume=true
-        if (!res.is_active) {
-          // Require 3 consecutive inactive responses before ending — guards against
-          // transient bad responses during server deploys or PHP file uploads
-          inactiveCountRef.current++;
-          if (inactiveCountRef.current >= 3) setPhase('ended');
-          return;
-        }
-        inactiveCountRef.current = 0;
-        pollFailCountRef.current = 0;
+    const closeStream = api.openLiveGameStream(
+      code,
+      (newState) => {
         lastSuccessfulPollRef.current = Date.now();
+        pollFailCountRef.current = 0;
+        inactiveCountRef.current = 0;
         if (showReconnect) setShowReconnect(false);
-        // Skip applying DB state during the grace period — the optimistic
-        // update is ahead of the DB until the host processes the event.
-        const msSinceEvent = Date.now() - lastEventTimeRef.current;
-        if (msSinceEvent < POST_EVENT_GRACE_MS) return;
-        setState(res.state);
-      } catch {
+        // Skip applying server state during the grace period — optimistic
+        // update is ahead of the DB until the host processes our last event.
+        if (Date.now() - lastEventTimeRef.current < POST_EVENT_GRACE_MS) return;
+        setState(newState);
+      },
+      () => {
+        // Server reports session inactive — require 3 before ending (guards
+        // against transient responses during deploys or file uploads)
+        inactiveCountRef.current++;
+        if (inactiveCountRef.current >= 3) setPhase('ended');
+      },
+      () => {
         pollFailCountRef.current++;
         if (pollFailCountRef.current >= 8) setShowReconnect(true);
-      }
-    };
+      },
+    );
 
     // Periodic checkin so host's "connected" indicator stays alive
     const checkin = setInterval(() => {
@@ -179,8 +181,7 @@ function RemotePageInner() {
       api.sendLiveGameEvent(code, { type: 'checkin', seat, ts: Date.now() }).catch(() => {});
     }, CHECKIN_INTERVAL_MS);
 
-    const id = setInterval(poll, POLL_INTERVAL_MS);
-    return () => { clearInterval(id); clearInterval(checkin); };
+    return () => { closeStream(); clearInterval(checkin); };
   }, [phase, code, seat]);
 
   // ── Reconnect on phone visibility restore ────────────────────────────────
