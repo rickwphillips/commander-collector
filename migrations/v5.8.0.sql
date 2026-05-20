@@ -1,0 +1,1 @@
+-- No schema changes for v5.8.0 (SSE implementation, no DB migrations required)
