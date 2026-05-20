@@ -21,7 +21,7 @@ import { goto } from './helpers';
 test.describe('Decks', () => {
   test.beforeEach(async ({ page }) => {
     await goto(page, '/decks/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('page loads with heading', async ({ page }) => {
@@ -56,7 +56,7 @@ test.describe('Decks', () => {
   });
 
   test('clicking a deck opens detail page (?id= URL)', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     // CardActionArea-root is the actual clickable deck tile (not the search/filter Card)
     const firstDeck = page.locator('.MuiCardActionArea-root').first();
     await firstDeck.click();
@@ -96,10 +96,10 @@ test.describe('Decks', () => {
   test.describe('Deck Detail / Decklist', () => {
     test.beforeEach(async ({ page }) => {
       await goto(page, '/decks/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       const firstDeck = page.locator('.MuiCardActionArea-root').first();
       await firstDeck.click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     });
 
     test('detail page heading is visible', async ({ page }) => {

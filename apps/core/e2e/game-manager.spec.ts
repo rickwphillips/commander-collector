@@ -29,7 +29,7 @@ test.describe('Game Manager — Setup', () => {
   // These tests only run if the page is showing the setup form, not an active game
   test.beforeEach(async ({ page }) => {
     await goto(page, '/game-manager/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('page loads', async ({ page }) => {
@@ -66,7 +66,7 @@ test.describe('Game Manager — Setup', () => {
 test.describe('Game Manager — Active Board', () => {
   test.beforeEach(async ({ page }) => {
     await goto(page, '/game-manager/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // If setup form is showing, start a quick 2-player game to get to the board
     const isSetup = await page.getByRole('heading', { name: /game setup/i }).count() > 0;
@@ -83,7 +83,7 @@ test.describe('Game Manager — Active Board', () => {
       }
 
       await page.getByRole('button', { name: /start game/i }).click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(1000);
     }
   });
@@ -182,7 +182,7 @@ test.describe('Game Manager — Active Board', () => {
 
   test('board persists on page reload', async ({ page }) => {
     await page.reload();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     // Should still show board (life totals visible), not setup form
     const lifeTotal = page.getByText(/^20$|^40$/).first();
     await expect(lifeTotal).toBeVisible();

@@ -9,6 +9,12 @@ import type { ApiCardRow } from './cards/types';
 const isDev = process.env.NODE_ENV === 'development';
 export const ASSET_BASE = isDev ? '' : '/app/projects/commander';
 
+// SSE connections cannot go through the Next.js dev proxy — it buffers the
+// response and replaces the content-type with application/json, killing the
+// EventSource. In dev, bypass the proxy and hit the PHP server directly.
+// In prod there is no proxy (static export), so the regular path works fine.
+const SSE_BASE = isDev ? 'http://127.0.0.1:8081/php-api/' : '/php-api/';
+
 // Auth token key (shared with portfolio login page)
 const AUTH_TOKEN_KEY = 'auth_token';
 
@@ -196,6 +202,82 @@ export const api = {
     }),
   deleteLiveGame: (code: string) =>
     apiFetch<{ success: boolean }>(`/live-game?code=${code}`, { method: 'DELETE' }),
+
+  // Open an SSE stream for a remote panel. Pushes state as the host writes.
+  // Returns a cleanup function — call it to close the EventSource.
+  openLiveGameStream: (
+    code: string,
+    onState: (state: import('./types').GameManagerState) => void,
+    onInactive: () => void,
+    onError?: () => void,
+  ): (() => void) => {
+    const url = `${SSE_BASE}live-game-stream.php?code=${encodeURIComponent(code)}`;
+    const es = new EventSource(url);
+
+    // Expose readyState on window for e2e testability
+    const win = typeof window !== 'undefined'
+      ? (window as unknown as Record<string, unknown>)
+      : null;
+    if (win) win._sseReadyState = es.readyState;
+
+    es.onopen = () => { if (win) win._sseReadyState = 1; };
+
+    es.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data.trim()) as {
+          type: string;
+          state?: import('./types').GameManagerState;
+        };
+        if (msg.type === 'state' && msg.state) {
+          onState(msg.state);
+        } else if (msg.type === 'inactive') {
+          es.close();
+          onInactive();
+        }
+        // 'close' = planned reconnect — EventSource handles it automatically
+      } catch { /* ignore malformed events */ }
+    };
+
+    es.onerror = () => {
+      if (win) win._sseReadyState = es.readyState;
+      onError?.();
+    };
+
+    return () => es.close();
+  },
+
+  // Open an SSE stream for the HOST. Pushes remote events as they arrive,
+  // atomically consuming the queue server-side so events are never double-applied.
+  // Returns a cleanup function — call it to close the EventSource.
+  openLiveGameHostStream: (
+    code: string,
+    onEvents: (events: import('./types').LiveGameEvent[]) => void,
+    onInactive: () => void,
+    onError?: () => void,
+  ): (() => void) => {
+    const url = `${SSE_BASE}live-game-stream.php?code=${encodeURIComponent(code)}&role=host`;
+    const es = new EventSource(url);
+
+    es.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data.trim()) as {
+          type: string;
+          events?: import('./types').LiveGameEvent[];
+        };
+        if (msg.type === 'events' && msg.events?.length) {
+          onEvents(msg.events);
+        } else if (msg.type === 'inactive') {
+          es.close();
+          onInactive();
+        }
+        // 'close' = planned reconnect — EventSource handles automatically
+      } catch { /* ignore malformed events */ }
+    };
+
+    es.onerror = () => { onError?.(); };
+
+    return () => es.close();
+  },
 
   // Get user's active game session (requires auth)
   getActiveGame: () =>

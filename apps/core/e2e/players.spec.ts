@@ -25,7 +25,7 @@ const TEST_PLAYER_NAME = `__pw_player_${Date.now()}`;
 test.describe('Players', () => {
   test.beforeEach(async ({ page }) => {
     await goto(page, '/players/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test.afterAll(async ({ browser }) => {
@@ -100,7 +100,7 @@ test.describe('Players', () => {
   });
 
   test('clicking a player opens detail page', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     const firstPlayer = page.locator('.MuiCardActionArea-root').first();
     await firstPlayer.click();
     await expect(page).toHaveURL(/players\/detail\/\?id=/);
@@ -109,11 +109,11 @@ test.describe('Players', () => {
   test.describe('Player Detail', () => {
     test.beforeEach(async ({ page }) => {
       await goto(page, '/players/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       // Navigate to first player via CardActionArea
       const firstPlayer = page.locator('.MuiCardActionArea-root').first();
       await firstPlayer.click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     });
 
     test('detail page heading visible', async ({ page }) => {

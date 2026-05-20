@@ -56,7 +56,7 @@ test.describe('Game Manager — Remote Panel', () => {
       return;
     }
     await goto(page, `/game-manager/remote/?code=${seatCode}`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     // Should not show enter-code form or error
     await expect(page.getByText(/invalid code|not found|expired/i)).not.toBeVisible();
   });
@@ -67,7 +67,7 @@ test.describe('Game Manager — Remote Panel', () => {
       return;
     }
     await goto(page, `/game-manager/remote/?code=${seatCode}`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     const lifeDisplay = page.getByText(/^20$|^40$/).first();
     await expect(lifeDisplay).toBeVisible();
   });
@@ -78,7 +78,7 @@ test.describe('Game Manager — Remote Panel', () => {
       return;
     }
     await goto(page, `/game-manager/remote/?code=${seatCode}`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     // + damage button
     const plusBtn = page.getByRole('button', { name: /^\+$|\+1/i }).first().or(
       page.locator('button').filter({ hasText: '+' }).first()
@@ -92,16 +92,46 @@ test.describe('Game Manager — Remote Panel', () => {
       return;
     }
     await goto(page, `/game-manager/remote/?code=${seatCode}`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     const cmdDmg = page.getByText(/commander damage/i).first();
     await expect(cmdDmg).toBeVisible();
   });
 
   test('invalid seat code shows error or enter-code state', async ({ page }) => {
     await goto(page, '/game-manager/remote/?code=INVALID_CODE_00000');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     // Should show not-found or revert to enter-code form
     const errorOrForm = page.getByText(/invalid|not found|expired|game code|enter code/i).first();
     await expect(errorOrForm).toBeVisible();
+  });
+
+  test('SSE EventSource is OPEN after connecting with valid code', async ({ page }) => {
+    if (!seatCode) { test.skip(true, 'No active game'); return; }
+    await goto(page, `/game-manager/remote/?code=${seatCode}`);
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2000); // allow SSE to establish
+
+    const readyState = await page.evaluate(
+      () => (window as Record<string, unknown>)._sseReadyState as number ?? -1
+    );
+    expect(readyState).toBe(1); // 1 = OPEN
+  });
+
+  test('remote does not poll live-game.php repeatedly after SSE connects', async ({ page }) => {
+    if (!seatCode) { test.skip(true, 'No active game'); return; }
+
+    const pollHits: string[] = [];
+    page.on('request', (req) => {
+      if (req.url().includes('live-game.php') && req.method() === 'GET') {
+        pollHits.push(req.url());
+      }
+    });
+
+    await goto(page, `/game-manager/remote/?code=${seatCode}`);
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(5000); // old 1s polling would fire 5+ times here
+
+    // One initial GET from connect() is expected. No repeated GETs after.
+    expect(pollHits.length).toBeLessThanOrEqual(1);
   });
 });

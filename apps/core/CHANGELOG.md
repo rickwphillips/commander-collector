@@ -1,5 +1,9 @@
 # Changelog
 
+## [5.8.0] - 2026-05-20
+
+- Replace live game polling with SSE (host 500ms + remote 1s polls removed, ~18,300 req/hr to ~300 req/hr)
+
 ## [5.7.0] - 2026-05-18
 
 - Card metadata resolver, coach list editing, security fixes, and test coverage

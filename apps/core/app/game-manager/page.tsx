@@ -80,7 +80,6 @@ function buildInitialState(playerSetups: PlayerSetup[], startingLife: number): G
   };
 }
 
-const POLL_INTERVAL_MS = 3000;
 
 export default function GameManagerPage() {
   const router = useRouter();
@@ -172,36 +171,27 @@ export default function GameManagerPage() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [state.phase]);
 
-  // Poll for remote events. The host is the sole writer of full state; remotes
-  // append typed events to the queue instead. We consume (read + clear) the queue
-  // every second and apply any events to our local state. The existing write effect
-  // then persists the merged result to the DB.
+  // SSE stream for remote events. The host is the sole writer of full state;
+  // remotes append typed events to the queue instead. The SSE endpoint
+  // atomically consumes (reads + clears) the queue server-side and pushes
+  // batches here as {"type":"events","events":[...]}. The existing write
+  // effect then persists the merged result to the DB.
   useEffect(() => {
     if (state.phase !== 'playing' || !state.sessionCode || !dbCheckComplete) return;
     const code = state.sessionCode;
 
-    const poll = async () => {
-      try {
-        const res = await api.getLiveGame(code, true); // consume=true clears the queue
-        if (!res.is_active) return;
-        if (res.remote_events.length === 0) return; // nothing to apply
+    const closeStream = api.openLiveGameHostStream(
+      code,
+      (events) => {
         setState((prev) => {
           if (!prev) return prev;
-          return res.remote_events.reduce((s, ev) => applyEvent(s, ev), prev);
+          return events.reduce((s, ev) => applyEvent(s, ev), prev);
         });
-      } catch { /* ignore poll errors */ }
-    };
+      },
+      () => { /* session inactive — host controls the session, no action needed */ },
+    );
 
-    const id = setInterval(poll, 500);
-
-    // Immediately consume queue on visibility restore — prevents events sitting
-    // unconsumed while the host tab was backgrounded, causing remote to revert.
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') poll();
-    };
-    document.addEventListener('visibilitychange', onVisible);
-
-    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisible); };
+    return () => { closeStream(); };
   }, [state.phase, state.sessionCode, dbCheckComplete]);
 
   const handleStart = async (playerSetups: PlayerSetup[], startingLife: number, turnTimerSeconds: number) => {
@@ -228,7 +218,7 @@ export default function GameManagerPage() {
         sessionCode: newSessionCode,
         sessionSeats: session.seats,
       }));
-    } catch {/* silent — live session is optional */}
+    } catch (err) { console.error('[GameManager] createLiveGame failed — SSE will not start:', err); }
   };
 
   const handleUpdate = (newState: GameManagerState | ((prev: GameManagerState) => GameManagerState)) => {
