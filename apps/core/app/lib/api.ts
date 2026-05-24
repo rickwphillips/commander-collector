@@ -342,22 +342,14 @@ export const api = {
       body: JSON.stringify({ cards, version }),
     }),
 
-  /**
-   * Attach a list to a deck (UUID-keyed).
-   * TODO(Step 6): No-op shim until Step 6 makes the underlying SQL functional.
-   * Call refresh() after this to pick up the updated deck_id once Step 6 lands.
-   */
+  /** Attach a list to a deck (UUID-keyed). */
   attachListToDeckV2: (listId: string, deckId: string): Promise<{ success: boolean }> =>
     apiFetch<{ success: boolean }>(`/lists?id=${encodeURIComponent(listId)}&action=attach_deck`, {
       method: 'POST',
       body: JSON.stringify({ deck_id: deckId }),
     }),
 
-  /**
-   * Detach a list from its deck (UUID-keyed).
-   * TODO(Step 6): No-op shim until Step 6 makes the underlying SQL functional.
-   * Call refresh() after this to pick up the cleared deck_id once Step 6 lands.
-   */
+  /** Detach a list from its deck (UUID-keyed). */
   detachListFromDeck: (listId: string): Promise<{ success: boolean }> =>
     apiFetch<{ success: boolean }>(`/lists?id=${encodeURIComponent(listId)}&action=detach_deck`, {
       method: 'POST',
@@ -504,7 +496,7 @@ export const api = {
     }
 
     const url = `${API_BASE}coach-chat.php`;
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    const token = typeof window !== 'undefined' ? localStorage.getItem(AUTH_TOKEN_KEY) : null;
     const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
