@@ -8,7 +8,7 @@
  */
 require_once 'config.php';
 require_once 'auth/middleware.php';
-requireAuth();
+$user = requireAuth();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') sendError('Method not allowed', 405);
 
@@ -18,6 +18,12 @@ $limit  = isset($input['limit']) ? max(1, min(75, (int)$input['limit'])) : 75;
 if (!$listId) sendError('list_id required');
 
 $db = getDB();
+
+// Verify the authenticated user owns this list
+$userId = $user['sub'] ?? null;
+$ownerCheck = $db->prepare('SELECT id FROM lists WHERE id = ? AND user_id = ? AND deleted_at IS NULL');
+$ownerCheck->execute([$listId, $userId]);
+if (!$ownerCheck->fetch()) sendError('List not found', 404);
 
 // Count total still unresolved (for progress tracking)
 $totalStmt = $db->prepare("
