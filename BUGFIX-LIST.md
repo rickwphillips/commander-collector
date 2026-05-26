@@ -6,16 +6,13 @@ Track bugs here. Fix them in dedicated sessions, not on the fly.
 
 ## Open
 
-### 1. Changelog mojibake — em dashes display as `â€"`
-- **Where:** Changelog page on prod (`/changelog`)
-- **Cause:** v5.0.0 migration inserted changelog entries containing em dashes (`—`, UTF-8 `E2 80 94`) but the `changelog_changes.text` and `changelog_releases.title` columns use `utf8` charset (3-byte), and the MySQL 5.7 connection or migration runner double-encoded the bytes
-- **Affected entries:** v5.0.0 changelog — "Unified Card Workflow — Phase 5 Cleanup" title and the two `changed` entries with em dashes in their text
-- **Fix approach:** Either update the affected rows with correct bytes via a PHP script that connects with `charset=utf8`, or convert the columns to `utf8mb4` and re-insert. Test the REPLACE pattern against the actual stored bytes first — the naive `REPLACE(text, 'â€"', '—')` matched 0 rows, so the actual byte sequence is different from what's displayed in the browser.
+_(none)_
 
 ---
 
 ## Fixed (log for reference)
 
+- **Changelog mojibake (em dashes as `â€"`):** v5.0.0 migration double-encoded em dashes in `changelog_releases.title` and `changelog_changes.text`. Verified clean on prod 2026-05-26; no affected rows remain.
 - **Card lookup fails on apostrophe names (e.g. "Teferi's Protection"):** `isKnownCardName` did an exact Set lookup but LLM output uses curly/right apostrophe (U+2019) while the catalog stores straight apostrophes (U+0027). Fixed by normalizing U+2019 and U+02BC to U+0027 before lookup in `cardCatalog.ts`.
 - **MCP endpoint double `.php` extension:** `apiFetch` appends `.php` automatically, but new MCP proxy endpoints were passed with `.php` already in the path (e.g. `/rules/score-deck.php` → `score-deck.php.php`). Fixed by stripping `.php` from all six endpoint strings in `api.ts`.
 - **PHP dev server wrong working directory:** Local PHP server (port 8081) was started from the workspace root instead of `apps/core/app/`, causing all `/php-api/*` requests to 404. Fix: `kill <pid>` and restart from `apps/core/app/`.
