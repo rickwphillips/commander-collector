@@ -39,3 +39,6 @@ apps/core/app/php-api/rules/p[0-9]*.md
 
 # External services (own repos)
 services/
+
+# OS cruft
+.DS_Store
