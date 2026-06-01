@@ -21,7 +21,9 @@ header('Content-Type: text/event-stream');
 header('Cache-Control: no-cache');
 header('X-Accel-Buffering: no');
 header('Content-Encoding: none');
-header('Access-Control-Allow-Origin: *');
+// CORS is inherited from config.php's origin allowlist (above). Same-origin in
+// prod, so this is moot there; in dev config.php already falls back to a
+// permissive origin. No per-endpoint override needed.
 
 $code   = isset($_GET['code'])  ? trim($_GET['code'])  : null;
 $isHost = isset($_GET['role'])  && $_GET['role'] === 'host';
