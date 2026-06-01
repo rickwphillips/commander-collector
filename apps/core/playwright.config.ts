@@ -24,9 +24,23 @@ export default defineConfig({
       testMatch: '**/auth.setup.ts',
     },
     {
+      // Seeds dedicated fixtures (player + list with cards) so data-dependent
+      // tests don't rely on ambient prod data. `teardown` removes them after.
+      name: 'seed',
+      testMatch: '**/seed.setup.ts',
+      dependencies: ['setup'],
+      teardown: 'cleanup',
+      use: { storageState: './e2e/.auth/state.json' },
+    },
+    {
+      name: 'cleanup',
+      testMatch: '**/seed.teardown.ts',
+      use: { storageState: './e2e/.auth/state.json' },
+    },
+    {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'], storageState: './e2e/.auth/state.json' },
-      dependencies: ['setup'],
+      dependencies: ['seed'],
     },
   ],
 });
