@@ -30,6 +30,7 @@ vi.mock('@/lib/api', () => ({
     createLiveGame:   vi.fn(),
     getActiveGame:    vi.fn(),
     getGameSettings:  vi.fn(),
+    openLiveGameHostStream: vi.fn(() => vi.fn()),
   },
   apiFetch: vi.fn(),
   API_BASE: '',

@@ -8,6 +8,10 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
     globals: true,
+    // userEvent component tests (e.g. GameForm) accumulate real per-keystroke
+    // delays and exceed the 5s default on slower CI runners. 15s gives headroom
+    // (the Lint+Build+Test job has a 15-minute budget).
+    testTimeout: 15000,
     exclude: ['**/node_modules/**', '**/e2e/**', '**/*.spec.ts'],
     coverage: {
       provider: 'v8',

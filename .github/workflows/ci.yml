@@ -72,8 +72,5 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Test (Turbo, informational, does not block)
-        # Existing test debt: vitest config picks up Playwright e2e specs,
-        # and a few GameForm.test.tsx cases time out. Tracked as follow-ups.
+      - name: Test (Turbo)
         run: npm test
-        continue-on-error: true
