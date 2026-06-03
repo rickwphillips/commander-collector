@@ -54,6 +54,7 @@ export function getDeviceId(): string {
 export async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
   // Handle query strings properly - insert .php before the query string
   const isGet = !options?.method || options.method === 'GET';
+  // Append _cb timestamp to every GET to prevent stale reads; intentional for this real-time app.
   const cb = isGet ? `_cb=${Date.now()}` : null;
   let url: string;
   if (endpoint.includes('?')) {
