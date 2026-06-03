@@ -190,7 +190,7 @@ switch ($method) {
                 $pdo->commit();
             } catch (Exception $e) {
                 $pdo->rollBack();
-                sendError('Failed to consume events: ' . $e->getMessage(), 500);
+                sendError('Failed to consume events', 500);
             }
         } else {
             $row = resolveSession($pdo, $code);

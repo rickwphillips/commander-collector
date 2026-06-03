@@ -184,7 +184,7 @@ elseif ($method === 'POST') {
             sendJSON(['success' => true, 'version' => $newVersion]);
         } catch (Exception $e) {
             $db->rollBack();
-            sendError('Failed to detach: ' . $e->getMessage(), 500);
+            sendError('Failed to detach', 500);
         }
     }
 
@@ -265,7 +265,7 @@ elseif ($method === 'POST') {
             sendJSON(['success' => true, 'version' => $newVersion]);
         } catch (Exception $e) {
             $db->rollBack();
-            sendError('Failed to attach: ' . $e->getMessage(), 500);
+            sendError('Failed to attach', 500);
         }
     }
 
@@ -319,7 +319,7 @@ elseif ($method === 'POST') {
             sendJSON(['success' => true, 'version' => $newVersion]);
         } catch (Exception $e) {
             $db->rollBack();
-            sendError('Failed to restore: ' . $e->getMessage(), 500);
+            sendError('Failed to restore', 500);
         }
     }
 
@@ -373,7 +373,7 @@ elseif ($method === 'POST') {
         sendJSON(['success' => true, 'list_id' => $newListId], 201);
     } catch (Exception $e) {
         $db->rollBack();
-        sendError('Failed to create list: ' . $e->getMessage(), 500);
+        sendError('Failed to create list', 500);
     }
 }
 
@@ -521,7 +521,7 @@ elseif ($method === 'PATCH') {
         sendJSON(['success' => true, 'version' => $newVersion]);
     } catch (Exception $e) {
         $db->rollBack();
-        sendError('Failed to update list: ' . $e->getMessage(), 500);
+        sendError('Failed to update list', 500);
     }
 }
 
@@ -578,7 +578,7 @@ elseif ($method === 'DELETE') {
         sendJSON(['success' => true]);
     } catch (Exception $e) {
         $db->rollBack();
-        sendError('Failed to delete list: ' . $e->getMessage(), 500);
+        sendError('Failed to delete list', 500);
     }
 }
 
