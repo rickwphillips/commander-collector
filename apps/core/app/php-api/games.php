@@ -147,11 +147,12 @@ switch ($method) {
                 $gameType
             ]);
 
-            // Insert results
+            // Insert results (prepare statements once outside the loop)
             $resultStmt = $pdo->prepare('
                 INSERT INTO game_results (id, game_id, deck_id, player_id, finish_position, eliminated_turn, team_number)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             ');
+            $deckStmt = $pdo->prepare('SELECT player_id FROM decks WHERE id = ?');
 
             foreach ($data['results'] as $result) {
                 if (empty($result['deck_id']) || !isset($result['finish_position'])) {
@@ -163,7 +164,6 @@ switch ($method) {
                 if (!empty($result['player_id'])) {
                     $playerId = (string)$result['player_id'];
                 } else {
-                    $deckStmt = $pdo->prepare('SELECT player_id FROM decks WHERE id = ?');
                     $deckStmt->execute([(string)$result['deck_id']]);
                     $deck = $deckStmt->fetch();
                     if (!$deck) {
@@ -188,7 +188,7 @@ switch ($method) {
 
         } catch (Exception $e) {
             $pdo->rollBack();
-            sendError('Failed to create game: ' . $e->getMessage(), 500);
+            sendError('Failed to create game', 500);
         }
         break;
 
@@ -244,11 +244,12 @@ switch ($method) {
                 $deleteStmt = $pdo->prepare('DELETE FROM game_results WHERE game_id = ?');
                 $deleteStmt->execute([$id]);
 
-                // Insert new results
+                // Insert new results (prepare statements once outside the loop)
                 $resultStmt = $pdo->prepare('
                     INSERT INTO game_results (id, game_id, deck_id, player_id, finish_position, eliminated_turn, team_number)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 ');
+                $deckStmt = $pdo->prepare('SELECT player_id FROM decks WHERE id = ?');
 
                 foreach ($data['results'] as $result) {
                     if (empty($result['deck_id']) || !isset($result['finish_position'])) {
@@ -259,7 +260,6 @@ switch ($method) {
                     if (!empty($result['player_id'])) {
                         $playerId = (string)$result['player_id'];
                     } else {
-                        $deckStmt = $pdo->prepare('SELECT player_id FROM decks WHERE id = ?');
                         $deckStmt->execute([(string)$result['deck_id']]);
                         $deck = $deckStmt->fetch();
                         if ($deck) {
@@ -284,7 +284,7 @@ switch ($method) {
 
         } catch (Exception $e) {
             $pdo->rollBack();
-            sendError('Failed to update game: ' . $e->getMessage(), 500);
+            sendError('Failed to update game', 500);
         }
         break;
 
