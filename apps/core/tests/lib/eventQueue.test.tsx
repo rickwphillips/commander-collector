@@ -34,6 +34,7 @@ vi.mock('@/lib/api', () => ({
     sendLiveGameEvent:   vi.fn(),
     getActiveGame:       vi.fn(),
     getGameSettings:     vi.fn(),
+    openLiveGameHostStream: vi.fn(() => vi.fn()),
   },
   apiFetch: vi.fn(),
   API_BASE: '',
@@ -204,47 +205,44 @@ describe('host page — event queue consumption', () => {
     vi.restoreAllMocks();
   });
 
-  it('applies remote events from poll and writes merged state to DB', async () => {
+  it('applies remote events from the host stream and writes merged state to DB', async () => {
     const lifeChangeEvent: LiveGameEvent = {
       type: 'life_change', playerIdx: 0, delta: -5, seat: 'top', ts: Date.now(),
     };
+
+    // Capture the stream's onEvents callback so the test can push a batch,
+    // mirroring how the SSE endpoint delivers events to the host.
+    let pushEvents: ((events: LiveGameEvent[]) => void) | null = null;
+    (api.openLiveGameHostStream as ReturnType<typeof vi.fn>).mockImplementation(
+      (_code: string, onEvents: (events: LiveGameEvent[]) => void) => {
+        pushEvents = onEvents;
+        return () => {};
+      },
+    );
 
     // getActiveGame returns an active playing session
     (api.getActiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
       is_active: true, state: mockPlayingState, session_code: 'abc123',
     });
-
-    // First poll: delivers the life event. Remaining: empty.
-    (api.getLiveGame as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce({
-        is_active: true,
-        state: mockPlayingState,
-        remote_events: [lifeChangeEvent],
-        updated_at: '2026-01-01T00:00:00Z',
-        seat: 'bottom',
-      })
-      .mockResolvedValue({
-        is_active: true,
-        state: mockPlayingState,
-        remote_events: [],
-        updated_at: '2026-01-01T00:00:00Z',
-        seat: 'bottom',
-      });
+    (api.getLiveGame as ReturnType<typeof vi.fn>).mockResolvedValue({
+      is_active: true,
+      state: mockPlayingState,
+      remote_events: [],
+      updated_at: '2026-01-01T00:00:00Z',
+      seat: 'bottom',
+    });
 
     render(<GameManagerPage />);
 
-    // Let getActiveGame resolve and state settle
+    // Let getActiveGame resolve and the stream effect register its callback.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(100);
     });
+    expect(pushEvents).not.toBeNull();
 
-    // Now advance enough for the poll interval (500ms) to fire
+    // Deliver the remote event via the stream, as the SSE endpoint would.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(600);
-    });
-
-    // Let state updates + write effect settle
-    await act(async () => {
+      pushEvents!([lifeChangeEvent]);
       await vi.advanceTimersByTimeAsync(100);
     });
 
