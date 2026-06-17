@@ -14,7 +14,7 @@ $failed = 0;
 $errors = [];
 
 // ── Mint a dev JWT ──────────────────────────────────────────────────────────
-require '/Users/rick/auth_secrets_dev.php';
+require '/Users/rickphillips/auth_secrets_dev.php';
 
 function mintToken(): string {
     $header  = rtrim(strtr(base64_encode(json_encode(['alg' => 'HS256', 'typ' => 'JWT'])), '+/', '-_'), '=');
