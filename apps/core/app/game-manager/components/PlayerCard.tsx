@@ -4,6 +4,7 @@ import { memo, useRef, useState } from 'react';
 import { keyframes } from '@emotion/react';
 import { Box, Button, Typography } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import { ControlFocusModal } from './ControlFocusModal';
 import type { PlayerState, CommanderDamageMap } from '../types';
 import type { MonarchAnim } from '@/game-manager/hooks/useMonarchTransition';
 
@@ -269,7 +270,12 @@ function arePlayerCardPropsEqual(prev: PlayerCardProps, next: PlayerCardProps): 
 }
 
 function PlayerCardImpl(props: PlayerCardProps) {
-  const { viewer, sizes, player, lifeKillOpponents, onLifeKillSelect, poisonKillOpponents, onPoisonKillSelect } = props;
+  const {
+    viewer, sizes, player, playerIdx, allPlayers, commanderDamage, computedLifeColor,
+    lifeKillOpponents, onLifeKillSelect, poisonKillOpponents, onPoisonKillSelect,
+    onLifeChange, onPoisonChange, onEnergyChange, onExperienceChange, onCommanderTaxChange,
+    handleCmdDmgChange,
+  } = props;
   const isPoisoned = player.poison >= 10;
 
   // ─── Card-local UI state ────────────────────────────────────────────────
@@ -287,7 +293,6 @@ function PlayerCardImpl(props: PlayerCardProps) {
   const [rulesOpenLabel, setRulesOpenLabel] = useState<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [openSnapshotKey, setOpenSnapshotKey] = useState<string | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [focusedControl, setFocusedControl] = useState<FocusedControl>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [qrOpen, setQrOpen] = useState(false);
@@ -322,6 +327,21 @@ function PlayerCardImpl(props: PlayerCardProps) {
   // parent to anchor against.
   return (
     <Box sx={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+      {/* ── Faded background art ── */}
+      {player.commander.artCropUrl && (
+        <Box
+          component="img"
+          src={player.commander.artCropUrl}
+          alt=""
+          sx={{
+            position: 'absolute', inset: 0,
+            width: '100%', height: '100%',
+            objectFit: 'cover', objectPosition: 'center',
+            opacity: 0.12, zIndex: 0, pointerEvents: 'none',
+          }}
+        />
+      )}
+
       {/* ── Concede confirm overlay ── */}
       {showEliminateConfirm && (
         <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5, pointerEvents: 'none', bgcolor: 'rgba(218,165,32,0.12)' }}>
@@ -403,6 +423,85 @@ function PlayerCardImpl(props: PlayerCardProps) {
         <VisibilityIcon sx={{ fontSize: 13 }} />
         <Typography sx={{ fontSize: 19, fontWeight: 600, lineHeight: 1.3 }}>{viewer.viewerTooltipText}</Typography>
       </Box>
+
+      {/* ── Focused control modal — enlarged single counter/damage control ── */}
+      {(() => {
+        if (!focusedControl) return null;
+        const fc = focusedControl;
+        let label = '';
+        let value = 0;
+        let onDec: () => void = () => {};
+        let onInc: () => void = () => {};
+        let onDec5: (() => void) | undefined;
+        let onInc5: (() => void) | undefined;
+        let valueColor: string = 'text.primary';
+        if (fc.type === 'life') {
+          label = 'Life Total';
+          value = player.life;
+          onDec = () => onLifeChange(playerIdx, -1);
+          onInc = () => onLifeChange(playerIdx, 1);
+          onDec5 = () => onLifeChange(playerIdx, -5);
+          onInc5 = () => onLifeChange(playerIdx, 5);
+          valueColor = computedLifeColor || 'primary.main';
+        } else if (fc.type === 'poison') {
+          label = 'Poison';
+          value = player.poison;
+          onDec = () => onPoisonChange(playerIdx, -1);
+          onInc = () => onPoisonChange(playerIdx, 1);
+          onDec5 = () => onPoisonChange(playerIdx, -5);
+          onInc5 = () => onPoisonChange(playerIdx, 5);
+          valueColor = player.poison >= 10 ? 'error.main' : player.poison > 0 ? 'warning.main' : 'text.disabled';
+        } else if (fc.type === 'energy') {
+          label = 'Energy';
+          value = player.energy;
+          onDec = () => onEnergyChange(playerIdx, -1);
+          onInc = () => onEnergyChange(playerIdx, 1);
+          onDec5 = () => onEnergyChange(playerIdx, -5);
+          onInc5 = () => onEnergyChange(playerIdx, 5);
+          valueColor = player.energy > 0 ? 'primary.main' : 'text.disabled';
+        } else if (fc.type === 'experience') {
+          label = 'XP';
+          value = player.experience;
+          onDec = () => onExperienceChange(playerIdx, -1);
+          onInc = () => onExperienceChange(playerIdx, 1);
+          onDec5 = () => onExperienceChange(playerIdx, -5);
+          onInc5 = () => onExperienceChange(playerIdx, 5);
+          valueColor = player.experience > 0 ? 'primary.main' : 'text.disabled';
+        } else if (fc.type === 'commanderTax') {
+          label = 'Tax';
+          value = player.commanderTax;
+          onDec = () => onCommanderTaxChange(playerIdx, -1);
+          onInc = () => onCommanderTaxChange(playerIdx, 1);
+          onDec5 = () => onCommanderTaxChange(playerIdx, -5);
+          onInc5 = () => onCommanderTaxChange(playerIdx, 5);
+          valueColor = player.commanderTax > 0 ? 'warning.main' : 'text.disabled';
+        } else if (fc.type === 'commanderDamage' && fc.sourceIdx !== undefined) {
+          const src = allPlayers[fc.sourceIdx];
+          const dmg = commanderDamage[playerIdx]?.[fc.sourceIdx] ?? [0, 0];
+          const isPartner = fc.isPartner ?? false;
+          const srcName = isPartner ? (src?.partner?.name ?? 'Partner') : (src?.commander?.name ?? src?.playerName ?? `Player ${fc.sourceIdx + 1}`);
+          label = `CMD Dmg — ${srcName}`;
+          value = isPartner ? dmg[1] : dmg[0];
+          onDec = () => handleCmdDmgChange(playerIdx, fc.sourceIdx!, isPartner, -1);
+          onInc = () => handleCmdDmgChange(playerIdx, fc.sourceIdx!, isPartner, 1);
+          onDec5 = () => handleCmdDmgChange(playerIdx, fc.sourceIdx!, isPartner, -5);
+          onInc5 = () => handleCmdDmgChange(playerIdx, fc.sourceIdx!, isPartner, 5);
+          valueColor = value >= 21 ? 'error.main' : 'text.primary';
+        }
+        return (
+          <ControlFocusModal
+            open
+            onClose={() => setFocusedControl(null)}
+            label={label}
+            value={value}
+            color={valueColor}
+            onDec={onDec}
+            onInc={onInc}
+            onDec5={onDec5}
+            onInc5={onInc5}
+          />
+        );
+      })()}
     </Box>
   );
 }
