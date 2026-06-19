@@ -1,10 +1,30 @@
 'use client';
 
 import { memo, useRef, useState } from 'react';
-import { Box, Typography } from '@mui/material';
+import { keyframes } from '@emotion/react';
+import { Box, Button, Typography } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import type { PlayerState, CommanderDamageMap } from '../types';
 import type { MonarchAnim } from '@/game-manager/hooks/useMonarchTransition';
+
+// ─── Local keyframes / constants used by migrated render blocks ────────────
+// Phase 3 will sweep cross-component keyframes into a shared module. For now
+// each block owns whatever it needs.
+const tearFall = keyframes`
+  0%   { transform: translateY(-12px) translateX(0px) scaleY(1);    opacity: 0; }
+  8%   { opacity: 0.85; }
+  40%  { transform: translateY(40%)  translateX(4px)  scaleY(1.1);  opacity: 0.75; }
+  75%  { transform: translateY(80%)  translateX(-3px) scaleY(0.95); opacity: 0.4; }
+  100% { transform: translateY(110%) translateX(1px)  scaleY(1);    opacity: 0; }
+`;
+const TEARS = [
+  { left: '12%', delay: '0s',    dur: '2.9s' },
+  { left: '28%', delay: '1.1s',  dur: '3.2s' },
+  { left: '45%', delay: '0.4s',  dur: '2.6s' },
+  { left: '60%', delay: '1.7s',  dur: '3.4s' },
+  { left: '76%', delay: '0.7s',  dur: '2.8s' },
+  { left: '88%', delay: '2.0s',  dur: '3.1s' },
+];
 
 /**
  * Presentational counterpart of PlayerPanel. All behavior hooks live in the
@@ -249,15 +269,18 @@ function arePlayerCardPropsEqual(prev: PlayerCardProps, next: PlayerCardProps): 
 }
 
 function PlayerCardImpl(props: PlayerCardProps) {
-  const { viewer } = props;
+  const { viewer, sizes, player, lifeKillOpponents, onLifeKillSelect, poisonKillOpponents, onPoisonKillSelect } = props;
+  const isPoisoned = player.poison >= 10;
 
   // ─── Card-local UI state ────────────────────────────────────────────────
   // None of this state is read by the orchestrator or any sibling. Lifting it
   // would just add prop noise and break memoization. It stays here.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [eliminateTurnInput, setEliminateTurnInput] = useState('');
+  // setShowEliminateConfirm is wired by the state-menu block (later commit).
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showEliminateConfirm, setShowEliminateConfirm] = useState(false);
+  void setShowEliminateConfirm;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [stateMenuOpen, setStateMenuOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -299,6 +322,73 @@ function PlayerCardImpl(props: PlayerCardProps) {
   // parent to anchor against.
   return (
     <Box sx={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+      {/* ── Concede confirm overlay ── */}
+      {showEliminateConfirm && (
+        <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5, pointerEvents: 'none', bgcolor: 'rgba(218,165,32,0.12)' }}>
+          <Typography sx={{ fontWeight: 900, color: '#DAA520', fontSize: 22, letterSpacing: 2, textShadow: '0 2px 8px rgba(0,0,0,0.5)', transform: 'rotate(-10deg)' }}>
+            CONCEDE?
+          </Typography>
+        </Box>
+      )}
+
+      {/* ── Eliminated overlay ── */}
+      {player.isEliminated && (
+        <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 11, pointerEvents: 'none', bgcolor: player.isConceded && !isPoisoned ? 'rgba(218,165,32,0.12)' : 'transparent', overflow: 'hidden' }}>
+          {player.isConceded && !isPoisoned && TEARS.map((t, i) => (
+            <Box key={i} sx={{
+              position: 'absolute', top: 0, left: t.left,
+              width: 7, height: 11,
+              borderRadius: '50% 50% 50% 50% / 70% 70% 30% 30%',
+              bgcolor: 'rgba(120, 190, 255, 0.8)',
+              boxShadow: '0 0 5px rgba(120,190,255,0.5)',
+              animation: `${tearFall} ${t.dur} ${t.delay} ease-in infinite`,
+            }} />
+          ))}
+          <Typography
+            sx={{ fontWeight: 900, letterSpacing: 4, fontSize: 48, transform: 'rotate(-15deg)', color: isPoisoned ? undefined : player.isConceded ? '#DAA520' : 'error.main' }}
+            style={isPoisoned ? { color: '#00c853', WebkitTextFillColor: '#00c853', WebkitTextStroke: '2px black' } : player.isConceded ? { WebkitTextStroke: '2px black' } : undefined}
+          >
+            {isPoisoned ? 'POISONED' : player.isConceded ? 'CONCEDED' : 'ELIMINATED'}
+          </Typography>
+        </Box>
+      )}
+
+      {/* ── Life kill attribution overlay ── */}
+      {lifeKillOpponents && onLifeKillSelect && (
+        <Box sx={{ position: 'absolute', inset: 0, zIndex: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, bgcolor: 'rgba(0,0,0,0.72)', px: 2 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: sizes.fsKillPrompt, color: '#fff', mb: 0.5, textAlign: 'center' }}>
+            Who brought {player.playerName} to 0?
+          </Typography>
+          {lifeKillOpponents.map((opp) => (
+            <Button key={opp.idx} variant="outlined" fullWidth onClick={() => onLifeKillSelect(opp.idx)}
+              sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.5)', '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,0.1)' } }}>
+              {opp.name}
+            </Button>
+          ))}
+          <Button onClick={() => onLifeKillSelect(null)} sx={{ color: 'rgba(255,255,255,0.5)', fontSize: sizes.fsKillPrompt, mt: 0.5 }}>
+            Skip
+          </Button>
+        </Box>
+      )}
+
+      {/* ── Poison kill attribution overlay ── */}
+      {poisonKillOpponents && onPoisonKillSelect && (
+        <Box sx={{ position: 'absolute', inset: 0, zIndex: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, bgcolor: 'rgba(0,40,0,0.78)', px: 2 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: sizes.fsKillPrompt, color: '#7fff7f', mb: 0.5, textAlign: 'center' }}>
+            Who poisoned {player.playerName}?
+          </Typography>
+          {poisonKillOpponents.map((opp) => (
+            <Button key={opp.idx} variant="outlined" fullWidth onClick={() => onPoisonKillSelect(opp.idx)}
+              sx={{ color: '#7fff7f', borderColor: 'rgba(100,255,100,0.4)', '&:hover': { borderColor: '#7fff7f', bgcolor: 'rgba(100,255,100,0.1)' } }}>
+              {opp.name}
+            </Button>
+          ))}
+          <Button onClick={() => onPoisonKillSelect(null)} sx={{ color: 'rgba(100,255,100,0.4)', fontSize: sizes.fsKillPrompt, mt: 0.5 }}>
+            Skip
+          </Button>
+        </Box>
+      )}
+
       {/* ── Viewer notification banner ── */}
       <Box sx={{
         position: 'absolute', top: 0, left: 0, right: 0, zIndex: 12,
