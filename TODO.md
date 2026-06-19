@@ -1,0 +1,2 @@
+- [ ] Create a game manager diagram
+- [ ] Selecting the autosearch results of a commander on the create deck page is not registering in the input field when selected. #bug

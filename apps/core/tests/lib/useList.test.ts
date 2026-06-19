@@ -74,7 +74,7 @@ describe('useList', () => {
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       expect(result.current.resolving).toBe(false);
-      expect(result.current.unresolvedCount).toBeUndefined(); // not exposed
+      expect('unresolvedCount' in result.current).toBe(false); // not exposed
       // resolver did not fire — apiFetch called exactly once (the initial load)
       expect(mockApiFetch).toHaveBeenCalledTimes(1);
       expect(result.current.resolveError).toBeNull();

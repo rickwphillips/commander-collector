@@ -111,9 +111,7 @@ test.describe('Game Manager — Remote Panel', () => {
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(2000); // allow SSE to establish
 
-    const readyState = await page.evaluate(
-      () => (window as Record<string, unknown>)._sseReadyState as number ?? -1
-    );
+    const readyState = await page.evaluate(() => window._sseReadyState ?? -1);
     expect(readyState).toBe(1); // 1 = OPEN
   });
 

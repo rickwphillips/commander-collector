@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthGuard';
-import { GameSetup } from './components/GameSetup';
+import { GameSetup, type GameSetupSubmit } from './components/GameSetup';
 import { GameBoard } from './components/GameBoard';
 import { GameEndSummary } from './components/GameEndSummary';
 import type { GameManagerState, PlayerSetup, PlayerState, CommanderDamageMap } from './types';
-import type { GameResultInput } from '@/lib/types';
+import type { GameResultInput, GameType } from '@/lib/types';
+import { isSeatFilled } from '@/lib/types';
 import { api } from '@/lib/api';
 import { applyEvent } from './remoteTransforms';
 
@@ -30,20 +31,29 @@ const DEFAULT_STATE: GameManagerState = {
   sessionSeats: null,
 };
 
-// Validate that a loaded game state is valid and playable
-function isValidPlayableState(state: GameManagerState): boolean {
+/**
+ * A state is resumable from the DB if it represents an active session: either
+ * seating (filling chairs) or playing. Anything else (empty, ended, or with
+ * an out-of-range currentPlayerIdx) is treated as junk and the session is
+ * deleted on load.
+ */
+function isResumableState(state: GameManagerState): boolean {
   if (!state.players || state.players.length === 0) return false;
-  if (state.phase !== 'playing') return false;
+  if (state.phase !== 'seating' && state.phase !== 'playing') return false;
   if (state.currentPlayerIdx < 0 || state.currentPlayerIdx >= state.players.length) return false;
   if (!state.commanderDamage) return false;
   return true;
 }
 
-function buildInitialState(playerSetups: PlayerSetup[], startingLife: number): GameManagerState {
-  const players: PlayerState[] = playerSetups.map((setup, i) => ({
-    ...setup,
-    position: (POSITIONS_BY_COUNT[playerSetups.length] ?? POSITIONS_BY_COUNT[4])[i],
-    life: startingLife,
+function emptySeatAt(position: PlayerState['position']): PlayerState {
+  return {
+    playerId: '',
+    deckId: '',
+    playerName: '',
+    deckName: '',
+    commander: { name: '' },
+    position,
+    life: 0,
     poison: 0,
     commanderTax: 0,
     isMonarch: false,
@@ -54,16 +64,34 @@ function buildInitialState(playerSetups: PlayerSetup[], startingLife: number): G
     isEliminated: false,
     isConceded: false,
     eliminatedTurn: null,
-  }));
+  };
+}
 
-  // Initialize commanderDamage map: each target has an entry for each source
+function buildSeatingState(payload: GameSetupSubmit, prefill?: PlayerSetup[]): GameManagerState {
+  const positions = POSITIONS_BY_COUNT[payload.playerCount] ?? POSITIONS_BY_COUNT[4];
+  const players: PlayerState[] = positions.map((position, i) => {
+    const seed = prefill?.[i];
+    const base = emptySeatAt(position);
+    if (seed) {
+      return {
+        ...base,
+        playerId: seed.playerId,
+        deckId: seed.deckId,
+        playerName: seed.playerName,
+        deckName: seed.deckName,
+        commander: seed.commander,
+        partner: seed.partner,
+        life: payload.startingLife,
+      };
+    }
+    return { ...base, life: payload.startingLife };
+  });
+
   const commanderDamage: CommanderDamageMap = {};
   for (let target = 0; target < players.length; target++) {
     commanderDamage[target] = {};
     for (let source = 0; source < players.length; source++) {
-      if (source !== target) {
-        commanderDamage[target][source] = [0, 0];
-      }
+      if (source !== target) commanderDamage[target][source] = [0, 0];
     }
   }
 
@@ -72,31 +100,48 @@ function buildInitialState(playerSetups: PlayerSetup[], startingLife: number): G
     commanderDamage,
     currentPlayerIdx: 0,
     turnNumber: 1,
-    startingLife,
-    phase: 'playing',
-    turnTimerSeconds: 300,
-    turnStartTime: Date.now(),
+    startingLife: payload.startingLife,
+    phase: 'seating',
+    turnTimerSeconds: payload.turnTimerSeconds,
+    turnStartTime: 0,
     notes: '',
+    gameType: payload.gameType,
   };
 }
-
 
 export default function GameManagerPage() {
   const router = useRouter();
   const { user } = useAuth();
   const [state, setState] = useState<GameManagerState>(DEFAULT_STATE);
-  const [setupPrefill, setSetupPrefill] = useState<PlayerSetup[] | null>(null);
+  const [restartPrefill, setRestartPrefill] = useState<PlayerSetup[] | null>(null);
 
-  // Ref for live session sync (tracks when last write happened)
-  const lastWriteTimeRef = useRef<number>(0);
-
-  // Single flag: don't render until DB check completes and state is actually loaded
-  // This prevents any rendering while checking for active session
   const [dbCheckComplete, setDbCheckComplete] = useState<boolean>(false);
   const dbCheckRef = useRef<boolean>(false);
 
-  // On mount: query DB for active game session
-  // Don't render ANYTHING until this completes and state is set
+  /**
+   * The canonical mutation funnel: update React state AND persist to the live
+   * session row. Replaces a pair of useEffects (one watching `state`, one
+   * watching `state.sessionCode` with a 100ms debounce) that previously kept
+   * the DB in sync after the fact. Calling commit() at the moment of mutation
+   * removes the effect-driven sync and its timing-ref scaffolding.
+   *
+   * Persistence is skipped when there is no sessionCode or the phase is not
+   * 'seating' / 'playing' (e.g. setup screen, ended summary, resume load).
+   */
+  const commit = useCallback(
+    (updater: GameManagerState | ((prev: GameManagerState) => GameManagerState)) => {
+      setState((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        if (next.sessionCode && (next.phase === 'seating' || next.phase === 'playing')) {
+          api.updateLiveGame(next.sessionCode, next).catch(() => {});
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
+  // On mount: query DB for active game session. Resume seating or playing.
   useEffect(() => {
     if (dbCheckRef.current) return;
     dbCheckRef.current = true;
@@ -107,34 +152,23 @@ export default function GameManagerPage() {
 
       try {
         const res = await api.getActiveGame();
-
         if (res.is_active && res.state) {
           sessionCode = res.session_code;
-
-          // Check: is state valid AND in playing phase?
-          if (isValidPlayableState(res.state) && res.state.phase === 'playing') {
-            // Valid, playable game — load it
+          if (isResumableState(res.state)) {
             loadedGame = {
               ...res.state,
               sessionCode: res.session_code,
-              sessionSeats: res.session_seats ?? null
+              sessionSeats: res.session_seats ?? null,
             };
-          } else {
-            // Bad state or ended game — delete corrupted session
-            if (sessionCode) {
-              api.deleteLiveGame(sessionCode).catch(() => {});
-            }
+          } else if (sessionCode) {
+            api.deleteLiveGame(sessionCode).catch(() => {});
           }
         }
-      } catch (err) {
-        // No active session or error — start fresh
+      } catch {
+        /* no active session */
       }
 
-      // Update state and complete check in same effect
-      if (loadedGame) {
-        setState(loadedGame);
-      }
-      // Mark check complete
+      if (loadedGame) setState(loadedGame);
       setDbCheckComplete(true);
     };
 
@@ -142,25 +176,9 @@ export default function GameManagerPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fire-and-forget DB write on every state change while playing.
-  useEffect(() => {
-    if (state.phase !== 'playing' || !state.sessionCode || !dbCheckComplete) return;
-    lastWriteTimeRef.current = Date.now();
-    api.updateLiveGame(state.sessionCode, state).catch(() => {});
-  }, [state, dbCheckComplete]);
-
-  // Also save state when sessionCode first becomes available (in case state changed while waiting for session)
-  useEffect(() => {
-    if (state.phase !== 'playing' || !state.sessionCode || !dbCheckComplete) return;
-    // Only trigger if enough time has passed since last write (avoid duplicate saves)
-    if (Date.now() - lastWriteTimeRef.current < 100) return;
-    api.updateLiveGame(state.sessionCode, state).catch(() => {});
-  }, [state.sessionCode]);
-
-  // Guard against accidental refresh / close-tab / browser-back while a game is
-  // in progress. Browser shows its native "Leave site?" prompt; we cannot
-  // customize the wording (anti-phishing measure). In-app <Link> clicks in the
-  // layout header bypass this — there is no router-level nav guard in App Router.
+  // Guard against accidental nav while the game is actually being played.
+  // Seating phase intentionally does NOT trigger this since the user may want
+  // to back out before committing to a game.
   useEffect(() => {
     if (state.phase !== 'playing') return;
     const handler = (e: BeforeUnloadEvent) => {
@@ -171,63 +189,80 @@ export default function GameManagerPage() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [state.phase]);
 
-  // SSE stream for remote events. The host is the sole writer of full state;
-  // remotes append typed events to the queue instead. The SSE endpoint
-  // atomically consumes (reads + clears) the queue server-side and pushes
-  // batches here as {"type":"events","events":[...]}. The existing write
-  // effect then persists the merged result to the DB.
+  // SSE stream for remote events (host side). Only runs in 'playing' phase;
+  // remotes should never connect before the game has actually started.
   useEffect(() => {
     if (state.phase !== 'playing' || !state.sessionCode || !dbCheckComplete) return;
     const code = state.sessionCode;
-
     const closeStream = api.openLiveGameHostStream(
       code,
       (events) => {
-        setState((prev) => {
-          if (!prev) return prev;
-          return events.reduce((s, ev) => applyEvent(s, ev), prev);
-        });
+        commit((prev) => events.reduce((s, ev) => applyEvent(s, ev), prev));
       },
-      () => { /* session inactive — host controls the session, no action needed */ },
+      () => { /* session inactive — host controls */ },
     );
-
     return () => { closeStream(); };
-  }, [state.phase, state.sessionCode, dbCheckComplete]);
+  }, [state.phase, state.sessionCode, dbCheckComplete, commit]);
 
-  const handleStart = async (playerSetups: PlayerSetup[], startingLife: number, turnTimerSeconds: number) => {
-    // New game starting — mark check as complete since we're creating a fresh session
+  const handleSetupSubmit = async (payload: GameSetupSubmit) => {
     dbCheckRef.current = true;
-    setDbCheckComplete(true);  // Also set state so fire-and-forget effect works
-    // Await the delete so the old session is gone before the new one is created.
-    // If it fails we proceed anyway — the new game gets a new code so it's isolated.
+    setDbCheckComplete(true);
     if (state.sessionCode) {
-      try { await api.deleteLiveGame(state.sessionCode); } catch {/* ok to proceed */}
+      try { await api.deleteLiveGame(state.sessionCode); } catch { /* ok */ }
     }
-    const newState = { ...buildInitialState(playerSetups, startingLife), turnTimerSeconds };
+    const newState = buildSeatingState(payload, restartPrefill ?? undefined);
+    // Direct setState here: no sessionCode yet, so commit() would skip persistence
+    // anyway. The first persist happens once the sessionCode arrives below.
     setState(newState);
-    // Create live session — fire-and-forget, failures don't block the game
+    setRestartPrefill(null);
+
     try {
-      const seats = playerSetups.map((_, i) =>
-        (POSITIONS_BY_COUNT[playerSetups.length] ?? POSITIONS_BY_COUNT[4])[i]
-      );
-      // Always pass user ID so session can be loaded later via active-game endpoint
+      const seats = newState.players.map((p) => p.position);
       const session = await api.createLiveGame(newState, seats, user?.id ?? undefined);
-      const newSessionCode = session.seats[newState.players.find((p) => p.position === 'bottom')?.position ?? 'bottom'] ?? null;
-      setState((prev) => ({
-        ...prev,
-        sessionCode: newSessionCode,
-        sessionSeats: session.seats,
-      }));
-    } catch (err) { console.error('[GameManager] createLiveGame failed — SSE will not start:', err); }
+      const bottomSeat = newState.players.find((p) => p.position === 'bottom')?.position ?? 'bottom';
+      const newSessionCode = session.seats[bottomSeat] ?? null;
+      // commit() here: writes the full state (including any seat picks the
+      // user made while createLiveGame was in flight) in a single DB call.
+      commit((prev) => ({ ...prev, sessionCode: newSessionCode, sessionSeats: session.seats }));
+    } catch (err) {
+      console.error('[GameManager] createLiveGame failed during seating:', err);
+    }
   };
 
-  const handleUpdate = (newState: GameManagerState | ((prev: GameManagerState) => GameManagerState)) => {
-    setState(newState);
+  const handleUpdate = commit;
+
+  const handleSeatUpdate = (idx: number, setup: PlayerSetup) => {
+    commit((prev) => ({
+      ...prev,
+      players: prev.players.map((p, i) =>
+        i === idx
+          ? {
+              ...p,
+              playerId: setup.playerId,
+              deckId: setup.deckId,
+              playerName: setup.playerName,
+              deckName: setup.deckName,
+              commander: setup.commander,
+              partner: setup.partner,
+            }
+          : p,
+      ),
+    }));
+  };
+
+  const handleStartGame = () => {
+    commit((prev) => {
+      if (prev.phase !== 'seating') return prev;
+      if (!prev.players.every(isSeatFilled)) return prev;
+      return { ...prev, phase: 'playing', turnStartTime: Date.now() };
+    });
   };
 
   const handleEndGame = () => {
-    setState((prev) => {
+    commit((prev) => {
       if (prev.sessionCode) api.deleteLiveGame(prev.sessionCode).catch(() => {});
+      // phase: 'ended' falls outside commit()'s persist guard, so the deleted
+      // session is the only DB-side effect here.
       return { ...prev, phase: 'ended' };
     });
   };
@@ -238,7 +273,7 @@ export default function GameManagerPage() {
 
   const handleSaveGame = async (currentState: GameManagerState) => {
     if (currentState.sessionCode) {
-      api.deleteLiveGame(currentState.sessionCode).catch(() => {/* silent */});
+      api.deleteLiveGame(currentState.sessionCode).catch(() => {});
     }
     const d = new Date();
     const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -251,7 +286,8 @@ export default function GameManagerPage() {
       ...losers.map((p, i) => ({ deck_id: p.deckId, player_id: p.playerId, finish_position: i + 2, eliminated_turn: p.eliminatedTurn, team_number: null })),
     ];
     const cleanNotes = currentState.notes.replace(/\[(?:cmdkill|poisonkill):[^\]]+\]\s*/g, '').trim() || null;
-    const { id } = await api.createGame({ played_at: today, notes: cleanNotes, game_type: 'standard', results });
+    const gameType: GameType = currentState.gameType ?? 'standard';
+    const { id } = await api.createGame({ played_at: today, notes: cleanNotes, game_type: gameType, results });
     router.push(`/games/detail?id=${id}`);
   };
 
@@ -259,7 +295,7 @@ export default function GameManagerPage() {
     if (state.sessionCode) {
       api.deleteLiveGame(state.sessionCode).catch(() => {/* silent */});
     }
-    setSetupPrefill(null);
+    setRestartPrefill(null);
     setState(DEFAULT_STATE);
   };
 
@@ -274,7 +310,7 @@ export default function GameManagerPage() {
     if (state.sessionCode) {
       api.deleteLiveGame(state.sessionCode).catch(() => {/* silent */});
     }
-    setSetupPrefill(currentPlayers.map((p) => ({
+    setRestartPrefill(currentPlayers.map((p) => ({
       playerId: p.playerId,
       deckId: p.deckId,
       playerName: p.playerName,
@@ -282,30 +318,30 @@ export default function GameManagerPage() {
       commander: p.commander,
       partner: p.partner,
     })));
-    setState(DEFAULT_STATE);
+    setState({ ...DEFAULT_STATE });
   };
 
-
-  // Don't render visible content until DB check completes
   if (!dbCheckComplete) {
     return null;
   }
 
-  // Show GameBoard if state is valid, playable, and in playing phase
-  if (isValidPlayableState(state) && state.phase === 'playing') {
+  // Active session: seating or playing. Both go through GameBoard.
+  if (isResumableState(state)) {
     return (
       <GameBoard
         state={state}
         onUpdate={handleUpdate}
+        onSeatUpdate={handleSeatUpdate}
+        onStartGame={handleStartGame}
         onEndGame={handleEndGame}
         onRestartGame={handleRestartGame}
         onLogGame={handleLogGame}
         onSaveGame={handleSaveGame}
+        onDiscard={handleDiscard}
       />
     );
   }
 
-  // Show end game summary when game has ended and a turn was actually played
   if (state.phase === 'ended' && state.players.length > 0 && state.firstPlayerIdx != null) {
     return (
       <GameEndSummary
@@ -314,12 +350,23 @@ export default function GameManagerPage() {
         startingLife={state.startingLife}
         commanderDamage={state.commanderDamage}
         onLogGame={handleLogGame}
-        onNewGame={() => setState(DEFAULT_STATE)}
+        onNewGame={handleNewGame}
         onDiscard={() => setState(DEFAULT_STATE)}
       />
     );
   }
 
-  // All else: show setup form (covers bad state, new games)
-  return <GameSetup onStart={handleStart} prefillPlayers={setupPrefill ?? undefined} />;
+  // Setup: simplified table-wide options. Restart prefill is held in
+  // restartPrefill and applied once the user submits.
+  return (
+    <GameSetup
+      onStart={handleSetupSubmit}
+      initial={
+        restartPrefill
+          ? { playerCount: restartPrefill.length, startingLife: state.startingLife }
+          : undefined
+      }
+    />
+  );
 }
+

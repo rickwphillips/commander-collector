@@ -599,7 +599,16 @@ export interface PlayerState extends PlayerSetup {
 
 export type CommanderDamageMap = Record<number, Record<number, [number, number]>>;
 
-export type GamePhase = 'setup' | 'playing' | 'ended';
+export type GamePhase = 'setup' | 'seating' | 'playing' | 'ended';
+
+/**
+ * A seat is "filled" when the user has chosen a player, a deck, and a commander
+ * for it. Used in the seating phase to gate the Start Game button and to flag
+ * which PlayerPanels should render in empty (CTA) mode.
+ */
+export function isSeatFilled(p: { playerId?: string; deckId?: string; commander?: { name?: string } | null }): boolean {
+  return !!p.playerId && !!p.deckId && !!p.commander?.name;
+}
 
 export interface GameManagerState {
   players: PlayerState[];
@@ -611,6 +620,7 @@ export interface GameManagerState {
   turnTimerSeconds: number;
   turnStartTime: number;
   notes: string;
+  gameType?: GameType;
   firstPlayerIdx?: number;          // index of the player who goes first (set when first player is chosen)
   sessionCode?: string | null;      // hex code for live session; null = no active session
   sessionSeats?: Record<string, string> | null; // { bottom: 'a3f9c12b', ... }
