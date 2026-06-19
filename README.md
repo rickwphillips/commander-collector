@@ -32,64 +32,53 @@ A Magic: The Gathering Commander game tracking app.
    npm install
    ```
 
-2. Set up the database by running `app/php-api/setup.sql` in phpMyAdmin
+2. Set up the database by running `apps/core/app/php-api/setup.sql` in phpMyAdmin (or via `mysql -u … < setup.sql` locally)
 
-3. Update `app/php-api/config.php` with your database credentials
+3. Place a `~/auth_secrets_dev.php` file outside the web root with the local DB credentials and JWT secret (config.php reads from there in dev; the keychain-backed variant is described in the project's local-dev notes). For prod, the same file lives on Bluehost as `~/auth_secrets.php`.
 
-4. Start the development server:
+4. Start the dev stack via the workspace script (starts MySQL, the PHP CLI server on :8081, and the Next dev server on :3001):
 
    ```bash
-   npm run dev
+   ./scripts/start-dev.sh
    ```
 
-5. Open http://localhost:3000
+5. Open http://localhost:3001
 
-## Database Setup
+## Database
 
-Run the SQL in `app/php-api/setup.sql` in phpMyAdmin to create:
+Schema lives in `apps/core/app/php-api/setup.sql`. Migrations are versioned at the monorepo root in `migrations/v{version}.sql` and applied by the `deploy` workspace script. Core tables include `players`, `decks`, `games`, `game_results`, `lists`, `list_cards`, `live_game_sessions`, `live_game_seats`, plus the auth/users tables in the shared `rickwphillips_auth` database.
 
-- `players` - Your playgroup members
-- `decks` - Each player's decks with commander and colors
-- `games` - Game records with date, winning turn, notes
-- `game_results` - Each player's result per game
+## PHP API
 
-## PHP API Files
-
-Upload `app/php-api/` contents to Bluehost:
-
-- `config.php` - Database connection (update credentials)
-- `players.php` - CRUD for players
-- `decks.php` - CRUD for decks
-- `games.php` - CRUD for games
-- `stats.php` - Statistics queries
-- `head-to-head.php` - Head-to-head records
-- `setup.sql` - Database schema
+`apps/core/app/php-api/` contains 50+ endpoints. Auth is JWT (issued by `auth/login.php`, verified by `auth/middleware.php`). The SSE endpoint is `live-game-stream.php` (text/event-stream, self-closes well under any proxy timeout). Endpoints accept the dev-only `_cb=` cache buster appended by the JS client.
 
 ## Deployment
 
-### Recommended: Vercel + Bluehost
+### Single-host on Bluehost (current)
 
-1. Deploy Next.js app to [Vercel](https://vercel.com) (free tier)
-2. Keep PHP API and MySQL on Bluehost
-3. Update `app/lib/api.ts` API_BASE to point to your Bluehost PHP API URL
+The Next app is built as a static export (`output: 'export'` in `apps/core/next.config.ts`) and deployed under `/app/projects/commander/` on Bluehost. The PHP API ships from `apps/core/app/php-api/` to the same Bluehost account; LiteSpeed serves `/php-api/*.php` directly. In dev, a Next rewrite (also in `next.config.ts`) proxies `/php-api/*` to `http://localhost:8081`, so the same client code works in both modes.
 
-### PHP API on Bluehost
-
-1. Upload `app/php-api/` files to `public_html/api/commander/`
-2. Update `config.php` with your database credentials
-3. Test endpoints: `https://yourdomain.com/api/commander/players.php`
+Deploy with the `deploy` workspace script (handles version-aware migration application + skill-driven preflight checks).
 
 ## Project Structure
 
 ```
-app/
-├── components/          # UI components
-├── lib/                 # API client and types
-├── theme/               # MUI theme
-├── players/             # Player pages
-├── decks/               # Deck pages
-├── games/               # Game pages
-├── stats/               # Statistics page
-├── php-api/             # PHP backend
-└── page.tsx             # Dashboard
+apps/
+├── core/                # Main app (Commander tracker)
+│   ├── app/
+│   │   ├── components/          # Shared UI
+│   │   ├── lib/                 # API client, types, useList, etc.
+│   │   ├── theme/               # MUI autumn palette
+│   │   ├── game-manager/        # Live game UI (PlayerCard split lives here)
+│   │   │   ├── components/      # PlayerPanel (orchestrator), PlayerCard (renderer), SeatingCard, etc.
+│   │   │   ├── hooks/           # useDamageFlash, useMonarchTransition, useLongPress, useSounds, ...
+│   │   │   ├── remoteTransforms.ts   # Pure reducers shared by host + remote panels
+│   │   │   └── detectSideEffects.ts  # State-diff → UI side-effect helper
+│   │   ├── players/, decks/, games/, stats/, lists/, rules/  # Routes
+│   │   └── php-api/             # PHP backend
+│   └── tests/                   # vitest specs (754 tests)
+└── rules-guru/                  # MTG rules-Q&A standalone app (port 3003 in dev)
+
+packages/
+└── shared/                      # Cross-app TypeScript helpers (@commander/shared)
 ```
