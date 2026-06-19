@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useLayoutEffect, useCallback } from 'react';
 import { Box, Button, Typography, IconButton, Stack } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -11,25 +11,16 @@ import { SeatPickerModal } from './SeatPickerModal';
 import { api } from '@/lib/api';
 import { isSeatFilled } from '@/lib/types';
 import { BracketMismatchBanner } from '@/components/BracketMismatchBanner';
-import type { Player, DeckWithPlayer, PlayerSetup } from '@/lib/types';
+import type { Player, DeckWithPlayer, PlayerSetup, LiveGameEvent, DistributiveOmit } from '@/lib/types';
 import type { GameManagerState, PlayerState } from '../types';
 import {
-  applyCommanderDamageChange,
-  applyCommanderTaxChange,
-  applyEliminate,
-  applyEnergyChange,
-  applyExperienceChange,
-  applyLifeChange,
+  applyEvent,
   applyLifeKillAttr,
   applyPassTurn,
-  applyPoisonChange,
   applyPoisonKillAttr,
   applyPrevTurn,
-  applyToggleCitysBlessing,
-  applyToggleInitiative,
-  applyToggleMonarch,
-  applyUndoEliminate,
 } from '../remoteTransforms';
+import { detectSideEffects, type SideEffect } from '../detectSideEffects';
 
 type RollPhase = 'idle' | 'rolling' | 'done';
 
@@ -81,8 +72,8 @@ export function GameBoard({
   const [winnerCountdown, setWinnerCountdown] = useState<number | null>(null);
   const winnerStateRef = useRef<GameManagerState | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [lifeKillPrompt, setLifeKillPrompt] = useState<{ targetIdx: number; pendingWinner: PlayerState | null } | null>(null);
-  const [poisonKillPrompt, setPoisonKillPrompt] = useState<{ targetIdx: number; newPlayers: PlayerState[] } | null>(null);
+  const [lifeKillPrompt, setLifeKillPrompt] = useState<{ targetIdx: number } | null>(null);
+  const [poisonKillPrompt, setPoisonKillPrompt] = useState<{ targetIdx: number } | null>(null);
   const [monarchTransfer, setMonarchTransfer] = useState<{ fromPos: string | null; toPos: string | null }>({ fromPos: null, toPos: null });
   const [highlightMode, setHighlightMode] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -305,82 +296,102 @@ export function GameBoard({
     updateState({ viewingPlayerIdx: idx });
   };
 
-  const handleLifeChange = (idx: number, delta: number) => {
-    const target = players[idx];
-    const isNewLifeKill = target.life > 0 && target.life + delta <= 0;
-    const { players: newPlayers, notes: newNotes } = applyLifeChange(state, idx, delta);
-    updateState({ players: newPlayers, notes: newNotes });
-    if (isNewLifeKill) {
-      const remaining = newPlayers.filter((p) => !p.isEliminated);
-      const pendingWinner = remaining.length === 1 ? remaining[0] : null;
-      setLifeKillPrompt({ targetIdx: idx, pendingWinner });
+  /**
+   * Apply a side effect produced by `detectSideEffects`. Centralized here so the
+   * host-handler path and the SSE-watch path produce identical UI behavior.
+   */
+  const applySideEffect = useCallback((fx: SideEffect) => {
+    switch (fx.type) {
+      case 'lifeKillPrompt':
+        setLifeKillPrompt((prev) => prev ?? { targetIdx: fx.targetIdx });
+        return;
+      case 'poisonKillPrompt':
+        setPoisonKillPrompt((prev) => prev ?? { targetIdx: fx.targetIdx });
+        return;
+      case 'monarchTransfer':
+        setMonarchTransfer({ fromPos: fx.fromPos, toPos: fx.toPos });
+        setTimeout(() => setMonarchTransfer({ fromPos: null, toPos: null }), 900);
+        return;
     }
-  };
+  }, []);
 
-  const handlePoisonChange = (idx: number, delta: number) => {
-    const target = players[idx];
-    const isNewPoisonKill = !target.isEliminated && Math.max(0, target.poison + delta) >= 10;
-    const { players: newPlayers, notes: newNotes } = applyPoisonChange(state, idx, delta);
-    updateState({ players: newPlayers, notes: newNotes });
-    if (isNewPoisonKill) {
-      setPoisonKillPrompt({ targetIdx: idx, newPlayers });
-    }
-  };
+  // Stale-state-resistant prev pointer for diff-based side-effect detection.
+  // This catches state changes from any source: host dispatchHostEvent calls
+  // AND SSE events applied by page.tsx. Using useLayoutEffect makes the
+  // resulting prompt feel synchronous with the user's action.
+  const prevStateRef = useRef<GameManagerState>(state);
+  useLayoutEffect(() => {
+    const prev = prevStateRef.current;
+    prevStateRef.current = state;
+    if (prev === state) return;
+    const fx = detectSideEffects(prev, state);
+    fx.forEach(applySideEffect);
+  }, [state, applySideEffect]);
 
-  const handleCommanderTaxChange = (idx: number, delta: number) => {
-    updateState({ players: applyCommanderTaxChange(state, idx, delta).players });
-  };
+  /**
+   * Single funnel for host-initiated state mutations. Builds the next state via
+   * the same `applyEvent` dispatcher the SSE path uses, then commits it. Side
+   * effects fall out of the state diff via the useLayoutEffect above — meaning
+   * a remote-driven life kill triggers the same attribution prompt as a host
+   * button press.
+   */
+  const dispatchHostEvent = useCallback(
+    (event: DistributiveOmit<LiveGameEvent, 'seat' | 'ts'>) => {
+      const stamped = { ...event, seat: '__host__', ts: Date.now() } as LiveGameEvent;
+      onUpdate((prev) => {
+        const next = applyEvent(prev, stamped);
+        // winnerStateRef snapshots the about-to-be-committed state so the 15s
+        // auto-save countdown sees the player config at the moment of the win.
+        if (winner) winnerStateRef.current = next;
+        return next;
+      });
+    },
+    [onUpdate, winner],
+  );
 
-  const handleToggleMonarch = (idx: number) => {
-    const currentMonarchIdx = players.findIndex((p) => p.isMonarch);
-    const fromPos = currentMonarchIdx >= 0 ? players[currentMonarchIdx].position : null;
-    const toPos = !players[idx].isMonarch ? players[idx].position : null;
-    setMonarchTransfer({ fromPos, toPos });
-    setTimeout(() => setMonarchTransfer({ fromPos: null, toPos: null }), 900);
-    updateState({ players: applyToggleMonarch(state, idx).players });
-  };
+  const handleLifeChange = (idx: number, delta: number) =>
+    dispatchHostEvent({ type: 'life_change', playerIdx: idx, delta });
 
-  const handleToggleInitiative = (idx: number) => {
-    updateState({ players: applyToggleInitiative(state, idx).players });
-  };
+  const handlePoisonChange = (idx: number, delta: number) =>
+    dispatchHostEvent({ type: 'poison_change', playerIdx: idx, delta });
 
-  const handleEnergyChange = (idx: number, delta: number) => {
-    updateState({ players: applyEnergyChange(state, idx, delta).players });
-  };
+  const handleCommanderTaxChange = (idx: number, delta: number) =>
+    dispatchHostEvent({ type: 'commander_tax_change', playerIdx: idx, delta });
 
-  const handleExperienceChange = (idx: number, delta: number) => {
-    updateState({ players: applyExperienceChange(state, idx, delta).players });
-  };
+  const handleToggleMonarch = (idx: number) =>
+    dispatchHostEvent({ type: 'toggle_monarch', playerIdx: idx });
 
-  const handleToggleCitysBlessing = (idx: number) => {
-    updateState({ players: applyToggleCitysBlessing(state, idx).players });
-  };
+  const handleToggleInitiative = (idx: number) =>
+    dispatchHostEvent({ type: 'toggle_initiative', playerIdx: idx });
+
+  const handleEnergyChange = (idx: number, delta: number) =>
+    dispatchHostEvent({ type: 'energy_change', playerIdx: idx, delta });
+
+  const handleExperienceChange = (idx: number, delta: number) =>
+    dispatchHostEvent({ type: 'experience_change', playerIdx: idx, delta });
+
+  const handleToggleCitysBlessing = (idx: number) =>
+    dispatchHostEvent({ type: 'toggle_citys_blessing', playerIdx: idx });
 
   const handleCommanderDamageChange = (
     targetIdx: number,
     sourceIdx: number,
     isPartner: boolean,
-    delta: number
-  ) => {
-    const wasEliminated = players[targetIdx].isEliminated;
-    const newState = applyCommanderDamageChange(state, targetIdx, sourceIdx, isPartner, delta);
-    onUpdate(newState);
-    if (!wasEliminated && newState.players[targetIdx].isEliminated) {
-      const remaining = newState.players.filter((p) => !p.isEliminated);
-      if (remaining.length === 1) setWinner(remaining[0]);
-    }
-  };
+    delta: number,
+  ) =>
+    dispatchHostEvent({
+      type: 'commander_damage_change',
+      targetIdx,
+      sourceIdx,
+      isPartner,
+      delta,
+    });
 
-  const handleEliminate = (idx: number) => {
-    const { players: newPlayers, notes: newNotes } = applyEliminate(state, idx);
-    updateState({ players: newPlayers, notes: newNotes });
-    const remaining = newPlayers.filter((p) => !p.isEliminated);
-    if (remaining.length === 1) setWinner(remaining[0]);
-  };
+  const handleEliminate = (idx: number) =>
+    dispatchHostEvent({ type: 'eliminate', playerIdx: idx });
 
-  const handleUndoEliminate = (idx: number) => {
-    updateState({ players: applyUndoEliminate(state, idx).players });
-  };
+  const handleUndoEliminate = (idx: number) =>
+    dispatchHostEvent({ type: 'undo_eliminate', playerIdx: idx });
 
   const handleNextTurn = () => {
     const next = applyPassTurn(state);
@@ -647,11 +658,13 @@ export function GameBoard({
                 {...(lifeKillPrompt?.targetIdx === idx && {
                   lifeKillOpponents: getActiveOpponents(players, idx),
                   onLifeKillSelect: (sourceIdx) => {
+                    // Attribution is a host-only side-channel note; no event
+                    // is broadcast to remotes. Use the reducer directly.
                     const { notes: newNotes } = applyLifeKillAttr(state, lifeKillPrompt.targetIdx, sourceIdx);
                     updateState({ notes: newNotes });
-                    const pending = lifeKillPrompt.pendingWinner;
                     setLifeKillPrompt(null);
-                    if (pending) setWinner(pending);
+                    // Winner detection runs in the state-driven useEffect, so
+                    // no explicit setWinner here.
                   },
                 })}
                 {...(poisonKillPrompt?.targetIdx === idx && {
@@ -659,10 +672,7 @@ export function GameBoard({
                   onPoisonKillSelect: (sourceIdx) => {
                     const { notes: newNotes } = applyPoisonKillAttr(state, poisonKillPrompt.targetIdx, sourceIdx);
                     updateState({ notes: newNotes });
-                    const remaining = poisonKillPrompt.newPlayers.filter((p) => !p.isEliminated);
-                    const pending = remaining.length === 1 ? remaining[0] : null;
                     setPoisonKillPrompt(null);
-                    if (pending) setWinner(pending);
                   },
                 })}
               />
