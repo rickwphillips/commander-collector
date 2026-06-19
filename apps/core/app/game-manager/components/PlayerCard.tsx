@@ -641,7 +641,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
   const {
     viewer, sizes, position, timer, animations, longPress,
     player, playerIdx, allPlayers, commanderDamage, computedLifeColor,
-    isCurrentPlayer, highlightMode,
+    isCurrentPlayer, highlightMode, isHighlighted, isWarning,
     seatCode, remoteConnected, remoteMode, soundEnabled, themeMode,
     lifeKillOpponents, onLifeKillSelect, poisonKillOpponents, onPoisonKillSelect,
     onLifeChange, onPoisonChange, onEnergyChange, onExperienceChange, onCommanderTaxChange,
@@ -853,12 +853,48 @@ function PlayerCardImpl(props: PlayerCardProps) {
   // it will compute it locally when it lands.
 
   // ─── Render: outer container + per-block sections ──────────────────────
-  // The outer container styling (warning border, timer-expired blink, poison
-  // saturation, etc.) is migrated with the header/main blocks. For now the
-  // card mounts a bare positioning shell so isolated render blocks have a
-  // parent to anchor against.
+  // Outer shell mirrors PlayerPanel's full styled wrapper: warning bg/border,
+  // highlight + current-player border/shadow, timer-expired blink, energyGlow
+  // text-shadow inheritance, poison saturate filter, eliminated opacity.
   return (
-    <Box sx={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+    <Box
+      sx={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        bgcolor: (theme) =>
+          isWarning
+            ? theme.palette.mode === 'dark' ? 'rgba(180,40,40,0.18)' : 'rgba(220,80,80,0.08)'
+            : theme.palette.mode === 'dark' ? '#2A1F14' : '#FFF8F0',
+        border: showEliminateConfirm
+          ? '3px solid #DAA520'
+          : isHighlighted
+          ? '3px solid #DAA520'
+          : (!highlightMode ? timer.currentPlayerBorder : undefined)
+          ?? (isWarning ? '2px solid #e53935' : undefined)
+          ?? ((theme: import('@mui/material').Theme) => `1px solid ${theme.palette.divider}`),
+        boxShadow: showEliminateConfirm
+          ? '0 0 24px 6px rgba(218,165,32,0.6)'
+          : isHighlighted
+          ? '0 0 24px 6px rgba(218,165,32,0.6)'
+          : (!highlightMode ? timer.currentPlayerShadow : null) ?? 'none',
+        ...(!highlightMode && timer.isTimerExpired && {
+          animation: 'timerBlink 0.5s step-end infinite',
+          '@keyframes timerBlink': {
+            '0%, 100%': { borderColor: '#e53935', boxShadow: '0 0 24px 6px rgba(229,57,53,0.6)' },
+            '50%': { borderColor: 'transparent', boxShadow: 'none' },
+          },
+        }),
+        transition: 'box-shadow 0.1s ease, border 0.1s ease, filter 1s ease',
+        '& .MuiTypography-root': { textShadow: energyGlow, transition: 'font-size 0.2s ease, margin 0.2s ease, text-shadow 0.4s ease' },
+        filter: poisonProgress > 0 ? `saturate(${1 + poisonProgress * 0.5})` : 'none',
+        borderRadius: 2, '& .MuiTouchRipple-root': { borderRadius: 2 },
+        overflow: 'hidden',
+        position: 'relative',
+        opacity: player.isEliminated ? 0.5 : 1,
+      }}
+    >
       {/* ── Header ── */}
       <Box
         sx={{
