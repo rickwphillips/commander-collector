@@ -1,7 +1,8 @@
 'use client';
 
 import { memo, useRef, useState } from 'react';
-import { Box } from '@mui/material';
+import { Box, Typography } from '@mui/material';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import type { PlayerState, CommanderDamageMap } from '../types';
 import type { MonarchAnim } from '@/game-manager/hooks/useMonarchTransition';
 
@@ -248,7 +249,7 @@ function arePlayerCardPropsEqual(prev: PlayerCardProps, next: PlayerCardProps): 
 }
 
 function PlayerCardImpl(props: PlayerCardProps) {
-  const { viewer, sizes } = props;
+  const { viewer } = props;
 
   // ─── Card-local UI state ────────────────────────────────────────────────
   // None of this state is read by the orchestrator or any sibling. Lifting it
@@ -291,26 +292,26 @@ function PlayerCardImpl(props: PlayerCardProps) {
   // crown keyframes which are migrated in Phase 3. The render block that needs
   // it will compute it locally when it lands.
 
-  // ─── Viewer notification banner ────────────────────────────────────────
-  // First migrated render block. Self-contained: only consumes the viewer
-  // bundle + one size token. Rendered in isolation here so the orchestrator's
-  // copy in PlayerPanel.tsx continues to ship the real UI during Phase 2.
+  // ─── Render: outer container + per-block sections ──────────────────────
+  // The outer container styling (warning border, timer-expired blink, poison
+  // saturation, etc.) is migrated with the header/main blocks. For now the
+  // card mounts a bare positioning shell so isolated render blocks have a
+  // parent to anchor against.
   return (
-    <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
-      <Box
-        sx={{
-          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 12,
-          background: (theme) => `linear-gradient(90deg, ${theme.palette.primary.main}00 0%, ${theme.palette.primary.main}aa 44%, ${theme.palette.primary.main}ff 50%, ${theme.palette.primary.main}aa 56%, ${theme.palette.primary.main}00 100%)`,
-          color: '#fff',
-          px: 1, py: 0.4,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, textAlign: 'center',
-          pointerEvents: 'none',
-          opacity: viewer.viewerBannerVisible ? 1 : 0,
-          transition: viewer.viewerBannerVisible ? 'opacity 0.2s ease' : 'opacity 0.6s ease',
-          fontSize: sizes.fsSectionLabel,
-        }}
-      >
-        {/* Banner contents are migrated with the eye-icon block (header). */}
+    <Box sx={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+      {/* ── Viewer notification banner ── */}
+      <Box sx={{
+        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 12,
+        background: (theme) => `linear-gradient(90deg, ${theme.palette.primary.main}00 0%, ${theme.palette.primary.main}aa 44%, ${theme.palette.primary.main}ff 50%, ${theme.palette.primary.main}aa 56%, ${theme.palette.primary.main}00 100%)`,
+        color: '#fff',
+        px: 1, py: 0.4,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, textAlign: 'center',
+        pointerEvents: 'none',
+        opacity: viewer.viewerBannerVisible ? 1 : 0,
+        transition: viewer.viewerBannerVisible ? 'opacity 0.2s ease' : 'opacity 0.6s ease',
+      }}>
+        <VisibilityIcon sx={{ fontSize: 13 }} />
+        <Typography sx={{ fontSize: 19, fontWeight: 600, lineHeight: 1.3 }}>{viewer.viewerTooltipText}</Typography>
       </Box>
     </Box>
   );
