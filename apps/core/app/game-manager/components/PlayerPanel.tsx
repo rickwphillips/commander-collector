@@ -3,6 +3,10 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { usePoisonSound } from '@/game-manager/hooks/usePoisonSound';
 import { useSounds } from '@/game-manager/hooks/useSounds';
+import { useDamageFlash } from '@/game-manager/hooks/useDamageFlash';
+import { useMonarchTransition } from '@/game-manager/hooks/useMonarchTransition';
+import { useCitysBlessingExit } from '@/game-manager/hooks/useCitysBlessingExit';
+import { useLongPress } from '@/game-manager/hooks/useLongPress';
 import { keyframes } from '@emotion/react';
 import { Box, CircularProgress, Stack, Typography, IconButton, Button, TextField, Tooltip, SvgIcon } from '@mui/material';
 import { getCardImageByName } from '@commander/shared/lib/cardImageCache';
@@ -564,24 +568,10 @@ export function PlayerPanel({
     try { localStorage.setItem(cmdDmgKey, next ? '1' : '0'); } catch {}
     return next;
   });
-  const [cityBlessingVisible, setCityBlessingVisible] = useState(player.hasCitysBlessing);
-  const [cityBlessingExiting, setCityBlessingExiting] = useState(false);
-  const prevHasCitysBlessing = useRef(player.hasCitysBlessing);
-  useEffect(() => {
-    if (player.hasCitysBlessing) {
-      if (!prevHasCitysBlessing.current) playCitysBlessing();
-      prevHasCitysBlessing.current = true;
-      setCityBlessingVisible(true);
-      setCityBlessingExiting(false);
-    } else {
-      prevHasCitysBlessing.current = false;
-      if (cityBlessingVisible) {
-        setCityBlessingExiting(true);
-        const t = setTimeout(() => { setCityBlessingVisible(false); setCityBlessingExiting(false); }, 3800);
-        return () => clearTimeout(t);
-      }
-    }
-  }, [player.hasCitysBlessing, playCitysBlessing]);
+  const { cityBlessingVisible, cityBlessingExiting } = useCitysBlessingExit(
+    player.hasCitysBlessing,
+    playCitysBlessing,
+  );
   const [xpFlashing, setXpFlashing] = useState(false);
   const [xpRippleKey, setXpRippleKey] = useState(0);
   const prevExperience = useRef(player.experience);
@@ -595,7 +585,7 @@ export function PlayerPanel({
     prevExperience.current = player.experience;
   }, [player.experience]);
 
-  const [damageFlash, setDamageFlash] = useState(0);
+  const damageFlash = useDamageFlash(player.life);
   const [lastCmdDmgSourceIdx, setLastCmdDmgSourceIdx] = useState<number | null>(null);
   const [openSnapshotKey, setOpenSnapshotKey] = useState<string | null>(null);
   type FocusedControl = {
@@ -604,40 +594,11 @@ export function PlayerPanel({
     isPartner?: boolean;
   } | null;
   const [focusedControl, setFocusedControl] = useState<FocusedControl>(null);
-  const prevLife = useRef(player.life);
-  useEffect(() => {
-    if (player.life < prevLife.current) {
-      const delta = prevLife.current - player.life;
-      setDamageFlash(delta);
-      setTimeout(() => setDamageFlash(0), 1000);
-    }
-    prevLife.current = player.life;
-  }, [player.life]);
 
-  const [monarchAnim, setMonarchAnim] = useState<'hidden' | 'entering' | 'exiting' | 'idle'>(
-    player.isMonarch ? 'idle' : 'hidden'
+  const { monarchAnim, monarchEnterIsTransfer } = useMonarchTransition(
+    player.isMonarch,
+    monarchTransfer,
   );
-  const [monarchEnterIsTransfer, setMonarchEnterIsTransfer] = useState(false);
-  // Keep a ref in sync with the prop so the effect can read the latest value
-  const monarchTransferRef = useRef(monarchTransfer);
-  monarchTransferRef.current = monarchTransfer;
-  const prevIsMonarchRef = useRef(player.isMonarch);
-  useEffect(() => {
-    const was = prevIsMonarchRef.current;
-    const is = player.isMonarch;
-    prevIsMonarchRef.current = is;
-    if (!was && is) {
-      const isXfer = monarchTransferRef.current.fromPos !== null && monarchTransferRef.current.toPos !== null;
-      setMonarchEnterIsTransfer(isXfer);
-      setMonarchAnim('entering');
-      const t = setTimeout(() => setMonarchAnim('idle'), isXfer ? 1800 : 700);
-      return () => clearTimeout(t);
-    } else if (was && !is) {
-      setMonarchAnim('exiting');
-      const t = setTimeout(() => setMonarchAnim('hidden'), 600);
-      return () => clearTimeout(t);
-    }
-  }, [player.isMonarch]);
   const showCrown = player.isMonarch || monarchAnim === 'exiting';
   const monarchAnimStr =
     monarchAnim === 'exiting'  ? `${crownExitToTop} 0.5s ease-in forwards` :
@@ -677,9 +638,7 @@ export function PlayerPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [lpKey, setLpKey] = useState<string | null>(null);
-  const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lpFired = useRef(false);
+  const { lpKey, startLongPress, cancelLongPress, guardClick } = useLongPress();
   const [qrOpen, setQrOpen] = useState(false);
   const [countersOpen, setCountersOpen] = useState(true);
   const [cmdPreviewName, setCmdPreviewName] = useState<string | null>(null);
@@ -705,24 +664,6 @@ export function PlayerPanel({
 
   // Auto-close QR when remote player connects
   useEffect(() => { if (remoteConnected && qrOpen) setQrOpen(false); }, [remoteConnected, qrOpen]);
-
-  const startLongPress = (key: string, cb: () => void) => {
-    lpFired.current = false;
-    lpTimer.current = setTimeout(() => {
-      lpFired.current = true;
-      cb();
-      setLpKey(key);
-      setTimeout(() => setLpKey(prev => prev === key ? null : prev), 700);
-    }, 500);
-  };
-  const cancelLongPress = () => {
-    if (lpTimer.current) clearTimeout(lpTimer.current);
-    lpTimer.current = null;
-  };
-  const guardClick = (cb: () => void) => () => {
-    if (lpFired.current) { lpFired.current = false; return; }
-    cb();
-  };
 
   const timerOff = turnTimerSeconds === 0;
   const timerProgress = timerOff ? 0 : Math.min(elapsedSeconds / turnTimerSeconds, 1);
