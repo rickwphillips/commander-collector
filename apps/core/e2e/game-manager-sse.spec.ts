@@ -99,9 +99,7 @@ test.describe('SSE — Live Game State Streaming', () => {
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(2000);
 
-    const readyState = await page.evaluate(
-      () => (window as Record<string, unknown>)._sseReadyState as number ?? -1
-    );
+    const readyState = await page.evaluate(() => window._sseReadyState ?? -1);
     expect(readyState).toBe(1); // 1 = OPEN
   });
 

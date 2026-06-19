@@ -13,7 +13,13 @@ export const ASSET_BASE = isDev ? '' : '/app/projects/commander';
 // response and replaces the content-type with application/json, killing the
 // EventSource. In dev, bypass the proxy and hit the PHP server directly.
 // In prod there is no proxy (static export), so the regular path works fine.
-const SSE_BASE = isDev ? 'http://127.0.0.1:8081/php-api/' : '/php-api/';
+// SSE bypasses the Next.js dev proxy (rewrites can buffer long-lived
+// streams). Hit PHP directly via "localhost" so the OS picks whichever IP
+// family the PHP -S server bound. The dev start script binds 0.0.0.0
+// (dual-stack), but a manually-launched PHP on macOS will bind IPv6-only;
+// "localhost" works in both cases, "127.0.0.1" only works for the
+// dual-stack/IPv4-bound case.
+const SSE_BASE = isDev ? 'http://localhost:8081/php-api/' : '/php-api/';
 
 // Auth token key (shared with portfolio login page)
 const AUTH_TOKEN_KEY = 'auth_token';
@@ -215,13 +221,10 @@ export const api = {
     const url = `${SSE_BASE}live-game-stream.php?code=${encodeURIComponent(code)}`;
     const es = new EventSource(url);
 
-    // Expose readyState on window for e2e testability
-    const win = typeof window !== 'undefined'
-      ? (window as unknown as Record<string, unknown>)
-      : null;
-    if (win) win._sseReadyState = es.readyState;
+    // Expose readyState on window for e2e testability (typed in types/globals.d.ts)
+    if (typeof window !== 'undefined') window._sseReadyState = es.readyState;
 
-    es.onopen = () => { if (win) win._sseReadyState = 1; };
+    es.onopen = () => { if (typeof window !== 'undefined') window._sseReadyState = 1; };
 
     es.onmessage = (e) => {
       try {
@@ -240,7 +243,7 @@ export const api = {
     };
 
     es.onerror = () => {
-      if (win) win._sseReadyState = es.readyState;
+      if (typeof window !== 'undefined') window._sseReadyState = es.readyState;
       onError?.();
     };
 

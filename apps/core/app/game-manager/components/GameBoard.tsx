@@ -1,18 +1,33 @@
 'use client';
 
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { Box, Button, Typography, IconButton } from '@mui/material';
+import { Box, Button, Typography, IconButton, Stack } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { PlayerPanel } from './PlayerPanel';
 import { CenterZone } from './CenterZone';
+import { SeatPickerModal } from './SeatPickerModal';
 import { api } from '@/lib/api';
+import { isSeatFilled } from '@/lib/types';
+import { BracketMismatchBanner } from '@/components/BracketMismatchBanner';
+import type { Player, DeckWithPlayer, PlayerSetup } from '@/lib/types';
 import type { GameManagerState, PlayerState } from '../types';
 import {
+  CLOCKWISE,
   applyCommanderDamageChange,
+  applyCommanderTaxChange,
+  applyEliminate,
+  applyEnergyChange,
+  applyExperienceChange,
   applyLifeChange,
-  applyPoisonChange,
   applyLifeKillAttr,
+  applyPoisonChange,
   applyPoisonKillAttr,
+  applyToggleCitysBlessing,
+  applyToggleInitiative,
+  applyToggleMonarch,
+  applyUndoEliminate,
 } from '../remoteTransforms';
 
 type RollPhase = 'idle' | 'rolling' | 'done';
@@ -38,9 +53,24 @@ interface GameBoardProps {
   onRestartGame: (players: PlayerState[]) => void;
   onLogGame: () => void;
   onSaveGame: (state: GameManagerState) => Promise<void>;
+  /** Seating-phase only: commit a seat's player/deck/commander selection. */
+  onSeatUpdate?: (idx: number, setup: PlayerSetup) => void;
+  /** Seating-phase only: flip to 'playing' once all seats are filled. */
+  onStartGame?: () => void;
+  /** Seating-phase only: cancel the game and return to /games. */
+  onDiscard?: () => void;
 }
 
-export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGame }: GameBoardProps) {
+export function GameBoard({
+  state,
+  onUpdate,
+  onEndGame,
+  onRestartGame,
+  onSaveGame,
+  onSeatUpdate,
+  onStartGame,
+  onDiscard,
+}: GameBoardProps) {
   const { players, commanderDamage, currentPlayerIdx, turnNumber, turnTimerSeconds, turnStartTime, startingLife } = state;
 
   const [rollState, setRollState] = useState<RollState>(IDLE_ROLL_STATE);
@@ -56,8 +86,25 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   const [highlightMode, setHighlightMode] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [posOverrides, setPosOverrides] = useState<Record<number, PlayerState['position']>>({});
-  const [viewingPlayerIdx, setViewingPlayerIdx] = useState<number | null>(null);
+  const [viewingPlayerIdx, _setViewingPlayerIdxRaw] = useState<number | null>(null);
   const settingsLoadedRef = useRef(false);
+
+  // Seating phase: per-seat picker state and loaded player/deck lists.
+  const [pickerSeatIdx, setPickerSeatIdx] = useState<number | null>(null);
+  const [pickerPlayers, setPickerPlayers] = useState<Player[]>([]);
+  const [pickerDecks, setPickerDecks] = useState<DeckWithPlayer[]>([]);
+  const seatingDataLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (state.phase !== 'seating' || seatingDataLoadedRef.current) return;
+    seatingDataLoadedRef.current = true;
+    Promise.all([api.getDecks(), api.getPlayers()])
+      .then(([decks, players]) => {
+        setPickerDecks(decks);
+        setPickerPlayers(players);
+      })
+      .catch(() => { /* leave empty; user can refresh */ });
+  }, [state.phase]);
 
   // Sync local firstPlayerIdx/firstPlayerSet with game state when loaded from DB
   useEffect(() => {
@@ -175,10 +222,10 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
     return () => { if (tickTimer.current) clearInterval(tickTimer.current); };
   }, [firstPlayerSet, turnStartTime]);
 
-  // Reset elapsed display when turn changes
-  useEffect(() => {
-    setElapsedSeconds(0);
-  }, [currentPlayerIdx]);
+  // No explicit elapsed-seconds reset on turn change: turnStartTime already
+  // advances per turn (handleNextTurn/handlePrevTurn set turnStartTime: Date.now()),
+  // and the tick effect above re-runs whenever turnStartTime changes, picking up
+  // the fresh value immediately.
 
   const startRoll = () => {
     if (rollTimer.current) clearTimeout(rollTimer.current);
@@ -250,11 +297,13 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
     onUpdate(next);
   };
 
-  // Sync read-only overlay visibility to game state so remote panels can show the eye indicator
-  useEffect(() => {
-    updateState({ viewingPlayerIdx: viewingPlayerIdx ?? null });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewingPlayerIdx]);
+  // Replaces a useState setter so the read-only overlay choice mirrors to the
+  // shared game state in one event. Avoids the effect-driven sync that would
+  // also fire on every unrelated state change.
+  const setViewingPlayerIdx = (idx: number | null) => {
+    _setViewingPlayerIdxRaw(idx);
+    updateState({ viewingPlayerIdx: idx });
+  };
 
   const handleLifeChange = (idx: number, delta: number) => {
     const target = players[idx];
@@ -279,52 +328,32 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   };
 
   const handleCommanderTaxChange = (idx: number, delta: number) => {
-    const newPlayers = players.map((p, i) =>
-      i === idx ? { ...p, commanderTax: Math.max(0, p.commanderTax + delta) } : p
-    );
-    updateState({ players: newPlayers });
+    updateState({ players: applyCommanderTaxChange(state, idx, delta).players });
   };
 
   const handleToggleMonarch = (idx: number) => {
-    const currentMonarchIdx = players.findIndex(p => p.isMonarch);
+    const currentMonarchIdx = players.findIndex((p) => p.isMonarch);
     const fromPos = currentMonarchIdx >= 0 ? players[currentMonarchIdx].position : null;
     const toPos = !players[idx].isMonarch ? players[idx].position : null;
     setMonarchTransfer({ fromPos, toPos });
     setTimeout(() => setMonarchTransfer({ fromPos: null, toPos: null }), 900);
-    const newPlayers = players.map((p, i) => ({
-      ...p,
-      isMonarch: i === idx ? !p.isMonarch : false,
-    }));
-    updateState({ players: newPlayers });
+    updateState({ players: applyToggleMonarch(state, idx).players });
   };
 
   const handleToggleInitiative = (idx: number) => {
-    const newPlayers = players.map((p, i) => ({
-      ...p,
-      hasInitiative: i === idx ? !p.hasInitiative : false,
-    }));
-    updateState({ players: newPlayers });
+    updateState({ players: applyToggleInitiative(state, idx).players });
   };
 
   const handleEnergyChange = (idx: number, delta: number) => {
-    const newPlayers = players.map((p, i) =>
-      i === idx ? { ...p, energy: Math.max(0, p.energy + delta) } : p
-    );
-    updateState({ players: newPlayers });
+    updateState({ players: applyEnergyChange(state, idx, delta).players });
   };
 
   const handleExperienceChange = (idx: number, delta: number) => {
-    const newPlayers = players.map((p, i) =>
-      i === idx ? { ...p, experience: Math.max(0, p.experience + delta) } : p
-    );
-    updateState({ players: newPlayers });
+    updateState({ players: applyExperienceChange(state, idx, delta).players });
   };
 
   const handleToggleCitysBlessing = (idx: number) => {
-    const newPlayers = players.map((p, i) =>
-      i === idx ? { ...p, hasCitysBlessing: !p.hasCitysBlessing } : p
-    );
-    updateState({ players: newPlayers });
+    updateState({ players: applyToggleCitysBlessing(state, idx).players });
   };
 
   const handleCommanderDamageChange = (
@@ -343,27 +372,15 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   };
 
   const handleEliminate = (idx: number) => {
-    const target = players[idx];
-    const note = `${target.playerName} conceded (turn ${state.turnNumber})`;
-    const newNotes = state.notes ? `${state.notes}\n${note}` : note;
-    const newPlayers = players.map((p, i) =>
-      i === idx
-        ? { ...p, isEliminated: true, isConceded: true, eliminatedTurn: state.turnNumber }
-        : p
-    );
+    const { players: newPlayers, notes: newNotes } = applyEliminate(state, idx);
     updateState({ players: newPlayers, notes: newNotes });
     const remaining = newPlayers.filter((p) => !p.isEliminated);
     if (remaining.length === 1) setWinner(remaining[0]);
   };
 
   const handleUndoEliminate = (idx: number) => {
-    const newPlayers = players.map((p, i) =>
-      i === idx ? { ...p, isEliminated: false, isConceded: false, eliminatedTurn: null } : p
-    );
-    updateState({ players: newPlayers });
+    updateState({ players: applyUndoEliminate(state, idx).players });
   };
-
-  const CLOCKWISE: PlayerState['position'][] = ['bottom', 'left', 'top', 'right'];
 
   const handleNextTurn = () => {
     const currentPos = players[currentPlayerIdx].position;
@@ -436,6 +453,155 @@ export function GameBoard({ state, onUpdate, onEndGame, onRestartGame, onSaveGam
   const leftColumnWidth = playerCount >= 3 ? leftPanelCss : '0px';
   const rightColumnWidth = playerCount >= 4 ? rightPanelCss : '0px';
   const gridTemplateColumns = `${leftColumnWidth} 1fr ${rightColumnWidth}`;
+
+  // -------- Seating phase early-return --------
+  if (state.phase === 'seating') {
+    const filledCount = players.filter(isSeatFilled).length;
+    const allFilled = filledCount === players.length && players.length > 0;
+    const takenPlayerIds = players.map((p) => p.playerId).filter(Boolean);
+    const currentSeat = pickerSeatIdx !== null ? players[pickerSeatIdx] : null;
+    const currentSetup: PlayerSetup | undefined =
+      currentSeat && isSeatFilled(currentSeat)
+        ? {
+            playerId: currentSeat.playerId,
+            deckId: currentSeat.deckId,
+            playerName: currentSeat.playerName,
+            deckName: currentSeat.deckName,
+            commander: currentSeat.commander,
+            partner: currentSeat.partner,
+          }
+        : undefined;
+
+    return (
+      <Box
+        sx={{
+          position: 'fixed',
+          inset: 0,
+          display: 'grid',
+          gridTemplateColumns,
+          gridTemplateRows: '1fr clamp(120px, 18dvh, 220px) 1fr',
+          bgcolor: (theme) => (theme.palette.mode === 'dark' ? '#1A1410' : '#FFF8F0'),
+          gap: 0.5,
+          px: 0.5,
+          py: 0,
+        }}
+      >
+        {players.map((player, idx) => {
+          const placement = getGridPlacement(player.position);
+          const rotation = getRotation(player.position);
+          const isVertical = player.position === 'left' || player.position === 'right';
+
+          if (player.position === 'right' && playerCount <= 3) return null;
+          if (player.position === 'left' && playerCount <= 2) return null;
+
+          return (
+            <Box key={idx} sx={{ ...placement, position: 'relative', overflow: 'hidden' }}>
+              <Box
+                sx={
+                  isVertical
+                    ? {
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        width: '100dvh',
+                        height: player.position === 'left' ? leftPanelCss : rightPanelCss,
+                        transform: `translate(-50%, -50%) ${rotation}`,
+                      }
+                    : { position: 'absolute', inset: 0, transform: rotation }
+                }
+              >
+                <PlayerPanel
+                  player={player}
+                  playerIdx={idx}
+                  allPlayers={players}
+                  commanderDamage={commanderDamage}
+                  startingLife={startingLife}
+                  highlightMode={false}
+                  turnTimerSeconds={turnTimerSeconds}
+                  onLifeChange={() => {}}
+                  onPoisonChange={() => {}}
+                  onCommanderTaxChange={() => {}}
+                  onEnergyChange={() => {}}
+                  onExperienceChange={() => {}}
+                  onToggleMonarch={() => {}}
+                  onToggleInitiative={() => {}}
+                  onToggleCitysBlessing={() => {}}
+                  onCommanderDamageChange={() => {}}
+                  onEliminate={() => {}}
+                  onUndoEliminate={() => {}}
+                  soundEnabled={false}
+                  seatingMode
+                  onOpenSeatPicker={() => setPickerSeatIdx(idx)}
+                />
+              </Box>
+            </Box>
+          );
+        })}
+
+        <Box
+          sx={{
+            gridColumn: 2,
+            gridRow: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1.5,
+            px: 2,
+          }}
+        >
+          <BracketMismatchBanner
+            slots={players.map((p, i) => ({
+              deckId: p.deckId || null,
+              commander: p.commander?.name || null,
+              playerName: p.playerName || `Player ${i + 1}`,
+            }))}
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
+            Seats filled {filledCount} / {players.length}
+          </Typography>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            {onDiscard && (
+              <Button startIcon={<ArrowBackIcon />} onClick={onDiscard} color="inherit">
+                Cancel
+              </Button>
+            )}
+            <Button
+              variant="contained"
+              size="large"
+              startIcon={<PlayArrowIcon />}
+              disabled={!allFilled || !onStartGame}
+              onClick={() => onStartGame?.()}
+            >
+              Start Game
+            </Button>
+          </Stack>
+          {!allFilled && (
+            <Typography variant="caption" color="text.secondary">
+              Tap each seat to choose a player and deck.
+            </Typography>
+          )}
+        </Box>
+
+        {pickerSeatIdx !== null && (
+          <SeatPickerModal
+            open
+            seatLabel={`${players[pickerSeatIdx]?.position ?? 'seat'} seat`}
+            initial={currentSetup}
+            players={pickerPlayers}
+            decks={pickerDecks}
+            excludePlayerIds={takenPlayerIds.filter((id) => id !== currentSeat?.playerId)}
+            onClose={() => setPickerSeatIdx(null)}
+            onConfirm={(setup) => {
+              onSeatUpdate?.(pickerSeatIdx, setup);
+              setPickerSeatIdx(null);
+            }}
+          />
+        )}
+      </Box>
+    );
+  }
+  // -------- End seating phase --------
 
   return (
     <Box

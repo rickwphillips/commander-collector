@@ -1,8 +1,14 @@
 <?php
 // SSE endpoint — streams live game state/events to remote panels and the host.
 // No auth required: the seat code IS the credential, same as live-game.php.
-// Apache Timeout is 300s on this host; we close ourselves at 270s and send
-// retry:100 so the browser reconnects in 100ms (invisible to the user).
+//
+// Self-close at SSE_MAX_SECONDS and send retry:100 so the browser reconnects
+// in 100ms (invisible to the user). The cap is set well below the smallest
+// upstream proxy timeout we have to live under:
+//   prod (Apache):        Timeout 300s   → close at 270s
+//   dev (Next.js rewrite): proxyTimeout 120s → close at 90s
+// We pick the dev-safe value everywhere so the same script works on both.
+//
 // 16KB padding per event forces Apache mod_proxy_fcgi to flush each chunk
 // immediately rather than buffering (confirmed via load test 2026-05-20).
 //
@@ -12,6 +18,9 @@
 
 set_time_limit(0); // prod has max_execution_time=0; CLI server defaults to 30s
 ini_set('zlib.output_compression', '0');
+
+// Self-close before any reasonable upstream proxy drops us. See header notes.
+const SSE_MAX_SECONDS = 90;
 
 // config.php sets Content-Type: application/json globally — include it first
 // so our SSE-specific headers overwrite it afterwards.
@@ -94,7 +103,7 @@ if ($isHost) {
     while (true) {
         if (connection_aborted()) break;
 
-        if (time() - $start >= 270) {
+        if (time() - $start >= SSE_MAX_SECONDS) {
             sseEmit(['type' => 'close']);
             break;
         }
@@ -153,7 +162,7 @@ if ($isHost) {
     while (true) {
         if (connection_aborted()) break;
 
-        if (time() - $start >= 270) {
+        if (time() - $start >= SSE_MAX_SECONDS) {
             sseEmit(['type' => 'close']);
             break;
         }
