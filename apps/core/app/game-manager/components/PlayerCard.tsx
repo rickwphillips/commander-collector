@@ -2,13 +2,44 @@
 
 import { memo, useEffect, useRef, useState } from 'react';
 import { keyframes } from '@emotion/react';
-import { Box, Button, CircularProgress, IconButton, Typography } from '@mui/material';
+import { Box, Button, CircularProgress, IconButton, Stack, SvgIcon, TextField, Tooltip, Typography } from '@mui/material';
+import Brightness4Icon from '@mui/icons-material/Brightness4';
+import Brightness7Icon from '@mui/icons-material/Brightness7';
+import ChatIcon from '@mui/icons-material/Chat';
+import InitiativeIcon from '@mui/icons-material/Castle';
 import CloseIcon from '@mui/icons-material/Close';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import ElimIcon from '@mui/icons-material/PersonOff';
+import QrCodeIcon from '@mui/icons-material/QrCode';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import VolumeOffIcon from '@mui/icons-material/VolumeOff';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import { QRCodeSVG } from 'qrcode.react';
 import { getCardImageByName } from '@commander/shared/lib/cardImageCache';
 import { ASSET_BASE } from '@/lib/api';
 import { ControlFocusModal } from './ControlFocusModal';
+
+// Local glyphs duplicated from PlayerPanel. Phase 3 will fold both into a
+// shared icons module along with the keyframes.
+const CrownIcon = (props: React.ComponentProps<typeof SvgIcon>) => (
+  <SvgIcon {...props} viewBox="0 0 24 24">
+    <path d="M5 16l-3-10 5.5 4L12 2l4.5 8L22 6l-3 10H5zm0 2h14v2H5v-2z" />
+  </SvgIcon>
+);
+const CityIcon = ({ active, ...props }: React.ComponentProps<typeof SvgIcon> & { active?: boolean }) => (
+  <SvgIcon {...props} viewBox="0 0 1024 1024">
+    {active && (
+      <defs>
+        <linearGradient id="cityGradCard" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#E040FB" />
+          <stop offset="50%" stopColor="#7851A9" />
+          <stop offset="100%" stopColor="#311B92" />
+        </linearGradient>
+      </defs>
+    )}
+    <path fill={active ? 'url(#cityGradCard)' : 'currentColor'} d="M503.612.522c5.954-.16 11.908-.32 17.862-.522 11.304 64.93 18.666 130.504 28.924 195.596 51.816 6.276 101.46 25.586 144.826 54.55 37.576-10.66 75.028-21.764 112.604-32.504-10.42 36.206-21.362 72.332-31.702 108.578-2.052 5.03 2.656 9.334 4.626 13.558 26.754 40.51 42.524 87.498 48.84 135.492 64.688 9.374 129.336 18.908 194.026 28.402.04 5.994.12 12.03.242 18.104-64.77 10.822-130.062 18.344-194.912 28.684-6.156 51.896-26.35 101.256-55.316 144.544 10.982 37.896 22.488 75.632 33.068 113.648-38.58-10.742-76.758-22.93-115.378-33.592-42.402 28.724-91.642 45.782-142.17 52.742-9.454 65.252-18.828 130.544-28.402 195.796-6.074.12-12.15.242-18.184.402-9.936-62.316-18.022-124.952-27.154-187.428-1.086-3.862-.846-10.862-6.598-10.622-48.638-6.436-94.66-25.666-135.694-52.178-39.144 11.426-78.206 23.174-117.43 34.276 10.58-38.096 22.528-75.792 33.23-113.848 2.252-5.432-2.736-10.098-4.868-14.604-24.702-38.982-40.27-83.638-45.7-129.458-65.736-11.104-131.994-19.27-197.89-29.368-.12-6.074-.2-12.19-.322-18.224 65.896-10.822 132.356-18.144 198.17-29.328 5.352-50.206 24.622-97.958 51.656-140.28-10.984-38.902-22.488-77.642-33.632-116.464 38.7 11.144 77.2 23.052 116.022 33.712 42.482-29.448 91.964-47.148 142.854-54.912 9.212-64.97 18.908-129.82 28.402-194.752zm-47.914 270.302c-33.47 8.006-65.13 23.294-92.526 44.132-5.432 3.742-10.54 10.018-8.852 17.058 1.852 7.844 9.696 11.706 15.448 16.494 23.494 16.776 46.064 34.878 69.798 51.332 8.69 5.994 21.644-.724 22.128-11.184 5.51-33.712 10.136-67.584 15.004-101.378 2.576-11.546-10.458-21.12-21-16.454zm104.074-1.488c-8.448 1.81-13.678 10.782-11.424 19.068 4.344 32.224 9.05 64.408 13.718 96.552.442 7.442 4.546 16.01 12.832 16.896 7.806 1.528 13.718-4.708 19.672-8.57 23.576-18.022 47.994-34.878 71.328-53.222 8.81-5.794 7.282-19.714-1.61-24.662-30.412-23.132-66.458-41.034-104.516-46.062zM326.28 354.22c-7.602 2.736-11.586 10.298-16.172 16.374-17.862 26.43-31.66 56.04-37.936 87.418-2.976 9.696 6.478 20.074 16.374 17.982 33.39-4.506 66.82-9.01 100.09-14.322 12.23-.32 17.782-16.332 9.656-24.86-17.38-24.138-35.362-47.834-52.862-71.85-4.304-6.156-10.822-12.954-19.15-10.742zm362.468.08c-19.472 21.242-34.718 46.184-52.74 68.712-5.714 8.972-16.816 17.58-13.156 29.448 3.54 9.334 14.442 9.616 22.77 11.104 31.178 4.224 62.276 9.414 93.494 13.436 10.138 1.892 19.31-9.132 15.97-18.868-7.644-35.722-23.694-69.838-46.344-98.48-4.264-6.598-12.994-8.892-19.994-5.352zM282.672 547.604c-7.604 2.574-12.834 10.66-10.218 18.666 7.482 34.798 23.212 67.988 45.178 95.986 5.108 8.088 17.982 9.214 23.654 1.168 17.782-22.57 34.236-46.144 51.736-68.914 4.706-6.678 11.948-14.28 8.126-23.092-3.34-10.902-17.018-9.412-25.988-11.626-30.856-3.46-61.512-10.378-92.488-12.188zm422.168 5.028c-24.178 3.902-48.598 6.154-72.614 10.902-10.5 2.052-13.84 16.414-6.84 23.936 18.586 25.626 37.534 51.012 56.564 76.356 5.47 10.138 20.758 10.098 26.35.08 23.252-30.454 42.24-66.458 46.786-104.758-8.368-20.556-34.074-6.476-50.246-6.516zm-265.434 71.086c-23.936 16.372-46.546 34.556-70.16 51.372-6.316 5.07-15.488 10.098-15.046 19.43.724 8.168 8.448 12.834 14.282 17.42 26.752 18.948 57.044 33.43 89.148 40.35 9.976 3.38 20.638-6.638 18.424-16.736-4.626-33.55-9.132-67.142-14.442-100.572-.28-10.54-13.596-17.46-22.206-11.264zm129.016.562c-6.356 3.258-5.994 11.788-7.604 17.822-4.384 31.016-9.052 62.034-13.396 93.09-2.976 10.622 7.926 21.806 18.626 18.024 35.322-7.524 68.994-23.092 97.556-45.138 8.288-4.948 9.938-17.66 1.892-23.614-24.782-19.512-50.568-37.776-75.712-56.844-5.794-5.07-14.402-8.046-21.362-3.34z" />
+  </SvgIcon>
+);
 import type { PlayerState, CommanderDamageMap } from '../types';
 import type { MonarchAnim } from '@/game-manager/hooks/useMonarchTransition';
 
@@ -275,27 +306,36 @@ function arePlayerCardPropsEqual(prev: PlayerCardProps, next: PlayerCardProps): 
 
 function PlayerCardImpl(props: PlayerCardProps) {
   const {
-    viewer, sizes, player, playerIdx, allPlayers, commanderDamage, computedLifeColor,
-    seatCode, remoteConnected,
+    viewer, sizes, position, player, playerIdx, allPlayers, commanderDamage, computedLifeColor,
+    seatCode, remoteConnected, remoteMode, soundEnabled, themeMode,
     lifeKillOpponents, onLifeKillSelect, poisonKillOpponents, onPoisonKillSelect,
     onLifeChange, onPoisonChange, onEnergyChange, onExperienceChange, onCommanderTaxChange,
     handleCmdDmgChange,
+    onToggleMonarch, onToggleInitiative, onToggleCitysBlessing,
+    onEliminate, onUndoEliminate, onToggleSound, onToggleTheme, onOpenChat,
   } = props;
   const isPoisoned = player.poison >= 10;
 
   // ─── Card-local UI state ────────────────────────────────────────────────
   // None of this state is read by the orchestrator or any sibling. Lifting it
   // would just add prop noise and break memoization. It stays here.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [eliminateTurnInput, setEliminateTurnInput] = useState('');
-  // setShowEliminateConfirm is wired by the state-menu block (later commit).
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showEliminateConfirm, setShowEliminateConfirm] = useState(false);
-  void setShowEliminateConfirm;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [stateMenuOpen, setStateMenuOpen] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [rulesOpenLabel, setRulesOpenLabel] = useState<string | null>(null);
+  const toggleRules = (label: string) => setRulesOpenLabel(l => l === label ? null : label);
+
+  // Auto-close the rules tooltip on next outside mousedown.
+  useEffect(() => {
+    if (!rulesOpenLabel) return;
+    const close = () => setRulesOpenLabel(null);
+    const id = setTimeout(() => document.addEventListener('mousedown', close), 0);
+    return () => { clearTimeout(id); document.removeEventListener('mousedown', close); };
+  }, [rulesOpenLabel]);
+
+  // setStateMenuOpen(true) is invoked by the header submenu trigger landing
+  // in a later commit; suppress unused-var until then.
+  void setStateMenuOpen;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [openSnapshotKey, setOpenSnapshotKey] = useState<string | null>(null);
   const [focusedControl, setFocusedControl] = useState<FocusedControl>(null);
@@ -430,6 +470,136 @@ function PlayerCardImpl(props: PlayerCardProps) {
           <Button onClick={() => onPoisonKillSelect(null)} sx={{ color: 'rgba(100,255,100,0.4)', fontSize: sizes.fsKillPrompt, mt: 0.5 }}>
             Skip
           </Button>
+        </Box>
+      )}
+
+      {/* ── Game state submenu ── */}
+      {stateMenuOpen && (
+        <Box
+          sx={{
+            position: 'absolute', inset: 0, zIndex: 20,
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(20,12,6,0.93)' : 'rgba(255,248,240,0.95)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start',
+            overflowY: 'auto', py: 2, gap: 0,
+            animation: 'stateMenuFadeIn 0.15s ease-out both',
+            '@keyframes stateMenuFadeIn': { from: { opacity: 0 }, to: { opacity: 1 } },
+          }}
+          onClick={() => { setStateMenuOpen(false); setShowEliminateConfirm(false); }}
+        >
+          <Box
+            sx={{
+              width: '90%', maxWidth: 220, maxHeight: '80%',
+              bgcolor: (theme) => theme.palette.mode === 'dark' ? '#1E1510' : '#FFFAF5',
+              border: (theme) => `1px solid ${theme.palette.divider}`,
+              borderRadius: 2, '& .MuiTouchRipple-root': { borderRadius: 2 },
+              overflowY: 'auto', overflowX: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {([
+              { label: 'Monarch', icon: <CrownIcon sx={{ fontSize: 18, color: player.isMonarch ? '#DAA520' : 'inherit' }} />, active: player.isMonarch, color: '#DAA520', toggle: () => { onToggleMonarch(playerIdx); setStateMenuOpen(false); }, rulesText: 'Draw a card at the beginning of your end step. Whenever a creature deals combat damage to you, its controller becomes the monarch.' },
+              { label: 'Initiative', icon: <InitiativeIcon sx={{ fontSize: 18 }} />, active: player.hasInitiative, color: '#4FC3F7', toggle: () => { onToggleInitiative(playerIdx); setStateMenuOpen(false); }, rulesText: "When you take the initiative, venture into the Undercity. At the beginning of your upkeep, venture into the Undercity. Whenever a creature deals combat damage to you, its controller takes the initiative." },
+              { label: "City's Blessing", icon: <CityIcon active={player.hasCitysBlessing} sx={{ fontSize: 18 }} />, active: player.hasCitysBlessing, color: '#7851A9', toggle: () => { onToggleCitysBlessing(playerIdx); setStateMenuOpen(false); }, rulesText: "You have the city&apos;s blessing for the rest of the game. Gained when you control ten or more permanents — it persists even if that number later drops below ten." },
+            ] as { label: string; icon: React.ReactNode; active: boolean; color: string; toggle: () => void; rulesText: string }[]).map(({ label, icon, active, color, toggle, rulesText }) => (
+              <Box key={label} onClick={toggle} sx={{
+                display: 'flex', alignItems: 'center', gap: 1.25,
+                px: 1.5, py: 1,
+                cursor: 'pointer',
+                color: active ? color : 'text.disabled',
+                borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+                '&:hover': { bgcolor: 'action.hover' },
+                transition: 'background-color 0.15s ease',
+              }}>
+                {icon}
+                <Typography sx={{ fontSize: 13, fontWeight: active ? 700 : 400, lineHeight: 1 }}>{label}</Typography>
+                <Tooltip
+                  open={rulesOpenLabel === `m:${label}`}
+                  onClose={() => setRulesOpenLabel(null)}
+                  title={<Typography sx={{ fontSize: 12, maxWidth: 240 }}>{rulesText}</Typography>}
+                  placement="left"
+                  arrow
+                  disableHoverListener
+                  disableFocusListener
+                  disableTouchListener
+                  slotProps={{ tooltip: { sx: { rotate: position.ttRotate } } }}
+                >
+                  <IconButton
+                    size="small"
+                    onClick={(e) => { e.stopPropagation(); toggleRules(`m:${label}`); }}
+                    sx={{ p: 0.25, ml: 'auto', color: rulesOpenLabel === `m:${label}` ? 'primary.main' : 'text.disabled' }}
+                  >
+                    <InfoOutlinedIcon sx={{ fontSize: 14 }} />
+                  </IconButton>
+                </Tooltip>
+                {active && <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: color, flexShrink: 0 }} />}
+              </Box>
+            ))}
+            {/* Eliminate row */}
+            {player.isEliminated ? (
+              <Box onClick={() => { onUndoEliminate(playerIdx); setStateMenuOpen(false); }} sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 1, cursor: 'pointer', color: 'error.main', borderTop: (theme) => `1px solid ${theme.palette.divider}`, '&:hover': { bgcolor: 'action.hover' }, transition: 'background-color 0.15s ease' }}>
+                <ElimIcon sx={{ fontSize: 18 }} />
+                <Typography sx={{ fontSize: 13, fontWeight: 700, lineHeight: 1 }}>Undo Concede</Typography>
+              </Box>
+            ) : showEliminateConfirm ? (
+              <Stack spacing={0.75} sx={{ px: 1.5, py: 1, bgcolor: 'rgba(218,165,32,0.12)', borderTop: (theme) => `1px solid ${theme.palette.divider}` }}>
+                <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#DAA520', lineHeight: 1.3 }}>Are you sure you want to quit?</Typography>
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                  <TextField size="small" label="Turn #" type="number" value={eliminateTurnInput}
+                    onChange={(e) => setEliminateTurnInput(e.target.value)}
+                    slotProps={{ htmlInput: { min: 1 } }} sx={{ width: 72 }} />
+                  <Button size="small" variant="contained"
+                    onClick={() => { onEliminate(playerIdx); setShowEliminateConfirm(false); setEliminateTurnInput(''); setStateMenuOpen(false); }}
+                    sx={{ fontSize: 9, py: 0, px: 0.5, minWidth: 0, bgcolor: '#DAA520', '&:hover': { bgcolor: '#c49a18' } }}>✓</Button>
+                  <Button size="small" variant="outlined"
+                    onClick={() => setShowEliminateConfirm(false)}
+                    sx={{ fontSize: 9, py: 0, px: 0.5, minWidth: 0, borderColor: '#DAA520', color: '#DAA520' }}>✕</Button>
+                </Stack>
+              </Stack>
+            ) : (
+              <Box onClick={() => setShowEliminateConfirm(true)} sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 1, cursor: 'pointer', color: 'text.disabled', borderTop: (theme) => `1px solid ${theme.palette.divider}`, '&:hover': { bgcolor: 'action.hover' }, transition: 'background-color 0.15s ease' }}>
+                <ElimIcon sx={{ fontSize: 18 }} />
+                <Typography sx={{ fontSize: 13, lineHeight: 1 }}>Concede</Typography>
+              </Box>
+            )}
+            {/* Seat code row */}
+            {seatCode && (
+              <Box
+                onClick={(e) => { e.stopPropagation(); setQrOpen(true); setStateMenuOpen(false); }}
+                sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 1, cursor: 'pointer', borderTop: (theme) => `1px solid ${theme.palette.divider}`, color: 'text.secondary', '&:hover': { bgcolor: 'action.hover' }, transition: 'background-color 0.15s ease' }}
+              >
+                <Typography sx={{ fontSize: 12, fontFamily: 'monospace', letterSpacing: 1.5, fontWeight: 700, flex: 1 }}>
+                  {seatCode}
+                </Typography>
+                <QrCodeIcon sx={{ fontSize: 16 }} />
+              </Box>
+            )}
+            {/* Rules Guru chat — remote only */}
+            {remoteMode && onOpenChat && (
+              <Box
+                onClick={(e) => { e.stopPropagation(); onOpenChat(player.playerName); setStateMenuOpen(false); }}
+                sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 1, cursor: 'pointer', borderTop: (theme) => `1px solid ${theme.palette.divider}`, color: 'primary.main', '&:hover': { bgcolor: 'action.hover' }, transition: 'background-color 0.15s ease' }}
+              >
+                <ChatIcon sx={{ fontSize: 18 }} />
+                <Typography sx={{ fontSize: 13, lineHeight: 1 }}>Ask Rules</Typography>
+              </Box>
+            )}
+            {/* Remote-only: sound + theme toggles */}
+            {remoteMode && (
+              <Box sx={{ display: 'flex', borderTop: (theme) => `1px solid ${theme.palette.divider}` }}>
+                <Box onClick={(e) => { e.stopPropagation(); onToggleSound?.(); setStateMenuOpen(false); }} sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75, py: 1, cursor: 'pointer', color: soundEnabled ? 'primary.main' : 'text.disabled', '&:hover': { bgcolor: 'action.hover' }, transition: 'background-color 0.15s ease' }}>
+                  {soundEnabled ? <VolumeUpIcon sx={{ fontSize: 18 }} /> : <VolumeOffIcon sx={{ fontSize: 18 }} />}
+                  <Typography sx={{ fontSize: 13, lineHeight: 1 }}>Sound</Typography>
+                </Box>
+                {onToggleTheme && (
+                  <Box onClick={(e) => { e.stopPropagation(); onToggleTheme(); setStateMenuOpen(false); }} sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75, py: 1, cursor: 'pointer', color: 'text.secondary', borderLeft: (theme) => `1px solid ${theme.palette.divider}`, '&:hover': { bgcolor: 'action.hover' }, transition: 'background-color 0.15s ease' }}>
+                    {themeMode === 'light' ? <Brightness4Icon sx={{ fontSize: 18 }} /> : <Brightness7Icon sx={{ fontSize: 18 }} />}
+                    <Typography sx={{ fontSize: 13, lineHeight: 1 }}>{themeMode === 'light' ? 'Dark' : 'Light'}</Typography>
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Box>
+          <Typography variant="caption" sx={{ color: 'text.disabled', mt: 1.5 }}>tap outside to close</Typography>
         </Box>
       )}
 
