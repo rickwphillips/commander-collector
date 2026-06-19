@@ -6,6 +6,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { PlayerPanel } from './PlayerPanel';
+import { SeatingCard } from './SeatingCard';
 import { CenterZone } from './CenterZone';
 import { SeatPickerModal } from './SeatPickerModal';
 import { api } from '@/lib/api';
@@ -484,27 +485,8 @@ export function GameBoard({
                     : { position: 'absolute', inset: 0, transform: rotation }
                 }
               >
-                <PlayerPanel
+                <SeatingCard
                   player={player}
-                  playerIdx={idx}
-                  allPlayers={players}
-                  commanderDamage={commanderDamage}
-                  startingLife={startingLife}
-                  highlightMode={false}
-                  turnTimerSeconds={turnTimerSeconds}
-                  onLifeChange={() => {}}
-                  onPoisonChange={() => {}}
-                  onCommanderTaxChange={() => {}}
-                  onEnergyChange={() => {}}
-                  onExperienceChange={() => {}}
-                  onToggleMonarch={() => {}}
-                  onToggleInitiative={() => {}}
-                  onToggleCitysBlessing={() => {}}
-                  onCommanderDamageChange={() => {}}
-                  onEliminate={() => {}}
-                  onUndoEliminate={() => {}}
-                  soundEnabled={false}
-                  seatingMode
                   onOpenSeatPicker={() => setPickerSeatIdx(idx)}
                 />
               </Box>

@@ -366,10 +366,6 @@ interface PlayerPanelProps {
   themeMode?: 'light' | 'dark';
   onToggleSound?: () => void;
   onOpenChat?: (playerName: string) => void;
-  /** Seating phase: when true, panel renders an empty CTA (or summary + edit icon if filled). */
-  seatingMode?: boolean;
-  /** Called when the user taps the seating-mode CTA or edit affordance. */
-  onOpenSeatPicker?: () => void;
 }
 
 // ── City Flag ─────────────────────────────────────────────────────────────────
@@ -509,8 +505,6 @@ export function PlayerPanel({
   themeMode,
   onToggleSound,
   onOpenChat,
-  seatingMode = false,
-  onOpenSeatPicker,
 }: PlayerPanelProps) {
   usePoisonSound(player.poison, player.isEliminated, soundEnabled);
   const { playCitysBlessing } = useSounds(soundEnabled, player.hasCitysBlessing);
@@ -1052,65 +1046,6 @@ export function PlayerPanel({
   const opponents = allPlayers
     .map((p, i) => ({ player: p, idx: i }))
     .filter(({ idx }) => idx !== playerIdx);
-
-  // ── Seating-phase early-return ─────────────────────────────────────────────
-  // Must come AFTER every hook above so hook order is stable across renders.
-  // In seating mode, render either an empty CTA or a compact summary with an
-  // edit affordance. Tapping either opens the SeatPickerModal owned by GameBoard.
-  if (seatingMode) {
-    const isFilled = !!(player.playerId && player.deckId && player.commander?.name);
-    const positionLabel = player.position.charAt(0).toUpperCase() + player.position.slice(1);
-    return (
-      <Box
-        onClick={onOpenSeatPicker}
-        sx={{
-          height: '100%',
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexDirection: 'column',
-          gap: 0.5,
-          cursor: onOpenSeatPicker ? 'pointer' : 'default',
-          border: 2,
-          borderStyle: 'dashed',
-          borderColor: isFilled ? 'primary.main' : 'divider',
-          borderRadius: 2,
-          bgcolor: isFilled ? 'action.selected' : 'transparent',
-          transition: 'background-color 120ms, border-color 120ms',
-          textAlign: 'center',
-          p: 1,
-          '&:hover': onOpenSeatPicker ? { bgcolor: 'action.hover', borderColor: 'primary.main' } : {},
-        }}
-      >
-        {isFilled ? (
-          <>
-            <Box sx={{ fontSize: 'clamp(11px, 1.2dvh, 14px)', fontWeight: 700, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 1 }}>
-              {positionLabel}
-            </Box>
-            <Box sx={{ fontSize: 'clamp(16px, 2.4dvh, 24px)', fontWeight: 700, lineHeight: 1.1 }}>
-              {player.playerName}
-            </Box>
-            <Box sx={{ fontSize: 'clamp(12px, 1.5dvh, 16px)', opacity: 0.85 }}>
-              {player.commander.name}{player.partner ? ` / ${player.partner.name}` : ''}
-            </Box>
-            <Box sx={{ fontSize: 'clamp(10px, 1.1dvh, 12px)', opacity: 0.6, mt: 0.5 }}>
-              Tap to edit
-            </Box>
-          </>
-        ) : (
-          <>
-            <Box sx={{ fontSize: 'clamp(11px, 1.2dvh, 14px)', fontWeight: 700, opacity: 0.6, textTransform: 'uppercase', letterSpacing: 1 }}>
-              {positionLabel}
-            </Box>
-            <Box sx={{ fontSize: 'clamp(14px, 2.2dvh, 20px)', fontWeight: 600, opacity: 0.85 }}>
-              Tap to choose player & deck
-            </Box>
-          </>
-        )}
-      </Box>
-    );
-  }
 
   return (
     <Box
