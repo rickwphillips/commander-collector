@@ -657,18 +657,22 @@ export function PlayerPanel({
     if (viewerPlayerNames.length > 2) return `${viewerPlayerNames.slice(0, 2).join(', ')} and ${viewerPlayerNames.length - 2} other${viewerPlayerNames.length - 2 > 1 ? 's' : ''} are viewing your panel`;
     return 'Someone is viewing your panel';
   })();
+  // Banner auto-hides 2.5s after each trigger. Triggers are: a change in
+  // viewing state (isBeingViewedByAnyone / viewer-list length), or an explicit
+  // manual ping via showViewerBanner() (called from the eye-icon click below).
+  // Modeled declaratively: the effect re-keys on the trigger inputs, cleans up
+  // its own timer on re-run / unmount, so no ref-stored timer is needed.
   const [viewerBannerVisible, setViewerBannerVisible] = useState(false);
-  const viewerBannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const showViewerBanner = () => {
-    if (viewerBannerTimer.current) clearTimeout(viewerBannerTimer.current);
-    setViewerBannerVisible(true);
-    viewerBannerTimer.current = setTimeout(() => setViewerBannerVisible(false), 2500);
-  };
+  const [viewerBannerNonce, setViewerBannerNonce] = useState(0);
+  const showViewerBanner = () => setViewerBannerNonce((n) => n + 1);
+
   useEffect(() => {
-    if (!isBeingViewedByAnyone) return;
-    showViewerBanner();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isBeingViewedByAnyone, viewerPlayerNames.length]);
+    // Skip the initial mount when not actively viewed.
+    if (!isBeingViewedByAnyone && viewerBannerNonce === 0) return;
+    setViewerBannerVisible(true);
+    const t = setTimeout(() => setViewerBannerVisible(false), 2500);
+    return () => clearTimeout(t);
+  }, [isBeingViewedByAnyone, viewerPlayerNames.length, viewerBannerNonce]);
 
   // Preload all commander art on mount so images stay cached across state changes
   useEffect(() => {

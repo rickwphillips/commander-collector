@@ -39,7 +39,7 @@ import { api } from '@/lib/api';
 import { scryfallCommanderSearch, scryfallPartnerSearch, scryfallGetCard, getOracleText, type ScryfallSearchResult } from '@/lib/scryfall';
 import { ManaCost } from '@/components/ManaCost';
 import { getOrdinalSuffix, MTG_COLORS_WITH_C } from '@/lib/utils';
-import type { DeckDetail as DeckDetailType, GameWithResults, DeckCard } from '@/lib/types';
+import type { DeckDetail as DeckDetailType, GameWithResults, Card as DeckCardEntry } from '@/lib/types';
 
 
 
@@ -50,7 +50,7 @@ export default function DeckDetailPage() {
 
   const [deck, setDeck] = useState<DeckDetailType | null>(null);
   const [games, setGames] = useState<GameWithResults[]>([]);
-  const [deckCards, setDeckCards] = useState<DeckCard[]>([]);
+  const [deckCards, setDeckCards] = useState<DeckCardEntry[]>([]);
   const [loading, setLoading] = useState(!!deckId);
   const [error, setError] = useState<string | null>(null);
 
