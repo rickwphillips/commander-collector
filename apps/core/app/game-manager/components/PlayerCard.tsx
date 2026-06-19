@@ -1,18 +1,25 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useRef, useState } from 'react';
 import { Box } from '@mui/material';
 import type { PlayerState, CommanderDamageMap } from '../types';
+import type { MonarchAnim } from '@/game-manager/hooks/useMonarchTransition';
 
 /**
- * Presentational counterpart of PlayerPanel. All hooks live in the orchestrator
- * (PlayerPanel.tsx); this component receives fully-computed props and renders
- * JSX. Wrapped in React.memo with a custom comparator so a life change in one
- * seat re-renders only that seat's card, not all four.
+ * Presentational counterpart of PlayerPanel. All behavior hooks live in the
+ * orchestrator (PlayerPanel.tsx); this component receives fully-computed props
+ * and renders JSX. Wrapped in React.memo with a custom comparator so a life
+ * change in one seat re-renders only that seat's card, not all four.
  *
- * This file is currently a STUB. The prop surface below reflects every value
- * the eventual presentational render will consume. Render JSX will be migrated
- * out of PlayerPanel in subsequent commits, one logical block at a time.
+ * Phase 2 migration in progress: render JSX is moving here from PlayerPanel one
+ * logical block at a time. PlayerCard is not yet imported anywhere — PlayerPanel
+ * still owns the real render. The card is being built in parallel; the wire-up
+ * happens in Phase 4.
+ *
+ * Card-local UI state (qrOpen, countersOpen, eliminateTurnInput, etc.) lives
+ * inside the card via useState — the orchestrator never reads it. Refs to
+ * card-rendered DOM (cmdScrollRef) live here too. Derived values that follow a
+ * pure function of props (showCrown, monarchAnimStr) are computed in render.
  */
 
 // ─── Discriminated unions used by callbacks ────────────────────────────────
@@ -76,13 +83,12 @@ export interface TimerTokens {
 export interface AnimationFlags {
   /** Damage-flash counter (changes trigger flash). 0 = no flash. */
   damageFlash: number;
-  /** Monarch crown enter/exit/stable state. */
-  monarchAnim: 'entering' | 'exiting' | null;
+  /**
+   * Monarch crown lifecycle from `useMonarchTransition`. The card derives
+   * `showCrown` and the crown animation CSS from this value.
+   */
+  monarchAnim: MonarchAnim;
   monarchEnterIsTransfer: boolean;
-  /** Whether crown should currently render (true while exiting too). */
-  showCrown: boolean;
-  /** Combined animation CSS string for crown. */
-  monarchAnimStr: string;
   /** Citys-blessing render gate (visible includes exit animation tail). */
   cityBlessingVisible: boolean;
   cityBlessingExiting: boolean;
@@ -106,40 +112,6 @@ export interface LongPressHandlers {
   startLongPress: (key: string, onTrigger: () => void) => void;
   cancelLongPress: () => void;
   guardClick: (key: string, fn: () => void) => () => void;
-}
-
-// ─── Local UI state owned by the orchestrator and lifted as props ──────────
-// (These remain in the orchestrator so the card stays purely presentational.
-// If a piece of state turns out to be card-local only, it can move into the
-// card during the migration.)
-export interface LocalUIState {
-  eliminateTurnInput: string;
-  setEliminateTurnInput: (v: string) => void;
-  showEliminateConfirm: boolean;
-  setShowEliminateConfirm: (v: boolean) => void;
-  stateMenuOpen: boolean;
-  setStateMenuOpen: (v: boolean) => void;
-  rulesOpenLabel: string | null;
-  toggleRules: (label: string) => void;
-  cmdDmgShowPlayer: boolean;
-  toggleCmdDmgShowPlayer: () => void;
-  openSnapshotKey: string | null;
-  setOpenSnapshotKey: (k: string | null) => void;
-  focusedControl: FocusedControl;
-  setFocusedControl: (f: FocusedControl) => void;
-  qrOpen: boolean;
-  setQrOpen: (v: boolean) => void;
-  countersOpen: boolean;
-  setCountersOpen: (v: boolean) => void;
-  cmdPreviewName: string | null;
-  setCmdPreviewName: (n: string | null) => void;
-  cmdPreviewUrl: string | null;
-  cmdPreviewZoom: number;
-  setCmdPreviewZoom: (z: number) => void;
-  cmdPreviewBase: { w: number; h: number } | null;
-  setCmdPreviewBase: (b: { w: number; h: number } | null) => void;
-  /** Ref forwarded so the orchestrator's auto-scroll effect can target the card's scroll container. */
-  cmdScrollRef: React.RefObject<HTMLDivElement | null>;
 }
 
 // ─── Threat-source derivation (computed in orchestrator from cmd damage) ───
@@ -201,7 +173,6 @@ export interface PlayerCardProps {
   animations: AnimationFlags;
   viewer: ViewerProps;
   longPress: LongPressHandlers;
-  uiState: LocalUIState;
 
   // Other orchestrator-derived values
   threatSource: ThreatSource | null;
@@ -220,11 +191,9 @@ export interface PlayerCardProps {
 // ─── Custom memo comparator ────────────────────────────────────────────────
 // Strategy: rely on the orchestrator to pass stable references for arrays,
 // objects, and handlers. Compare scalars by value, references by identity.
-// Bundles (sizes/position/timer/animations/viewer/longPress/uiState) are
-// expected to be stable references unless their contents actually change —
-// the orchestrator will memoize each bundle so this comparator can rely on
-// reference equality. Once render is migrated and bundles are wired, this
-// comparator may be refined (e.g. shallow-compare bundles for safety).
+// Bundles (sizes/position/timer/animations/viewer/longPress) are expected to
+// be stable references unless their contents actually change — the orchestrator
+// will memoize each bundle so this comparator can rely on reference equality.
 function arePlayerCardPropsEqual(prev: PlayerCardProps, next: PlayerCardProps): boolean {
   return (
     prev.player === next.player &&
@@ -249,7 +218,6 @@ function arePlayerCardPropsEqual(prev: PlayerCardProps, next: PlayerCardProps): 
     prev.animations === next.animations &&
     prev.viewer === next.viewer &&
     prev.longPress === next.longPress &&
-    prev.uiState === next.uiState &&
     prev.threatSource === next.threatSource &&
     prev.computedLifeColor === next.computedLifeColor &&
     prev.lostRatio === next.lostRatio &&
@@ -279,9 +247,73 @@ function arePlayerCardPropsEqual(prev: PlayerCardProps, next: PlayerCardProps): 
   );
 }
 
-function PlayerCardImpl(_props: PlayerCardProps) {
-  // STUB: render is migrated out of PlayerPanel in subsequent commits.
-  return <Box>TODO: PlayerCard render</Box>;
+function PlayerCardImpl(props: PlayerCardProps) {
+  const { viewer, sizes } = props;
+
+  // ─── Card-local UI state ────────────────────────────────────────────────
+  // None of this state is read by the orchestrator or any sibling. Lifting it
+  // would just add prop noise and break memoization. It stays here.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [eliminateTurnInput, setEliminateTurnInput] = useState('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [showEliminateConfirm, setShowEliminateConfirm] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [stateMenuOpen, setStateMenuOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [rulesOpenLabel, setRulesOpenLabel] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [openSnapshotKey, setOpenSnapshotKey] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [focusedControl, setFocusedControl] = useState<FocusedControl>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [qrOpen, setQrOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [countersOpen, setCountersOpen] = useState(true);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [cmdPreviewName, setCmdPreviewName] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [cmdPreviewZoom, setCmdPreviewZoom] = useState(1);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [cmdPreviewBase, setCmdPreviewBase] = useState<{ w: number; h: number } | null>(null);
+  // Ref into the CMD damage scroll container — used by the zoom autoscroll effect
+  // when that effect is migrated as part of the commander-preview block.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const cmdScrollRef = useRef<HTMLDivElement>(null);
+
+  // ─── Derived from animations bundle (cheap, recompute every render) ─────
+  // showCrown / monarchAnimStr were lifted as props in Phase 1; the card owns
+  // them now because they're pure functions of `monarchAnim`.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { monarchAnim } = props.animations;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const showCrown = props.player.isMonarch || monarchAnim === 'exiting';
+  // monarchAnimStr is intentionally not derived here yet — it depends on the
+  // crown keyframes which are migrated in Phase 3. The render block that needs
+  // it will compute it locally when it lands.
+
+  // ─── Viewer notification banner ────────────────────────────────────────
+  // First migrated render block. Self-contained: only consumes the viewer
+  // bundle + one size token. Rendered in isolation here so the orchestrator's
+  // copy in PlayerPanel.tsx continues to ship the real UI during Phase 2.
+  return (
+    <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
+      <Box
+        sx={{
+          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 12,
+          background: (theme) => `linear-gradient(90deg, ${theme.palette.primary.main}00 0%, ${theme.palette.primary.main}aa 44%, ${theme.palette.primary.main}ff 50%, ${theme.palette.primary.main}aa 56%, ${theme.palette.primary.main}00 100%)`,
+          color: '#fff',
+          px: 1, py: 0.4,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, textAlign: 'center',
+          pointerEvents: 'none',
+          opacity: viewer.viewerBannerVisible ? 1 : 0,
+          transition: viewer.viewerBannerVisible ? 'opacity 0.2s ease' : 'opacity 0.6s ease',
+          fontSize: sizes.fsSectionLabel,
+        }}
+      >
+        {/* Banner contents are migrated with the eye-icon block (header). */}
+      </Box>
+    </Box>
+  );
 }
 
 export const PlayerCard = memo(PlayerCardImpl, arePlayerCardPropsEqual);
