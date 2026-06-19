@@ -1,9 +1,13 @@
 'use client';
 
-import { memo, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { keyframes } from '@emotion/react';
-import { Box, Button, Typography } from '@mui/material';
+import { Box, Button, CircularProgress, IconButton, Typography } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import { QRCodeSVG } from 'qrcode.react';
+import { getCardImageByName } from '@commander/shared/lib/cardImageCache';
+import { ASSET_BASE } from '@/lib/api';
 import { ControlFocusModal } from './ControlFocusModal';
 import type { PlayerState, CommanderDamageMap } from '../types';
 import type { MonarchAnim } from '@/game-manager/hooks/useMonarchTransition';
@@ -272,6 +276,7 @@ function arePlayerCardPropsEqual(prev: PlayerCardProps, next: PlayerCardProps): 
 function PlayerCardImpl(props: PlayerCardProps) {
   const {
     viewer, sizes, player, playerIdx, allPlayers, commanderDamage, computedLifeColor,
+    seatCode, remoteConnected,
     lifeKillOpponents, onLifeKillSelect, poisonKillOpponents, onPoisonKillSelect,
     onLifeChange, onPoisonChange, onEnergyChange, onExperienceChange, onCommanderTaxChange,
     handleCmdDmgChange,
@@ -294,20 +299,39 @@ function PlayerCardImpl(props: PlayerCardProps) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [openSnapshotKey, setOpenSnapshotKey] = useState<string | null>(null);
   const [focusedControl, setFocusedControl] = useState<FocusedControl>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [qrOpen, setQrOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [countersOpen, setCountersOpen] = useState(true);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [cmdPreviewName, setCmdPreviewName] = useState<string | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [cmdPreviewUrl, setCmdPreviewUrl] = useState<string | null>(null);
   const [cmdPreviewZoom, setCmdPreviewZoom] = useState(1);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [cmdPreviewBase, setCmdPreviewBase] = useState<{ w: number; h: number } | null>(null);
-  // Ref into the CMD damage scroll container — used by the zoom autoscroll effect
-  // when that effect is migrated as part of the commander-preview block.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const cmdScrollRef = useRef<HTMLDivElement>(null);
+
+  // setCmdPreviewName is invoked by the header art click and CMD-damage block
+  // landing in later commits. Suppress unused-var until then.
+  void setCmdPreviewName;
+
+  // Resolve preview URL when name changes; reset zoom/base.
+  // All inputs/outputs are card-local; no orchestrator hook reads cmdPreviewUrl.
+  useEffect(() => {
+    if (!cmdPreviewName) { setCmdPreviewUrl(null); setCmdPreviewZoom(1); setCmdPreviewBase(null); return; }
+    setCmdPreviewUrl(null);
+    setCmdPreviewZoom(1);
+    setCmdPreviewBase(null);
+    getCardImageByName(cmdPreviewName).then(url => setCmdPreviewUrl(url));
+  }, [cmdPreviewName]);
+
+  // Scroll to bottom when zoom changes so the card bottom (player name / mana cost)
+  // stays in view.
+  useEffect(() => {
+    if (cmdPreviewZoom > 1 && cmdScrollRef.current) {
+      cmdScrollRef.current.scrollTop = cmdScrollRef.current.scrollHeight;
+    }
+  }, [cmdPreviewZoom]);
+
+  // Auto-close QR when remote player connects.
+  useEffect(() => { if (remoteConnected && qrOpen) setQrOpen(false); }, [remoteConnected, qrOpen]);
 
   // ─── Derived from animations bundle (cheap, recompute every render) ─────
   // showCrown / monarchAnimStr were lifted as props in Phase 1; the card owns
@@ -502,6 +526,86 @@ function PlayerCardImpl(props: PlayerCardProps) {
           />
         );
       })()}
+
+      {/* ── Commander card preview overlay ── */}
+      {cmdPreviewName && (
+        <Box
+          onClick={() => { setCmdPreviewName(null); setCmdPreviewZoom(1); setCmdPreviewBase(null); }}
+          sx={{ position: 'absolute', inset: 0, zIndex: 35, bgcolor: 'rgba(0,0,0,0.88)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1.5 }}
+        >
+          <IconButton
+            size="small"
+            onClick={(e) => { e.stopPropagation(); setCmdPreviewName(null); setCmdPreviewZoom(1); setCmdPreviewBase(null); }}
+            sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1, color: 'rgba(255,255,255,0.85)', bgcolor: 'rgba(0,0,0,0.5)', '&:hover': { bgcolor: 'rgba(0,0,0,0.75)' } }}
+          >
+            <CloseIcon sx={{ fontSize: 28 }} />
+          </IconButton>
+          {cmdPreviewUrl ? (
+            cmdPreviewZoom > 1 ? (
+              <Box
+                ref={cmdScrollRef}
+                onClick={() => { setCmdPreviewName(null); setCmdPreviewZoom(1); setCmdPreviewBase(null); }}
+                sx={{ position: 'absolute', inset: 8, overflow: 'auto', cursor: 'zoom-out', background: 'transparent !important' }}
+              >
+                <Box sx={{ minWidth: '100%', minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent !important' }}>
+                  <Box
+                    component="img"
+                    src={cmdPreviewUrl}
+                    alt={cmdPreviewName ?? ''}
+                    draggable={false}
+                    onClick={(e) => { e.stopPropagation(); setCmdPreviewZoom(1); }}
+                    sx={{ display: 'block', width: cmdPreviewBase ? cmdPreviewBase.w * cmdPreviewZoom : 'auto', height: 'auto', borderRadius: '4.7%', userSelect: 'none', flexShrink: 0 }}
+                  />
+                </Box>
+              </Box>
+            ) : (
+              <Box
+                component="img"
+                src={cmdPreviewUrl}
+                alt={cmdPreviewName ?? ''}
+                draggable={false}
+                onLoad={(e: React.SyntheticEvent<HTMLImageElement>) => setCmdPreviewBase({ w: e.currentTarget.clientWidth, h: e.currentTarget.clientHeight })}
+                onClick={(e) => { e.stopPropagation(); setCmdPreviewZoom(2.5); }}
+                sx={{ maxHeight: '88%', maxWidth: '88%', borderRadius: '4.7%', display: 'block', cursor: 'zoom-in', userSelect: 'none' }}
+              />
+            )
+          ) : (
+            <CircularProgress size={36} thickness={4} sx={{ color: 'rgba(255,255,255,0.45)' }} />
+          )}
+        </Box>
+      )}
+
+      {/* ── QR overlay — in-panel, does not take over the board ── */}
+      {seatCode && qrOpen && (
+        <Box
+          onClick={() => { navigator.clipboard?.writeText(seatCode).catch(() => {}); setQrOpen(false); }}
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 30,
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(20,12,6,0.93)' : 'rgba(255,248,240,0.95)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1.5,
+            cursor: 'pointer',
+          }}
+        >
+          <Box sx={{ p: 1, bgcolor: '#fff', borderRadius: 1 }}>
+            <QRCodeSVG
+              value={`${typeof window !== 'undefined' ? window.location.origin : ''}${ASSET_BASE}/game-manager/remote/?code=${seatCode}`}
+              size={140}
+            />
+          </Box>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: 15, letterSpacing: 3, fontWeight: 700 }}>
+            {seatCode}
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            tap to copy &amp; close
+          </Typography>
+        </Box>
+      )}
     </Box>
   );
 }
