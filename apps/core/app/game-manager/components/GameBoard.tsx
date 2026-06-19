@@ -6,6 +6,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { PlayerPanel } from './PlayerPanel';
+import { ReadOnlyPlayerPanel } from './ReadOnlyPlayerPanel';
 import { SeatingCard } from './SeatingCard';
 import { CenterZone } from './CenterZone';
 import { SeatPickerModal } from './SeatPickerModal';
@@ -728,32 +729,18 @@ export function GameBoard({
       {/* Read-only player panel overlay */}
       {viewingPlayerIdx !== null && (() => {
         const vPlayer = players[viewingPlayerIdx];
-        const noop = () => {};
         return (
           <Box
             sx={{ position: 'fixed', inset: 0, zIndex: 60, bgcolor: 'rgba(0,0,0,0.7)' }}
             onClick={() => setViewingPlayerIdx(null)}
           >
             <Box onClick={(e) => e.stopPropagation()} sx={{ position: 'absolute', inset: 0 }}>
-              <PlayerPanel
-                player={{ ...vPlayer, position: 'bottom' }}
+              <ReadOnlyPlayerPanel
+                player={vPlayer}
                 playerIdx={viewingPlayerIdx}
                 allPlayers={players}
                 commanderDamage={commanderDamage}
                 startingLife={startingLife}
-                onLifeChange={noop}
-                onPoisonChange={noop}
-                onCommanderTaxChange={noop}
-                onEnergyChange={noop}
-                onExperienceChange={noop}
-                onToggleMonarch={noop}
-                onToggleInitiative={noop}
-                onToggleCitysBlessing={noop}
-                onCommanderDamageChange={noop}
-                onEliminate={noop}
-                onUndoEliminate={noop}
-                highlightMode={false}
-                soundEnabled={false}
                 activePlayerIdx={currentPlayerIdx}
                 turnTimerSeconds={turnTimerSeconds}
               />
