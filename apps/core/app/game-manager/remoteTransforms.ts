@@ -267,27 +267,67 @@ export function applyPassTurn(state: GameManagerState): GameManagerState {
   };
 }
 
-function applyViewPlayer(state: GameManagerState, event: LiveGameEvent): GameManagerState {
+/**
+ * Mirror of applyPassTurn going backwards. Steps counter-clockwise through
+ * active seats and decrements the turn number when departing through the
+ * first player's position. Refuses to step back below turn 1.
+ */
+export function applyPrevTurn(state: GameManagerState): GameManagerState {
+  const { players, currentPlayerIdx, turnNumber } = state;
+  const firstIdx = state.firstPlayerIdx ?? 0;
+  const currentPos = players[currentPlayerIdx].position;
+  const curCW = CLOCKWISE.indexOf(currentPos);
+  const firstCW = CLOCKWISE.indexOf(players[firstIdx].position);
+  let prevPlayerIdx = -1;
+  let stepsBack = 0;
+  for (let step = 1; step <= 4; step++) {
+    const prevPos = CLOCKWISE[(curCW - step + 4) % 4];
+    const idx = players.findIndex((p) => p.position === prevPos && !p.isEliminated);
+    if (idx !== -1) {
+      prevPlayerIdx = idx;
+      stepsBack = step;
+      break;
+    }
+  }
+  if (prevPlayerIdx === -1) return state;
+  const distBackToFirst = (curCW - firstCW + 4) % 4;
+  const wouldDecrement = distBackToFirst < stepsBack;
+  if (wouldDecrement && turnNumber === 1) return state;
+  const newTurnNumber = wouldDecrement ? Math.max(1, turnNumber - 1) : turnNumber;
+  return {
+    ...state,
+    currentPlayerIdx: prevPlayerIdx,
+    turnNumber: newTurnNumber,
+    turnStartTime: Date.now(),
+  };
+}
+
+type ViewEvent = Extract<LiveGameEvent, { type: 'view_open' | 'view_heartbeat' | 'view_close' }>;
+
+function applyViewPlayer(state: GameManagerState, event: ViewEvent): GameManagerState {
   const prevMap = state.viewerMap ?? {};
   if (event.type === 'view_close') {
     const { [event.seat]: _removed, ...rest } = prevMap;
     return { ...state, viewerMap: Object.keys(rest).length > 0 ? rest : null };
   }
-  const targetIdx = event.playerIdx ?? -1;
+  const targetIdx = event.playerIdx;
   if (targetIdx < 0) {
     const { [event.seat]: _removed, ...rest } = prevMap;
     return { ...state, viewerMap: Object.keys(rest).length > 0 ? rest : null };
   }
-  const viewer = state.players.find(p => p.position === event.seat);
+  const viewer = state.players.find((p) => p.position === event.seat);
   const existing = prevMap[event.seat];
   // Preserve firstSeenTs on heartbeat or if reconnecting quickly (within 20s)
-  const isReconnect = existing && (Date.now() - existing.ts < 20000);
-  const firstSeenTs = (event.type === 'view_heartbeat' || isReconnect)
-    ? (existing?.firstSeenTs ?? event.ts)
+  const isReconnect = existing && Date.now() - existing.ts < 20000;
+  const firstSeenTs = event.type === 'view_heartbeat' || isReconnect
+    ? existing?.firstSeenTs ?? event.ts
     : event.ts;
   return {
     ...state,
-    viewerMap: { ...prevMap, [event.seat]: { targetIdx, viewerName: viewer?.playerName ?? event.seat, ts: event.ts, firstSeenTs } },
+    viewerMap: {
+      ...prevMap,
+      [event.seat]: { targetIdx, viewerName: viewer?.playerName ?? event.seat, ts: event.ts, firstSeenTs },
+    },
   };
 }
 
@@ -299,42 +339,45 @@ function applyViewPlayer(state: GameManagerState, event: LiveGameEvent): GameMan
 export function applyEvent(state: GameManagerState, event: LiveGameEvent): GameManagerState {
   switch (event.type) {
     case 'life_change':
-      return applyLifeChange(state, event.playerIdx!, event.delta!);
+      return applyLifeChange(state, event.playerIdx, event.delta);
     case 'poison_change':
-      return applyPoisonChange(state, event.playerIdx!, event.delta!);
+      return applyPoisonChange(state, event.playerIdx, event.delta);
     case 'commander_tax_change':
-      return applyCommanderTaxChange(state, event.playerIdx!, event.delta!);
+      return applyCommanderTaxChange(state, event.playerIdx, event.delta);
     case 'energy_change':
-      return applyEnergyChange(state, event.playerIdx!, event.delta!);
+      return applyEnergyChange(state, event.playerIdx, event.delta);
     case 'experience_change':
-      return applyExperienceChange(state, event.playerIdx!, event.delta!);
+      return applyExperienceChange(state, event.playerIdx, event.delta);
     case 'toggle_monarch':
-      return applyToggleMonarch(state, event.playerIdx!);
+      return applyToggleMonarch(state, event.playerIdx);
     case 'toggle_initiative':
-      return applyToggleInitiative(state, event.playerIdx!);
+      return applyToggleInitiative(state, event.playerIdx);
     case 'toggle_citys_blessing':
-      return applyToggleCitysBlessing(state, event.playerIdx!);
+      return applyToggleCitysBlessing(state, event.playerIdx);
     case 'commander_damage_change':
       return applyCommanderDamageChange(
-        state, event.targetIdx!, event.sourceIdx!, event.isPartner!, event.delta!
+        state, event.targetIdx, event.sourceIdx, event.isPartner, event.delta,
       );
     case 'eliminate':
-      return applyEliminate(state, event.playerIdx!);
+      return applyEliminate(state, event.playerIdx);
     case 'undo_eliminate':
-      return applyUndoEliminate(state, event.playerIdx!);
+      return applyUndoEliminate(state, event.playerIdx);
     case 'pass_turn':
       return applyPassTurn(state);
     case 'checkin':
       return applyCheckin(state, event.seat, event.ts);
     case 'life_kill_attr':
-      return applyLifeKillAttr(state, event.playerIdx!, event.sourcePlayerIdx ?? null);
+      return applyLifeKillAttr(state, event.playerIdx, event.sourcePlayerIdx);
     case 'poison_kill_attr':
-      return applyPoisonKillAttr(state, event.playerIdx!, event.sourcePlayerIdx ?? null);
+      return applyPoisonKillAttr(state, event.playerIdx, event.sourcePlayerIdx);
     case 'view_open':
     case 'view_heartbeat':
     case 'view_close':
       return applyViewPlayer(state, event);
-    default:
+    default: {
+      const _exhaustive: never = event;
+      void _exhaustive;
       return state;
+    }
   }
 }

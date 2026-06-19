@@ -14,7 +14,6 @@ import { BracketMismatchBanner } from '@/components/BracketMismatchBanner';
 import type { Player, DeckWithPlayer, PlayerSetup } from '@/lib/types';
 import type { GameManagerState, PlayerState } from '../types';
 import {
-  CLOCKWISE,
   applyCommanderDamageChange,
   applyCommanderTaxChange,
   applyEliminate,
@@ -22,8 +21,10 @@ import {
   applyExperienceChange,
   applyLifeChange,
   applyLifeKillAttr,
+  applyPassTurn,
   applyPoisonChange,
   applyPoisonKillAttr,
+  applyPrevTurn,
   applyToggleCitysBlessing,
   applyToggleInitiative,
   applyToggleMonarch,
@@ -85,7 +86,6 @@ export function GameBoard({
   const [monarchTransfer, setMonarchTransfer] = useState<{ fromPos: string | null; toPos: string | null }>({ fromPos: null, toPos: null });
   const [highlightMode, setHighlightMode] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [posOverrides, setPosOverrides] = useState<Record<number, PlayerState['position']>>({});
   const [viewingPlayerIdx, _setViewingPlayerIdxRaw] = useState<number | null>(null);
   const settingsLoadedRef = useRef(false);
 
@@ -383,41 +383,15 @@ export function GameBoard({
   };
 
   const handleNextTurn = () => {
-    const currentPos = players[currentPlayerIdx].position;
-    const curCW = CLOCKWISE.indexOf(currentPos);
-    const firstCW = CLOCKWISE.indexOf(players[firstPlayerIdx].position);
-    let nextPlayerIdx = -1;
-    let stepsToNext = 0;
-    for (let step = 1; step <= 4; step++) {
-      const nextPos = CLOCKWISE[(curCW + step) % 4];
-      const idx = players.findIndex(p => p.position === nextPos && !p.isEliminated);
-      if (idx !== -1) { nextPlayerIdx = idx; stepsToNext = step; break; }
-    }
-    if (nextPlayerIdx === -1) return;
-    // Increment turn when we cross through the first player's position (even if they're eliminated)
-    const distToFirst = (firstCW - curCW + 4) % 4;
-    const newTurnNumber = distToFirst >= 1 && distToFirst <= stepsToNext ? turnNumber + 1 : turnNumber;
-    updateState({ currentPlayerIdx: nextPlayerIdx, turnNumber: newTurnNumber, turnStartTime: Date.now() });
+    const next = applyPassTurn(state);
+    if (next === state) return;
+    updateState({ currentPlayerIdx: next.currentPlayerIdx, turnNumber: next.turnNumber, turnStartTime: next.turnStartTime });
   };
 
   const handlePrevTurn = () => {
-    const currentPos = players[currentPlayerIdx].position;
-    const curCW = CLOCKWISE.indexOf(currentPos);
-    const firstCW = CLOCKWISE.indexOf(players[firstPlayerIdx].position);
-    let prevPlayerIdx = -1;
-    let stepsBack = 0;
-    for (let step = 1; step <= 4; step++) {
-      const prevPos = CLOCKWISE[(curCW - step + 4) % 4];
-      const idx = players.findIndex(p => p.position === prevPos && !p.isEliminated);
-      if (idx !== -1) { prevPlayerIdx = idx; stepsBack = step; break; }
-    }
-    if (prevPlayerIdx === -1) return;
-    // Decrement turn when we depart through the first player's position going backward (including when current IS first player)
-    const distBackToFirst = (curCW - firstCW + 4) % 4;
-    const wouldDecrement = distBackToFirst < stepsBack;
-    if (wouldDecrement && turnNumber === 1) return;
-    const newTurnNumber = wouldDecrement ? Math.max(1, turnNumber - 1) : turnNumber;
-    updateState({ currentPlayerIdx: prevPlayerIdx, turnNumber: newTurnNumber, turnStartTime: Date.now() });
+    const next = applyPrevTurn(state);
+    if (next === state) return;
+    updateState({ currentPlayerIdx: next.currentPlayerIdx, turnNumber: next.turnNumber, turnStartTime: next.turnStartTime });
   };
 
   const getRotation = (position: PlayerState['position']) => {
@@ -427,14 +401,6 @@ export function GameBoard({
       case 'left': return 'rotate(90deg)';
       case 'right': return 'rotate(-90deg)';
     }
-  };
-
-  const getEffectivePos = (idx: number): PlayerState['position'] => posOverrides[idx] ?? players[idx].position;
-
-  const handleSwitchToPlayer = (fromIdx: number, toIdx: number) => {
-    const fromPos = getEffectivePos(fromIdx);
-    const toPos = getEffectivePos(toIdx);
-    setPosOverrides(prev => ({ ...prev, [fromIdx]: toPos, [toIdx]: fromPos }));
   };
 
   // Grid placement: col/row (1-indexed)
@@ -490,9 +456,6 @@ export function GameBoard({
           const placement = getGridPlacement(player.position);
           const rotation = getRotation(player.position);
           const isVertical = player.position === 'left' || player.position === 'right';
-
-          if (player.position === 'right' && playerCount <= 3) return null;
-          if (player.position === 'left' && playerCount <= 2) return null;
 
           return (
             <Box key={idx} sx={{ ...placement, position: 'relative', overflow: 'hidden' }}>
@@ -619,13 +582,12 @@ export function GameBoard({
       }}
     >
       {players.map((player, idx) => {
-        const effectivePosition = getEffectivePos(idx);
-        const placement = getGridPlacement(effectivePosition);
-        const rotation = getRotation(effectivePosition);
-        const isVertical = effectivePosition === 'left' || effectivePosition === 'right';
-
-        if (effectivePosition === 'right' && playerCount <= 3) return null;
-        if (effectivePosition === 'left' && playerCount <= 2) return null;
+        // POSITIONS_BY_COUNT (page.tsx) restricts the players array to the
+        // active seats for the chosen count, so player.position is always one
+        // we render. No need for a "skip right at 3 players" guard.
+        const placement = getGridPlacement(player.position);
+        const rotation = getRotation(player.position);
+        const isVertical = player.position === 'left' || player.position === 'right';
 
         return (
           <Box

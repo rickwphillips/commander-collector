@@ -6,7 +6,7 @@ import { Box, Typography, TextField, Button, Stack, CircularProgress, IconButton
 import CloseIcon from '@mui/icons-material/Close';
 import { PlayerPanel } from '../components/PlayerPanel';
 import { api } from '@/lib/api';
-import type { GameManagerState, PlayerState, LiveGameEvent } from '@/lib/types';
+import type { GameManagerState, PlayerState, LiveGameEvent, DistributiveOmit } from '@/lib/types';
 import { applyEvent } from '../remoteTransforms';
 import { useThemeMode } from '@/components/ThemeProvider';
 
@@ -203,8 +203,10 @@ function RemotePageInner() {
   // Applies the event optimistically to local state for instant UX, then
   // posts it to the DB event queue. The host picks it up on its next 1s poll,
   // applies it to the authoritative state, and writes the merged result.
-  const sendEvent = useCallback((eventData: Omit<LiveGameEvent, 'seat' | 'ts'>) => {
-    const event: LiveGameEvent = { ...eventData, seat, ts: Date.now() };
+  const sendEvent = useCallback((eventData: DistributiveOmit<LiveGameEvent, 'seat' | 'ts'>) => {
+    // DistributiveOmit preserves each union member's discriminant fields; a
+    // plain Omit would collapse them and lose type narrowing at call sites.
+    const event = { ...eventData, seat, ts: Date.now() } as LiveGameEvent;
     // Optimistic update — apply instantly so the panel feels responsive.
     setState((prev) => prev ? applyEvent(prev, event) : prev);
     // Start grace period so the poll doesn't overwrite optimistic state

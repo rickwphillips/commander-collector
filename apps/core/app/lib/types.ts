@@ -1,4 +1,5 @@
 // Canonical card type and API adapters (Phase 0 unified card workflow)
+import type { Card } from './cards/types';
 export type { Card } from './cards/types';
 export { toApiCard, fromApiCard } from './cards/types';
 
@@ -44,25 +45,6 @@ export interface ScryfallCachedCard {
   cached_at?: string;
 }
 
-// Deck card list entry
-/** @deprecated Use Card from './cards/types' instead. */
-export interface DeckCard {
-  id?: string;
-  deck_id: string;
-  scryfall_id: string | null;
-  card_name: string;
-  quantity: number;
-  is_commander: number; // 0 or 1
-  is_proxy: number;     // 0 or 1
-  // Joined from scryfall_card_cache
-  image_uri?: string | null;
-  back_image_uri?: string | null;
-  colors?: string;
-  color_identity?: string;
-  type_line?: string | null;
-  mana_cost?: string | null;
-}
-
 export interface CreateDeckCardInput {
   card_name: string;
   scryfall_id?: string | null;
@@ -95,24 +77,7 @@ export interface CardList {
 }
 
 export interface CardListDetail extends CardList {
-  cards: ListCard[];
-}
-
-/** @deprecated Use Card from './cards/types' instead. */
-export interface ListCard {
-  id?: string;
-  list_id: string;
-  scryfall_id: string | null;
-  card_name: string;
-  quantity: number;
-  is_commander: number;
-  is_proxy: number;
-  image_uri?: string | null;
-  back_image_uri?: string | null;
-  colors?: string;
-  color_identity?: string;
-  type_line?: string | null;
-  mana_cost?: string | null;
+  cards: Card[];
 }
 
 export interface CardPrint {
@@ -527,37 +492,60 @@ export interface LiveGameSession {
 // Typed events sent by remote panels instead of full state writes.
 // The host consumes these from the event queue, applies them to its own
 // authoritative state, and writes the merged result back to the DB.
-export type LiveGameEventType =
-  | 'life_change'
-  | 'poison_change'
-  | 'commander_tax_change'
-  | 'energy_change'
-  | 'experience_change'
-  | 'toggle_monarch'
-  | 'toggle_initiative'
-  | 'toggle_citys_blessing'
-  | 'commander_damage_change'
-  | 'eliminate'
-  | 'undo_eliminate'
-  | 'pass_turn'
-  | 'checkin'
-  | 'life_kill_attr'
-  | 'poison_kill_attr'
-  | 'view_open'       // remote panel opened another player's panel overlay
-  | 'view_heartbeat'  // remote panel is still viewing (sent every ~5s); -1 = stopped
-  | 'view_close';     // remote panel closed the overlay
-
-export interface LiveGameEvent {
-  type: LiveGameEventType;
-  playerIdx?: number;         // target player index (most events)
-  targetIdx?: number;         // commander_damage_change: player receiving damage
-  sourceIdx?: number;         // commander_damage_change: player dealing damage
-  isPartner?: boolean;        // commander_damage_change: is partner commander
-  delta?: number;             // numeric change (life_change, poison_change, etc.)
-  sourcePlayerIdx?: number | null; // life_kill_attr / poison_kill_attr: who caused the kill (null = skip)
-  seat: string;               // which seat sent this event
-  ts: number;                 // client timestamp ms (for ordering / expiry)
+//
+// Modeled as a discriminated union: each event type carries exactly the
+// fields it needs, eliminating the prior pattern of `field?: T` + runtime
+// non-null assertions in the dispatcher.
+interface LiveGameEventBase {
+  seat: string;     // which seat sent this event
+  ts: number;       // client timestamp ms (for ordering / expiry)
 }
+
+export type LiveGameEvent =
+  | (LiveGameEventBase & { type: 'life_change'; playerIdx: number; delta: number })
+  | (LiveGameEventBase & { type: 'poison_change'; playerIdx: number; delta: number })
+  | (LiveGameEventBase & { type: 'commander_tax_change'; playerIdx: number; delta: number })
+  | (LiveGameEventBase & { type: 'energy_change'; playerIdx: number; delta: number })
+  | (LiveGameEventBase & { type: 'experience_change'; playerIdx: number; delta: number })
+  | (LiveGameEventBase & { type: 'toggle_monarch'; playerIdx: number })
+  | (LiveGameEventBase & { type: 'toggle_initiative'; playerIdx: number })
+  | (LiveGameEventBase & { type: 'toggle_citys_blessing'; playerIdx: number })
+  | (LiveGameEventBase & {
+      type: 'commander_damage_change';
+      targetIdx: number;
+      sourceIdx: number;
+      isPartner: boolean;
+      delta: number;
+    })
+  | (LiveGameEventBase & { type: 'eliminate'; playerIdx: number })
+  | (LiveGameEventBase & { type: 'undo_eliminate'; playerIdx: number })
+  | (LiveGameEventBase & { type: 'pass_turn' })
+  | (LiveGameEventBase & { type: 'checkin' })
+  | (LiveGameEventBase & {
+      type: 'life_kill_attr';
+      playerIdx: number;
+      sourcePlayerIdx: number | null;
+    })
+  | (LiveGameEventBase & {
+      type: 'poison_kill_attr';
+      playerIdx: number;
+      sourcePlayerIdx: number | null;
+    })
+  | (LiveGameEventBase & { type: 'view_open'; playerIdx: number })
+  | (LiveGameEventBase & { type: 'view_heartbeat'; playerIdx: number })
+  | (LiveGameEventBase & { type: 'view_close' });
+
+/** All possible `type` values (back-compat alias derived from the union). */
+export type LiveGameEventType = LiveGameEvent['type'];
+
+/**
+ * `Omit` distributed across a union. Plain `Omit<U, K>` collapses members so
+ * the discriminant fields would be lost. Use this for shapes like "what the
+ * remote panel constructs before stamping seat+ts on it."
+ */
+export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown
+  ? Omit<T, K>
+  : never;
 
 export interface LiveGameSeatResponse {
   seat: string;                  // 'bottom' | 'top' | 'left' | 'right'

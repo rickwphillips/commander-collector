@@ -541,8 +541,10 @@ describe('applyEvent', () => {
 
   it('returns state unchanged for unknown event type', () => {
     const state = makeState();
-    // Cast to bypass TypeScript — simulates a future/unknown event type arriving
-    const result = applyEvent(state, { type: 'unknown_future_event' as LiveGameEvent['type'], seat: 'top', ts: 0 });
+    // Cast through unknown to bypass the now-strict union — simulates a
+    // future/unknown event type arriving from the wire that didn't exist when
+    // this client was deployed.
+    const result = applyEvent(state, { type: 'unknown_future_event', seat: 'top', ts: 0 } as unknown as LiveGameEvent);
     expect(result).toBe(state);
   });
 

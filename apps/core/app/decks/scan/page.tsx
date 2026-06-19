@@ -98,7 +98,7 @@ function ScanPageInner() {
       } else if (dest.kind === 'append-to-list') {
         // Load current list to obtain OCC version — PHP response includes `version`
         const existing = await api.getList(dest.listId) as import('@/lib/types').CardListDetail & { version?: number };
-        const merged = [...(existing.cards as unknown as Card[]), ...buffer].map((c) => ({
+        const merged = [...existing.cards, ...buffer].map((c) => ({
           card_name: c.card_name, scryfall_id: c.scryfall_id,
           quantity: c.quantity, is_commander: c.is_commander, is_proxy: c.is_proxy,
         }));
