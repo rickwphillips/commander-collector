@@ -9,6 +9,12 @@ import { useCitysBlessingExit } from '@/game-manager/hooks/useCitysBlessingExit'
 import { useLongPress } from '@/game-manager/hooks/useLongPress';
 import { useLocalStorageBool } from '@/game-manager/hooks/useLocalStorageBool';
 import { keyframes } from '@emotion/react';
+import {
+  useXpKeyframes,
+  useEnergyKeyframes,
+  useDamageFlashKeyframe,
+  usePoisonBoilKeyframe,
+} from './PlayerCard.keyframes';
 import { Box, CircularProgress, Stack, Typography, IconButton, Button, TextField, Tooltip, SvgIcon } from '@mui/material';
 import { getCardImageByName } from '@commander/shared/lib/cardImageCache';
 import { ControlFocusModal } from './ControlFocusModal';
@@ -702,86 +708,32 @@ export function PlayerPanel({
   const xpGlow = xpGlowIntensity > 0
     ? `0 0 ${4 + xpGlowIntensity * 12}px rgba(218,165,32,${(0.5 + xpGlowIntensity * 0.5).toFixed(2)}), 0 0 ${10 + xpGlowIntensity * 24}px rgba(218,165,32,${(0.2 + xpGlowIntensity * 0.3).toFixed(2)})`
     : undefined;
-  const xpShimmerAnim = useMemo(() => player.experience > 0 ? keyframes`
-    0%,100% { text-shadow: ${xpGlow}; filter: brightness(1); }
-    45%, 55% { text-shadow: 0 0 ${6 + xpGlowIntensity * 16}px rgba(255,223,0,0.95), 0 0 ${18 + xpGlowIntensity * 28}px rgba(218,165,32,0.7); filter: brightness(1.5); }
-  ` : null, [player.experience]);
-  const xpFlashAnim = useMemo(() => keyframes`
-    0%   { box-shadow: 0 2px 8px rgba(218,165,32,0.5); transform: rotate(45deg) scale(1); }
-    25%  { box-shadow: 0 2px 28px rgba(255,215,0,1), 0 0 48px rgba(255,215,0,0.5); transform: rotate(45deg) scale(1.3); }
-    100% { box-shadow: 0 2px 8px rgba(218,165,32,0.5); transform: rotate(45deg) scale(1); }
-  `, []);
-  const xpRippleAnim = useMemo(() => keyframes`
-    0%   { transform: translate(-50%,-50%) rotate(45deg) scale(0.4); opacity: 0.9; }
-    100% { transform: translate(-50%,-50%) rotate(45deg) scale(4);   opacity: 0; }
-  `, []);
-  const xpLevelUpAnim = useMemo(() => keyframes`
-    0%   { transform: scale(1); }
-    25%  { transform: scale(1.3); }
-    60%  { transform: scale(0.93); }
-    100% { transform: scale(1); }
-  `, []);
-  const xpShimmerSweepAnim = useMemo(() => player.experience > 0 ? keyframes`
-    0%   { transform: translateX(-120%); opacity: 0; }
-    6%   { transform: translateX(-120%); opacity: 0; }
-    7%   { opacity: 0.8; }
-    17%  { transform: translateX(180%); opacity: 0.8; }
-    21%  { transform: translateX(300%); opacity: 0; }
-    22%  { transform: translateX(-120%); opacity: 0; }
-    57%  { transform: translateX(-120%); opacity: 0; }
-    58%  { opacity: 0.5; }
-    65%  { transform: translateX(160%); opacity: 0.5; }
-    69%  { transform: translateX(300%); opacity: 0; }
-    70%  { transform: translateX(-120%); opacity: 0; }
-    100% { transform: translateX(-120%); opacity: 0; }
-  ` : null, [player.experience]);
-  const xpEmberAnim = useMemo(() => player.experience > 0 ? keyframes`
-    0%   { transform: translateY(0) scale(1); opacity: 0.9; }
-    100% { transform: translateY(-26px) scale(0.2); opacity: 0; }
-  ` : null, [player.experience]);
-  const xpRuneGlowAnim = useMemo(() => player.experience > 0 ? keyframes`
-    0%, 100% { filter: drop-shadow(0 0 2px rgba(218,165,32,0.35)); }
-    50%       { filter: drop-shadow(0 0 9px rgba(255,215,0,0.85)); }
-  ` : null, [player.experience]);
+  const {
+    xpShimmerAnim,
+    xpFlashAnim,
+    xpRippleAnim,
+    xpLevelUpAnim,
+    xpShimmerSweepAnim,
+    xpEmberAnim,
+    xpRuneGlowAnim,
+  } = useXpKeyframes(player.experience, xpGlow, xpGlowIntensity);
 
   const energyStaticShadow = player.energy > 5
     ? `0 0 18px rgba(30,100,210,0.55), 0 0 36px rgba(20,70,180,0.3)`
     : undefined;
-  const energyPulseAnim = useMemo(() => player.energy > 5 ? keyframes`
-    0%   { text-shadow: ${energyStaticShadow}, 0 0 4px rgba(80,200,255,0.95), 0 0 8px rgba(80,200,255,0.8); }
-    100% { text-shadow: ${energyStaticShadow}, 0 0 ${30 + player.energy * 5}px rgba(80,200,255,0), 0 0 ${60 + player.energy * 10}px rgba(80,200,255,0); }
-  ` : null, [player.energy]);
   const sizzleAmp = Math.min(player.energy - 5, 10) * 0.2;
-  const energySizzleAnim = useMemo(() => player.energy > 5 ? keyframes`
-    0%   { transform: translate(0, 0); }
-    10%  { transform: translate(${-sizzleAmp}px, ${sizzleAmp * 0.5}px); }
-    20%  { transform: translate(${sizzleAmp}px, ${-sizzleAmp}px); }
-    30%  { transform: translate(${-sizzleAmp * 0.5}px, ${sizzleAmp}px); }
-    40%  { transform: translate(${sizzleAmp}px, ${sizzleAmp * 0.5}px); }
-    50%  { transform: translate(${-sizzleAmp}px, ${-sizzleAmp * 0.5}px); }
-    60%  { transform: translate(${sizzleAmp * 0.5}px, ${sizzleAmp}px); }
-    70%  { transform: translate(${-sizzleAmp}px, ${sizzleAmp * 0.5}px); }
-    80%  { transform: translate(${sizzleAmp}px, ${-sizzleAmp * 0.5}px); }
-    90%  { transform: translate(${-sizzleAmp * 0.5}px, ${-sizzleAmp}px); }
-    100% { transform: translate(0, 0); }
-  ` : null, [player.energy]);
+  const { energyPulseAnim, energySizzleAnim } = useEnergyKeyframes(
+    player.energy,
+    energyStaticShadow,
+    sizzleAmp,
+  );
 
-  const damageFlashAnim = useMemo(() => keyframes`
-    0%   { text-shadow: 0 0 0px rgba(180,0,0,0); filter: brightness(1); }
-    20%  { text-shadow: 0 0 32px rgba(220,0,0,1), 0 0 64px rgba(180,0,0,0.7); filter: brightness(1.8); }
-    100% { text-shadow: 0 0 0px rgba(180,0,0,0); filter: brightness(1); }
-  `, []);
+  const damageFlashAnim = useDamageFlashKeyframe();
 
   // Poison boil — life total drifts like it's floating in churning water (starts at 8 poison)
   const poisonBoilAmp = player.poison >= 10 ? 5 : player.poison === 9 ? 3.8 : player.poison === 8 ? 1.5 : 0;
   const poisonBoilSkew = Math.min(poisonBoilAmp * 0.6, 2.5);
-  const poisonBoilAnim = useMemo(() => player.poison >= 8 ? keyframes`
-    0%   { transform: translate(0, 0) skew(0deg, 0deg); }
-    20%  { transform: translate(${poisonBoilAmp * 0.5}px, ${-poisonBoilAmp}px) skew(${poisonBoilSkew}deg, ${-poisonBoilSkew * 0.4}deg); }
-    45%  { transform: translate(${-poisonBoilAmp}px, ${poisonBoilAmp * 0.6}px) skew(${-poisonBoilSkew * 0.7}deg, ${poisonBoilSkew * 0.5}deg); }
-    70%  { transform: translate(${poisonBoilAmp * 0.7}px, ${poisonBoilAmp * 0.4}px) skew(${poisonBoilSkew * 0.5}deg, ${-poisonBoilSkew * 0.3}deg); }
-    100% { transform: translate(0, 0) skew(0deg, 0deg); }
-  ` : null, [player.poison, poisonBoilAmp, poisonBoilSkew]);
+  const poisonBoilAnim = usePoisonBoilKeyframe(player.poison, poisonBoilAmp, poisonBoilSkew);
   const poisonBoilDuration = player.poison >= 10 ? 2.0 : player.poison >= 9 ? 2.5 : 5.0;
 
   const lostRatio = player.life <= 0 ? 1 : Math.max(0, Math.min((startingLife - player.life) / startingLife, 1));
