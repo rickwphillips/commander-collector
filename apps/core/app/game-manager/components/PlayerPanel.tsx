@@ -7,6 +7,7 @@ import { useDamageFlash } from '@/game-manager/hooks/useDamageFlash';
 import { useMonarchTransition } from '@/game-manager/hooks/useMonarchTransition';
 import { useCitysBlessingExit } from '@/game-manager/hooks/useCitysBlessingExit';
 import { useLongPress } from '@/game-manager/hooks/useLongPress';
+import { useLocalStorageBool } from '@/game-manager/hooks/useLocalStorageBool';
 import { keyframes } from '@emotion/react';
 import { Box, CircularProgress, Stack, Typography, IconButton, Button, TextField, Tooltip, SvgIcon } from '@mui/material';
 import { getCardImageByName } from '@commander/shared/lib/cardImageCache';
@@ -559,15 +560,10 @@ export function PlayerPanel({
     const id = setTimeout(() => document.addEventListener('mousedown', close), 0);
     return () => { clearTimeout(id); document.removeEventListener('mousedown', close); };
   }, [rulesOpenLabel]);
-  const cmdDmgKey = `cmdDmgShowPlayer:${player.playerId}`;
-  const [cmdDmgShowPlayer, setCmdDmgShowPlayer] = useState(() => {
-    try { return localStorage.getItem(cmdDmgKey) === '1'; } catch { return false; }
-  });
-  const toggleCmdDmgShowPlayer = () => setCmdDmgShowPlayer(p => {
-    const next = !p;
-    try { localStorage.setItem(cmdDmgKey, next ? '1' : '0'); } catch {}
-    return next;
-  });
+  const [cmdDmgShowPlayer, setCmdDmgShowPlayer] = useLocalStorageBool(
+    `cmdDmgShowPlayer:${player.playerId}`,
+  );
+  const toggleCmdDmgShowPlayer = () => setCmdDmgShowPlayer();
   const { cityBlessingVisible, cityBlessingExiting } = useCitysBlessingExit(
     player.hasCitysBlessing,
     playCitysBlessing,
