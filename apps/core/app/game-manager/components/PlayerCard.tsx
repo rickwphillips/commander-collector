@@ -3,6 +3,7 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { keyframes } from '@emotion/react';
 import { Box, Button, CircularProgress, IconButton, Stack, SvgIcon, TextField, Tooltip, Typography } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import ChatIcon from '@mui/icons-material/Chat';
@@ -11,6 +12,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import ElimIcon from '@mui/icons-material/PersonOff';
 import QrCodeIcon from '@mui/icons-material/QrCode';
+import SmartphoneIcon from '@mui/icons-material/Smartphone';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
@@ -18,6 +20,9 @@ import { QRCodeSVG } from 'qrcode.react';
 import { getCardImageByName } from '@commander/shared/lib/cardImageCache';
 import { ASSET_BASE } from '@/lib/api';
 import { ControlFocusModal } from './ControlFocusModal';
+import { useXpKeyframes } from './PlayerCard.keyframes';
+
+const XP_ICON_SRC = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRPxc2Yz21vbnc5VP3Muxnx5VtQGAynItuNWg&s';
 
 // Local glyphs duplicated from PlayerPanel. Phase 3 will fold both into a
 // shared icons module along with the keyframes.
@@ -164,11 +169,13 @@ export interface ViewerProps {
 }
 
 // ─── Long-press hook surfaces (handlers + render key) ──────────────────────
+// Signatures mirror `useLongPress` exactly so consumers can pass the bundle
+// straight through without adapter shims.
 export interface LongPressHandlers {
-  lpKey: number;
+  lpKey: string | null;
   startLongPress: (key: string, onTrigger: () => void) => void;
   cancelLongPress: () => void;
-  guardClick: (key: string, fn: () => void) => () => void;
+  guardClick: (cb: () => void) => () => void;
 }
 
 // ─── Threat-source derivation (computed in orchestrator from cmd damage) ───
@@ -306,14 +313,18 @@ function arePlayerCardPropsEqual(prev: PlayerCardProps, next: PlayerCardProps): 
 
 function PlayerCardImpl(props: PlayerCardProps) {
   const {
-    viewer, sizes, position, player, playerIdx, allPlayers, commanderDamage, computedLifeColor,
+    viewer, sizes, position, timer, animations, longPress,
+    player, playerIdx, allPlayers, commanderDamage, computedLifeColor,
+    isCurrentPlayer, highlightMode,
     seatCode, remoteConnected, remoteMode, soundEnabled, themeMode,
     lifeKillOpponents, onLifeKillSelect, poisonKillOpponents, onPoisonKillSelect,
     onLifeChange, onPoisonChange, onEnergyChange, onExperienceChange, onCommanderTaxChange,
     handleCmdDmgChange,
     onToggleMonarch, onToggleInitiative, onToggleCitysBlessing,
-    onEliminate, onUndoEliminate, onToggleSound, onToggleTheme, onOpenChat,
+    onEliminate, onUndoEliminate, onPassTurn,
+    onToggleSound, onToggleTheme, onOpenChat,
   } = props;
+  const { lpKey, startLongPress, cancelLongPress, guardClick } = longPress;
   const isPoisoned = player.poison >= 10;
 
   // ─── Card-local UI state ────────────────────────────────────────────────
@@ -333,9 +344,6 @@ function PlayerCardImpl(props: PlayerCardProps) {
     return () => { clearTimeout(id); document.removeEventListener('mousedown', close); };
   }, [rulesOpenLabel]);
 
-  // setStateMenuOpen(true) is invoked by the header submenu trigger landing
-  // in a later commit; suppress unused-var until then.
-  void setStateMenuOpen;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [openSnapshotKey, setOpenSnapshotKey] = useState<string | null>(null);
   const [focusedControl, setFocusedControl] = useState<FocusedControl>(null);
@@ -347,10 +355,6 @@ function PlayerCardImpl(props: PlayerCardProps) {
   const [cmdPreviewZoom, setCmdPreviewZoom] = useState(1);
   const [cmdPreviewBase, setCmdPreviewBase] = useState<{ w: number; h: number } | null>(null);
   const cmdScrollRef = useRef<HTMLDivElement>(null);
-
-  // setCmdPreviewName is invoked by the header art click and CMD-damage block
-  // landing in later commits. Suppress unused-var until then.
-  void setCmdPreviewName;
 
   // Resolve preview URL when name changes; reset zoom/base.
   // All inputs/outputs are card-local; no orchestrator hook reads cmdPreviewUrl.
@@ -377,9 +381,28 @@ function PlayerCardImpl(props: PlayerCardProps) {
   // showCrown / monarchAnimStr were lifted as props in Phase 1; the card owns
   // them now because they're pure functions of `monarchAnim`.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { monarchAnim } = props.animations;
+  const { monarchAnim } = animations;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const showCrown = props.player.isMonarch || monarchAnim === 'exiting';
+  const showCrown = player.isMonarch || monarchAnim === 'exiting';
+
+  // ─── XP keyframes (pure functions of player.experience) ─────────────────
+  // These are derived from player.experience only — calling the shared hook
+  // locally keeps invalidation tight and avoids threading 7 keyframe objects
+  // through props.
+  const xpGlowIntensity = player.experience > 0 ? Math.min(player.experience / 10, 1) : 0;
+  const xpGlow = xpGlowIntensity > 0
+    ? `0 0 ${4 + xpGlowIntensity * 12}px rgba(218,165,32,${(0.5 + xpGlowIntensity * 0.5).toFixed(2)}), 0 0 ${10 + xpGlowIntensity * 24}px rgba(218,165,32,${(0.2 + xpGlowIntensity * 0.3).toFixed(2)})`
+    : undefined;
+  const {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    xpShimmerAnim,
+    xpFlashAnim,
+    xpRippleAnim,
+    xpLevelUpAnim,
+    xpShimmerSweepAnim,
+    xpEmberAnim,
+    xpRuneGlowAnim,
+  } = useXpKeyframes(player.experience, xpGlow, xpGlowIntensity);
   // monarchAnimStr is intentionally not derived here yet — it depends on the
   // crown keyframes which are migrated in Phase 3. The render block that needs
   // it will compute it locally when it lands.
@@ -391,6 +414,216 @@ function PlayerCardImpl(props: PlayerCardProps) {
   // parent to anchor against.
   return (
     <Box sx={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+      {/* ── Header ── */}
+      <Box
+        sx={{
+        px: 1, py: 0.5, flexShrink: 0, filter: 'none', position: 'relative', zIndex: 3, display: 'flex', alignItems: 'center',
+        background: isCurrentPlayer && highlightMode
+          ? `linear-gradient(90deg, ${timer.timerColorRgba(0.3)} 0%, ${timer.timerColorRgba(0.7)} 50%, ${timer.timerColorRgba(0.3)} 100%)`
+          : 'rgba(0,0,0,0.08)',
+        transition: 'background-color 0.3s ease',
+        ...(timer.isTimerExpired && highlightMode && {
+          animation: 'headerBlink 0.5s step-end infinite',
+          '@keyframes headerBlink': {
+            '0%, 100%': { background: '#e9353540' },
+            '50%': { background: 'rgba(0,0,0,0.08)' },
+          },
+        }),
+      }}>
+        {/* Left: commander art + tax */}
+        <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0, zIndex: 1 }}>
+          {player.commander.artCropUrl && (
+            <Box component="img" src={player.commander.artCropUrl} alt={player.commander.name}
+              onClick={(e) => { e.stopPropagation(); setCmdPreviewName(player.commander.name); }}
+              sx={{ height: sizes.artHeight, width: 'auto', borderRadius: 0.5, flexShrink: 0, cursor: 'zoom-in' }} />
+          )}
+          {player.commanderTax > 0 && (
+            <Tooltip title={`Tax: cast ${player.commanderTax}× (+${player.commanderTax * 2} generic mana)`} placement="bottom" arrow>
+              <Stack direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
+                <Typography sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary', lineHeight: 1, userSelect: 'none' }}>+</Typography>
+                <Box sx={{
+                  width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                  background: 'radial-gradient(circle at 38% 35%, #d0d0d0, #7a7a7a)',
+                  border: '1.5px solid #3a3a3a',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Typography sx={{ fontSize: 11, fontWeight: 800, color: '#111', lineHeight: 1, userSelect: 'none' }}>
+                    {player.commanderTax * 2}
+                  </Typography>
+                </Box>
+              </Stack>
+            </Tooltip>
+          )}
+          {player.experience > 0 && (
+            <Box sx={{
+              position: 'relative', flexShrink: 0, width: 34, height: 34,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              overflow: 'visible',
+              ...(xpRuneGlowAnim && { animation: `${xpRuneGlowAnim} 2.5s ease-in-out infinite${animations.xpFlashing ? `, ${xpLevelUpAnim} 0.7s ease-out` : ''}` }),
+            }}>
+              {/* Ember particles drifting upward */}
+              {xpEmberAnim && [0, 1, 2, 3].map((i) => (
+                <Box key={i} sx={{
+                  position: 'absolute',
+                  width: i % 2 === 0 ? 3 : 2, height: i % 2 === 0 ? 3 : 2,
+                  borderRadius: '50%',
+                  bgcolor: i % 2 === 0 ? '#FFD700' : '#FFA040',
+                  bottom: '55%',
+                  left: `${15 + i * 20}%`,
+                  pointerEvents: 'none',
+                  animation: `${xpEmberAnim} ${1.1 + i * 0.35}s ease-out ${i * 0.38}s infinite`,
+                }} />
+              ))}
+              {/* Diamond shape with shimmer sweep inside */}
+              <Box sx={{
+                position: 'absolute',
+                width: 26, height: 26,
+                transform: 'rotate(45deg)',
+                background: 'linear-gradient(135deg, #FFD700, #8B6914)',
+                border: '1.5px solid rgba(255,215,0,0.85)',
+                boxShadow: '0 2px 8px rgba(218,165,32,0.55)',
+                overflow: 'hidden',
+                ...(animations.xpFlashing && { animation: `${xpFlashAnim} 0.7s ease-out` }),
+              }}>
+                {xpShimmerSweepAnim && (
+                  <Box sx={{
+                    position: 'absolute', top: '-20%', left: 0,
+                    width: '28%', height: '140%',
+                    background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.72), transparent)',
+                    pointerEvents: 'none',
+                    animation: `${xpShimmerSweepAnim} 7.5s linear infinite`,
+                  }} />
+                )}
+              </Box>
+              {/* Ripple — also diamond */}
+              <Box key={animations.xpRippleKey} sx={{
+                position: 'absolute', top: '50%', left: '50%',
+                width: 26, height: 26,
+                border: '2px solid rgba(255,215,0,0.8)',
+                pointerEvents: 'none',
+                animation: `${xpRippleAnim} 0.7s ease-out forwards`,
+              }} />
+              {/* Text — unrotated, on top */}
+              <Stack direction="column" alignItems="center" spacing={0} sx={{ position: 'relative' }}>
+                <Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: 10, height: 10, objectFit: 'contain', mixBlendMode: 'multiply' }} />
+                <Typography sx={{ fontSize: 9, fontWeight: 900, color: '#111', lineHeight: 1, userSelect: 'none' }}>{player.experience}</Typography>
+              </Stack>
+            </Box>
+          )}
+          {/* Pass Turn */}
+          {isCurrentPlayer && onPassTurn && (
+            <Box
+              onClick={onPassTurn}
+              sx={{
+                px: 1.5, py: 0.5,
+                borderRadius: 1.5,
+                border: '2px solid',
+                borderColor: 'primary.main',
+                cursor: 'pointer',
+                userSelect: 'none',
+              }}
+            >
+              <Typography sx={{ fontSize: sizes.fsPassBtn, fontWeight: 700, color: 'primary.main', whiteSpace: 'nowrap', lineHeight: 1.4 }}>
+                PASS
+              </Typography>
+            </Box>
+          )}
+        </Stack>
+
+        {/* Center: absolutely positioned so it's always centered relative to the full header */}
+        <Box sx={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', width: 'max-content', maxWidth: 'calc(100% - 96px)', textAlign: 'center', pointerEvents: 'none' }}>
+          <Typography
+            noWrap
+            onClick={seatCode ? () => setQrOpen(true) : undefined}
+            sx={{ fontWeight: 700, fontSize: sizes.fsPlayerName, lineHeight: 1.2, pointerEvents: seatCode ? 'auto' : 'none', cursor: seatCode ? 'pointer' : 'default' }}
+          >
+            {player.playerName}
+          </Typography>
+          <Typography noWrap sx={{ fontSize: sizes.fsDeckName, lineHeight: 1.2, color: 'text.secondary', pointerEvents: 'none' }}>
+            {player.deckName} · {player.commander.name}{player.partner ? ` / ${player.partner.name}` : ''}
+          </Typography>
+        </Box>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: 'auto', zIndex: 1 }}>
+            {/* Being viewed indicator */}
+            {viewer.isBeingViewedByAnyone && (
+              <VisibilityIcon onClick={(e) => { e.stopPropagation(); viewer.onEyeIconClick(); }} sx={{ fontSize: sizes.fsHeaderIcon, color: 'primary.main', cursor: 'pointer', animation: 'eyePulse 1.5s ease-in-out infinite', '@keyframes eyePulse': { '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.4 } } }} />
+            )}
+            {/* Active game state indicators */}
+            <>
+              {player.isMonarch && (
+                <Tooltip open={rulesOpenLabel === 'h:Monarch'} onClose={() => setRulesOpenLabel(null)} title={<Typography sx={{ fontSize: 12, maxWidth: 240 }}>Draw a card at the beginning of your end step. Whenever a creature deals combat damage to you, its controller becomes the monarch.</Typography>} placement={position.ttHeaderPlacement} arrow disableHoverListener disableFocusListener disableTouchListener slotProps={position.ttHeaderSlotProps}>
+                  <CrownIcon
+                    onClick={guardClick(() => toggleRules('h:Monarch'))}
+                    onPointerDown={(e) => { e.stopPropagation(); startLongPress('off-monarch', () => onToggleMonarch(playerIdx)); }}
+                    onPointerUp={cancelLongPress}
+                    onPointerLeave={cancelLongPress}
+                    onPointerCancel={cancelLongPress}
+                    sx={{ fontSize: sizes.fsHeaderIcon, color: '#DAA520', cursor: 'pointer', animation: 'crownShimmer 2s ease-in-out infinite', '@keyframes crownShimmer': { '0%, 100%': { filter: 'drop-shadow(0 0 2px #DAA520) brightness(1)' }, '50%': { filter: 'drop-shadow(0 0 7px #FFD700) brightness(1.5)' } } }}
+                  />
+                </Tooltip>
+              )}
+              {!player.isMonarch && allPlayers.some(p => p.isMonarch) && (
+                <Tooltip open={rulesOpenLabel === 'h:Monarch'} onClose={() => setRulesOpenLabel(null)} title={<Typography sx={{ fontSize: 12, maxWidth: 240 }}>Draw a card at the beginning of your end step. Whenever a creature deals combat damage to you, its controller becomes the monarch.</Typography>} placement={position.ttHeaderPlacement} arrow disableHoverListener disableFocusListener disableTouchListener slotProps={position.ttHeaderSlotProps}>
+                  <CrownIcon
+                    onClick={guardClick(() => toggleRules('h:Monarch'))}
+                    onPointerDown={(e) => { e.stopPropagation(); startLongPress('take-monarch', () => onToggleMonarch(playerIdx)); }}
+                    onPointerUp={cancelLongPress}
+                    onPointerLeave={cancelLongPress}
+                    onPointerCancel={cancelLongPress}
+                    sx={{ fontSize: sizes.fsHeaderIcon, color: 'text.disabled', cursor: 'pointer', opacity: 0.4 }}
+                  />
+                </Tooltip>
+              )}
+              {player.hasInitiative && (
+                <Tooltip open={rulesOpenLabel === 'h:Initiative'} onClose={() => setRulesOpenLabel(null)} title={<Typography sx={{ fontSize: 12, maxWidth: 240 }}>When you take the initiative, venture into the Undercity. At the beginning of your upkeep, venture into the Undercity. Whenever a creature deals combat damage to you, its controller takes the initiative.</Typography>} placement={position.ttHeaderPlacement} arrow disableHoverListener disableFocusListener disableTouchListener slotProps={position.ttHeaderSlotProps}>
+                  <InitiativeIcon
+                    onClick={guardClick(() => toggleRules('h:Initiative'))}
+                    onPointerDown={(e) => { e.stopPropagation(); startLongPress('off-initiative', () => onToggleInitiative(playerIdx)); }}
+                    onPointerUp={cancelLongPress}
+                    onPointerLeave={cancelLongPress}
+                    onPointerCancel={cancelLongPress}
+                    sx={{ fontSize: sizes.fsHeaderIcon, color: '#4FC3F7', cursor: 'pointer' }}
+                  />
+                </Tooltip>
+              )}
+              {!player.hasInitiative && allPlayers.some(p => p.hasInitiative) && (
+                <Tooltip open={rulesOpenLabel === 'h:Initiative'} onClose={() => setRulesOpenLabel(null)} title={<Typography sx={{ fontSize: 12, maxWidth: 240 }}>When you take the initiative, venture into the Undercity. At the beginning of your upkeep, venture into the Undercity. Whenever a creature deals combat damage to you, its controller takes the initiative.</Typography>} placement={position.ttHeaderPlacement} arrow disableHoverListener disableFocusListener disableTouchListener slotProps={position.ttHeaderSlotProps}>
+                  <InitiativeIcon
+                    onClick={guardClick(() => toggleRules('h:Initiative'))}
+                    onPointerDown={(e) => { e.stopPropagation(); startLongPress('take-initiative', () => onToggleInitiative(playerIdx)); }}
+                    onPointerUp={cancelLongPress}
+                    onPointerLeave={cancelLongPress}
+                    onPointerCancel={cancelLongPress}
+                    sx={{ fontSize: sizes.fsHeaderIcon, color: 'text.disabled', cursor: 'pointer', opacity: 0.4 }}
+                  />
+                </Tooltip>
+              )}
+              {player.hasCitysBlessing && (
+                <Tooltip open={rulesOpenLabel === "h:City's Blessing"} onClose={() => setRulesOpenLabel(null)} title={<Typography sx={{ fontSize: 12, maxWidth: 240 }}>You have the city&apos;s blessing for the rest of the game. Gained when you control ten or more permanents — it persists even if that number later drops below ten.</Typography>} placement={position.ttHeaderPlacement} arrow disableHoverListener disableFocusListener disableTouchListener slotProps={position.ttHeaderSlotProps}>
+                  <CityIcon
+                    active
+                    onClick={guardClick(() => toggleRules("h:City's Blessing"))}
+                    onPointerDown={(e) => { e.stopPropagation(); startLongPress("off-citys-blessing", () => onToggleCitysBlessing(playerIdx)); }}
+                    onPointerUp={cancelLongPress}
+                    onPointerLeave={cancelLongPress}
+                    onPointerCancel={cancelLongPress}
+                    sx={{ fontSize: sizes.fsHeaderIcon, cursor: 'pointer' }}
+                  />
+                </Tooltip>
+              )}
+              {/* Remote connected indicator */}
+              {remoteConnected && (
+                <SmartphoneIcon sx={{ fontSize: sizes.fsSmallIcon, color: 'success.main', animation: 'remotePulse 2s ease-in-out infinite', '@keyframes remotePulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.4 } }, flexShrink: 0 }} />
+              )}
+              {/* Submenu trigger */}
+              <IconButton size="small" onClick={() => setStateMenuOpen(o => !o)} onPointerDown={(e) => e.stopPropagation()} sx={{ p: 0.5, color: stateMenuOpen ? 'primary.main' : 'text.secondary' }}>
+                <AddIcon sx={{ fontSize: sizes.fsMenuTrigger, transition: 'transform 0.2s ease', transform: stateMenuOpen ? 'rotate(45deg)' : 'none' }} />
+              </IconButton>
+            </>
+          </Stack>
+      </Box>
+
       {/* ── Faded background art ── */}
       {player.commander.artCropUrl && (
         <Box
