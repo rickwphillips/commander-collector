@@ -8,7 +8,9 @@ import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import ChatIcon from '@mui/icons-material/Chat';
 import InitiativeIcon from '@mui/icons-material/Castle';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CloseIcon from '@mui/icons-material/Close';
+import OpenInFullIcon from '@mui/icons-material/OpenInFull';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import ElimIcon from '@mui/icons-material/PersonOff';
 import QrCodeIcon from '@mui/icons-material/QrCode';
@@ -20,7 +22,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import { getCardImageByName } from '@commander/shared/lib/cardImageCache';
 import { ASSET_BASE } from '@/lib/api';
 import { ControlFocusModal } from './ControlFocusModal';
-import { useXpKeyframes } from './PlayerCard.keyframes';
+import { useXpKeyframes, useEnergyKeyframes, useDamageFlashKeyframe, usePoisonBoilKeyframe } from './PlayerCard.keyframes';
+import { useLocalStorageBool } from '@/game-manager/hooks/useLocalStorageBool';
 
 const XP_ICON_SRC = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRPxc2Yz21vbnc5VP3Muxnx5VtQGAynItuNWg&s';
 
@@ -51,6 +54,18 @@ import type { MonarchAnim } from '@/game-manager/hooks/useMonarchTransition';
 // ─── Local keyframes / constants used by migrated render blocks ────────────
 // Phase 3 will sweep cross-component keyframes into a shared module. For now
 // each block owns whatever it needs.
+const crownShimmerBig = keyframes`
+  0%, 100% { filter: drop-shadow(0 0 3px #DAA520) brightness(1); }
+  50%       { filter: drop-shadow(0 0 10px #FFD700) brightness(1.6); }
+`;
+const crownEnterFromTop = keyframes`
+  from { transform: translateY(-80px) rotate(-25deg); opacity: 0; }
+  to   { transform: translateY(0) rotate(-25deg); opacity: 1; }
+`;
+const crownExitToTop = keyframes`
+  from { transform: translateY(0) rotate(-25deg); opacity: 1; }
+  to   { transform: translateY(-80px) rotate(-25deg); opacity: 0; }
+`;
 const tearFall = keyframes`
   0%   { transform: translateY(-12px) translateX(0px) scaleY(1);    opacity: 0; }
   8%   { opacity: 0.85; }
@@ -322,7 +337,9 @@ function PlayerCardImpl(props: PlayerCardProps) {
     handleCmdDmgChange,
     onToggleMonarch, onToggleInitiative, onToggleCitysBlessing,
     onEliminate, onUndoEliminate, onPassTurn,
+    onSwitchToPlayer,
     onToggleSound, onToggleTheme, onOpenChat,
+    threatSource, crackAlpha,
   } = props;
   const { lpKey, startLongPress, cancelLongPress, guardClick } = longPress;
   const isPoisoned = player.poison >= 10;
@@ -344,12 +361,14 @@ function PlayerCardImpl(props: PlayerCardProps) {
     return () => { clearTimeout(id); document.removeEventListener('mousedown', close); };
   }, [rulesOpenLabel]);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [openSnapshotKey, setOpenSnapshotKey] = useState<string | null>(null);
   const [focusedControl, setFocusedControl] = useState<FocusedControl>(null);
   const [qrOpen, setQrOpen] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [countersOpen, setCountersOpen] = useState(true);
+  const [cmdDmgShowPlayer, setCmdDmgShowPlayer] = useLocalStorageBool(
+    `cmdDmgShowPlayer:${player.playerId}`,
+  );
+  const toggleCmdDmgShowPlayer = () => setCmdDmgShowPlayer();
   const [cmdPreviewName, setCmdPreviewName] = useState<string | null>(null);
   const [cmdPreviewUrl, setCmdPreviewUrl] = useState<string | null>(null);
   const [cmdPreviewZoom, setCmdPreviewZoom] = useState(1);
@@ -394,7 +413,6 @@ function PlayerCardImpl(props: PlayerCardProps) {
     ? `0 0 ${4 + xpGlowIntensity * 12}px rgba(218,165,32,${(0.5 + xpGlowIntensity * 0.5).toFixed(2)}), 0 0 ${10 + xpGlowIntensity * 24}px rgba(218,165,32,${(0.2 + xpGlowIntensity * 0.3).toFixed(2)})`
     : undefined;
   const {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     xpShimmerAnim,
     xpFlashAnim,
     xpRippleAnim,
@@ -403,6 +421,122 @@ function PlayerCardImpl(props: PlayerCardProps) {
     xpEmberAnim,
     xpRuneGlowAnim,
   } = useXpKeyframes(player.experience, xpGlow, xpGlowIntensity);
+
+  // ─── Energy / damage / poison keyframes ─────────────────────────────────
+  const energyGlowIntensity = player.energy > 0 ? Math.min(player.energy / 8, 1) : 0;
+  const energyGlow = energyGlowIntensity > 0
+    ? `0 0 ${4 + energyGlowIntensity * 18}px rgba(80,200,255,${(0.5 + energyGlowIntensity * 0.45).toFixed(2)}), 0 0 ${10 + energyGlowIntensity * 36}px rgba(80,200,255,${(0.2 + energyGlowIntensity * 0.3).toFixed(2)})`
+    : undefined;
+  // energyGlow is used in the outer container; reserved here for Phase 4 wiring.
+  void energyGlow;
+  const energyStaticShadow = player.energy > 5
+    ? `0 0 18px rgba(30,100,210,0.55), 0 0 36px rgba(20,70,180,0.3)`
+    : undefined;
+  const sizzleAmp = Math.min(player.energy - 5, 10) * 0.2;
+  const { energyPulseAnim, energySizzleAnim } = useEnergyKeyframes(
+    player.energy,
+    energyStaticShadow,
+    sizzleAmp,
+  );
+  const energyPulseDuration = player.energy > 5 ? Math.max(0.8, 2.5 - (player.energy - 5) * 0.09) : 2.5;
+  const damageFlashAnim = useDamageFlashKeyframe();
+  const poisonProgress = Math.min(player.poison / 10, 1);
+  const poisonBoilAmp = player.poison >= 10 ? 5 : player.poison === 9 ? 3.8 : player.poison === 8 ? 1.5 : 0;
+  const poisonBoilSkew = Math.min(poisonBoilAmp * 0.6, 2.5);
+  const poisonBoilAnim = usePoisonBoilKeyframe(player.poison, poisonBoilAmp, poisonBoilSkew);
+  const poisonBoilDuration = player.poison >= 10 ? 2.0 : player.poison >= 9 ? 2.5 : 5.0;
+
+  // ─── Monarch crown anim string ──────────────────────────────────────────
+  const { monarchEnterIsTransfer } = animations;
+  const monarchAnimStr =
+    monarchAnim === 'exiting'  ? `${crownExitToTop} 0.5s ease-in forwards` :
+    monarchAnim === 'entering' ? `${crownEnterFromTop} ${monarchEnterIsTransfer ? '1s' : '0.5s'} ${monarchEnterIsTransfer ? '0.5s' : '0s'} ease-out both, ${crownShimmerBig} 2s ease-in-out infinite` :
+    `${crownShimmerBig} 2s ease-in-out infinite`;
+
+  // ─── Derived helpers used in Block B ────────────────────────────────────
+  const { startingLife, activePlayerIdx } = props;
+  const isCmdDmgHigh = Object.values(commanderDamage[playerIdx] ?? {}).some(
+    (dmg) => dmg[0] >= 21 || dmg[1] >= 21
+  );
+  const opponents = allPlayers
+    .map((p, i) => ({ player: p, idx: i }))
+    .filter(({ idx }) => idx !== playerIdx);
+  function lifeColor(life: number): string {
+    if (life <= 0) return '#6B0000';
+    if (life > startingLife) {
+      const gain = Math.min((life - startingLife) / startingLife, 1);
+      const r = Math.round(180 - 140 * gain);
+      const g = Math.round(120 + 102 * gain);
+      const b = Math.round(60 - 36 * gain);
+      return `rgb(${r},${g},${b})`;
+    }
+    const ratio = Math.max(0, Math.min((startingLife - life) / startingLife, 1));
+    if (ratio <= 0) return '';
+    const r = Math.round(180 + 71 * ratio);
+    const g = Math.round(120 - 120 * ratio);
+    const b = Math.round(60 - 60 * ratio);
+    return `rgb(${r},${g},${b})`;
+  }
+
+  // ─── Crack layers (per-player fingerprint, fixed in render lifetime) ───
+  const ox = 38 + (playerIdx % 7);
+  const oy = 32 + (playerIdx % 5);
+  const cp = (d: string, w: number, op: number) =>
+    `<path d="${d}" stroke="rgba(10,0,0,${op})" stroke-width="${w}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const crackSvg = (paths: string) =>
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${paths}</svg>`;
+  const crackLayers: Array<{ from: number; svg: string }> = [
+    { from: 0.2, svg: crackSvg(
+      cp(`M${ox},${oy} L${ox-14},${oy-18} L${ox-22},${oy-32}`, 1.6, 0.95) +
+      cp(`M${ox},${oy} L${ox+8},${oy-22} L${ox+5},0`, 1.5, 0.92) +
+      cp(`M${ox},${oy} L${ox+28},${oy-14} L${ox+48},${oy-26} L100,${oy-18}`, 1.4, 0.9) +
+      cp(`M${ox},${oy} L${ox+22},${oy+18} L${ox+38},${oy+42} L100,${oy+60}`, 1.3, 0.88) +
+      cp(`M${ox},${oy} L${ox+4},${oy+28} L${ox-2},${oy+52} L${ox+6},100`, 1.3, 0.87) +
+      cp(`M${ox},${oy} L${ox-18},${oy+22} L${ox-34},${oy+48} L0,${oy+62}`, 1.2, 0.85) +
+      cp(`M${ox},${oy} L${ox-28},${oy+6} L0,${oy+14}`, 1.2, 0.84)
+    )},
+    { from: 0.35, svg: crackSvg(
+      cp(`M${ox-14},${oy-18} L${ox-30},${oy-12} L0,${oy-8}`, 1.0, 0.88) +
+      cp(`M${ox-14},${oy-18} L${ox-8},${oy-34} L0,${oy-48}`, 0.9, 0.85) +
+      cp(`M${ox+8},${oy-22} L${ox+22},${oy-14} L${ox+40},${oy-20} L100,${oy-30}`, 0.9, 0.85) +
+      cp(`M${ox+28},${oy-14} L${ox+22},${oy+6} L${ox+36},${oy+18}`, 0.85, 0.82) +
+      cp(`M${ox+22},${oy+18} L${ox+10},${oy+32} L${ox+16},${oy+50}`, 0.85, 0.82) +
+      cp(`M${ox+4},${oy+28} L${ox+18},${oy+36} L${ox+28},${oy+58} L${ox+18},100`, 0.8, 0.8) +
+      cp(`M${ox-18},${oy+22} L${ox-6},${oy+34} L${ox-12},${oy+52}`, 0.8, 0.8) +
+      cp(`M${ox-28},${oy+6} L${ox-18},${oy-6} L${ox-10},${oy-20}`, 0.8, 0.8)
+    )},
+    { from: 0.5, svg: crackSvg(
+      cp(`M${ox-30},${oy-12} L${ox-42},${oy-24} L${ox-36},${oy-40} L0,${oy-52}`, 0.75, 0.82) +
+      cp(`M${ox-8},${oy-34} L${ox+4},${oy-48} L${ox-2},${oy-62} L${ox+10},${oy-80}`, 0.72, 0.8) +
+      cp(`M${ox+40},${oy-20} L${ox+50},${oy-8} L${ox+62},${oy-16}`, 0.7, 0.78) +
+      cp(`M${ox+36},${oy+18} L${ox+52},${oy+28} L${ox+68},${oy+20} L100,${oy+32}`, 0.7, 0.78) +
+      cp(`M${ox+16},${oy+50} L${ox+30},${oy+62} L${ox+22},${oy+78} L${ox+36},100`, 0.68, 0.76) +
+      cp(`M${ox-12},${oy+52} L${ox-24},${oy+64} L${ox-14},${oy+80} L0,${oy+90}`, 0.68, 0.76) +
+      cp(`M${ox-42},${oy-24} L${ox-52},${oy-10} L0,${oy-4}`, 0.65, 0.74) +
+      cp(`M${ox+10},${oy-80} L${ox+22},${oy-72} L${ox+36},${oy-82}`, 0.62, 0.72)
+    )},
+    { from: 0.7, svg: crackSvg(
+      cp(`M${ox-22},${oy-32} L${ox-6},${oy-22} L${ox+4},${oy-38}`, 0.6, 0.8) +
+      cp(`M${ox+5},0 L${ox-10},${oy-44} L${ox-20},${oy-58}`, 0.55, 0.78) +
+      cp(`M${ox+48},${oy-26} L${ox+58},${oy-14} L${ox+72},${oy-22}`, 0.55, 0.76) +
+      cp(`M${ox+62},${oy-16} L${ox+76},${oy-6} L${ox+84},${oy+8}`, 0.52, 0.74) +
+      cp(`M${ox+28},${oy+58} L${ox+44},${oy+68} L${ox+38},${oy+84}`, 0.52, 0.74) +
+      cp(`M${ox-24},${oy+64} L${ox-38},${oy+72} L${ox-28},${oy+86}`, 0.5, 0.72) +
+      cp(`M${ox-52},${oy-10} L${ox-62},${oy+4} L${ox-50},${oy+18}`, 0.5, 0.72) +
+      cp(`M${ox+22},${oy+6} L${ox+14},${oy+18} L${ox+24},${oy+30}`, 0.48, 0.7)
+    )},
+    { from: 0.85, svg: crackSvg(
+      cp(`M${ox-6},${oy+8} L${ox+4},${oy+14} L${ox-2},${oy+22}`, 0.45, 0.8) +
+      cp(`M${ox+10},${oy+4} L${ox+18},${oy+12} L${ox+12},${oy+22}`, 0.42, 0.78) +
+      cp(`M${ox+6},${oy-10} L${ox+14},${oy-4} L${ox+8},${oy+6}`, 0.42, 0.76) +
+      cp(`M${ox-10},${oy-6} L${ox-4},${oy+4} L${ox-12},${oy+12}`, 0.4, 0.74) +
+      cp(`M${ox-36},${oy-40} L${ox-28},${oy-30} L${ox-38},${oy-22}`, 0.4, 0.72) +
+      cp(`M${ox+36},${oy-82} L${ox+48},${oy-76} L${ox+42},${oy-64}`, 0.38, 0.7) +
+      cp(`M${ox+84},${oy+8} L${ox+90},${oy+22} L${ox+80},${oy+34}`, 0.38, 0.7) +
+      cp(`M${ox+44},${oy+68} L${ox+54},${oy+80} L${ox+44},${oy+92}`, 0.36, 0.68) +
+      cp(`M${ox-62},${oy+4} L${ox-72},${oy+16} L${ox-62},${oy+28}`, 0.36, 0.68)
+    )},
+  ];
   // monarchAnimStr is intentionally not derived here yet — it depends on the
   // crown keyframes which are migrated in Phase 3. The render block that needs
   // it will compute it locally when it lands.
@@ -622,6 +756,489 @@ function PlayerCardImpl(props: PlayerCardProps) {
               </IconButton>
             </>
           </Stack>
+      </Box>
+
+      {/* ── Main: Commander Damage (left) + Life (right) ── */}
+      <Box sx={{ display: 'flex', flex: 1, minHeight: 0, borderTop: (theme) => `1px solid ${theme.palette.divider}`, filter: 'none', position: 'relative', zIndex: 3 }}>
+
+        {/* Commander Damage box */}
+        <Box sx={{
+          ...(remoteMode ? { width: '33dvw', flexShrink: 0 } : { flex: 1, minWidth: 0 }),
+          borderRight: (theme) => `1px solid ${theme.palette.divider}`,
+          px: remoteMode ? 1 : 0.5,
+          py: remoteMode ? 1 : 0.25,
+          display: 'grid',
+          gridTemplateColumns: `1fr ${sizes.cmdBtnWidth} ${sizes.valColWidth} ${sizes.cmdBtnWidth}`,
+          alignContent: remoteMode ? 'start' : 'center',
+          alignItems: 'center',
+          rowGap: remoteMode ? 0.5 : 0.1,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          position: 'relative',
+          transition: 'padding 0.2s ease, row-gap 0.2s ease',
+        }}>
+          {/* Threat vignette — commander art fades in as damage approaches 21 */}
+          {threatSource?.artUrl && threatSource.intensity > 0 && (
+            <Box sx={{
+              position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+              backgroundImage: `url(${threatSource.artUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center top',
+              opacity: threatSource.intensity * 0.28,
+              transition: 'opacity 0.6s ease',
+              pointerEvents: 'none',
+            }} />
+          )}
+          {(threatSource?.intensity ?? 0) > 0 && (
+            <Box sx={{
+              position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+              boxShadow: `inset 0 0 24px rgba(160,0,0,${((threatSource?.intensity ?? 0) * 0.65).toFixed(2)})`,
+              transition: 'box-shadow 0.6s ease',
+              pointerEvents: 'none',
+            }} />
+          )}
+          {/* Title row */}
+          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ gridColumn: '1 / -1', mb: 0.25 }}>
+            <Typography sx={{ fontSize: sizes.fsSectionLabel, fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5, flex: 1 }}>
+              CMD Damage{isCmdDmgHigh && <Typography component="span" sx={{ fontSize: sizes.fsSectionLabel, color: 'error.main', ml: 0.5 }}>⚠</Typography>}
+            </Typography>
+            <Button size="small" variant={cmdDmgShowPlayer ? 'contained' : 'outlined'} onClick={toggleCmdDmgShowPlayer} sx={{ minWidth: 0, px: remoteMode ? 1.25 : 0.75, py: remoteMode ? 0.5 : 0, fontSize: remoteMode ? sizes.fsSectionLabel : 'clamp(7px, 1.2dvh, 11px)', lineHeight: 1.4, flexShrink: 0 }}>
+              {cmdDmgShowPlayer ? 'Player' : 'CMD'}
+            </Button>
+          </Stack>
+          {opponents.flatMap(({ player: source, idx: sourceIdx }) => {
+            const dmg = commanderDamage[playerIdx]?.[sourceIdx] ?? [0, 0];
+            const dealt = commanderDamage[sourceIdx]?.[playerIdx] ?? [0, 0];
+            const dealtTotal = dealt[0] + dealt[1];
+            const sourceEliminated = source.isEliminated;
+            const rows = [
+              <Box key={`${sourceIdx}-name`} sx={{ minWidth: 0, pt: 0 }}>
+                <Stack direction="row" alignItems="center" spacing={0.5} sx={{ cursor: 'pointer', minWidth: 0 }} onClick={(e) => { e.stopPropagation(); setOpenSnapshotKey(k => k === `${sourceIdx}-snap` ? null : `${sourceIdx}-snap`); }}>
+                  {activePlayerIdx === sourceIdx && (
+                    <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0, boxShadow: '0 0 4px 1px rgba(var(--mui-palette-primary-mainChannel) / 0.7)' }} />
+                  )}
+                  <Typography sx={{ fontSize: sizes.fsSourceName, color: sourceEliminated ? 'text.disabled' : activePlayerIdx === sourceIdx ? 'primary.main' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', fontWeight: activePlayerIdx === sourceIdx ? 700 : 400, flex: 1, minWidth: 0 }}>
+                    {cmdDmgShowPlayer ? source.playerName : source.commander.name}
+                  </Typography>
+                  <Tooltip title={`Dealt ${source.partner ? `${dealt[0]}/${dealt[1]}` : dealtTotal} commander damage to ${source.playerName}`} placement="top" slotProps={position.ttSlotProps} arrow><Typography sx={{ fontSize: sizes.fsSourceName, fontWeight: 900, color: dealtTotal >= 21 ? 'error.main' : dealtTotal > 0 ? '#e67e22' : 'text.disabled', lineHeight: 1, flexShrink: 0 }}>⚔{source.partner ? `${dealt[0]}/${dealt[1]}` : dealtTotal}</Typography></Tooltip>
+                </Stack>
+                <Stack direction="row" spacing={0.5} sx={{ mt: 0.15, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {source.isMonarch && <Tooltip title="Monarch" placement="top" slotProps={position.ttSlotProps} arrow><CrownIcon sx={{
+                    fontSize: sizes.fsStatBadge,
+                    color: '#DAA520',
+                    animation: 'crownShimmer 2s ease-in-out infinite',
+                    '@keyframes crownShimmer': {
+                      '0%, 100%': { filter: 'drop-shadow(0 0 2px #DAA520) brightness(1)' },
+                      '50%': { filter: 'drop-shadow(0 0 7px #FFD700) brightness(1.5)' },
+                    },
+                  }} /></Tooltip>}
+                  {source.hasCitysBlessing && <Tooltip title="City's Blessing" placement="top" slotProps={position.ttSlotProps} arrow><span><CityIcon active sx={{ fontSize: sizes.fsStatBadge }} /></span></Tooltip>}
+                  {source.hasInitiative && <Tooltip title="Initiative" placement="top" slotProps={position.ttSlotProps} arrow><InitiativeIcon sx={{ fontSize: sizes.fsStatBadge, color: '#4FC3F7' }} /></Tooltip>}
+                  <Tooltip title={`Life: ${source.life}`} placement="top" slotProps={position.ttSlotProps} arrow><Typography sx={{ fontSize: sizes.fsStatBadge, fontWeight: 800, color: lifeColor(source.life) || 'primary.main', lineHeight: 1 }}>♥{source.life}</Typography></Tooltip>
+                  {source.poison > 0 && <Tooltip title={`Poison: ${source.poison}`} placement="top" slotProps={position.ttSlotProps} arrow><Typography sx={{ fontSize: sizes.fsStatBadge, fontWeight: 800, color: source.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1 }}>☠{source.poison}</Typography></Tooltip>}
+                  {source.energy > 0 && <Tooltip title={`Energy: ${source.energy}`} placement="top" slotProps={position.ttSlotProps} arrow><Typography sx={{ fontSize: sizes.fsStatBadge, fontWeight: 800, color: '#4FC8FF', lineHeight: 1 }}>⚡{source.energy}</Typography></Tooltip>}
+                  {source.experience > 0 && <Tooltip title={`XP: ${source.experience}`} placement="top" slotProps={position.ttSlotProps} arrow><Stack direction="row" alignItems="center" spacing={0.25}><Box sx={{ bgcolor: 'background.paper', display: 'inline-flex' }}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: sizes.fsStatBadge, height: sizes.fsStatBadge, objectFit: 'contain', mixBlendMode: 'multiply', transition: 'width 0.2s ease, height 0.2s ease' }} /></Box><Typography sx={{ fontSize: sizes.fsStatBadge, fontWeight: 800, color: '#DAA520', lineHeight: 1 }}>{source.experience}</Typography></Stack></Tooltip>}
+                </Stack>
+              </Box>,
+              <Tooltip key={`${sourceIdx}-dec`} open={lpKey === `${sourceIdx}-dec`} title="-5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
+                <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, false, -1))} onPointerDown={() => startLongPress(`${sourceIdx}-dec`, () => handleCmdDmgChange(playerIdx, sourceIdx, false, -5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: sizes.cmdBtnWidth, minHeight: sizes.cmdBtnHeight }}>
+                  <Typography sx={{ fontSize: sizes.fsCounterBtn, fontWeight: 700, lineHeight: 1 }}>−</Typography>
+                </IconButton></span>
+              </Tooltip>,
+              <Typography key={`${sourceIdx}-val`} onClick={() => setFocusedControl({ type: 'commanderDamage', sourceIdx, isPartner: false })} sx={{ fontSize: sizes.fsCounterValue, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', cursor: 'pointer', color: dmg[0] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary' }}>
+                {dmg[0]}
+              </Typography>,
+              <Tooltip key={`${sourceIdx}-inc`} open={lpKey === `${sourceIdx}-inc`} title="+5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
+                <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, false, 1))} onPointerDown={() => startLongPress(`${sourceIdx}-inc`, () => handleCmdDmgChange(playerIdx, sourceIdx, false, 5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: sizes.cmdBtnWidth, minHeight: sizes.cmdBtnHeight }}>
+                  <Typography sx={{ fontSize: sizes.fsCounterBtn, fontWeight: 700, lineHeight: 1 }}>+</Typography>
+                </IconButton></span>
+              </Tooltip>,
+            ];
+            if (source.partner) {
+              rows.push(
+                <Typography key={`${sourceIdx}-pname`} onClick={(e) => { e.stopPropagation(); setOpenSnapshotKey(k => k === `${sourceIdx}-psnap` ? null : `${sourceIdx}-psnap`); }} sx={{ fontSize: sizes.fsSourceName, color: sourceEliminated ? 'text.disabled' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', cursor: 'pointer' }}>
+                  {source.partner.name}
+                </Typography>,
+                <Tooltip key={`${sourceIdx}-pdec`} open={lpKey === `${sourceIdx}-pdec`} title="-5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
+                  <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, true, -1))} onPointerDown={() => startLongPress(`${sourceIdx}-pdec`, () => handleCmdDmgChange(playerIdx, sourceIdx, true, -5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: sizes.cmdBtnWidth, minHeight: sizes.cmdBtnHeight }}>
+                    <Typography sx={{ fontSize: sizes.fsCounterBtn, fontWeight: 700, lineHeight: 1 }}>−</Typography>
+                  </IconButton></span>
+                </Tooltip>,
+                <Typography key={`${sourceIdx}-pval`} onClick={() => setFocusedControl({ type: 'commanderDamage', sourceIdx, isPartner: true })} sx={{ fontSize: sizes.fsCounterValue, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', cursor: 'pointer', color: dmg[1] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary' }}>
+                  {dmg[1]}
+                </Typography>,
+                <Tooltip key={`${sourceIdx}-pinc`} open={lpKey === `${sourceIdx}-pinc`} title="+5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
+                  <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, true, 1))} onPointerDown={() => startLongPress(`${sourceIdx}-pinc`, () => handleCmdDmgChange(playerIdx, sourceIdx, true, 5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: sizes.cmdBtnWidth, minHeight: sizes.cmdBtnHeight }}>
+                    <Typography sx={{ fontSize: sizes.fsCounterBtn, fontWeight: 700, lineHeight: 1 }}>+</Typography>
+                  </IconButton></span>
+                </Tooltip>,
+              );
+            }
+            return rows;
+          })}
+
+          {/* Commander snapshot overlay */}
+          {openSnapshotKey !== null && (() => {
+            const match = openSnapshotKey.match(/^(\d+)-(p?snap)$/);
+            if (!match) return null;
+            const srcIdx = parseInt(match[1]);
+            const src = opponents.find(o => o.idx === srcIdx)?.player;
+            if (!src) return null;
+            const dealtRows = allPlayers
+              .flatMap((tgt, tgtIdx) => {
+                if (tgtIdx === srcIdx) return [];
+                const d = commanderDamage[tgtIdx]?.[srcIdx] ?? [0, 0];
+                return [{ tgt, d, tgtIdx }];
+              })
+              .sort((a, b) => {
+                if (a.tgtIdx === playerIdx) return -1;
+                if (b.tgtIdx === playerIdx) return 1;
+                return 0;
+              });
+            const srcLifeColor = lifeColor(src.life);
+            return (
+              <Box
+                key="snapshot-overlay"
+                onClick={() => setOpenSnapshotKey(null)}
+                sx={{
+                  position: 'absolute', inset: 0, zIndex: 20,
+                  bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(20,12,4,0.96)' : 'rgba(255,248,240,0.97)',
+                  overflow: 'auto',
+                  display: 'flex', flexDirection: 'column',
+                }}
+              >
+                {src.commander.artCropUrl && (
+                  <Box sx={{ position: 'absolute', inset: 0, backgroundImage: `url(${src.commander.artCropUrl})`, backgroundSize: 'cover', backgroundPosition: 'center top', opacity: 0.15, pointerEvents: 'none' }} />
+                )}
+                <Box onClick={(e) => e.stopPropagation()} sx={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', p: 1, gap: 0.5, overflowY: 'auto' }}>
+                  <Stack direction="row" alignItems="center" spacing={0.75}>
+                    <Box sx={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                      <Stack direction="row" alignItems="center" spacing={0.5}>
+                        <Typography sx={{ fontSize: sizes.fsSourceName, fontWeight: 800, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{src.playerName}</Typography>
+                        {src.isMonarch && <CrownIcon sx={{ fontSize: sizes.fsStatBadge, color: '#DAA520', flexShrink: 0 }} />}
+                        {src.hasInitiative && <InitiativeIcon sx={{ fontSize: sizes.fsStatBadge, color: '#4FC3F7', flexShrink: 0 }} />}
+                      </Stack>
+                      <Typography onClick={(e) => { e.stopPropagation(); setCmdPreviewName(src.commander.name); }} sx={{ fontSize: sizes.fsSectionLabel, color: 'text.secondary', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', '&:hover': { color: 'primary.main' } }}>{src.commander.name}</Typography>
+                      {src.partner && <Typography onClick={(e) => { e.stopPropagation(); setCmdPreviewName(src.partner!.name); }} sx={{ fontSize: sizes.fsSectionLabel, color: 'text.secondary', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', '&:hover': { color: 'primary.main' } }}>{src.partner.name}</Typography>}
+                    </Box>
+                    <Typography sx={{ fontSize: 'clamp(28px, 8dvmax, 56px)', fontWeight: 900, lineHeight: 1, color: srcLifeColor || 'primary.main', textDecoration: src.isEliminated ? 'line-through' : 'none', flexShrink: 0 }}>{src.life}</Typography>
+                    <Stack direction="column" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
+                      <IconButton size="small" onClick={() => setOpenSnapshotKey(null)} sx={{ p: 0.25 }}>
+                        <CloseIcon sx={{ fontSize: sizes.fsSourceName }} />
+                      </IconButton>
+                      {onSwitchToPlayer && !src.isEliminated && srcIdx !== playerIdx && (
+                        <Tooltip title="View panel" placement="left" slotProps={position.ttSlotProps} arrow>
+                          <IconButton size="small" onClick={(e) => { e.stopPropagation(); setOpenSnapshotKey(null); onSwitchToPlayer(srcIdx); }} sx={{ p: 0.25 }}>
+                            <OpenInFullIcon sx={{ fontSize: sizes.fsSectionLabel }} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Stack>
+                  </Stack>
+
+                  <Box sx={{ borderTop: '1px solid', borderColor: 'divider' }} />
+
+                  <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="space-between" sx={{
+                    px: 1, py: 0.5, borderRadius: 1,
+                    background: (theme) => theme.palette.mode === 'dark'
+                      ? 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.03) 100%)'
+                      : 'linear-gradient(135deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.02) 100%)',
+                    border: '1px solid',
+                    borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                  }}>
+                    <Typography sx={{ fontSize: sizes.fsSourceName, fontWeight: 700, color: src.poison >= 10 ? 'error.main' : src.poison > 0 ? '#66BB6A' : 'text.disabled' }}>☠ {src.poison}</Typography>
+                    <Typography sx={{ fontSize: sizes.fsSourceName, fontWeight: 700, color: src.energy > 0 ? '#4FC8FF' : 'text.disabled' }}>⚡ {src.energy}</Typography>
+                    <Typography sx={{ fontSize: sizes.fsSourceName, fontWeight: 700, color: src.experience > 0 ? '#DAA520' : 'text.disabled' }}>XP {src.experience}</Typography>
+                    <Typography sx={{ fontSize: sizes.fsSourceName, fontWeight: 700, color: src.commanderTax > 0 ? 'text.secondary' : 'text.disabled' }}>Tax +{src.commanderTax * 2}</Typography>
+                  </Stack>
+
+                  <Stack sx={{ flex: 1, minWidth: 0 }} spacing={0.25}>
+                    <Typography sx={{ fontSize: sizes.fsSectionLabel, fontWeight: 600, color: 'text.disabled', textTransform: 'uppercase', letterSpacing: 0.5 }}>CMD Dealt</Typography>
+                    {dealtRows.map(({ tgt, d, tgtIdx }) => {
+                      const isMe = tgtIdx === playerIdx;
+                      return (
+                        <Stack key={tgt.playerName} direction="row" alignItems="center" justifyContent="space-between" spacing={0.5}
+                          onClick={!isMe ? (e) => { e.stopPropagation(); setOpenSnapshotKey(`${tgtIdx}-snap`); } : undefined}
+                          sx={{ cursor: isMe ? 'default' : 'pointer', borderRadius: 0.5, '&:hover': !isMe ? { bgcolor: 'action.hover' } : undefined, px: 0.25 }}
+                        >
+                          {tgt.commander?.artCropUrl
+                            ? <Box component="img" src={tgt.commander.artCropUrl} alt="" onClick={(e) => { e.stopPropagation(); setCmdPreviewName(tgt.commander!.name); }} sx={{ height: 'clamp(16px, 2.5dvmax, 28px)', width: 'auto', borderRadius: 0.25, flexShrink: 0, opacity: isMe ? 1 : 0.75, cursor: 'pointer', '&:hover': { opacity: 1 } }} />
+                            : <Box sx={{ height: 'clamp(16px, 2.5dvmax, 28px)', width: 'clamp(11px, 1.8dvmax, 20px)', borderRadius: 0.25, flexShrink: 0, bgcolor: 'action.hover' }} />
+                          }
+                          <Typography sx={{ fontSize: sizes.fsSectionLabel, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, color: isMe ? 'primary.main' : 'text.secondary', fontWeight: isMe ? 700 : 400 }}>{tgt.playerName}</Typography>
+                          <Typography sx={{ fontSize: sizes.fsSourceName, fontWeight: 700, color: (d[0] >= 21 || d[1] >= 21) ? 'error.main' : isMe ? 'primary.main' : 'text.primary', flexShrink: 0 }}>
+                            {src.partner ? `${d[0]}/${d[1]}` : d[0]}
+                          </Typography>
+                        </Stack>
+                      );
+                    })}
+                  </Stack>
+                </Box>
+              </Box>
+            );
+          })()}
+        </Box>
+
+        {/* Life total + controls */}
+        <Box sx={{ ...(remoteMode ? { width: '33dvw', flexShrink: 0 } : { flex: 1, minWidth: 0 }), display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5, alignSelf: 'stretch', pt: remoteMode ? 2 : 0 }}>
+          <Box sx={{ position: 'relative', lineHeight: 1, overflow: 'visible', width: '100%', flex: remoteMode ? undefined : 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            {showCrown && (
+              <CrownIcon sx={{
+                fontSize: 'clamp(40px, 9dvh, 72px)',
+                color: '#DAA520',
+                transform: 'rotate(-25deg)',
+                position: 'absolute',
+                top: '-3dvh',
+                left: '-4dvh',
+                animation: monarchAnimStr,
+              }} />
+            )}
+            <Box sx={{ position: 'relative', overflow: 'hidden', lineHeight: 1, width: '100%', flex: remoteMode ? undefined : 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              {crackLayers.map(({ from, svg }) => (
+                <Box key={from} sx={{
+                  position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(svg)}")`,
+                  backgroundSize: '100% 100%',
+                  mixBlendMode: 'multiply',
+                  pointerEvents: 'none',
+                  userSelect: 'none',
+                  opacity: crackAlpha(from),
+                  transition: 'opacity 0.5s ease',
+                }} />
+              ))}
+              {threatSource?.cmdName && threatSource.intensity > 0 && (
+                [
+                  { top: '10%',  left: '6%',  rotate: -18 },
+                  { top: '74%',  left: '55%', rotate:  11 },
+                  { top: '42%',  left: '62%', rotate:  -6 },
+                  { top: '84%',  left: '8%',  rotate:  20 },
+                  { top: '22%',  left: '48%', rotate:  -9 },
+                ].map(({ top, left, rotate }, i) => (
+                  <Typography key={`threat-${i}`} sx={{
+                    position: 'absolute', top, left,
+                    fontSize: 18 + (i % 3) * 4,
+                    fontWeight: 900,
+                    fontFamily: '"Georgia", "Palatino Linotype", serif',
+                    fontStyle: 'italic',
+                    color: 'error.main',
+                    pointerEvents: 'none',
+                    userSelect: 'none',
+                    whiteSpace: 'nowrap',
+                    zIndex: 0,
+                    transition: 'opacity 0.6s ease',
+                    letterSpacing: 1.5,
+                    textTransform: 'uppercase',
+                    lineHeight: 1,
+                    textShadow: `0 0 8px rgba(180,0,0,${(threatSource.intensity * 0.4).toFixed(2)})`,
+                    animation: `threatNamePulse ${1.8 + i * 0.3}s ease-in-out infinite`,
+                    '@keyframes threatNamePulse': {
+                      '0%, 100%': { opacity: threatSource.intensity * (0.09 + i * 0.02), transform: `rotate(${rotate + (playerIdx % 3) * 5}deg) scale(1)` },
+                      '50%': { opacity: threatSource.intensity * (0.18 + i * 0.04), transform: `rotate(${rotate + (playerIdx % 3) * 5}deg) scale(1.06)` },
+                    },
+                  }}>
+                    {threatSource.cmdName}
+                  </Typography>
+                ))
+              )}
+              <Typography onClick={() => setFocusedControl({ type: 'life' })} sx={{
+                position: 'relative', zIndex: 1,
+                fontWeight: 900,
+                fontSize: remoteMode ? 'clamp(80px, 22dvmax, 260px)' : (countersOpen ? 'clamp(34px, 10dvh, 112px)' : 'clamp(60px, 20dvh, 240px)'),
+                lineHeight: 1,
+                cursor: 'pointer',
+                color: computedLifeColor || ((theme: import('@mui/material').Theme) => theme.palette.primary.main),
+                transition: 'color 0.4s ease, font-size 0.2s ease',
+                ...(animations.damageFlash > 0 && { animation: `${damageFlashAnim} 0.6s ease-out forwards` }),
+                ...(animations.damageFlash === 0 && energyPulseAnim && { animation: `${energyPulseAnim} ${energyPulseDuration.toFixed(2)}s ease-out infinite, ${energySizzleAnim} 0.12s linear infinite` }),
+                ...(animations.damageFlash === 0 && !energyPulseAnim && poisonBoilAnim && { animation: `${poisonBoilAnim} ${poisonBoilDuration}s ease-in-out infinite` }),
+              }}>
+                {player.life}
+              </Typography>
+              {animations.damageFlash > 0 && (
+                <Box sx={{
+                  position: 'absolute', top: '44%', left: 0,
+                  width: '70%', height: '10%',
+                  background: 'linear-gradient(to right, transparent, rgba(200,0,0,0.5) 35%, rgba(235,0,0,0.88) 50%, rgba(200,0,0,0.5) 65%, transparent)',
+                  pointerEvents: 'none',
+                  animation: 'lifeSwipe1 0.6s ease-in forwards',
+                  '@keyframes lifeSwipe1': {
+                    '0%':   { transform: 'translate(-170%, -300%) rotate(22deg)' },
+                    '100%': { transform: 'translate(370%, 300%) rotate(22deg)' },
+                  },
+                }} />
+              )}
+              {animations.damageFlash > 0 && (
+                <Box sx={{
+                  position: 'absolute', top: '44%', left: 0,
+                  width: '70%', height: '10%',
+                  background: 'linear-gradient(to left, transparent, rgba(180,0,0,0.45) 35%, rgba(215,0,0,0.78) 50%, rgba(180,0,0,0.45) 65%, transparent)',
+                  pointerEvents: 'none',
+                  opacity: 0,
+                  animation: 'lifeSwipe2 0.6s ease-in 0.12s forwards',
+                  '@keyframes lifeSwipe2': {
+                    '0%':   { transform: 'translate(-170%, 300%) rotate(-16deg)', opacity: 1 },
+                    '100%': { transform: 'translate(370%, -300%) rotate(-16deg)', opacity: 1 },
+                  },
+                }} />
+              )}
+              {animations.damageFlash >= 5 && (
+                <Box sx={{
+                  position: 'absolute', top: '44%', left: 0,
+                  width: '70%', height: '10%',
+                  background: 'linear-gradient(to left, transparent, rgba(220,0,0,0.4) 35%, rgba(255,20,20,0.68) 50%, rgba(220,0,0,0.4) 65%, transparent)',
+                  pointerEvents: 'none', opacity: 0,
+                  animation: 'lifeSwipe3 0.58s ease-in 0.28s forwards',
+                  '@keyframes lifeSwipe3': {
+                    '0%':   { transform: 'translate(370%, -300%) rotate(30deg)', opacity: 1 },
+                    '100%': { transform: 'translate(-170%, 300%) rotate(30deg)', opacity: 1 },
+                  },
+                }} />
+              )}
+              {animations.damageFlash >= 5 && (
+                <Box sx={{
+                  position: 'absolute', top: '44%', left: 0,
+                  width: '70%', height: '10%',
+                  background: 'linear-gradient(to left, transparent, rgba(200,0,0,0.38) 35%, rgba(235,10,10,0.62) 50%, rgba(200,0,0,0.38) 65%, transparent)',
+                  pointerEvents: 'none', opacity: 0,
+                  animation: 'lifeSwipe4 0.6s ease-in 0.4s forwards',
+                  '@keyframes lifeSwipe4': {
+                    '0%':   { transform: 'translate(370%, 300%) rotate(-22deg)', opacity: 1 },
+                    '100%': { transform: 'translate(-170%, -300%) rotate(-22deg)', opacity: 1 },
+                  },
+                }} />
+              )}
+              {animations.damageFlash >= 5 && (
+                <Box sx={{
+                  position: 'absolute', top: '44%', left: 0,
+                  width: '70%', height: '10%',
+                  background: 'linear-gradient(to right, transparent, rgba(180,0,0,0.35) 35%, rgba(220,10,10,0.58) 50%, rgba(180,0,0,0.35) 65%, transparent)',
+                  pointerEvents: 'none', opacity: 0,
+                  animation: 'lifeSwipe5 0.58s ease-in 0.54s forwards',
+                  '@keyframes lifeSwipe5': {
+                    '0%':   { transform: 'translate(-170%, -350%) rotate(38deg)', opacity: 1 },
+                    '100%': { transform: 'translate(370%, 350%) rotate(38deg)', opacity: 1 },
+                  },
+                }} />
+              )}
+              <Stack direction="row" alignItems="center" spacing={remoteMode ? 0 : 0.5} sx={{ mt: remoteMode ? 1 : 'clamp(0px, 0.6dvh, 4px)', flexShrink: 0, zIndex: 1, ...(remoteMode && { width: '100%', justifyContent: 'space-evenly' }) }}>
+                <Tooltip open={lpKey === 'life-dec'} title="-5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
+                  <IconButton
+                    onClick={guardClick(() => onLifeChange(playerIdx, -1))}
+                    onPointerDown={() => startLongPress('life-dec', () => onLifeChange(playerIdx, -5))}
+                    onPointerUp={cancelLongPress}
+                    onPointerLeave={cancelLongPress}
+                    onPointerCancel={cancelLongPress}
+                    sx={{ px: remoteMode ? 4 : 0.5, py: 0.5, minWidth: remoteMode ? 100 : 52, minHeight: 52, borderRadius: 2, '& .MuiTouchRipple-root': { borderRadius: 2 } }}
+                  >
+                    <Typography sx={{ fontWeight: 700, fontSize: sizes.fsLifeBtn }}>−</Typography>
+                  </IconButton>
+                </Tooltip>
+                <Tooltip open={lpKey === 'life-inc'} title="+5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
+                  <IconButton
+                    onClick={guardClick(() => onLifeChange(playerIdx, 1))}
+                    onPointerDown={() => startLongPress('life-inc', () => onLifeChange(playerIdx, 5))}
+                    onPointerUp={cancelLongPress}
+                    onPointerLeave={cancelLongPress}
+                    onPointerCancel={cancelLongPress}
+                    sx={{ px: remoteMode ? 4 : 0.5, py: 0.5, minWidth: remoteMode ? 100 : 52, minHeight: 52, borderRadius: 2, '& .MuiTouchRipple-root': { borderRadius: 2 } }}
+                  >
+                    <Typography sx={{ fontWeight: 700, fontSize: sizes.fsLifeBtn }}>+</Typography>
+                  </IconButton>
+                </Tooltip>
+              </Stack>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Counters — right column, collapsible */}
+        <Box sx={{
+          display: 'flex',
+          flexDirection: 'row',
+          ...(countersOpen ? { flex: 1 } : { flex: 'none', width: 24 }),
+          minWidth: 0,
+          overflow: 'hidden',
+          borderLeft: (theme) => `1px solid ${theme.palette.divider}`,
+        }}>
+          <Box
+            onClick={() => setCountersOpen(o => !o)}
+            sx={{ width: 24, flexShrink: 0, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', pt: 0.5, gap: 0.5, cursor: 'pointer' }}
+          >
+            {!countersOpen && <>
+              {player.poison > 0 && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
+                  <Box sx={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Typography sx={{ fontSize: 14, color: player.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1 }}>☠</Typography>
+                  </Box>
+                  <Typography sx={{ fontSize: 11, color: player.poison >= 10 ? '#e53935' : '#66BB6A', fontWeight: 700, lineHeight: 1 }}>{player.poison}</Typography>
+                </Box>
+              )}
+              {player.energy > 0 && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
+                  <Box sx={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Typography sx={{ fontSize: 14, color: '#4FC8FF', lineHeight: 1 }}>⚡</Typography>
+                  </Box>
+                  <Typography sx={{ fontSize: 11, color: '#4FC8FF', fontWeight: 700, lineHeight: 1 }}>{player.energy}</Typography>
+                </Box>
+              )}
+              {player.experience > 0 && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
+                  <Box sx={{ width: 16, height: 16, bgcolor: 'background.paper', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: 14, height: 14, objectFit: 'contain', mixBlendMode: 'multiply' }} />
+                  </Box>
+                  <Typography sx={{ fontSize: 11, color: '#DAA520', fontWeight: 700, lineHeight: 1 }}>{player.experience}</Typography>
+                </Box>
+              )}
+              {player.commanderTax > 0 && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
+                  <Box sx={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, background: 'radial-gradient(circle at 38% 35%, #d0d0d0, #7a7a7a)', border: '1.5px solid #3a3a3a', boxShadow: '0 1px 3px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Typography sx={{ fontSize: 7, fontWeight: 800, color: '#111', lineHeight: 1, userSelect: 'none' }}>+{player.commanderTax * 2}</Typography>
+                  </Box>
+                  <Typography sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 700, lineHeight: 1 }}>{player.commanderTax}</Typography>
+                </Box>
+              )}
+            </>}
+            <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }}>
+              <ChevronRightIcon sx={{ fontSize: 22, color: 'text.secondary', transform: countersOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s ease', display: 'block' }} />
+            </Box>
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', opacity: countersOpen ? 1 : 0, transition: 'opacity 0.15s ease' }}>
+            <Typography sx={{ fontSize: sizes.fsSectionLabel, fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5, px: 0.75, pt: 0.5, pb: 0.25, flexShrink: 0 }}>Counters</Typography>
+            <Box sx={{
+              flex: 1,
+              minWidth: 0,
+              px: remoteMode ? 0.75 : 0.25,
+              pb: remoteMode ? 1 : 0.25,
+              overflowY: 'auto',
+              display: 'grid',
+              gridTemplateColumns: `1fr ${sizes.cmdBtnWidth} ${sizes.valColWidth} ${sizes.cmdBtnWidth}`,
+              alignContent: remoteMode ? 'start' : 'safe center',
+              alignItems: 'center',
+              rowGap: remoteMode ? 0.5 : 0.1,
+            }}>
+            {([
+              ['Poison', player.poison, () => onPoisonChange(playerIdx, -1), () => onPoisonChange(playerIdx, 1), () => onPoisonChange(playerIdx, -5), () => onPoisonChange(playerIdx, 5), player.poison >= 10 ? 'error.main' : player.poison > 0 ? 'warning.main' : 'text.disabled'],
+              ['Energy', player.energy, () => onEnergyChange(playerIdx, -1), () => onEnergyChange(playerIdx, 1), () => onEnergyChange(playerIdx, -5), () => onEnergyChange(playerIdx, 5), player.energy > 0 ? 'primary.main' : 'text.disabled'],
+              ['XP', player.experience, () => onExperienceChange(playerIdx, -1), () => onExperienceChange(playerIdx, 1), () => onExperienceChange(playerIdx, -5), () => onExperienceChange(playerIdx, 5), player.experience > 0 ? 'primary.main' : 'text.disabled'],
+              ['Tax', player.commanderTax, () => onCommanderTaxChange(playerIdx, -1), () => onCommanderTaxChange(playerIdx, 1), () => onCommanderTaxChange(playerIdx, -5), () => onCommanderTaxChange(playerIdx, 5), player.commanderTax > 0 ? 'warning.main' : 'text.disabled'],
+            ] as [string, number, () => void, () => void, () => void, () => void, string][]).flatMap(([label, value, onDec, onInc, onDec5, onInc5, color]) => [
+              <Stack key={`${label}-lbl`} direction="row" alignItems="center" spacing={0.4} sx={{ overflow: 'hidden', filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none', minWidth: 0 }}>
+                {label === 'Poison'     && <Typography component="span" sx={{ fontSize: sizes.fsSourceName, color: player.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1, flexShrink: 0 }}>☠</Typography>}
+                {label === 'Energy'     && <Typography component="span" sx={{ fontSize: sizes.fsSourceName, color: '#4FC8FF', lineHeight: 1, flexShrink: 0 }}>⚡</Typography>}
+                {label === 'XP' && <Box sx={{ bgcolor: 'background.paper', display: 'inline-flex', flexShrink: 0 }}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: sizes.fsSourceName, height: sizes.fsSourceName, objectFit: 'contain', mixBlendMode: 'multiply' }} /></Box>}
+                {label === 'Tax'        && <Box sx={{ width: sizes.fsSourceName, height: sizes.fsSourceName, borderRadius: '50%', flexShrink: 0, background: 'radial-gradient(circle at 38% 35%, #d0d0d0, #7a7a7a)', border: '1px solid #3a3a3a', boxShadow: '0 1px 2px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Typography sx={{ fontSize: 7, fontWeight: 800, color: '#111', lineHeight: 1, userSelect: 'none' }}>+{player.commanderTax * 2}</Typography></Box>}
+                <Typography component="span" sx={{ fontSize: sizes.fsSourceName, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</Typography>
+              </Stack>,
+              <Tooltip key={`${label}-dec`} open={lpKey === `${label}-dec`} title="-5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
+                <IconButton onClick={guardClick(onDec)} onPointerDown={() => startLongPress(`${label}-dec`, onDec5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: sizes.cmdBtnWidth, minHeight: sizes.cmdBtnHeight }}><Typography sx={{ fontSize: sizes.fsCounterBtn, fontWeight: 700 }}>−</Typography></IconButton>
+              </Tooltip>,
+              <Typography key={`${label}-val`} onClick={() => { const t = { 'Poison': 'poison', 'Energy': 'energy', 'XP': 'experience', 'Tax': 'commanderTax' }[label] as 'poison' | 'energy' | 'experience' | 'commanderTax' | undefined; if (t) setFocusedControl({ type: t }); }} sx={{ fontSize: sizes.fsCounterValue, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', cursor: 'pointer', color, filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none', ...(label === 'Poison' && value === 9 && { animation: 'poisonPulse 2.5s ease-in-out infinite', '@keyframes poisonPulse': { '0%, 100%': { opacity: 1, transform: 'scale(1)', textShadow: '0 0 8px rgba(0,200,60,0.9), 0 0 20px rgba(0,200,60,0.5)' }, '50%': { opacity: 0.3, transform: 'scale(0.85)', textShadow: '0 0 2px rgba(0,200,60,0.2)' } } }), ...(label === 'XP' && xpGlow && { textShadow: xpGlow, ...(xpShimmerAnim && { animation: `${xpShimmerAnim} 3s ease-in-out infinite` }) }) }}>{value}</Typography>,
+              <Tooltip key={`${label}-inc`} open={lpKey === `${label}-inc`} title="+5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
+                <IconButton onClick={guardClick(onInc)} onPointerDown={() => startLongPress(`${label}-inc`, onInc5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: sizes.cmdBtnWidth, minHeight: sizes.cmdBtnHeight }}><Typography sx={{ fontSize: sizes.fsCounterBtn, fontWeight: 700 }}>+</Typography></IconButton>
+              </Tooltip>,
+            ])}
+          </Box>
+        </Box>
+      </Box>
       </Box>
 
       {/* ── Faded background art ── */}
