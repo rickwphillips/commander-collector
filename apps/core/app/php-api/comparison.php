@@ -530,7 +530,8 @@ try {
     $stmt->execute($params);
     $rows = $stmt->fetchAll();
 } catch (PDOException $e) {
-    sendError('Query failed: ' . $e->getMessage(), 500);
+    error_log('comparison.php query failed: ' . $e->getMessage());
+    sendError('Query failed', 500);
 }
 
 // --- Compute recent_win_rate if requested ---

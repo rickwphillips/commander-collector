@@ -1827,7 +1827,7 @@ while ($iter < $maxIter) {
             $result = executeTool($block['name'], $block['input'] ?? []);
         } catch (Throwable $e) {
             coachLog('executeTool exception [' . $block['name'] . ']: ' . $e->getMessage());
-            sseEmit('error', ['error' => 'Tool execution failed: ' . $e->getMessage()]);
+            sseEmit('error', ['error' => 'Tool execution failed']);
             exit();
         }
         sseEmit('tool_result', ['tool' => $block['name'], 'ok' => true]);
