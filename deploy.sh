@@ -243,7 +243,7 @@ fi
 # any existing .htaccess on the remote is wiped on every static deploy. This has
 # recurred 4 times. The explicit SSH cat-write below is the canonical fix — do NOT
 # remove it or replace with set mirror:exclude-regex "". See memory file:
-# ~/.claude/projects/-Users-rick-FreddyRhetorickProjects/memory/feedback_htaccess_deploy.md
+# ~/.claude/projects/-Users-rick-FreddyRhetorickContexts/memory/feedback_htaccess_deploy.md
 if [ "$PHP_ONLY" = false ]; then
   echo "═══════════════════════════════════════════"
   echo "  Restoring .htaccess files..."
