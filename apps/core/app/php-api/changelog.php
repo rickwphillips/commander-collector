@@ -56,7 +56,8 @@ switch ($method) {
             sendJSON(['version' => $input['version']], 201);
         } catch (Exception $e) {
             $pdo->rollBack();
-            sendError('Failed to create release: ' . $e->getMessage(), 500);
+            error_log('changelog.php create release failed: ' . $e->getMessage());
+            sendError('Failed to create release', 500);
         }
         break;
 
@@ -100,7 +101,8 @@ switch ($method) {
             sendJSON(['updated' => true]);
         } catch (Exception $e) {
             $pdo->rollBack();
-            sendError('Failed to update release: ' . $e->getMessage(), 500);
+            error_log('changelog.php update release failed: ' . $e->getMessage());
+            sendError('Failed to update release', 500);
         }
         break;
 
