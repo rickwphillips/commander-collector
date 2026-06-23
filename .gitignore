@@ -42,3 +42,6 @@ services/
 
 # OS cruft
 .DS_Store
+
+# deploy script — local-only symlink to the private deploy-scripts dir (infra blueprint)
+deploy.sh
