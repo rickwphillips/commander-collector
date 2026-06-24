@@ -10,7 +10,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-SRC="/Users/rickphillips/FreddyRhetorickProjects/mtg-rules/interactions"
+SRC="/Users/rickphillips/FreddyRhetorickContexts/mtg-rules/interactions"
 SEED_PHP="$PROJECT_DIR/apps/core/app/php-api/rules/seed.php"
 
 APPLY=false

@@ -15,7 +15,7 @@ commander-collector/docs/SEARCH_PLAN.md
 ## Project Location
 
 ```
-/Users/rickphillips/FreddyRhetorickProjects/commander-collector/
+/Users/rickphillips/FreddyRhetorickContexts/commander-collector/
 ```
 
 Key files for this work:
