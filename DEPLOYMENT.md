@@ -5,14 +5,14 @@
 ### 1. Start PHP server (Terminal 1)
 
 ```bash
-cd /Users/rickphillips/FreddyRhetorickProjects/commander-collector/app
+cd /Users/rickphillips/FreddyRhetorickContexts/commander-collector/app
 php -S localhost:8080
 ```
 
 ### 2. Start Next.js dev server (Terminal 2)
 
 ```bash
-cd /Users/rickphillips/FreddyRhetorickProjects/commander-collector
+cd /Users/rickphillips/FreddyRhetorickContexts/commander-collector
 npm run dev
 ```
 
@@ -46,20 +46,20 @@ The PHP config auto-detects local vs production and uses the appropriate credent
 ### Build
 
 ```bash
-cd /Users/rickphillips/FreddyRhetorickProjects/commander-collector
+cd /Users/rickphillips/FreddyRhetorickContexts/commander-collector
 npm run build
 ```
 
 ### Deploy Static Files
 
 ```bash
-rsync -avz --delete --exclude '.DS_Store' /Users/rickphillips/FreddyRhetorickProjects/commander-collector/out/ rickwphillips:~/public_html/app/projects/commander/
+rsync -avz --delete --exclude '.DS_Store' /Users/rickphillips/FreddyRhetorickContexts/commander-collector/out/ rickwphillips:~/public_html/app/projects/commander/
 ```
 
 ### Deploy PHP API
 
 ```bash
-rsync -avz --exclude '.DS_Store' /Users/rickphillips/FreddyRhetorickProjects/commander-collector/app/php-api/ rickwphillips:~/public_html/php-api/
+rsync -avz --exclude '.DS_Store' /Users/rickphillips/FreddyRhetorickContexts/commander-collector/app/php-api/ rickwphillips:~/public_html/php-api/
 ```
 
 **Note:** The PHP API lives at `~/public_html/php-api/` (not inside `/app/`) due to Bluehost security rules.
@@ -71,14 +71,14 @@ rsync -avz --exclude '.DS_Store' /Users/rickphillips/FreddyRhetorickProjects/com
 ### Build
 
 ```bash
-cd /Users/rickphillips/FreddyRhetorickProjects/website/rickwphillips.com
+cd /Users/rickphillips/FreddyRhetorickContexts/website/rickwphillips.com
 npm run build
 ```
 
 ### Deploy Static Files
 
 ```bash
-rsync -avz --delete --exclude '.DS_Store' --exclude 'projects/commander' --exclude 'php-api' /Users/rickphillips/FreddyRhetorickProjects/website/rickwphillips.com/out/ rickwphillips:~/public_html/app/
+rsync -avz --delete --exclude '.DS_Store' --exclude 'projects/commander' --exclude 'php-api' /Users/rickphillips/FreddyRhetorickContexts/website/rickwphillips.com/out/ rickwphillips:~/public_html/app/
 ```
 
 **Important:** After deploying the main website, restore the .htaccess file:

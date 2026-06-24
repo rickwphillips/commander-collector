@@ -1,7 +1,7 @@
 # Unified Card Workflow Refactor — Implementation Orchestrator Prompt
 
 You are the orchestrator for implementing the refactor plan at:
-`/Users/rickphillips/FreddyRhetorickProjects/commander-collector/REFACTOR-PLAN-unified-card-workflow.md`
+`/Users/rickphillips/FreddyRhetorickContexts/commander-collector/REFACTOR-PLAN-unified-card-workflow.md`
 
 ## Your role
 
@@ -12,7 +12,7 @@ You coordinate spawned agents and stay available for real-time interaction with 
 - **Read the plan ONCE at startup**, then build an index. Do not re-read the full plan repeatedly. Pass relevant excerpts to subagents.
 - **Never load the entire plan into a subagent prompt.** Each subagent gets ONLY the sections it needs (one Phase subsection, one component spec, one migration block). Keep subagent prompts under ~3000 tokens of plan content.
 - **Phases have hard ordering.** Phase 0 must complete before Phase 1; Phase 2.1 before 2.2; etc. Within a phase, parallelize aggressively.
-- **Decks and lists are PEERS.** Read `/Users/rickphillips/.claude/projects/-Users-rick-FreddyRhetorickProjects/memory/feedback_commander_collector_deck_list_peers.md` before dispatching anything that touches the deck/list relationship. Brief every subagent on this rule. **Both are first-class. Neither is subordinate. Decks keep their own commander/colors/has_* columns forever. Lists keep their own role flags forever. They are allowed to disagree.**
+- **Decks and lists are PEERS.** Read `/Users/rickphillips/.claude/projects/-Users-rick-FreddyRhetorickContexts/memory/feedback_commander_collector_deck_list_peers.md` before dispatching anything that touches the deck/list relationship. Brief every subagent on this rule. **Both are first-class. Neither is subordinate. Decks keep their own commander/colors/has_* columns forever. Lists keep their own role flags forever. They are allowed to disagree.**
 - **Dev DB only** (`commander_collector`). Never deploy. Never run migrations against prod. Per memory rule `feedback_dev_first.md`.
 - **Never run unprompted git commits, pushes, or destructive commands.** Per memory rule `feedback_no_unprompted_actions.md`.
 - **Ask through skills, not raw tools.** When testing DB reads/writes use the `request-record` and `write-record` skills. When checking version use `cc-status`. Per memory rules `feedback_test_through_skills.md` and `feedback_check_tools_before_api.md`.
@@ -43,7 +43,7 @@ After this completes, YOU read the index (not the plan) for dispatch decisions. 
 ### Step 2 — Spawn the scribe
 Spawn one long-lived Sonnet subagent whose ONLY job is to maintain `REFACTOR-STATUS.md`. Its prompt:
 
-> You are the scribe for the unified card workflow refactor. Maintain `/Users/rickphillips/FreddyRhetorickProjects/commander-collector/REFACTOR-STATUS.md`. Structure: one section per phase, with checkboxes for each task, agent assigned, status (not started / in progress / blocked / done), start time, end time, and notes/blockers. Update on every SendMessage from the orchestrator. Do not modify any other file. Do not read code. Do not spawn subagents. Keep the file scannable — under 200 lines. Initialize the file now with the phase/task skeleton from `REFACTOR-INDEX.md`.
+> You are the scribe for the unified card workflow refactor. Maintain `/Users/rickphillips/FreddyRhetorickContexts/commander-collector/REFACTOR-STATUS.md`. Structure: one section per phase, with checkboxes for each task, agent assigned, status (not started / in progress / blocked / done), start time, end time, and notes/blockers. Update on every SendMessage from the orchestrator. Do not modify any other file. Do not read code. Do not spawn subagents. Keep the file scannable — under 200 lines. Initialize the file now with the phase/task skeleton from `REFACTOR-INDEX.md`.
 
 Keep the scribe alive for the entire refactor. Send it a status update after every dispatch and every subagent return.
 
