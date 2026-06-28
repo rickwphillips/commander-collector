@@ -663,7 +663,9 @@ export const api = {
       buffer += chunk;
       const events: { event: string; data: string }[] = [];
       const blocks = buffer.split('\n\n');
-      buffer = blocks.pop()!;
+      // split() always yields at least one element, so pop() is never undefined;
+      // `?? ''` keeps the same behavior without a non-null assertion.
+      buffer = blocks.pop() ?? '';
       for (const block of blocks) {
         let event = '', data = '';
         for (const line of block.split('\n')) {
