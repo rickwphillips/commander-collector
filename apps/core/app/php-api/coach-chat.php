@@ -1356,7 +1356,8 @@ function executeTool(string $name, array $input): string {
             return json_encode(['success' => true, 'list_id' => $listId, 'message' => $msg]);
         } catch (Exception $e) {
             $db->rollBack();
-            return json_encode(['error' => 'Failed to update list: ' . $e->getMessage()]);
+            error_log('coach-chat.php update_list failed: ' . $e->getMessage());
+            return json_encode(['error' => 'Failed to update list']);
         }
     }
 
@@ -1400,7 +1401,8 @@ function executeTool(string $name, array $input): string {
             ]);
         } catch (Exception $e) {
             $db->rollBack();
-            return json_encode(['error' => 'Failed to create list: ' . $e->getMessage()]);
+            error_log('coach-chat.php create_list failed: ' . $e->getMessage());
+            return json_encode(['error' => 'Failed to create list']);
         }
     }
 
