@@ -22,7 +22,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import { getCardImageByName } from '@commander/shared/lib/cardImageCache';
 import { ASSET_BASE } from '@/lib/api';
 import { ControlFocusModal } from './ControlFocusModal';
-import { useXpKeyframes, useEnergyKeyframes, useDamageFlashKeyframe, usePoisonBoilKeyframe } from './PlayerCard.keyframes';
+import { LifeTotal } from './LifeTotal';
+import { useXpKeyframes } from './PlayerCard.keyframes';
 import { useLocalStorageBool } from '@/game-manager/hooks/useLocalStorageBool';
 
 const XP_ICON_SRC = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRPxc2Yz21vbnc5VP3Muxnx5VtQGAynItuNWg&s';
@@ -740,22 +741,10 @@ function PlayerCardImpl(props: PlayerCardProps) {
     : undefined;
   // energyGlow is used in the outer container; reserved here for Phase 4 wiring.
   void energyGlow;
-  const energyStaticShadow = player.energy > 5
-    ? `0 0 18px rgba(30,100,210,0.55), 0 0 36px rgba(20,70,180,0.3)`
-    : undefined;
-  const sizzleAmp = Math.min(player.energy - 5, 10) * 0.2;
-  const { energyPulseAnim, energySizzleAnim } = useEnergyKeyframes(
-    player.energy,
-    energyStaticShadow,
-    sizzleAmp,
-  );
-  const energyPulseDuration = player.energy > 5 ? Math.max(0.8, 2.5 - (player.energy - 5) * 0.09) : 2.5;
-  const damageFlashAnim = useDamageFlashKeyframe();
+  // The life-number reaction stack (damage flash + swipes, energy pulse/sizzle,
+  // poison boil) now lives in the shared <LifeTotal>; it derives those from the
+  // raw energy / poison / damageFlash values passed below.
   const poisonProgress = Math.min(player.poison / 10, 1);
-  const poisonBoilAmp = player.poison >= 10 ? 5 : player.poison === 9 ? 3.8 : player.poison === 8 ? 1.5 : 0;
-  const poisonBoilSkew = Math.min(poisonBoilAmp * 0.6, 2.5);
-  const poisonBoilAnim = usePoisonBoilKeyframe(player.poison, poisonBoilAmp, poisonBoilSkew);
-  const poisonBoilDuration = player.poison >= 10 ? 2.0 : player.poison >= 9 ? 2.5 : 5.0;
 
   // ─── Monarch crown anim string ──────────────────────────────────────────
   const { monarchEnterIsTransfer } = animations;
@@ -1387,86 +1376,15 @@ function PlayerCardImpl(props: PlayerCardProps) {
                   </Typography>
                 ))
               )}
-              <Typography onClick={() => setFocusedControl({ type: 'life' })} sx={{
-                position: 'relative', zIndex: 1,
-                fontWeight: 900,
-                fontSize: remoteMode ? 'clamp(80px, 22dvmax, 260px)' : (countersOpen ? 'clamp(34px, 10dvh, 112px)' : 'clamp(60px, 20dvh, 240px)'),
-                lineHeight: 1,
-                cursor: 'pointer',
-                color: computedLifeColor || ((theme: import('@mui/material').Theme) => theme.palette.primary.main),
-                transition: 'color 0.4s ease, font-size 0.2s ease',
-                ...(animations.damageFlash > 0 && { animation: `${damageFlashAnim} 0.6s ease-out forwards` }),
-                ...(animations.damageFlash === 0 && energyPulseAnim && { animation: `${energyPulseAnim} ${energyPulseDuration.toFixed(2)}s ease-out infinite, ${energySizzleAnim} 0.12s linear infinite` }),
-                ...(animations.damageFlash === 0 && !energyPulseAnim && poisonBoilAnim && { animation: `${poisonBoilAnim} ${poisonBoilDuration}s ease-in-out infinite` }),
-              }}>
-                {player.life}
-              </Typography>
-              {animations.damageFlash > 0 && (
-                <Box sx={{
-                  position: 'absolute', top: '44%', left: 0,
-                  width: '70%', height: '10%',
-                  background: 'linear-gradient(to right, transparent, rgba(200,0,0,0.5) 35%, rgba(235,0,0,0.88) 50%, rgba(200,0,0,0.5) 65%, transparent)',
-                  pointerEvents: 'none',
-                  animation: 'lifeSwipe1 0.6s ease-in forwards',
-                  '@keyframes lifeSwipe1': {
-                    '0%':   { transform: 'translate(-170%, -300%) rotate(22deg)' },
-                    '100%': { transform: 'translate(370%, 300%) rotate(22deg)' },
-                  },
-                }} />
-              )}
-              {animations.damageFlash > 0 && (
-                <Box sx={{
-                  position: 'absolute', top: '44%', left: 0,
-                  width: '70%', height: '10%',
-                  background: 'linear-gradient(to left, transparent, rgba(180,0,0,0.45) 35%, rgba(215,0,0,0.78) 50%, rgba(180,0,0,0.45) 65%, transparent)',
-                  pointerEvents: 'none',
-                  opacity: 0,
-                  animation: 'lifeSwipe2 0.6s ease-in 0.12s forwards',
-                  '@keyframes lifeSwipe2': {
-                    '0%':   { transform: 'translate(-170%, 300%) rotate(-16deg)', opacity: 1 },
-                    '100%': { transform: 'translate(370%, -300%) rotate(-16deg)', opacity: 1 },
-                  },
-                }} />
-              )}
-              {animations.damageFlash >= 5 && (
-                <Box sx={{
-                  position: 'absolute', top: '44%', left: 0,
-                  width: '70%', height: '10%',
-                  background: 'linear-gradient(to left, transparent, rgba(220,0,0,0.4) 35%, rgba(255,20,20,0.68) 50%, rgba(220,0,0,0.4) 65%, transparent)',
-                  pointerEvents: 'none', opacity: 0,
-                  animation: 'lifeSwipe3 0.58s ease-in 0.28s forwards',
-                  '@keyframes lifeSwipe3': {
-                    '0%':   { transform: 'translate(370%, -300%) rotate(30deg)', opacity: 1 },
-                    '100%': { transform: 'translate(-170%, 300%) rotate(30deg)', opacity: 1 },
-                  },
-                }} />
-              )}
-              {animations.damageFlash >= 5 && (
-                <Box sx={{
-                  position: 'absolute', top: '44%', left: 0,
-                  width: '70%', height: '10%',
-                  background: 'linear-gradient(to left, transparent, rgba(200,0,0,0.38) 35%, rgba(235,10,10,0.62) 50%, rgba(200,0,0,0.38) 65%, transparent)',
-                  pointerEvents: 'none', opacity: 0,
-                  animation: 'lifeSwipe4 0.6s ease-in 0.4s forwards',
-                  '@keyframes lifeSwipe4': {
-                    '0%':   { transform: 'translate(370%, 300%) rotate(-22deg)', opacity: 1 },
-                    '100%': { transform: 'translate(-170%, -300%) rotate(-22deg)', opacity: 1 },
-                  },
-                }} />
-              )}
-              {animations.damageFlash >= 5 && (
-                <Box sx={{
-                  position: 'absolute', top: '44%', left: 0,
-                  width: '70%', height: '10%',
-                  background: 'linear-gradient(to right, transparent, rgba(180,0,0,0.35) 35%, rgba(220,10,10,0.58) 50%, rgba(180,0,0,0.35) 65%, transparent)',
-                  pointerEvents: 'none', opacity: 0,
-                  animation: 'lifeSwipe5 0.58s ease-in 0.54s forwards',
-                  '@keyframes lifeSwipe5': {
-                    '0%':   { transform: 'translate(-170%, -350%) rotate(38deg)', opacity: 1 },
-                    '100%': { transform: 'translate(370%, 350%) rotate(38deg)', opacity: 1 },
-                  },
-                }} />
-              )}
+              <LifeTotal
+                value={player.life}
+                fontSize={remoteMode ? 'clamp(80px, 22dvmax, 260px)' : (countersOpen ? 'clamp(34px, 10dvh, 112px)' : 'clamp(60px, 20dvh, 240px)')}
+                color={computedLifeColor || undefined}
+                onClick={() => setFocusedControl({ type: 'life' })}
+                damageFlash={animations.damageFlash}
+                energy={player.energy}
+                poison={player.poison}
+              />
               <Stack direction="row" alignItems="center" spacing={remoteMode ? 0 : 0.5} sx={{ mt: remoteMode ? 1 : 'clamp(0px, 0.6dvh, 4px)', flexShrink: 0, zIndex: 1, ...(remoteMode && { width: '100%', justifyContent: 'space-evenly' }) }}>
                 <Tooltip open={lpKey === 'life-dec'} title="-5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
                   <IconButton
