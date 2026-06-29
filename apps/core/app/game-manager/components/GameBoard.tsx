@@ -9,6 +9,7 @@ import { PlayerPanel } from './PlayerPanel';
 import { ReadOnlyPlayerPanel } from './ReadOnlyPlayerPanel';
 import { SeatingCard } from './SeatingCard';
 import { CenterZone } from './CenterZone';
+import { TeamPanel, type TeamMember } from './TeamPanel';
 import { SeatPickerModal } from './SeatPickerModal';
 import { api } from '@/lib/api';
 import { isSeatFilled } from '@/lib/types';
@@ -38,6 +39,35 @@ function getActiveOpponents(players: PlayerState[], excludeIdx: number) {
   return players
     .map((p, i) => ({ name: p.playerName, idx: i }))
     .filter((_, i) => i !== excludeIdx && !players[i].isEliminated);
+}
+
+/**
+ * Two-Headed Giant start-of-game roll: every active player rolls a d20. The
+ * roll is only redone when the highest roll is tied across opposing teams — a
+ * tie between teammates does not require a reroll. The team of the highest
+ * roller takes the first turn. Returns the winning seat index plus a human
+ * note recording every roll for the game log.
+ */
+function rollForFirstTeam(
+  players: PlayerState[],
+  active: number[],
+): { winnerIdx: number; detail: string } {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const rolls = active.map((idx) => ({ idx, roll: 1 + Math.floor(Math.random() * 20) }));
+    const max = Math.max(...rolls.map((r) => r.roll));
+    const top = rolls.filter((r) => r.roll === max);
+    const topTeams = new Set(top.map((r) => players[r.idx].teamNumber));
+    if (topTeams.size > 1) continue; // highest roll tied across teams — reroll
+    const winnerIdx = top[0].idx;
+    const team = players[winnerIdx].teamNumber;
+    const summary = rolls.map((r) => `${players[r.idx].playerName} ${r.roll}`).join(', ');
+    return {
+      winnerIdx,
+      detail: `2HG roll (d20): ${summary}. Team ${team} (${players[winnerIdx].playerName}) goes first.`,
+    };
+  }
+  const winnerIdx = active[0];
+  return { winnerIdx, detail: `2HG roll: Team ${players[winnerIdx].teamNumber} goes first.` };
 }
 
 interface GameBoardProps {
@@ -118,25 +148,38 @@ export function GameBoard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [winner]);
 
-  // Detect winner from any source (direct handlers OR remote events applied via setState)
+  // Detect winner from any source (direct handlers OR remote events applied via
+  // setState). In 2HG the game ends when only one team still has live players;
+  // in standard play it ends when one seat remains. The `winner` we store is a
+  // representative survivor (the whole surviving team in 2HG).
   useEffect(() => {
     if (winner) return;
     if (!firstPlayerSet) return;
     const remaining = players.filter((p) => !p.isEliminated);
-    if (remaining.length === 1 && players.some((p) => p.isEliminated)) {
+    if (!players.some((p) => p.isEliminated)) return;
+    if (state.gameType === '2hg') {
+      const remainingTeams = new Set(remaining.map((p) => p.teamNumber));
+      if (remainingTeams.size === 1 && remaining.length > 0) setWinner(remaining[0]);
+    } else if (remaining.length === 1) {
       setWinner(remaining[0]);
     }
-  }, [players, winner, firstPlayerSet]);
+  }, [players, winner, firstPlayerSet, state.gameType]);
 
-  // Cancel countdown if a correction restores more than one active player
+  // Cancel countdown if a correction restores a contested board.
   useEffect(() => {
     if (!winner) return;
     const remaining = players.filter((p) => !p.isEliminated);
-    if (remaining.length !== 1) {
+    const stillWon =
+      state.gameType === '2hg'
+        ? new Set(remaining.map((p) => p.teamNumber)).size === 1 &&
+          remaining.length > 0 &&
+          players.some((p) => p.isEliminated)
+        : remaining.length === 1;
+    if (!stillWon) {
       setWinner(null);
       setWinnerCountdown(null);
     }
-  }, [players, winner]);
+  }, [players, winner, state.gameType]);
 
   useEffect(() => {
     if (winnerCountdown === null) return;
@@ -204,6 +247,8 @@ export function GameBoard({
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const rollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tickTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  // 2HG: the per-player roll summary to record in notes once the roll is accepted.
+  const rollDetailRef = useRef<string | null>(null);
 
   // Tick the turn timer every second
   useEffect(() => {
@@ -223,7 +268,18 @@ export function GameBoard({
   const startRoll = () => {
     if (rollTimer.current) clearTimeout(rollTimer.current);
     const active = players.map((p, i) => i).filter((i) => !players[i].isEliminated);
-    const finalIdx = active[Math.floor(Math.random() * active.length)];
+    // 2HG resolves the first turn via a team roll (reroll only on cross-team
+    // ties); standard play just picks a random active seat. Either way the
+    // animation lands on finalIdx below.
+    let finalIdx: number;
+    if (state.gameType === '2hg') {
+      const { winnerIdx, detail } = rollForFirstTeam(players, active);
+      finalIdx = winnerIdx;
+      rollDetailRef.current = detail;
+    } else {
+      finalIdx = active[Math.floor(Math.random() * active.length)];
+      rollDetailRef.current = null;
+    }
 
     // Build a sequence that cycles through active players and lands on finalIdx
     const STEPS = 18;
@@ -254,7 +310,9 @@ export function GameBoard({
   const handleAcceptFirstPlayer = () => {
     if (rollState.finalIdx === null) return;
     const player = players[rollState.finalIdx];
-    const note = `First player (rolled): ${player?.playerName ?? '?'}`;
+    // For 2HG, record the full team-roll summary; otherwise the simple line.
+    const note = rollDetailRef.current ?? `First player (rolled): ${player?.playerName ?? '?'}`;
+    rollDetailRef.current = null;
     const newNotes = state.notes ? `${state.notes}\n${note}` : note;
     onUpdate({ ...state, currentPlayerIdx: rollState.finalIdx, firstPlayerIdx: rollState.finalIdx, turnStartTime: Date.now(), notes: newNotes });
     setRollState(IDLE_ROLL_STATE);
@@ -427,11 +485,26 @@ export function GameBoard({
   };
 
   const playerCount = players.length;
+  // 2HG takes its turn as a team, so both teammates highlight together; standard
+  // play highlights the single active seat.
+  const activeTeamNumber = state.gameType === '2hg' ? players[currentPlayerIdx]?.teamNumber ?? null : null;
+  const isSeatActive = (idx: number) =>
+    state.gameType === '2hg'
+      ? players[idx]?.teamNumber != null && players[idx].teamNumber === activeTeamNumber
+      : currentPlayerIdx === idx;
   const leftPanelCss = playerCount === 3 ? 'clamp(200px, 25dvw, 380px)' : 'clamp(160px, 21dvw, 300px)';
   const rightPanelCss = 'clamp(160px, 21dvw, 300px)';
   const leftColumnWidth = playerCount >= 3 ? leftPanelCss : '0px';
   const rightColumnWidth = playerCount >= 4 ? rightPanelCss : '0px';
-  const gridTemplateColumns = `${leftColumnWidth} 1fr ${rightColumnWidth}`;
+  // 2HG renders two team panels rotated into the left/right columns so each
+  // team reads its panel from its own long side of the table (tablet flat in
+  // the middle). The column width and the rotated frame's height share the same
+  // size. Standard play sizes the side columns to the seat count.
+  const is2hg = state.gameType === '2hg';
+  const twoHgPanelCss = 'clamp(280px, 32dvw, 560px)';
+  const gridTemplateColumns = is2hg
+    ? `${twoHgPanelCss} 1fr ${twoHgPanelCss}`
+    : `${leftColumnWidth} 1fr ${rightColumnWidth}`;
 
   // -------- Seating phase early-return --------
   if (state.phase === 'seating') {
@@ -465,35 +538,65 @@ export function GameBoard({
           py: 0,
         }}
       >
-        {players.map((player, idx) => {
-          const placement = getGridPlacement(player.position);
-          const rotation = getRotation(player.position);
-          const isVertical = player.position === 'left' || player.position === 'right';
-
-          return (
-            <Box key={idx} sx={{ ...placement, position: 'relative', overflow: 'hidden' }}>
-              <Box
-                sx={
-                  isVertical
-                    ? {
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        width: '100dvh',
-                        height: player.position === 'left' ? leftPanelCss : rightPanelCss,
-                        transform: `translate(-50%, -50%) ${rotation}`,
-                      }
-                    : { position: 'absolute', inset: 0, transform: rotation }
-                }
-              >
-                <SeatingCard
-                  player={player}
-                  onOpenSeatPicker={() => setPickerSeatIdx(idx)}
-                />
+        {state.gameType === '2hg' ? (
+          // 2HG seating: two team columns (Team 1 left, Team 2 right), each
+          // holding its two seats stacked vertically.
+          [1, 2].map((teamNum) => (
+            <Box
+              key={teamNum}
+              sx={{
+                gridColumn: teamNum === 1 ? 1 : 3,
+                gridRow: '1 / 4',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 0.5,
+                p: 0.5,
+                minHeight: 0,
+              }}
+            >
+              <Box sx={{ textAlign: 'center', fontWeight: 800, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: teamNum === 1 ? 'primary.main' : 'secondary.main' }}>
+                Team {teamNum}
               </Box>
+              {players.map((player, idx) =>
+                player.teamNumber === teamNum ? (
+                  <Box key={idx} sx={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
+                    <SeatingCard player={player} onOpenSeatPicker={() => setPickerSeatIdx(idx)} />
+                  </Box>
+                ) : null,
+              )}
             </Box>
-          );
-        })}
+          ))
+        ) : (
+          players.map((player, idx) => {
+            const placement = getGridPlacement(player.position);
+            const rotation = getRotation(player.position);
+            const isVertical = player.position === 'left' || player.position === 'right';
+
+            return (
+              <Box key={idx} sx={{ ...placement, position: 'relative', overflow: 'hidden' }}>
+                <Box
+                  sx={
+                    isVertical
+                      ? {
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          width: '100dvh',
+                          height: player.position === 'left' ? leftPanelCss : rightPanelCss,
+                          transform: `translate(-50%, -50%) ${rotation}`,
+                        }
+                      : { position: 'absolute', inset: 0, transform: rotation }
+                  }
+                >
+                  <SeatingCard
+                    player={player}
+                    onOpenSeatPicker={() => setPickerSeatIdx(idx)}
+                  />
+                </Box>
+              </Box>
+            );
+          })
+        )}
 
         <Box
           sx={{
@@ -560,6 +663,45 @@ export function GameBoard({
   }
   // -------- End seating phase --------
 
+  // 2HG: collapse the four seats into two team panels (Team 1 left, Team 2
+  // right). Life/poison are already shared by reconcileTeams; the panels render
+  // a single life + poison and route mutations through the normal handlers.
+  const team1: TeamMember[] = players.map((player, idx) => ({ player, idx })).filter((m) => m.player.teamNumber === 1);
+  const team2: TeamMember[] = players.map((player, idx) => ({ player, idx })).filter((m) => m.player.teamNumber === 2);
+  const activeTeam = state.gameType === '2hg' ? players[currentPlayerIdx]?.teamNumber ?? null : null;
+  const renderTeamPanel = (members: TeamMember[], opponents: TeamMember[], teamNumber: number, panelPosition: 'left' | 'right') => (
+    <Box sx={{ gridColumn: panelPosition === 'left' ? 1 : 3, gridRow: '1 / 4', position: 'relative', overflow: 'hidden' }}>
+      {/* Rotated into the column so the panel faces its long side of the table:
+          left team rotates 90deg, right team -90deg (same trick as the standard
+          left/right player panels). The frame is laid out landscape (width
+          100dvh) then rotated, which is why TeamPanel is a horizontal layout. */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          width: '100dvh',
+          height: twoHgPanelCss,
+          transform: `translate(-50%, -50%) ${panelPosition === 'left' ? 'rotate(90deg)' : 'rotate(-90deg)'}`,
+        }}
+      >
+        <TeamPanel
+          teamNumber={teamNumber}
+          members={members}
+          opponents={opponents}
+          commanderDamage={commanderDamage}
+          startingLife={startingLife}
+          isActiveTeam={firstPlayerSet && activeTeam === teamNumber}
+          position={panelPosition}
+          onLifeChange={handleLifeChange}
+          onPoisonChange={handlePoisonChange}
+          onCommanderTaxChange={handleCommanderTaxChange}
+          onCommanderDamageChange={handleCommanderDamageChange}
+        />
+      </Box>
+    </Box>
+  );
+
   return (
     <Box
       sx={{
@@ -575,7 +717,13 @@ export function GameBoard({
         py: 0,
       }}
     >
-      {players.map((player, idx) => {
+      {state.gameType === '2hg' && (
+        <>
+          {renderTeamPanel(team1, team2, 1, 'left')}
+          {renderTeamPanel(team2, team1, 2, 'right')}
+        </>
+      )}
+      {state.gameType !== '2hg' && players.map((player, idx) => {
         // POSITIONS_BY_COUNT (page.tsx) restricts the players array to the
         // active seats for the chosen count, so player.position is always one
         // we render. No need for a "skip right at 3 players" guard.
@@ -616,13 +764,13 @@ export function GameBoard({
                 allPlayers={players}
                 commanderDamage={commanderDamage}
                 isHighlighted={rollState.highlightIdx === idx}
-                isCurrentPlayer={firstPlayerSet && currentPlayerIdx === idx}
-                elapsedSeconds={firstPlayerSet && currentPlayerIdx === idx ? elapsedSeconds : 0}
+                isCurrentPlayer={firstPlayerSet && isSeatActive(idx)}
+                elapsedSeconds={firstPlayerSet && isSeatActive(idx) ? elapsedSeconds : 0}
                 turnTimerSeconds={turnTimerSeconds}
                 startingLife={startingLife}
                 highlightMode={highlightMode}
-                seatCode={state.sessionSeats?.[player.position] ?? undefined}
-                remoteConnected={!!state.remoteCheckins?.[player.position] && Date.now() - (state.remoteCheckins[player.position] ?? 0) < 15000}
+                seatCode={state.gameType === '2hg' ? undefined : (state.sessionSeats?.[player.position] ?? undefined)}
+                remoteConnected={state.gameType !== '2hg' && !!state.remoteCheckins?.[player.position] && Date.now() - (state.remoteCheckins[player.position] ?? 0) < 15000}
                 onLifeChange={handleLifeChange}
                 onPoisonChange={handlePoisonChange}
                 onCommanderTaxChange={handleCommanderTaxChange}
@@ -701,6 +849,7 @@ export function GameBoard({
           onToggleFullscreen={toggleFullscreen}
           notes={state.notes}
           onNotesChange={(n) => updateState({ notes: n })}
+          gameType={state.gameType}
           highlightMode={highlightMode}
           onToggleHighlightMode={() => {
             const newVal = !highlightMode;
@@ -770,7 +919,9 @@ export function GameBoard({
           display: 'flex', alignItems: 'center', gap: 1.5,
         }}>
           <Typography sx={{ fontWeight: 900, fontSize: 'clamp(14px, 2.5dvh, 20px)', flex: 1 }}>
-            🏆 {winner.playerName} wins — saving in {winnerCountdown}s
+            🏆 {state.gameType === '2hg' && winner.teamNumber != null
+              ? `Team ${winner.teamNumber} (${players.filter((p) => p.teamNumber === winner.teamNumber).map((p) => p.playerName).join(' & ')})`
+              : winner.playerName} wins — saving in {winnerCountdown}s
           </Typography>
           <Button size="small" variant="contained" onClick={() => {
             const s = winnerStateRef.current ?? state;

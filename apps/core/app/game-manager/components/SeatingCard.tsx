@@ -25,6 +25,7 @@ interface SeatingCardProps {
 export function SeatingCard({ player, onOpenSeatPicker }: SeatingCardProps) {
   const isFilled = !!(player.playerId && player.deckId && player.commander?.name);
   const positionLabel = player.position.charAt(0).toUpperCase() + player.position.slice(1);
+  const teamLabel = player.teamNumber != null ? `Team ${player.teamNumber}` : null;
 
   return (
     <Box
@@ -46,11 +47,32 @@ export function SeatingCard({ player, onOpenSeatPicker }: SeatingCardProps) {
         transition: 'background-color 120ms, border-color 120ms',
         textAlign: 'center',
         p: 1,
+        position: 'relative',
         '&:hover': onOpenSeatPicker
           ? { bgcolor: 'action.hover', borderColor: 'primary.main' }
           : {},
       }}
     >
+      {teamLabel && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 6,
+            left: 6,
+            px: 0.75,
+            py: 0.25,
+            borderRadius: 1,
+            bgcolor: player.teamNumber === 1 ? 'primary.main' : 'secondary.main',
+            color: '#fff',
+            fontSize: 'clamp(9px, 1dvh, 11px)',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+          }}
+        >
+          {teamLabel}
+        </Box>
+      )}
       {isFilled ? (
         <>
           <Box sx={{ fontSize: 'clamp(11px, 1.2dvh, 14px)', fontWeight: 700, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 1 }}>

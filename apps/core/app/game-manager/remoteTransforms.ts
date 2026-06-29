@@ -16,6 +16,105 @@ export const CLOCKWISE: ReadonlyArray<'bottom' | 'left' | 'top' | 'right'> = [
   'right',
 ];
 
+// In Two-Headed Giant a team loses at 15 poison counters (vs 10 for a single
+// player) and at 21 combat damage from a single commander (same as standard).
+export const TWOHG_POISON_THRESHOLD = 15;
+
+/**
+ * reconcileTeams — the only place 2HG team semantics live.
+ *
+ * The per-player reducers above are entirely 2HG-agnostic: they apply a life /
+ * poison / commander-damage change to a single seat exactly as they do for a
+ * standard game. After the reducer runs, this function (called from applyEvent
+ * for 2HG games only) makes the two teammates on each team share one life and
+ * one poison total, and eliminates both heads together when any team-level loss
+ * condition is met:
+ *   - shared life reaches 0
+ *   - shared poison reaches 15
+ *   - a single commander has dealt 21+ combat damage to the team
+ *     (summed across both heads)
+ *   - either head concedes
+ *
+ * It compares prev → next to find which teammate's value the reducer changed and
+ * mirrors that value onto the other head, so a single +/- on either seat moves
+ * the team total exactly once. Elimination is recomputed from scratch every call,
+ * which makes undo (life back above 0, poison back below 15) self-correcting.
+ */
+export function reconcileTeams(
+  prev: GameManagerState,
+  next: GameManagerState,
+): GameManagerState {
+  if (next.gameType !== '2hg') return next;
+
+  // Group seat indices by team number.
+  const teams = new Map<number, number[]>();
+  next.players.forEach((p, i) => {
+    if (p.teamNumber == null) return;
+    const arr = teams.get(p.teamNumber) ?? [];
+    arr.push(i);
+    teams.set(p.teamNumber, arr);
+  });
+
+  const players = [...next.players];
+
+  for (const idxs of teams.values()) {
+    if (idxs.length < 2) continue; // not a full pair yet (seating); leave as-is
+
+    // Shared life: take the value the reducer just changed, else the existing
+    // (already-mirrored) value.
+    const lifeChanged = idxs.find((t) => next.players[t].life !== prev.players[t]?.life);
+    const teamLife = lifeChanged != null ? next.players[lifeChanged].life : next.players[idxs[0]].life;
+
+    // Shared poison: same rule.
+    const poisonChanged = idxs.find((t) => next.players[t].poison !== prev.players[t]?.poison);
+    const teamPoison =
+      poisonChanged != null
+        ? next.players[poisonChanged].poison
+        : Math.max(...idxs.map((t) => next.players[t].poison));
+
+    // 21 combat damage from a single commander, summed across both heads. The
+    // commanderDamage slot is [ownCommander, partnerCommander]; own and partner
+    // are distinct commanders, so each is checked separately.
+    const sources = new Set<number>();
+    idxs.forEach((t) =>
+      Object.keys(next.commanderDamage[t] ?? {}).forEach((s) => sources.add(Number(s))),
+    );
+    let cmdKill = false;
+    for (const s of sources) {
+      let own = 0;
+      let partner = 0;
+      for (const t of idxs) {
+        const d = next.commanderDamage[t]?.[s] ?? [0, 0];
+        own += d[0];
+        partner += d[1];
+      }
+      if (own >= 21 || partner >= 21) cmdKill = true;
+    }
+
+    const conceded = idxs.some((t) => next.players[t].isConceded);
+    const eliminated = teamLife <= 0 || teamPoison >= TWOHG_POISON_THRESHOLD || cmdKill || conceded;
+    const wasEliminated = idxs.every((t) => prev.players[t]?.isEliminated);
+    let eliminatedTurn: number | null = null;
+    if (eliminated) {
+      eliminatedTurn = wasEliminated
+        ? (prev.players[idxs[0]]?.eliminatedTurn ?? next.turnNumber)
+        : next.turnNumber;
+    }
+
+    for (const t of idxs) {
+      players[t] = {
+        ...players[t],
+        life: teamLife,
+        poison: teamPoison,
+        isEliminated: eliminated,
+        eliminatedTurn,
+      };
+    }
+  }
+
+  return { ...next, players };
+}
+
 export function applyLifeChange(
   state: GameManagerState,
   idx: number,
@@ -238,7 +337,47 @@ export function applyCheckin(state: GameManagerState, seat: string, ts: number):
   };
 }
 
+/**
+ * 2HG turn passing: hand the turn to the other team as a unit. `dir > 0` is
+ * Next Turn, `dir < 0` is Previous Turn. currentPlayerIdx points at one live
+ * seat of the active team (it just identifies whose turn it is; the board
+ * highlights both teammates). The turn number counts rounds: going forward it
+ * increments when play returns to the team that started the game; going back it
+ * decrements when leaving the starting team.
+ */
+function passTeamTurn(state: GameManagerState, dir: number): GameManagerState {
+  const { players, currentPlayerIdx, turnNumber } = state;
+  const firstIdx = state.firstPlayerIdx ?? 0;
+  const curTeam = players[currentPlayerIdx]?.teamNumber;
+  const firstTeam = players[firstIdx]?.teamNumber;
+  if (curTeam == null) return state;
+  const nextIdx = players.findIndex(
+    (p) => p.teamNumber != null && p.teamNumber !== curTeam && !p.isEliminated,
+  );
+  if (nextIdx === -1) return state; // no opposing team to pass to
+  let newTurnNumber = turnNumber;
+  if (dir > 0) {
+    if (players[nextIdx].teamNumber === firstTeam) newTurnNumber = turnNumber + 1;
+  } else {
+    if (curTeam === firstTeam) {
+      if (turnNumber === 1) return state; // can't step before the first turn
+      newTurnNumber = turnNumber - 1;
+    }
+  }
+  return {
+    ...state,
+    currentPlayerIdx: nextIdx,
+    turnNumber: newTurnNumber,
+    turnStartTime: Date.now(),
+  };
+}
+
 export function applyPassTurn(state: GameManagerState): GameManagerState {
+  // 2HG: teammates share one turn. Passing the turn hands play to the OTHER
+  // team as a unit (not the next seat). The turn number counts rounds, so it
+  // increments when play returns to the team that started the game.
+  if (state.gameType === '2hg') return passTeamTurn(state, +1);
+
   const { players, currentPlayerIdx, turnNumber } = state;
   const firstIdx = state.firstPlayerIdx ?? 0;
   const currentPos = players[currentPlayerIdx].position;
@@ -273,6 +412,8 @@ export function applyPassTurn(state: GameManagerState): GameManagerState {
  * first player's position. Refuses to step back below turn 1.
  */
 export function applyPrevTurn(state: GameManagerState): GameManagerState {
+  if (state.gameType === '2hg') return passTeamTurn(state, -1);
+
   const { players, currentPlayerIdx, turnNumber } = state;
   const firstIdx = state.firstPlayerIdx ?? 0;
   const currentPos = players[currentPlayerIdx].position;
@@ -337,6 +478,13 @@ function applyViewPlayer(state: GameManagerState, event: ViewEvent): GameManager
  * Unknown event types are ignored (returns state unchanged).
  */
 export function applyEvent(state: GameManagerState, event: LiveGameEvent): GameManagerState {
+  const next = applyEventInner(state, event);
+  // For 2HG, fold each per-seat change into shared team life/poison + joint
+  // elimination. No-op for standard games (reconcileTeams returns next as-is).
+  return reconcileTeams(state, next);
+}
+
+function applyEventInner(state: GameManagerState, event: LiveGameEvent): GameManagerState {
   switch (event.type) {
     case 'life_change':
       return applyLifeChange(state, event.playerIdx, event.delta);

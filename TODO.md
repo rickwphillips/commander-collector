@@ -1,2 +1,5 @@
 - [ ] Create a game manager diagram
 - [ ] Selecting the autosearch results of a commander on the create deck page is not registering in the input field when selected. #bug
+- [~] Update the game manager to accommodate 2HG. (first pass done: shared life/poison, team roll, collective team turns, two-panel left/right layout, remote disabled)
+  - [ ] 2HG team panel: keep each player's individual counters (energy, XP) and the ability menu (monarch, initiative, city's blessing) per player, not just shared life/poison + tax
+  - [ ] Revisit team-panel orientation/density once individual counters are restored

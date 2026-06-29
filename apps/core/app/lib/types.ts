@@ -583,6 +583,8 @@ export interface PlayerState extends PlayerSetup {
   isEliminated: boolean;
   isConceded: boolean;
   eliminatedTurn: number | null;
+  /** 2HG only: which team (1 or 2) this seat belongs to. null/undefined for standard games. */
+  teamNumber?: number | null;
 }
 
 export type CommanderDamageMap = Record<number, Record<number, [number, number]>>;

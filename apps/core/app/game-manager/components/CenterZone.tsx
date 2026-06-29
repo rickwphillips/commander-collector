@@ -30,10 +30,14 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import TextFieldsIcon from '@mui/icons-material/TextFields';
 import ChatIcon from '@mui/icons-material/Chat';
 import MinimizeIcon from '@mui/icons-material/Minimize';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import Badge from '@mui/material/Badge';
 import { useThemeMode } from '@/components/ThemeProvider';
 import { RulesQuickLookup } from '@/components/RulesQuickLookup';
 import type { PlayerState, CommanderDamageMap } from '../types';
+import type { GameType } from '@/lib/types';
+
+const TWO_HEADED_GIANT_RULES_URL = 'https://magic.wizards.com/en/formats/two-headed-giant';
 
 function D20Icon({ size = 16 }: { size?: number }) {
   return (
@@ -86,6 +90,7 @@ interface CenterZoneProps {
   soundEnabled: boolean;
   onToggleSound: () => void;
   commanderDamage: CommanderDamageMap;
+  gameType?: GameType;
 }
 
 function rollDie(sides: number): number {
@@ -120,6 +125,7 @@ export function CenterZone({
   soundEnabled,
   onToggleSound,
   commanderDamage,
+  gameType,
 }: CenterZoneProps) {
   type RollEntry = { label: string; rolls: (number | string)[]; total: number | null; color: string };
   const [history, setHistory] = useState<RollEntry[]>([]);
@@ -395,6 +401,16 @@ export function CenterZone({
     : null;
 
   const currentPlayer = players[currentPlayerIdx];
+  // 2HG takes its turn as a team: the turn tracker names the active team and its
+  // two pilots rather than a single seat.
+  const is2hg = gameType === '2hg';
+  const activeTeam = is2hg ? currentPlayer?.teamNumber ?? null : null;
+  const turnCmdLabel = is2hg && activeTeam != null
+    ? `Team ${activeTeam}`
+    : (currentPlayer?.commander.name ?? '—');
+  const turnPlayerLabel = is2hg && activeTeam != null
+    ? players.filter((p) => p.teamNumber === activeTeam).map((p) => p.playerName).join(' & ')
+    : (currentPlayer?.playerName ?? '—');
 
   const renderDiceGrid = (
     rolls: (number | string)[],
@@ -447,10 +463,10 @@ export function CenterZone({
                   Turn {turnNumber}
                 </Typography>
                 <Typography sx={{ fontSize: fsCmdName, fontWeight: 600, color: 'text.primary', lineHeight: 1.2 }}>
-                  {currentPlayer?.commander.name ?? '—'}
+                  {turnCmdLabel}
                 </Typography>
                 <Typography sx={{ fontSize: fsPlayerName, color: 'text.secondary', lineHeight: 1.3 }}>
-                  {currentPlayer?.playerName ?? '—'}
+                  {turnPlayerLabel}
                 </Typography>
               </Box>
 
@@ -481,10 +497,10 @@ export function CenterZone({
                   Turn {turnNumber}
                 </Typography>
                 <Typography sx={{ fontSize: fsCmdName, fontWeight: 600, color: 'text.primary', lineHeight: 1.2 }}>
-                  {currentPlayer?.commander.name ?? '—'}
+                  {turnCmdLabel}
                 </Typography>
                 <Typography sx={{ fontSize: fsPlayerName, color: 'text.secondary', lineHeight: 1.3 }}>
-                  {currentPlayer?.playerName ?? '—'}
+                  {turnPlayerLabel}
                 </Typography>
               </Box>
             </Stack>
@@ -768,6 +784,21 @@ export function CenterZone({
                 End Game
               </Button>
             </Stack>
+
+            {gameType === '2hg' && (
+              <Button
+                component="a"
+                href={TWO_HEADED_GIANT_RULES_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="text"
+                size="small"
+                endIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
+                sx={{ fontSize: 11, py: 0.5, mt: 0.5 }}
+              >
+                Two-Headed Giant Rules
+              </Button>
+            )}
           </Box>
         )}
 

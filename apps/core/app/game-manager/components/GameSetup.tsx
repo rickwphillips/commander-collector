@@ -48,11 +48,20 @@ export function GameSetup({ onStart, initial }: GameSetupProps) {
   const [turnTimerSeconds, setTurnTimerSeconds] = useState<number>(initial?.turnTimerSeconds ?? 300);
   const [gameType, setGameType] = useState<GameType>(initial?.gameType ?? 'standard');
 
+  // Two-Headed Giant is always four players (two teams of two) and starts each
+  // team at 30 life per the official rules. Player count is forced to 4 in the
+  // game-type change handler below; this effect keeps the life default in sync.
   useEffect(() => {
     if (!isCustomLife) {
-      setStartingLife(playerCount === 2 ? 30 : 40);
+      if (gameType === '2hg') setStartingLife(30);
+      else setStartingLife(playerCount === 2 ? 30 : 40);
     }
-  }, [playerCount, isCustomLife]);
+  }, [playerCount, isCustomLife, gameType]);
+
+  const handleGameTypeChange = (val: GameType) => {
+    setGameType(val);
+    if (val === '2hg') setPlayerCount(4);
+  };
 
   const handleLifePreset = (_: React.MouseEvent<HTMLElement>, val: number | null) => {
     if (val === null) return;
@@ -109,10 +118,15 @@ export function GameSetup({ onStart, initial }: GameSetupProps) {
                   Players
                 </Typography>
                 <ToggleButtonGroup value={playerCount} exclusive onChange={handlePlayerCountChange} size="small">
-                  <ToggleButton value={2}>2</ToggleButton>
-                  <ToggleButton value={3}>3</ToggleButton>
+                  <ToggleButton value={2} disabled={gameType === '2hg'}>2</ToggleButton>
+                  <ToggleButton value={3} disabled={gameType === '2hg'}>3</ToggleButton>
                   <ToggleButton value={4}>4</ToggleButton>
                 </ToggleButtonGroup>
+                {gameType === '2hg' && (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                    Two-Headed Giant is always 4 players (two teams of two).
+                  </Typography>
+                )}
               </Box>
 
               <Box>
@@ -163,7 +177,7 @@ export function GameSetup({ onStart, initial }: GameSetupProps) {
                   select
                   size="small"
                   value={gameType}
-                  onChange={(e) => setGameType(e.target.value as GameType)}
+                  onChange={(e) => handleGameTypeChange(e.target.value as GameType)}
                   sx={{ width: 200 }}
                 >
                   <MenuItem value="standard">Standard</MenuItem>

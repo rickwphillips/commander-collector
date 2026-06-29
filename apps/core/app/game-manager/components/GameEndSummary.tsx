@@ -108,6 +108,21 @@ export function GameEndSummary({
                             commander={player.commander.name}
                             size="small"
                           />
+                          {player.teamNumber != null && (
+                            <Box
+                              sx={{
+                                px: 0.75,
+                                py: 0.25,
+                                borderRadius: 1,
+                                bgcolor: player.teamNumber === 1 ? 'primary.main' : 'secondary.main',
+                                color: '#fff',
+                                fontSize: 11,
+                                fontWeight: 700,
+                              }}
+                            >
+                              Team {player.teamNumber}
+                            </Box>
+                          )}
                         </Stack>
                         <Typography variant="caption" color="text.secondary">
                           {player.deckName} · {player.commander.name}
