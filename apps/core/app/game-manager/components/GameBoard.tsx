@@ -497,13 +497,13 @@ export function GameBoard({
   const leftColumnWidth = playerCount >= 3 ? leftPanelCss : '0px';
   const rightColumnWidth = playerCount >= 4 ? rightPanelCss : '0px';
   // 2HG renders two team panels rotated into the left/right columns so each
-  // team reads its panel from its own long side of the table (tablet flat in
-  // the middle). The column width and the rotated frame's height share the same
-  // size. Standard play sizes the side columns to the seat count.
+  // 2HG renders one full-width team panel along the top edge and one along the
+  // bottom edge (tablet flat in landscape between the two teams). The bottom
+  // team is upright; the top team is rotated 180deg to face the players on the
+  // opposite long side. Standard play sizes the side columns to the seat count.
   const is2hg = state.gameType === '2hg';
-  const twoHgPanelCss = 'clamp(280px, 32dvw, 560px)';
   const gridTemplateColumns = is2hg
-    ? `${twoHgPanelCss} 1fr ${twoHgPanelCss}`
+    ? '1fr minmax(300px, 520px) 1fr'
     : `${leftColumnWidth} 1fr ${rightColumnWidth}`;
 
   // -------- Seating phase early-return --------
@@ -539,27 +539,28 @@ export function GameBoard({
         }}
       >
         {state.gameType === '2hg' ? (
-          // 2HG seating: two team columns (Team 1 left, Team 2 right), each
-          // holding its two seats stacked vertically.
-          [1, 2].map((teamNum) => (
+          // 2HG seating: Team 2 spans the top row, Team 1 the bottom row, each
+          // holding its two seats side by side (matches the top/bottom board).
+          [2, 1].map((teamNum) => (
             <Box
               key={teamNum}
               sx={{
-                gridColumn: teamNum === 1 ? 1 : 3,
-                gridRow: '1 / 4',
+                gridColumn: '1 / -1',
+                gridRow: teamNum === 2 ? 1 : 3,
                 display: 'flex',
-                flexDirection: 'column',
+                flexDirection: 'row',
+                alignItems: 'stretch',
                 gap: 0.5,
                 p: 0.5,
                 minHeight: 0,
               }}
             >
-              <Box sx={{ textAlign: 'center', fontWeight: 800, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: teamNum === 1 ? 'primary.main' : 'secondary.main' }}>
+              <Box sx={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', textAlign: 'center', fontWeight: 800, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: teamNum === 1 ? 'primary.main' : 'secondary.main', flexShrink: 0 }}>
                 Team {teamNum}
               </Box>
               {players.map((player, idx) =>
                 player.teamNumber === teamNum ? (
-                  <Box key={idx} sx={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
+                  <Box key={idx} sx={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden' }}>
                     <SeatingCard player={player} onOpenSeatPicker={() => setPickerSeatIdx(idx)} />
                   </Box>
                 ) : null,
@@ -669,36 +670,30 @@ export function GameBoard({
   const team1: TeamMember[] = players.map((player, idx) => ({ player, idx })).filter((m) => m.player.teamNumber === 1);
   const team2: TeamMember[] = players.map((player, idx) => ({ player, idx })).filter((m) => m.player.teamNumber === 2);
   const activeTeam = state.gameType === '2hg' ? players[currentPlayerIdx]?.teamNumber ?? null : null;
-  const renderTeamPanel = (members: TeamMember[], opponents: TeamMember[], teamNumber: number, panelPosition: 'left' | 'right') => (
-    <Box sx={{ gridColumn: panelPosition === 'left' ? 1 : 3, gridRow: '1 / 4', position: 'relative', overflow: 'hidden' }}>
-      {/* Rotated into the column so the panel faces its long side of the table:
-          left team rotates 90deg, right team -90deg (same trick as the standard
-          left/right player panels). The frame is laid out landscape (width
-          100dvh) then rotated, which is why TeamPanel is a horizontal layout. */}
-      <Box
-        sx={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          width: '100dvh',
-          height: twoHgPanelCss,
-          transform: `translate(-50%, -50%) ${panelPosition === 'left' ? 'rotate(90deg)' : 'rotate(-90deg)'}`,
-        }}
-      >
-        <TeamPanel
-          teamNumber={teamNumber}
-          members={members}
-          opponents={opponents}
-          commanderDamage={commanderDamage}
-          startingLife={startingLife}
-          isActiveTeam={firstPlayerSet && activeTeam === teamNumber}
-          position={panelPosition}
-          onLifeChange={handleLifeChange}
-          onPoisonChange={handlePoisonChange}
-          onCommanderTaxChange={handleCommanderTaxChange}
-          onCommanderDamageChange={handleCommanderDamageChange}
-        />
-      </Box>
+  const renderTeamPanel = (members: TeamMember[], opponents: TeamMember[], teamNumber: number, edge: 'top' | 'bottom') => (
+    <Box
+      sx={{
+        gridColumn: '1 / -1',
+        gridRow: edge === 'top' ? 1 : 3,
+        position: 'relative',
+        overflow: 'hidden',
+        p: 0.5,
+        // Top team is rotated 180deg to face the players on the opposite side.
+        transform: edge === 'top' ? 'rotate(180deg)' : 'none',
+      }}
+    >
+      <TeamPanel
+        teamNumber={teamNumber}
+        members={members}
+        opponents={opponents}
+        commanderDamage={commanderDamage}
+        startingLife={startingLife}
+        isActiveTeam={firstPlayerSet && activeTeam === teamNumber}
+        onLifeChange={handleLifeChange}
+        onPoisonChange={handlePoisonChange}
+        onCommanderTaxChange={handleCommanderTaxChange}
+        onCommanderDamageChange={handleCommanderDamageChange}
+      />
     </Box>
   );
 
@@ -719,8 +714,8 @@ export function GameBoard({
     >
       {state.gameType === '2hg' && (
         <>
-          {renderTeamPanel(team1, team2, 1, 'left')}
-          {renderTeamPanel(team2, team1, 2, 'right')}
+          {renderTeamPanel(team1, team2, 1, 'bottom')}
+          {renderTeamPanel(team2, team1, 2, 'top')}
         </>
       )}
       {state.gameType !== '2hg' && players.map((player, idx) => {

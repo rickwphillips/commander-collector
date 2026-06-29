@@ -34,7 +34,6 @@ interface TeamPanelProps {
   commanderDamage: CommanderDamageMap;
   startingLife: number;
   isActiveTeam: boolean;
-  position: 'left' | 'right';
   onLifeChange: (idx: number, delta: number) => void;
   onPoisonChange: (idx: number, delta: number) => void;
   onCommanderTaxChange: (idx: number, delta: number) => void;
