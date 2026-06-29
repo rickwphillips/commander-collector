@@ -692,6 +692,11 @@ export function GameBoard({
         onLifeChange={handleLifeChange}
         onPoisonChange={handlePoisonChange}
         onCommanderTaxChange={handleCommanderTaxChange}
+        onEnergyChange={handleEnergyChange}
+        onExperienceChange={handleExperienceChange}
+        onToggleMonarch={handleToggleMonarch}
+        onToggleInitiative={handleToggleInitiative}
+        onToggleCitysBlessing={handleToggleCitysBlessing}
         onCommanderDamageChange={handleCommanderDamageChange}
       />
     </Box>
