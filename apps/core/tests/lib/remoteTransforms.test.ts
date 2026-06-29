@@ -12,8 +12,10 @@ import {
   applyEliminate,
   applyUndoEliminate,
   applyPassTurn,
+  applyPrevTurn,
   applyCheckin,
   applyEvent,
+  reconcileTeams,
 } from '@/game-manager/remoteTransforms';
 import type { GameManagerState, PlayerState, LiveGameEvent } from '@/lib/types';
 
@@ -586,5 +588,195 @@ describe('applyEvent', () => {
     const result = events.reduce(applyEvent, state);
     expect(result.players[0].life).toBe(38); // bottom player's change
     expect(result.players[1].life).toBe(37); // top player's change
+  });
+});
+
+// ─── Two-Headed Giant: shared life, shared poison, joint elimination ──────────
+// Teams: 1 = {bottom(0), left(1)}, 2 = {top(2), right(3)}. Each team shares one
+// life and one poison total; both heads are eliminated together when any
+// team-level loss condition is met.
+
+describe('2HG — reconcileTeams shared totals and team elimination', () => {
+  function make2hgState(overrides: Partial<GameManagerState> = {}): GameManagerState {
+    return makeState({
+      gameType: '2hg',
+      startingLife: 30,
+      players: [
+        makePlayer({ position: 'bottom', playerName: 'Alice', playerId: 'p-alice', life: 30, teamNumber: 1 }),
+        makePlayer({ position: 'left',   playerName: 'Bob',   playerId: 'p-bob',   life: 30, teamNumber: 1 }),
+        makePlayer({ position: 'top',    playerName: 'Carol', playerId: 'p-carol', life: 30, teamNumber: 2 }),
+        makePlayer({ position: 'right',  playerName: 'Dave',  playerId: 'p-dave',  life: 30, teamNumber: 2 }),
+      ],
+      ...overrides,
+    });
+  }
+
+  it('mirrors a life change onto the teammate (one delta, both heads reflect it)', () => {
+    const state = make2hgState();
+    const result = applyEvent(state, { seat: 'bottom', ts: 1, type: 'life_change', playerIdx: 0, delta: -5 });
+    expect(result.players[0].life).toBe(25); // changed head
+    expect(result.players[1].life).toBe(25); // teammate mirrors
+    // opposing team untouched
+    expect(result.players[2].life).toBe(30);
+    expect(result.players[3].life).toBe(30);
+  });
+
+  it('a delta on either head moves the team total exactly once', () => {
+    let state = make2hgState();
+    state = applyEvent(state, { seat: 'bottom', ts: 1, type: 'life_change', playerIdx: 0, delta: -4 });
+    state = applyEvent(state, { seat: 'left', ts: 2, type: 'life_change', playerIdx: 1, delta: -6 });
+    // 30 - 4 - 6 = 20, shared by both heads
+    expect(state.players[0].life).toBe(20);
+    expect(state.players[1].life).toBe(20);
+  });
+
+  it('eliminates both teammates together when shared life reaches 0', () => {
+    const state = make2hgState({
+      players: [
+        makePlayer({ position: 'bottom', life: 3, teamNumber: 1 }),
+        makePlayer({ position: 'left',   life: 3, teamNumber: 1 }),
+        makePlayer({ position: 'top',    life: 30, teamNumber: 2 }),
+        makePlayer({ position: 'right',  life: 30, teamNumber: 2 }),
+      ],
+    });
+    const result = applyEvent(state, { seat: 'bottom', ts: 1, type: 'life_change', playerIdx: 0, delta: -3 });
+    expect(result.players[0].isEliminated).toBe(true);
+    expect(result.players[1].isEliminated).toBe(true);
+    expect(result.players[0].eliminatedTurn).toBe(1);
+    expect(result.players[1].eliminatedTurn).toBe(1);
+    // opposing team alive
+    expect(result.players[2].isEliminated).toBe(false);
+    expect(result.players[3].isEliminated).toBe(false);
+  });
+
+  it('eliminates the team at 15 poison (not 10), mirrored to both heads', () => {
+    let state = make2hgState({
+      players: [
+        makePlayer({ position: 'bottom', poison: 9, teamNumber: 1 }),
+        makePlayer({ position: 'left',   poison: 9, teamNumber: 1 }),
+        makePlayer({ position: 'top',    teamNumber: 2 }),
+        makePlayer({ position: 'right',  teamNumber: 2 }),
+      ],
+    });
+    // 9 -> 12: still alive under the 15 threshold (standard would kill at 10)
+    state = applyEvent(state, { seat: 'bottom', ts: 1, type: 'poison_change', playerIdx: 0, delta: 3 });
+    expect(state.players[0].poison).toBe(12);
+    expect(state.players[1].poison).toBe(12);
+    expect(state.players[0].isEliminated).toBe(false);
+    expect(state.players[1].isEliminated).toBe(false);
+    // 12 -> 15: team eliminated
+    state = applyEvent(state, { seat: 'bottom', ts: 2, type: 'poison_change', playerIdx: 0, delta: 3 });
+    expect(state.players[0].poison).toBe(15);
+    expect(state.players[1].poison).toBe(15);
+    expect(state.players[0].isEliminated).toBe(true);
+    expect(state.players[1].isEliminated).toBe(true);
+  });
+
+  it('eliminates the team at 21 combat damage from a single commander, summed across heads', () => {
+    const state = make2hgState();
+    // Carol's commander (source 2) deals 11 to Alice and 10 to Bob = 21 to Team 1.
+    let s = applyEvent(state, { seat: 'top', ts: 1, type: 'commander_damage_change', targetIdx: 0, sourceIdx: 2, isPartner: false, delta: 11 });
+    expect(s.players[0].isEliminated).toBe(false);
+    s = applyEvent(s, { seat: 'top', ts: 2, type: 'commander_damage_change', targetIdx: 1, sourceIdx: 2, isPartner: false, delta: 10 });
+    expect(s.players[0].isEliminated).toBe(true);
+    expect(s.players[1].isEliminated).toBe(true);
+    // opposing team unaffected
+    expect(s.players[2].isEliminated).toBe(false);
+    expect(s.players[3].isEliminated).toBe(false);
+  });
+
+  it('un-eliminates the team when shared life is restored above 0', () => {
+    let state = make2hgState({
+      players: [
+        makePlayer({ position: 'bottom', life: 1, teamNumber: 1 }),
+        makePlayer({ position: 'left',   life: 1, teamNumber: 1 }),
+        makePlayer({ position: 'top',    teamNumber: 2 }),
+        makePlayer({ position: 'right',  teamNumber: 2 }),
+      ],
+    });
+    state = applyEvent(state, { seat: 'bottom', ts: 1, type: 'life_change', playerIdx: 0, delta: -1 });
+    expect(state.players[0].isEliminated).toBe(true);
+    expect(state.players[1].isEliminated).toBe(true);
+    // restore life: both heads come back
+    state = applyEvent(state, { seat: 'bottom', ts: 2, type: 'life_change', playerIdx: 0, delta: 5 });
+    expect(state.players[0].life).toBe(5);
+    expect(state.players[1].life).toBe(5);
+    expect(state.players[0].isEliminated).toBe(false);
+    expect(state.players[1].isEliminated).toBe(false);
+  });
+
+  it('one head conceding eliminates the whole team', () => {
+    const state = make2hgState();
+    const result = applyEvent(state, { seat: 'bottom', ts: 1, type: 'eliminate', playerIdx: 0 });
+    expect(result.players[0].isEliminated).toBe(true);
+    expect(result.players[1].isEliminated).toBe(true);
+  });
+
+  it('reconcileTeams is a no-op for standard games', () => {
+    const state = makeState(); // no gameType
+    const next = applyLifeChange(state, 0, -5);
+    expect(reconcileTeams(state, next)).toBe(next);
+    // teammate-less standard play: only the changed seat moves
+    const result = applyEvent(state, { seat: 'bottom', ts: 1, type: 'life_change', playerIdx: 0, delta: -5 });
+    expect(result.players[0].life).toBe(35);
+    expect(result.players[1].life).toBe(40);
+  });
+});
+
+// ─── Two-Headed Giant: collective team turns ─────────────────────────────────
+// Teams: 1 = {bottom(0), left(1)}, 2 = {top(2), right(3)}. A team takes its turn
+// as a unit; Next Turn hands play to the other team, and the turn number counts
+// rounds (increments when play returns to the team that started).
+
+describe('2HG — collective team turns', () => {
+  function turnState(overrides: Partial<GameManagerState> = {}): GameManagerState {
+    return makeState({
+      gameType: '2hg',
+      currentPlayerIdx: 0,
+      firstPlayerIdx: 0,
+      turnNumber: 1,
+      players: [
+        makePlayer({ position: 'bottom', playerName: 'Alice', teamNumber: 1 }),
+        makePlayer({ position: 'left',   playerName: 'Bob',   teamNumber: 1 }),
+        makePlayer({ position: 'top',    playerName: 'Carol', teamNumber: 2 }),
+        makePlayer({ position: 'right',  playerName: 'Dave',  teamNumber: 2 }),
+      ],
+      ...overrides,
+    });
+  }
+
+  it('Next Turn passes to the other team and keeps turn 1 until the round closes', () => {
+    const next = applyPassTurn(turnState());
+    // active team is now team 2 (currentPlayerIdx points at a team-2 seat)
+    expect(next.players[next.currentPlayerIdx].teamNumber).toBe(2);
+    expect(next.turnNumber).toBe(1);
+  });
+
+  it('a full round (both teams pass) increments the turn number to 2', () => {
+    let s = turnState();
+    s = applyPassTurn(s); // team 1 -> team 2, turn 1
+    s = applyPassTurn(s); // team 2 -> team 1, round closes, turn 2
+    expect(s.players[s.currentPlayerIdx].teamNumber).toBe(1);
+    expect(s.turnNumber).toBe(2);
+  });
+
+  it('Previous Turn unwinds a round back to the other team', () => {
+    // team 1 active on turn 2 (i.e. two passes have happened)
+    const s = turnState({ currentPlayerIdx: 0, turnNumber: 2 });
+    const prev = applyPrevTurn(s);
+    expect(prev.players[prev.currentPlayerIdx].teamNumber).toBe(2);
+    expect(prev.turnNumber).toBe(1);
+  });
+
+  it('Previous Turn refuses to step before the first turn', () => {
+    const s = turnState({ currentPlayerIdx: 0, turnNumber: 1 });
+    expect(applyPrevTurn(s)).toBe(s);
+  });
+
+  it('standard games still pass seat-by-seat (no team jump)', () => {
+    const s = makeState({ currentPlayerIdx: 0, firstPlayerIdx: 0 }); // no gameType
+    const next = applyPassTurn(s);
+    // clockwise bottom -> left (idx 1)
+    expect(next.currentPlayerIdx).toBe(1);
   });
 });

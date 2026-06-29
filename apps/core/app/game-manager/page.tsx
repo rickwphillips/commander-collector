@@ -17,6 +17,16 @@ const POSITIONS_BY_COUNT: Record<number, Array<PlayerState['position']>> = {
   3: ['bottom', 'left', 'top'],
   4: ['bottom', 'left', 'top', 'right'],
 };
+
+// 2HG pairs the four seats into two teams of two. The pairing follows the
+// clockwise turn order (bottom → left → top → right) so teammates are adjacent:
+// Team 1 = bottom + left, Team 2 = top + right.
+const TEAM_BY_POSITION: Record<PlayerState['position'], number> = {
+  bottom: 1,
+  left: 1,
+  top: 2,
+  right: 2,
+};
 const DEFAULT_STATE: GameManagerState = {
   players: [],
   commanderDamage: {},
@@ -64,14 +74,20 @@ function emptySeatAt(position: PlayerState['position']): PlayerState {
     isEliminated: false,
     isConceded: false,
     eliminatedTurn: null,
+    teamNumber: null,
   };
 }
 
 function buildSeatingState(payload: GameSetupSubmit, prefill?: PlayerSetup[]): GameManagerState {
-  const positions = POSITIONS_BY_COUNT[payload.playerCount] ?? POSITIONS_BY_COUNT[4];
+  // 2HG is always four seats (two teams of two), regardless of the setup count.
+  const is2hg = payload.gameType === '2hg';
+  const positions = is2hg
+    ? POSITIONS_BY_COUNT[4]
+    : POSITIONS_BY_COUNT[payload.playerCount] ?? POSITIONS_BY_COUNT[4];
   const players: PlayerState[] = positions.map((position, i) => {
     const seed = prefill?.[i];
     const base = emptySeatAt(position);
+    const teamNumber = is2hg ? TEAM_BY_POSITION[position] : null;
     if (seed) {
       return {
         ...base,
@@ -82,9 +98,10 @@ function buildSeatingState(payload: GameSetupSubmit, prefill?: PlayerSetup[]): G
         commander: seed.commander,
         partner: seed.partner,
         life: payload.startingLife,
+        teamNumber,
       };
     }
-    return { ...base, life: payload.startingLife };
+    return { ...base, life: payload.startingLife, teamNumber };
   });
 
   const commanderDamage: CommanderDamageMap = {};
@@ -190,9 +207,11 @@ export default function GameManagerPage() {
   }, [state.phase]);
 
   // SSE stream for remote events (host side). Only runs in 'playing' phase;
-  // remotes should never connect before the game has actually started.
+  // remotes should never connect before the game has actually started. Remote
+  // phone panels are disabled for 2HG, so the host does not listen there.
   useEffect(() => {
     if (state.phase !== 'playing' || !state.sessionCode || !dbCheckComplete) return;
+    if (state.gameType === '2hg') return;
     const code = state.sessionCode;
     const closeStream = api.openLiveGameHostStream(
       code,
@@ -202,7 +221,7 @@ export default function GameManagerPage() {
       () => { /* session inactive — host controls */ },
     );
     return () => { closeStream(); };
-  }, [state.phase, state.sessionCode, dbCheckComplete, commit]);
+  }, [state.phase, state.sessionCode, state.gameType, dbCheckComplete, commit]);
 
   const handleSetupSubmit = async (payload: GameSetupSubmit) => {
     dbCheckRef.current = true;
@@ -277,16 +296,35 @@ export default function GameManagerPage() {
     }
     const d = new Date();
     const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const winner = currentState.players.find((p) => !p.isEliminated);
-    const losers = currentState.players
-      .filter((p) => p.isEliminated)
-      .sort((a, b) => (b.eliminatedTurn ?? 0) - (a.eliminatedTurn ?? 0));
-    const results: GameResultInput[] = [
-      ...(winner ? [{ deck_id: winner.deckId, player_id: winner.playerId, finish_position: 1, eliminated_turn: null, team_number: null }] : []),
-      ...losers.map((p, i) => ({ deck_id: p.deckId, player_id: p.playerId, finish_position: i + 2, eliminated_turn: p.eliminatedTurn, team_number: null })),
-    ];
-    const cleanNotes = currentState.notes.replace(/\[(?:cmdkill|poisonkill):[^\]]+\]\s*/g, '').trim() || null;
     const gameType: GameType = currentState.gameType ?? 'standard';
+
+    let results: GameResultInput[];
+    if (gameType === '2hg') {
+      // 2HG resolves at the team level: the surviving team places 1st, the
+      // eliminated team places 2nd. Every result carries its team_number, which
+      // the games.php endpoint requires for 2HG.
+      const winningTeam = currentState.players.find((p) => !p.isEliminated)?.teamNumber ?? null;
+      results = currentState.players.map((p) => {
+        const won = p.teamNumber != null && p.teamNumber === winningTeam;
+        return {
+          deck_id: p.deckId,
+          player_id: p.playerId,
+          finish_position: won ? 1 : 2,
+          eliminated_turn: won ? null : p.eliminatedTurn,
+          team_number: p.teamNumber ?? null,
+        };
+      });
+    } else {
+      const winner = currentState.players.find((p) => !p.isEliminated);
+      const losers = currentState.players
+        .filter((p) => p.isEliminated)
+        .sort((a, b) => (b.eliminatedTurn ?? 0) - (a.eliminatedTurn ?? 0));
+      results = [
+        ...(winner ? [{ deck_id: winner.deckId, player_id: winner.playerId, finish_position: 1, eliminated_turn: null, team_number: null }] : []),
+        ...losers.map((p, i) => ({ deck_id: p.deckId, player_id: p.playerId, finish_position: i + 2, eliminated_turn: p.eliminatedTurn, team_number: null })),
+      ];
+    }
+    const cleanNotes = currentState.notes.replace(/\[(?:cmdkill|poisonkill):[^\]]+\]\s*/g, '').trim() || null;
     const { id } = await api.createGame({ played_at: today, notes: cleanNotes, game_type: gameType, results });
     router.push(`/games/detail?id=${id}`);
   };
