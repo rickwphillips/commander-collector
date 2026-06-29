@@ -25,6 +25,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import InitiativeIcon from '@mui/icons-material/Castle';
 import CityIcon from '@mui/icons-material/LocationCity';
 import { getCardImageByName } from '@commander/shared/lib/cardImageCache';
+import { useDamageFlashKeyframe, usePoisonBoilKeyframe } from './PlayerCard.keyframes';
 import type { PlayerState, CommanderDamageMap } from '@/lib/types';
 
 // Small crown glyph mirrored from PlayerCard so the Monarch toggle reads the
@@ -191,6 +192,24 @@ export function TeamPanel({
   const lifeColor =
     life <= 0 ? '#B71C1C' : life <= 10 ? '#E65100' : life <= 20 ? '#F9A825' : 'primary.main';
 
+  // Damage + poison animations on the shared readouts (mirrored from PlayerCard).
+  // The boil intensifies with poison; the red flash replays whenever shared life
+  // drops. Both keyframe hooks are called once here (life/poison are single
+  // shared values), so there is no rules-of-hooks issue from per-team rendering.
+  const damageFlashAnim = useDamageFlashKeyframe();
+  const poisonBoilAmp = poison >= 10 ? 5 : poison === 9 ? 3.8 : poison === 8 ? 1.5 : 0;
+  const poisonBoilSkew = Math.min(poisonBoilAmp * 0.6, 2.5);
+  const poisonBoilAnim = usePoisonBoilKeyframe(poison, poisonBoilAmp, poisonBoilSkew);
+  const poisonBoilDuration = poison >= 10 ? 2.0 : poison >= 9 ? 2.5 : 5.0;
+
+  // Bump a key on every shared-life decrease so the flash keyframe replays.
+  const prevLifeRef = useRef(life);
+  const [lifeFlashKey, setLifeFlashKey] = useState(0);
+  useEffect(() => {
+    if (life < prevLifeRef.current) setLifeFlashKey((k) => k + 1);
+    prevLifeRef.current = life;
+  }, [life]);
+
   return (
     <Box
       sx={{
@@ -321,7 +340,10 @@ export function TeamPanel({
       <Stack sx={{ flex: 1.2, minWidth: 0, alignItems: 'center', justifyContent: 'center' }} spacing={0.5}>
         <Stack direction="row" alignItems="center" justifyContent="center" spacing={1.5}>
           <StatButton onClick={() => onLifeChange(primary.idx, -1)}><RemoveIcon sx={{ fontSize: 30 }} /></StatButton>
-          <Typography sx={{ fontWeight: 900, fontSize: 'clamp(52px, 11dvh, 120px)', lineHeight: 1, color: lifeColor, minWidth: 96, textAlign: 'center' }}>
+          <Typography
+            key={lifeFlashKey}
+            sx={{ fontWeight: 900, fontSize: 'clamp(52px, 11dvh, 120px)', lineHeight: 1, color: lifeColor, minWidth: 96, textAlign: 'center', ...(lifeFlashKey > 0 && { animation: `${damageFlashAnim} 0.6s ease-out forwards` }) }}
+          >
             {life}
           </Typography>
           <StatButton onClick={() => onLifeChange(primary.idx, 1)}><AddIcon sx={{ fontSize: 30 }} /></StatButton>
@@ -332,7 +354,7 @@ export function TeamPanel({
         <Stack direction="row" alignItems="center" justifyContent="center" spacing={1} sx={{ mt: 0.5 }}>
           <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>Poison</Typography>
           <StatButton onClick={() => onPoisonChange(primary.idx, -1)}><RemoveIcon sx={{ fontSize: 16 }} /></StatButton>
-          <Typography sx={{ fontWeight: 800, fontSize: 20, minWidth: 26, textAlign: 'center', color: poison >= 15 ? '#2E7D32' : 'text.primary' }}>
+          <Typography sx={{ fontWeight: 800, fontSize: 20, minWidth: 26, textAlign: 'center', color: poison >= 15 ? '#2E7D32' : 'text.primary', ...(poisonBoilAnim && { animation: `${poisonBoilAnim} ${poisonBoilDuration}s ease-in-out infinite` }) }}>
             {poison}
           </Typography>
           <StatButton onClick={() => onPoisonChange(primary.idx, 1)}><AddIcon sx={{ fontSize: 16 }} /></StatButton>
