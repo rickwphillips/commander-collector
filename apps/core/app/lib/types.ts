@@ -611,6 +611,7 @@ export interface GameManagerState {
   turnStartTime: number;
   notes: string;
   gameType?: GameType;
+  teamNames?: Record<number, string> | null; // 2HG only: custom team display names keyed by team number; falls back to "Team N"
   firstPlayerIdx?: number;          // index of the player who goes first (set when first player is chosen)
   sessionCode?: string | null;      // hex code for live session; null = no active session
   sessionSeats?: Record<string, string> | null; // { bottom: 'a3f9c12b', ... }
