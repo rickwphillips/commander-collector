@@ -670,6 +670,9 @@ export function GameBoard({
   const team1: TeamMember[] = players.map((player, idx) => ({ player, idx })).filter((m) => m.player.teamNumber === 1);
   const team2: TeamMember[] = players.map((player, idx) => ({ player, idx })).filter((m) => m.player.teamNumber === 2);
   const activeTeam = state.gameType === '2hg' ? players[currentPlayerIdx]?.teamNumber ?? null : null;
+  const handleTeamNameChange = (teamNumber: number, name: string) => {
+    onUpdate((prev) => ({ ...prev, teamNames: { ...prev.teamNames, [teamNumber]: name } }));
+  };
   const renderTeamPanel = (members: TeamMember[], opponents: TeamMember[], teamNumber: number, edge: 'top' | 'bottom') => (
     <Box
       sx={{
@@ -684,6 +687,8 @@ export function GameBoard({
     >
       <TeamPanel
         teamNumber={teamNumber}
+        teamName={state.teamNames?.[teamNumber] ?? `Team ${teamNumber}`}
+        onTeamNameChange={(name) => handleTeamNameChange(teamNumber, name)}
         members={members}
         opponents={opponents}
         commanderDamage={commanderDamage}

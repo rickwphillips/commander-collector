@@ -18,14 +18,14 @@
  * both heads in sync. Standard games never use this component.
  */
 import { useState, useEffect, useRef } from 'react';
-import { Box, Stack, Typography, IconButton, SvgIcon, CircularProgress } from '@mui/material';
+import { Box, Stack, Typography, IconButton, SvgIcon, CircularProgress, TextField } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import CloseIcon from '@mui/icons-material/Close';
 import InitiativeIcon from '@mui/icons-material/Castle';
 import CityIcon from '@mui/icons-material/LocationCity';
 import { getCardImageByName } from '@commander/shared/lib/cardImageCache';
-import { useDamageFlashKeyframe, usePoisonBoilKeyframe } from './PlayerCard.keyframes';
+import { LifeTotal } from './LifeTotal';
 import type { PlayerState, CommanderDamageMap } from '@/lib/types';
 
 // Small crown glyph mirrored from PlayerCard so the Monarch toggle reads the
@@ -43,6 +43,8 @@ export interface TeamMember {
 
 interface TeamPanelProps {
   teamNumber: number;
+  teamName: string;
+  onTeamNameChange: (name: string) => void;
   members: TeamMember[];
   opponents: TeamMember[];
   commanderDamage: CommanderDamageMap;
@@ -142,6 +144,8 @@ function AbilityToggle({
 
 export function TeamPanel({
   teamNumber,
+  teamName,
+  onTeamNameChange,
   members,
   opponents,
   commanderDamage,
@@ -165,6 +169,16 @@ export function TeamPanel({
   const [cmdPreviewZoom, setCmdPreviewZoom] = useState(1);
   const [cmdPreviewBase, setCmdPreviewBase] = useState<{ w: number; h: number } | null>(null);
   const cmdScrollRef = useRef<HTMLDivElement>(null);
+
+  // Inline team-name editing in the app bar. Commit on Enter/blur, cancel on Esc.
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(teamName);
+  const startEditName = () => { setNameDraft(teamName); setEditingName(true); };
+  const commitName = () => {
+    const trimmed = nameDraft.trim();
+    if (trimmed && trimmed !== teamName) onTeamNameChange(trimmed);
+    setEditingName(false);
+  };
 
   // Resolve preview URL when name changes; reset zoom/base.
   useEffect(() => {
@@ -192,23 +206,27 @@ export function TeamPanel({
   const lifeColor =
     life <= 0 ? '#B71C1C' : life <= 10 ? '#E65100' : life <= 20 ? '#F9A825' : 'primary.main';
 
-  // Damage + poison animations on the shared readouts (mirrored from PlayerCard).
-  // The boil intensifies with poison; the red flash replays whenever shared life
-  // drops. Both keyframe hooks are called once here (life/poison are single
-  // shared values), so there is no rules-of-hooks issue from per-team rendering.
-  const damageFlashAnim = useDamageFlashKeyframe();
-  const poisonBoilAmp = poison >= 10 ? 5 : poison === 9 ? 3.8 : poison === 8 ? 1.5 : 0;
-  const poisonBoilSkew = Math.min(poisonBoilAmp * 0.6, 2.5);
-  const poisonBoilAnim = usePoisonBoilKeyframe(poison, poisonBoilAmp, poisonBoilSkew);
-  const poisonBoilDuration = poison >= 10 ? 2.0 : poison >= 9 ? 2.5 : 5.0;
+  // The shared life number's reactions (damage flash, energy pulse, poison boil)
+  // are rendered by the shared <LifeTotal>. Per-player counters react to the
+  // team's HIGHEST value, so a teammate raising energy lights up the shared
+  // readout the moment they do. Poison/life are mirrored across heads, so their
+  // single value is already the team value.
+  const teamEnergy = members.reduce((max, m) => Math.max(max, m.player.energy), 0);
 
-  // Bump a key on every shared-life decrease so the flash keyframe replays.
+  // Drive the damage flash transiently off shared-life decreases, then clear it
+  // so it plays once per hit and unmounts when done.
   const prevLifeRef = useRef(life);
-  const [lifeFlashKey, setLifeFlashKey] = useState(0);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [damageFlash, setDamageFlash] = useState(0);
   useEffect(() => {
-    if (life < prevLifeRef.current) setLifeFlashKey((k) => k + 1);
+    if (life < prevLifeRef.current) {
+      setDamageFlash(prevLifeRef.current - life);
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+      flashTimer.current = setTimeout(() => setDamageFlash(0), 650);
+    }
     prevLifeRef.current = life;
   }, [life]);
+  useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current); }, []);
 
   return (
     <Box
@@ -217,10 +235,7 @@ export function TeamPanel({
         height: '100%',
         width: '100%',
         display: 'flex',
-        flexDirection: 'row',
-        alignItems: 'stretch',
-        gap: 1.5,
-        p: 1.5,
+        flexDirection: 'column',
         borderRadius: 2,
         border: (theme) => `2px solid ${isActiveTeam ? theme.palette.primary.main : theme.palette.divider}`,
         bgcolor: (theme) => (theme.palette.mode === 'dark' ? '#221913' : '#FFFDFA'),
@@ -229,31 +244,49 @@ export function TeamPanel({
         overflow: 'hidden',
       }}
     >
-      {/* Section A: team header + pilots + per-commander tax */}
-      <Stack spacing={0.75} sx={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <Box
-            sx={{
-              px: 0.75,
-              py: 0.25,
-              borderRadius: 1,
-              bgcolor: teamNumber === 1 ? 'primary.main' : 'secondary.main',
-              color: '#fff',
-              fontSize: 12,
-              fontWeight: 800,
-              textTransform: 'uppercase',
-              letterSpacing: 0.5,
-              whiteSpace: 'nowrap',
-            }}
+      {/* Custom 2HG app bar: team color badge + editable team name + active flag.
+          Mirrors the 4-player card's header strip, tailored to a team. Click the
+          name to rename the team in-game (persists with the live game state). */}
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={1}
+        sx={{ flexShrink: 0, px: 1.25, py: 0.5, borderBottom: (theme) => `1px solid ${theme.palette.divider}` }}
+      >
+        <Box sx={{ width: 14, height: 14, borderRadius: 0.5, flexShrink: 0, bgcolor: teamNumber === 1 ? 'primary.main' : 'secondary.main' }} />
+        {editingName ? (
+          <TextField
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onBlur={commitName}
+            onKeyDown={(e) => { if (e.key === 'Enter') commitName(); else if (e.key === 'Escape') setEditingName(false); }}
+            autoFocus
+            variant="standard"
+            inputProps={{ maxLength: 32 }}
+            sx={{ '& .MuiInput-input': { fontSize: 14, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, py: 0 } }}
+          />
+        ) : (
+          <Typography
+            noWrap
+            onClick={startEditName}
+            title="Click to rename team"
+            sx={{ fontSize: 14, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
           >
-            Team {teamNumber}
-          </Box>
-          {isActiveTeam && (
-            <Typography sx={{ fontSize: 10, fontWeight: 700, color: 'primary.main', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              Active
-            </Typography>
-          )}
-        </Stack>
+            {teamName}
+          </Typography>
+        )}
+        <Box sx={{ flex: 1 }} />
+        {isActiveTeam && (
+          <Typography sx={{ fontSize: 10, fontWeight: 700, color: 'primary.main', textTransform: 'uppercase', letterSpacing: 0.5, whiteSpace: 'nowrap' }}>
+            Active
+          </Typography>
+        )}
+      </Stack>
+
+      {/* Body: landscape stat row (pilots | shared life | commander damage). */}
+      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', alignItems: 'stretch', gap: 1.5, p: 1.5 }}>
+      {/* Section A: pilots + per-commander tax */}
+      <Stack spacing={0.75} sx={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
         {members.map((m) => (
           <Box key={m.idx}>
             <Stack direction="row" alignItems="center" spacing={1}>
@@ -340,12 +373,16 @@ export function TeamPanel({
       <Stack sx={{ flex: 1.2, minWidth: 0, alignItems: 'center', justifyContent: 'center' }} spacing={0.5}>
         <Stack direction="row" alignItems="center" justifyContent="center" spacing={1.5}>
           <StatButton onClick={() => onLifeChange(primary.idx, -1)}><RemoveIcon sx={{ fontSize: 30 }} /></StatButton>
-          <Typography
-            key={lifeFlashKey}
-            sx={{ fontWeight: 900, fontSize: 'clamp(52px, 11dvh, 120px)', lineHeight: 1, color: lifeColor, minWidth: 96, textAlign: 'center', ...(lifeFlashKey > 0 && { animation: `${damageFlashAnim} 0.6s ease-out forwards` }) }}
-          >
-            {life}
-          </Typography>
+          <LifeTotal
+            value={life}
+            fontSize="clamp(52px, 11dvh, 120px)"
+            color={lifeColor}
+            damageFlash={damageFlash}
+            energy={teamEnergy}
+            poison={poison}
+            reactions={{ swipes: false }}
+            sx={{ minWidth: 96, textAlign: 'center' }}
+          />
           <StatButton onClick={() => onLifeChange(primary.idx, 1)}><AddIcon sx={{ fontSize: 30 }} /></StatButton>
         </Stack>
         <Typography sx={{ fontSize: 10, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
@@ -354,7 +391,7 @@ export function TeamPanel({
         <Stack direction="row" alignItems="center" justifyContent="center" spacing={1} sx={{ mt: 0.5 }}>
           <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>Poison</Typography>
           <StatButton onClick={() => onPoisonChange(primary.idx, -1)}><RemoveIcon sx={{ fontSize: 16 }} /></StatButton>
-          <Typography sx={{ fontWeight: 800, fontSize: 20, minWidth: 26, textAlign: 'center', color: poison >= 15 ? '#2E7D32' : 'text.primary', ...(poisonBoilAnim && { animation: `${poisonBoilAnim} ${poisonBoilDuration}s ease-in-out infinite` }) }}>
+          <Typography sx={{ fontWeight: 800, fontSize: 20, minWidth: 26, textAlign: 'center', color: poison >= 15 ? '#2E7D32' : 'text.primary' }}>
             {poison}
           </Typography>
           <StatButton onClick={() => onPoisonChange(primary.idx, 1)}><AddIcon sx={{ fontSize: 16 }} /></StatButton>
@@ -394,6 +431,7 @@ export function TeamPanel({
           return rows;
         })}
       </Stack>
+      </Box>
 
       {/* Commander card preview overlay — scoped to this panel via the root
           Box's position:relative + inset:0, copied from PlayerCard. */}
