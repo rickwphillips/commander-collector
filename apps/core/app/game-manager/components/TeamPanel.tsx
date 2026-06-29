@@ -142,6 +142,27 @@ function AbilityToggle({
   );
 }
 
+/** Compact commander identity shown in the team app bar, one per pilot. */
+function CommanderBrief({ member, align, onView }: { member?: TeamMember; align: 'left' | 'right'; onView: (name: string) => void }) {
+  if (!member) return <Box sx={{ flex: 1, minWidth: 0 }} />;
+  const { player } = member;
+  return (
+    <Box sx={{ flex: 1, minWidth: 0, textAlign: align }}>
+      <Typography
+        noWrap
+        onClick={() => onView(player.commander.name)}
+        title={player.commander.name}
+        sx={{ fontSize: 12, fontWeight: 700, lineHeight: 1.15, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+      >
+        {player.playerName}
+      </Typography>
+      <Typography noWrap sx={{ fontSize: 10, color: 'text.secondary', lineHeight: 1.15 }}>
+        {player.commander.name}{player.partner ? ` / ${player.partner.name}` : ''}
+      </Typography>
+    </Box>
+  );
+}
+
 export function TeamPanel({
   teamNumber,
   teamName,
@@ -244,43 +265,49 @@ export function TeamPanel({
         overflow: 'hidden',
       }}
     >
-      {/* Custom 2HG app bar: team color badge + editable team name + active flag.
-          Mirrors the 4-player card's header strip, tailored to a team. Click the
-          name to rename the team in-game (persists with the live game state). */}
+      {/* Custom 2HG app bar: each commander's current details flank a centered,
+          editable team name (click to rename — persists with the live game
+          state). Mirrors the 4-player card's header, doubled for the two pilots. */}
       <Stack
         direction="row"
         alignItems="center"
         spacing={1}
         sx={{ flexShrink: 0, px: 1.25, py: 0.5, borderBottom: (theme) => `1px solid ${theme.palette.divider}` }}
       >
-        <Box sx={{ width: 14, height: 14, borderRadius: 0.5, flexShrink: 0, bgcolor: teamNumber === 1 ? 'primary.main' : 'secondary.main' }} />
-        {editingName ? (
-          <TextField
-            value={nameDraft}
-            onChange={(e) => setNameDraft(e.target.value)}
-            onBlur={commitName}
-            onKeyDown={(e) => { if (e.key === 'Enter') commitName(); else if (e.key === 'Escape') setEditingName(false); }}
-            autoFocus
-            variant="standard"
-            inputProps={{ maxLength: 32 }}
-            sx={{ '& .MuiInput-input': { fontSize: 14, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, py: 0 } }}
-          />
-        ) : (
-          <Typography
-            noWrap
-            onClick={startEditName}
-            title="Click to rename team"
-            sx={{ fontSize: 14, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
-          >
-            {teamName}
-          </Typography>
-        )}
-        <Box sx={{ flex: 1 }} />
-        {isActiveTeam && (
-          <Typography sx={{ fontSize: 10, fontWeight: 700, color: 'primary.main', textTransform: 'uppercase', letterSpacing: 0.5, whiteSpace: 'nowrap' }}>
-            Active
-          </Typography>
-        )}
+        <CommanderBrief member={members[0]} align="left" onView={setCmdPreviewName} />
+
+        {/* Center: color badge + editable team name + active flag. */}
+        <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0 }}>
+          <Box sx={{ width: 12, height: 12, borderRadius: 0.5, flexShrink: 0, bgcolor: teamNumber === 1 ? 'primary.main' : 'secondary.main' }} />
+          {editingName ? (
+            <TextField
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onBlur={commitName}
+              onKeyDown={(e) => { if (e.key === 'Enter') commitName(); else if (e.key === 'Escape') setEditingName(false); }}
+              autoFocus
+              variant="standard"
+              inputProps={{ maxLength: 32, style: { textAlign: 'center' } }}
+              sx={{ '& .MuiInput-input': { fontSize: 14, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, py: 0 } }}
+            />
+          ) : (
+            <Typography
+              noWrap
+              onClick={startEditName}
+              title="Click to rename team"
+              sx={{ fontSize: 14, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, cursor: 'pointer', textAlign: 'center', '&:hover': { color: 'primary.main' } }}
+            >
+              {teamName}
+            </Typography>
+          )}
+          {isActiveTeam && (
+            <Typography sx={{ fontSize: 10, fontWeight: 700, color: 'primary.main', textTransform: 'uppercase', letterSpacing: 0.5, whiteSpace: 'nowrap' }}>
+              Active
+            </Typography>
+          )}
+        </Stack>
+
+        <CommanderBrief member={members[1]} align="right" onView={setCmdPreviewName} />
       </Stack>
 
       {/* Body: landscape stat row (pilots | shared life | commander damage). */}
@@ -296,74 +323,55 @@ export function TeamPanel({
                   src={m.player.commander.artCropUrl}
                   alt=""
                   onClick={(e) => { e.stopPropagation(); setCmdPreviewName(m.player.commander.name); }}
-                  sx={{ height: 28, width: 'auto', borderRadius: 0.5, flexShrink: 0, cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
+                  title={m.player.commander.name}
+                  sx={{ height: 36, width: 'auto', borderRadius: 0.5, flexShrink: 0, cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
                 />
               )}
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography noWrap sx={{ fontSize: 13, fontWeight: 700, lineHeight: 1.2 }}>{m.player.playerName}</Typography>
-                <Typography noWrap sx={{ fontSize: 11, color: 'text.secondary', lineHeight: 1.2 }}>
-                  <Box
-                    component="span"
-                    onClick={(e) => { e.stopPropagation(); setCmdPreviewName(m.player.commander.name); }}
-                    sx={{ cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
-                  >
-                    {m.player.commander.name}
-                  </Box>
-                  {m.player.partner && (
-                    <>
-                      {' / '}
-                      <Box
-                        component="span"
-                        onClick={(e) => { e.stopPropagation(); setCmdPreviewName(m.player.partner!.name); }}
-                        sx={{ cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
-                      >
-                        {m.player.partner.name}
-                      </Box>
-                    </>
-                  )}
-                </Typography>
-              </Box>
-            </Stack>
-            {/* Per-player counters: commander tax + (individual) energy + XP.
-                Tax stays per-commander; energy and experience are per-player and
-                route to this teammate's real seat idx, not the shared primary. */}
-            <Stack direction="row" alignItems="center" useFlexGap flexWrap="wrap" spacing={1} sx={{ mt: 0.25 }}>
-              <Stack direction="row" alignItems="center" spacing={0.25}>
-                <Typography sx={{ fontSize: 9, color: 'text.secondary' }}>Tax</Typography>
-                <StatButton onClick={() => onCommanderTaxChange(m.idx, -1)}><RemoveIcon sx={{ fontSize: 12 }} /></StatButton>
-                <Typography sx={{ fontSize: 12, fontWeight: 700, minWidth: 14, textAlign: 'center' }}>{m.player.commanderTax}</Typography>
-                <StatButton onClick={() => onCommanderTaxChange(m.idx, 1)}><AddIcon sx={{ fontSize: 12 }} /></StatButton>
+              {/* Identity (pilot + commander) lives in the app bar; this column
+                  keeps the per-player controls beside the commander's art. */}
+              <Stack spacing={0.25} sx={{ flex: 1, minWidth: 0 }}>
+                {/* Per-player counters: commander tax + (individual) energy + XP.
+                    Tax stays per-commander; energy and experience are per-player
+                    and route to this teammate's real seat idx, not the primary. */}
+                <Stack direction="row" alignItems="center" useFlexGap flexWrap="wrap" spacing={1}>
+                  <Stack direction="row" alignItems="center" spacing={0.25}>
+                    <Typography sx={{ fontSize: 9, color: 'text.secondary' }}>Tax</Typography>
+                    <StatButton onClick={() => onCommanderTaxChange(m.idx, -1)}><RemoveIcon sx={{ fontSize: 12 }} /></StatButton>
+                    <Typography sx={{ fontSize: 12, fontWeight: 700, minWidth: 14, textAlign: 'center' }}>{m.player.commanderTax}</Typography>
+                    <StatButton onClick={() => onCommanderTaxChange(m.idx, 1)}><AddIcon sx={{ fontSize: 12 }} /></StatButton>
+                  </Stack>
+                  <MiniCounter
+                    glyph="⚡"
+                    glyphColor="#4FC8FF"
+                    label="Energy"
+                    value={m.player.energy}
+                    active={m.player.energy > 0}
+                    onDec={() => onEnergyChange(m.idx, -1)}
+                    onInc={() => onEnergyChange(m.idx, 1)}
+                  />
+                  <MiniCounter
+                    glyph="✦"
+                    glyphColor="#DAA520"
+                    label="XP"
+                    value={m.player.experience}
+                    active={m.player.experience > 0}
+                    onDec={() => onExperienceChange(m.idx, -1)}
+                    onInc={() => onExperienceChange(m.idx, 1)}
+                  />
+                </Stack>
+                {/* Per-player ability toggles (individual, not shared). */}
+                <Stack direction="row" alignItems="center" spacing={0.5}>
+                  <AbilityToggle active={m.player.isMonarch} color="#DAA520" title="Monarch" onToggle={() => onToggleMonarch(m.idx)}>
+                    <CrownIcon sx={{ fontSize: 14 }} />
+                  </AbilityToggle>
+                  <AbilityToggle active={m.player.hasInitiative} color="#4FC3F7" title="Initiative" onToggle={() => onToggleInitiative(m.idx)}>
+                    <InitiativeIcon sx={{ fontSize: 14 }} />
+                  </AbilityToggle>
+                  <AbilityToggle active={m.player.hasCitysBlessing} color="#7851A9" title="City's Blessing" onToggle={() => onToggleCitysBlessing(m.idx)}>
+                    <CityIcon sx={{ fontSize: 14 }} />
+                  </AbilityToggle>
+                </Stack>
               </Stack>
-              <MiniCounter
-                glyph="⚡"
-                glyphColor="#4FC8FF"
-                label="Energy"
-                value={m.player.energy}
-                active={m.player.energy > 0}
-                onDec={() => onEnergyChange(m.idx, -1)}
-                onInc={() => onEnergyChange(m.idx, 1)}
-              />
-              <MiniCounter
-                glyph="✦"
-                glyphColor="#DAA520"
-                label="XP"
-                value={m.player.experience}
-                active={m.player.experience > 0}
-                onDec={() => onExperienceChange(m.idx, -1)}
-                onInc={() => onExperienceChange(m.idx, 1)}
-              />
-            </Stack>
-            {/* Per-player ability toggles (individual, not shared). */}
-            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.25 }}>
-              <AbilityToggle active={m.player.isMonarch} color="#DAA520" title="Monarch" onToggle={() => onToggleMonarch(m.idx)}>
-                <CrownIcon sx={{ fontSize: 14 }} />
-              </AbilityToggle>
-              <AbilityToggle active={m.player.hasInitiative} color="#4FC3F7" title="Initiative" onToggle={() => onToggleInitiative(m.idx)}>
-                <InitiativeIcon sx={{ fontSize: 14 }} />
-              </AbilityToggle>
-              <AbilityToggle active={m.player.hasCitysBlessing} color="#7851A9" title="City's Blessing" onToggle={() => onToggleCitysBlessing(m.idx)}>
-                <CityIcon sx={{ fontSize: 14 }} />
-              </AbilityToggle>
             </Stack>
           </Box>
         ))}
