@@ -27,6 +27,7 @@ import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import ReplayIcon from '@mui/icons-material/Replay';
 import SettingsIcon from '@mui/icons-material/Settings';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import TextFieldsIcon from '@mui/icons-material/TextFields';
 import ChatIcon from '@mui/icons-material/Chat';
 import MinimizeIcon from '@mui/icons-material/Minimize';
@@ -35,7 +36,8 @@ import Badge from '@mui/material/Badge';
 import { useThemeMode } from '@/components/ThemeProvider';
 import { RulesQuickLookup } from '@/components/RulesQuickLookup';
 import type { PlayerState, CommanderDamageMap } from '../types';
-import type { GameType } from '@/lib/types';
+import type { GameType, GameLogEvent, GameLogEntry } from '@/lib/types';
+import { describeLogEntry, logEntryTime } from '@/lib/gameLogFormat';
 
 const TWO_HEADED_GIANT_RULES_URL = 'https://magic.wizards.com/en/formats/two-headed-giant';
 
@@ -91,6 +93,10 @@ interface CenterZoneProps {
   onToggleSound: () => void;
   commanderDamage: CommanderDamageMap;
   gameType?: GameType;
+  /** Record die-roll events into the game log (values live only here). */
+  onLogEvent?: (events: GameLogEvent[]) => void;
+  /** Fetch the current game's buffered log entries for the in-game viewer. */
+  onViewLog?: () => Promise<GameLogEntry[]>;
 }
 
 function rollDie(sides: number): number {
@@ -126,6 +132,8 @@ export function CenterZone({
   onToggleSound,
   commanderDamage,
   gameType,
+  onLogEvent,
+  onViewLog,
 }: CenterZoneProps) {
   type RollEntry = { label: string; rolls: (number | string)[]; total: number | null; color: string };
   const [history, setHistory] = useState<RollEntry[]>([]);
@@ -153,22 +161,43 @@ export function CenterZone({
   const [adamsRule, setAdamsRule] = useState(false);
   const [noLoners, setNoLoners] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
+  const [logEntries, setLogEntries] = useState<GameLogEntry[]>([]);
+  const [logLoading, setLogLoading] = useState(false);
+
+  const openLog = async () => {
+    if (!onViewLog) return;
+    setLogLoading(true);
+    setLogEntries([]);
+    setLogOpen(true);
+    try {
+      setLogEntries(await onViewLog());
+    } finally {
+      setLogLoading(false);
+    }
+  };
   const { mode, toggleTheme } = useThemeMode();
   const lastTimerRef = useRef(turnTimerSeconds > 0 ? turnTimerSeconds : 300);
   const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lpFired = useRef(false);
   const diceAudio = useRef<{ d20: HTMLAudioElement | null; d6: HTMLAudioElement | null }>({ d20: null, d6: null });
   const lastRoundScores = useRef<Record<string, number>>({});
-  const chatUrlRef = useRef<string | null>(null);
+  const [chatUrl, setChatUrl] = useState<string | null>(null);
   const chatIframeRef = useRef<HTMLIFrameElement | null>(null);
-  useEffect(() => {
-    const basePath = process.env.NODE_ENV === 'production' ? '/app/projects/commander' : '';
-    const d20 = new Audio(`${basePath}/audio/d-20.mp3`);
-    const d6  = new Audio(`${basePath}/audio/d-6.mp3`);
-    d20.preload = 'auto';
-    d6.preload  = 'auto';
-    diceAudio.current = { d20, d6 };
-  }, []);
+  // Lazily create the dice-roll audio on first use (from a roll handler) rather
+  // than in a mount effect, so the elements are not effect-owned values that the
+  // rules forbid mutating (currentTime rewind) elsewhere.
+  const getDiceAudio = () => {
+    if (!diceAudio.current.d20) {
+      const basePath = process.env.NODE_ENV === 'production' ? '/app/projects/commander' : '';
+      const d20 = new Audio(`${basePath}/audio/d-20.mp3`);
+      const d6 = new Audio(`${basePath}/audio/d-6.mp3`);
+      d20.preload = 'auto';
+      d6.preload = 'auto';
+      diceAudio.current = { d20, d6 };
+    }
+    return diceAudio.current;
+  };
 
   // Push real-time timer state to the iframe every second while chat is open
   useEffect(() => {
@@ -209,7 +238,8 @@ export function CenterZone({
     animTimers.current = [];
 
     if (soundEnabled) {
-      const audio = sides === 20 ? diceAudio.current.d20 : sides === 6 ? diceAudio.current.d6 : null;
+      const dice = getDiceAudio();
+      const audio = sides === 20 ? dice.d20 : sides === 6 ? dice.d6 : null;
       if (audio) {
         audio.currentTime = 0;
         audio.play().catch(() => {});
@@ -230,6 +260,9 @@ export function CenterZone({
       color = sides === 20 && diceCount === 1 ? (finalRolls[0] === 20 ? '#DAA520' : finalRolls[0] === 1 ? 'error.main' : 'primary.main') : 'primary.main';
     }
     const histLabel = sides === null ? (diceCount === 1 ? 'Coin Flip' : `${diceCount}× Coin`) : `d${sides}`;
+
+    // Record the die-roll values in the game log (they live only in the dice UI).
+    onLogEvent?.([{ type: 'die_roll', payload: { die: histLabel, sides, count: diceCount, rolls: finalRolls, total } }]);
 
     setRollingEntry({ label: histLabel, color, finalRolls, revealed: finalRolls.map(() => false), total, sides });
 
@@ -267,9 +300,10 @@ export function CenterZone({
 
     animTimers.current.forEach(clearTimeout);
     animTimers.current = [];
-    if (soundEnabled && diceAudio.current.d20) {
-      diceAudio.current.d20.currentTime = 0;
-      diceAudio.current.d20.play().catch(() => {});
+    const d20Audio = getDiceAudio().d20;
+    if (soundEnabled && d20Audio) {
+      d20Audio.currentTime = 0;
+      d20Audio.play().catch(() => {});
     }
 
     const displayIndices = isTiebreak ? origIndices : playerIndices;
@@ -286,6 +320,18 @@ export function CenterZone({
     });
     const labels = displayIndices.map(idx => players[idx].playerName);
     const initialRevealed = displayIndices.map((_, i) => !activeSlots[i]);
+
+    // Record the roll-off values for first player (each round, including
+    // tiebreak re-rolls). The resulting turn order is captured separately from
+    // game state once a first player is locked in.
+    onLogEvent?.([{
+      type: 'roll_for_first',
+      payload: {
+        sides: 20,
+        tiebreak: isTiebreak,
+        rolls: playerIndices.map((idx, i) => ({ player: players[idx].playerName, roll: newRolls[i] })),
+      },
+    }]);
 
     setRollOffState({ phase: 'rolling', activeIndices: playerIndices, originalIndices: origIndices });
     setDiceOpen(true);
@@ -655,7 +701,7 @@ export function CenterZone({
                 const base = typeof window !== 'undefined' && process.env.NODE_ENV === 'development'
                   ? 'http://localhost:3003'
                   : '/app/projects/commander/rules';
-                chatUrlRef.current = `${base}/chat?ctx=${ctxParam}`;
+                setChatUrl(`${base}/chat?ctx=${ctxParam}`);
                 setChatOpen(true);
               }
             }}
@@ -761,6 +807,19 @@ export function CenterZone({
               </Button>
             </Stack>
 
+            {onViewLog && (
+              <Button
+                variant="outlined"
+                size="small"
+                fullWidth
+                onClick={() => { setSettingsOpen(false); openLog(); }}
+                startIcon={<FormatListBulletedIcon sx={{ fontSize: 14 }} />}
+                sx={{ fontSize: 11, py: 0.5, width: '100%' }}
+              >
+                Game Log
+              </Button>
+            )}
+
             <Stack direction="row" spacing={1} sx={{ width: '100%' }}>
               <Button
                 variant="outlined"
@@ -802,11 +861,47 @@ export function CenterZone({
           </Box>
         )}
 
+        {/* Game Log viewer */}
+        <Dialog open={logOpen} onClose={() => setLogOpen(false)} fullWidth maxWidth="sm">
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1.5, fontWeight: 600, fontSize: '1rem' }}>
+            Game Log
+            <IconButton size="small" onClick={() => setLogOpen(false)} sx={{ p: 0.25 }}>
+              <CloseIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent dividers sx={{ p: 0 }}>
+            {logLoading ? (
+              <Typography sx={{ p: 2, color: 'text.secondary', fontSize: 13 }}>Loading...</Typography>
+            ) : logEntries.length === 0 ? (
+              <Typography sx={{ p: 2, color: 'text.secondary', fontSize: 13 }}>No events logged yet.</Typography>
+            ) : (
+              <Box component="ol" sx={{ m: 0, p: 0, listStyle: 'none' }}>
+                {/* Newest first: the buffer returns events oldest-first. */}
+                {logEntries.slice().reverse().map((e, i) => (
+                  <Box
+                    component="li"
+                    key={i}
+                    sx={{
+                      display: 'flex', gap: 1, px: 2, py: 0.75,
+                      borderTop: i > 0 ? '1px solid' : 'none', borderColor: 'divider',
+                    }}
+                  >
+                    <Typography component="span" sx={{ color: 'text.disabled', fontVariantNumeric: 'tabular-nums', fontSize: 11, minWidth: 60, flexShrink: 0 }}>
+                      {logEntryTime(e.ts)}
+                    </Typography>
+                    <Typography component="span" sx={{ fontSize: 13 }}>{describeLogEntry(e)}</Typography>
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </DialogContent>
+        </Dialog>
+
         {/* Rules Guru chat Dialog */}
         <Dialog
           open={chatOpen && !chatMinimized}
           keepMounted
-          onClose={() => { setChatOpen(false); setChatMinimized(false); setChatHasNewContent(false); setChatSearching(false); chatUrlRef.current = null; }}
+          onClose={() => { setChatOpen(false); setChatMinimized(false); setChatHasNewContent(false); setChatSearching(false); setChatUrl(null); }}
           fullWidth
           maxWidth="md"
           PaperProps={{ sx: { height: '85vh', display: 'flex', flexDirection: 'column' } }}
@@ -817,16 +912,16 @@ export function CenterZone({
               <IconButton size="small" onClick={() => { setChatMinimized(true); setChatHasNewContent(false); }} title="Minimize">
                 <MinimizeIcon />
               </IconButton>
-              <IconButton size="small" onClick={() => { setChatOpen(false); setChatMinimized(false); setChatHasNewContent(false); setChatSearching(false); chatUrlRef.current = null; }}>
+              <IconButton size="small" onClick={() => { setChatOpen(false); setChatMinimized(false); setChatHasNewContent(false); setChatSearching(false); setChatUrl(null); }}>
                 <CloseIcon />
               </IconButton>
             </Box>
           </DialogTitle>
           <DialogContent sx={{ p: 0, flex: 1, overflow: 'hidden' }}>
-            {(chatOpen || chatMinimized) && chatUrlRef.current && (
+            {(chatOpen || chatMinimized) && chatUrl && (
               <iframe
                 ref={chatIframeRef}
-                src={chatUrlRef.current}
+                src={chatUrl}
                 style={{ width: '100%', height: '100%', border: 'none' }}
                 title="Rules Guru"
               />

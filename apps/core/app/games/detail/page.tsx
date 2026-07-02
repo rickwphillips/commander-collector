@@ -24,6 +24,8 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import GroupsIcon from '@mui/icons-material/Groups';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import { describeLogEntry, logEntryTime } from '@/lib/gameLogFormat';
 import { PageContainer } from '@/components/PageContainer';
 import { ColorIdentityChips } from '@/components/ColorIdentityChips';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -44,6 +46,7 @@ export default function GameDetailPage() {
   // Delete state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [logDialogOpen, setLogDialogOpen] = useState(false);
 
   useEffect(() => {
     if (gameId) {
@@ -99,6 +102,11 @@ export default function GameDetailPage() {
       backLabel="Back to Games"
       actions={
         <Stack direction="row" spacing={1}>
+          {game && game.log && game.log.length > 0 && (
+            <Button startIcon={<FormatListBulletedIcon />} onClick={() => setLogDialogOpen(true)}>
+              Game Log
+            </Button>
+          )}
           <Button startIcon={<EditIcon />} component={Link} href={`/games/edit?id=${gameId}`}>
             Edit
           </Button>
@@ -258,6 +266,47 @@ export default function GameDetailPage() {
           </Card>
         </>
       )}
+
+      {/* Game Log Dialog */}
+      <Dialog open={logDialogOpen} onClose={() => setLogDialogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Game Log</DialogTitle>
+        <DialogContent dividers sx={{ p: 0 }}>
+          {game.log && game.log.length > 0 ? (
+            <Box component="ol" sx={{ m: 0, p: 0, listStyle: 'none' }}>
+              {/* Newest first. */}
+              {game.log.slice().reverse().map((e, i) => (
+                <Box
+                  component="li"
+                  key={i}
+                  sx={{
+                    display: 'flex',
+                    gap: 1,
+                    px: 2,
+                    py: 0.75,
+                    borderTop: i > 0 ? '1px solid' : 'none',
+                    borderColor: 'divider',
+                  }}
+                >
+                  <Typography
+                    component="span"
+                    sx={{ color: 'text.disabled', fontVariantNumeric: 'tabular-nums', fontSize: 12, minWidth: 64, flexShrink: 0 }}
+                  >
+                    {logEntryTime(e.ts)}
+                  </Typography>
+                  <Typography component="span" sx={{ fontSize: 14 }}>
+                    {describeLogEntry(e)}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          ) : (
+            <Typography sx={{ p: 2, color: 'text.secondary' }}>No log recorded for this game.</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLogDialogOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Delete Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>

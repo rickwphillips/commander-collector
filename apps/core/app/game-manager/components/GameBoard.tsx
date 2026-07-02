@@ -83,6 +83,12 @@ interface GameBoardProps {
   onStartGame?: () => void;
   /** Seating-phase only: cancel the game and return to /games. */
   onDiscard?: () => void;
+  /** Log die-roll events (values live in the dice UI, not GameManagerState). */
+  onLogEvent?: (events: import('@/lib/types').GameLogEvent[]) => void;
+  /** Fetch the current game's buffered log entries for the in-game viewer. */
+  onViewLog?: () => Promise<import('@/lib/types').GameLogEntry[]>;
+  /** Called right before the turn is stepped backwards, so it logs as a revert. */
+  onTurnRevert?: () => void;
 }
 
 export function GameBoard({
@@ -94,15 +100,18 @@ export function GameBoard({
   onSeatUpdate,
   onStartGame,
   onDiscard,
+  onLogEvent,
+  onViewLog,
+  onTurnRevert,
 }: GameBoardProps) {
   const { players, commanderDamage, currentPlayerIdx, turnNumber, turnTimerSeconds, turnStartTime, startingLife } = state;
 
   const [rollState, setRollState] = useState<RollState>(IDLE_ROLL_STATE);
   const [firstPlayerSet, setFirstPlayerSet] = useState(state.firstPlayerIdx != null);
   const [firstPlayerIdx, setFirstPlayerIdx] = useState(state.firstPlayerIdx ?? 0);
-  const [winner, setWinner] = useState<PlayerState | null>(null);
   const [winnerCountdown, setWinnerCountdown] = useState<number | null>(null);
-  const winnerStateRef = useRef<GameManagerState | null>(null);
+  const [prevWinnerKey, setPrevWinnerKey] = useState<string | null>(null);
+  const winnerSavedRef = useRef(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lifeKillPrompt, setLifeKillPrompt] = useState<{ targetIdx: number } | null>(null);
   const [poisonKillPrompt, setPoisonKillPrompt] = useState<{ targetIdx: number } | null>(null);
@@ -129,70 +138,64 @@ export function GameBoard({
       .catch(() => { /* leave empty; user can refresh */ });
   }, [state.phase]);
 
-  // Sync local firstPlayerIdx/firstPlayerSet with game state when loaded from DB
-  useEffect(() => {
+  // Sync local firstPlayer state when it arrives from the DB (resume) or a
+  // remote event. Adjusting during render on the prop change avoids a
+  // synchronous setState in an effect.
+  const [prevStateFirstIdx, setPrevStateFirstIdx] = useState(state.firstPlayerIdx);
+  if (state.firstPlayerIdx !== prevStateFirstIdx) {
+    setPrevStateFirstIdx(state.firstPlayerIdx);
     if (state.firstPlayerIdx != null && !firstPlayerSet) {
       setFirstPlayerIdx(state.firstPlayerIdx);
       setFirstPlayerSet(true);
     }
-  }, [state.firstPlayerIdx, firstPlayerSet]);
+  }
 
-  // Start a 15s countdown when a winner is detected; auto-save when it hits 0
-  useEffect(() => {
-    if (winner) {
-      winnerStateRef.current = state;
-      setWinnerCountdown(15);
-    } else {
-      setWinnerCountdown(null);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [winner]);
-
-  // Detect winner from any source (direct handlers OR remote events applied via
-  // setState). In 2HG the game ends when only one team still has live players;
-  // in standard play it ends when one seat remains. The `winner` we store is a
-  // representative survivor (the whole surviving team in 2HG).
-  useEffect(() => {
-    if (winner) return;
-    if (!firstPlayerSet) return;
+  // The winner is derived from the board, not stored in effect-set state: in 2HG
+  // the game ends when only one team still has live players; in standard play
+  // when one seat remains. Deriving it keeps it consistent with `players` on
+  // every render (from direct handlers OR remote events applied via setState).
+  const winner: PlayerState | null = (() => {
+    if (!firstPlayerSet) return null;
+    if (!players.some((p) => p.isEliminated)) return null;
     const remaining = players.filter((p) => !p.isEliminated);
-    if (!players.some((p) => p.isEliminated)) return;
     if (state.gameType === '2hg') {
       const remainingTeams = new Set(remaining.map((p) => p.teamNumber));
-      if (remainingTeams.size === 1 && remaining.length > 0) setWinner(remaining[0]);
-    } else if (remaining.length === 1) {
-      setWinner(remaining[0]);
+      return remainingTeams.size === 1 && remaining.length > 0 ? remaining[0] : null;
     }
-  }, [players, winner, firstPlayerSet, state.gameType]);
+    return remaining.length === 1 ? remaining[0] : null;
+  })();
+  const winnerKey = winner
+    ? state.gameType === '2hg' && winner.teamNumber != null
+      ? `team-${winner.teamNumber}`
+      : winner.playerId
+    : null;
 
-  // Cancel countdown if a correction restores a contested board.
-  useEffect(() => {
-    if (!winner) return;
-    const remaining = players.filter((p) => !p.isEliminated);
-    const stillWon =
-      state.gameType === '2hg'
-        ? new Set(remaining.map((p) => p.teamNumber)).size === 1 &&
-          remaining.length > 0 &&
-          players.some((p) => p.isEliminated)
-        : remaining.length === 1;
-    if (!stillWon) {
-      setWinner(null);
-      setWinnerCountdown(null);
-    }
-  }, [players, winner, state.gameType]);
+  // Start a 15s auto-save countdown when a winner appears, and clear it if a
+  // correction restores a contested board. Adjusting state during render on the
+  // winner-key change keeps this out of an effect (React's "storing information
+  // from previous renders" pattern), so no synchronous setState runs in an effect.
+  if (winnerKey !== prevWinnerKey) {
+    setPrevWinnerKey(winnerKey);
+    setWinnerCountdown(winnerKey ? 15 : null);
+  }
 
+  // Tick the countdown down each second. The setState runs inside the timer
+  // callback (deferred), not synchronously in the effect body.
   useEffect(() => {
-    if (winnerCountdown === null) return;
-    if (winnerCountdown === 0) {
-      const savedState = winnerStateRef.current;
-      setWinner(null);
-      setWinnerCountdown(null);
-      if (savedState) onSaveGame(savedState);
-      return;
-    }
+    if (winnerCountdown === null || winnerCountdown <= 0) return;
     const t = setTimeout(() => setWinnerCountdown((c) => (c !== null ? c - 1 : null)), 1000);
     return () => clearTimeout(t);
-  }, [winnerCountdown, onSaveGame]);
+  }, [winnerCountdown]);
+
+  // When the countdown reaches 0, auto-save the current (still-winning) board
+  // exactly once. onSaveGame navigates away; the ref guard only matters if state
+  // churns before navigation completes.
+  useEffect(() => {
+    if (winnerCountdown === 0 && !winnerSavedRef.current) {
+      winnerSavedRef.current = true;
+      onSaveGame(state);
+    }
+  }, [winnerCountdown, onSaveGame, state]);
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -245,6 +248,9 @@ export function GameBoard({
 
 
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  // Wall-clock, refreshed by the per-second tick, so remote-connection freshness
+  // is computed from state instead of an impure Date.now() call during render.
+  const [nowMs, setNowMs] = useState(0);
   const rollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tickTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   // 2HG: the per-player roll summary to record in notes once the roll is accepted.
@@ -255,7 +261,9 @@ export function GameBoard({
     if (!firstPlayerSet) return;
     if (tickTimer.current) clearInterval(tickTimer.current);
     tickTimer.current = setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - turnStartTime) / 1000));
+      const t = Date.now();
+      setElapsedSeconds(Math.floor((t - turnStartTime) / 1000));
+      setNowMs(t);
     }, 1000);
     return () => { if (tickTimer.current) clearInterval(tickTimer.current); };
   }, [firstPlayerSet, turnStartTime]);
@@ -338,14 +346,11 @@ export function GameBoard({
     setFirstPlayerSet(false);
     setFirstPlayerIdx(0);
     setRollState(IDLE_ROLL_STATE);
-    setWinner(null);
     onRestartGame(players);
   };
 
   const updateState = (patch: Partial<GameManagerState>) => {
-    const next = { ...state, ...patch };
-    if (winner) winnerStateRef.current = next;
-    onUpdate(next);
+    onUpdate({ ...state, ...patch });
   };
 
   // Replaces a useState setter so the read-only overlay choice mirrors to the
@@ -398,15 +403,9 @@ export function GameBoard({
   const dispatchHostEvent = useCallback(
     (event: DistributiveOmit<LiveGameEvent, 'seat' | 'ts'>) => {
       const stamped = { ...event, seat: '__host__', ts: Date.now() } as LiveGameEvent;
-      onUpdate((prev) => {
-        const next = applyEvent(prev, stamped);
-        // winnerStateRef snapshots the about-to-be-committed state so the 15s
-        // auto-save countdown sees the player config at the moment of the win.
-        if (winner) winnerStateRef.current = next;
-        return next;
-      });
+      onUpdate((prev) => applyEvent(prev, stamped));
     },
-    [onUpdate, winner],
+    [onUpdate],
   );
 
   const handleLifeChange = (idx: number, delta: number) =>
@@ -462,6 +461,8 @@ export function GameBoard({
   const handlePrevTurn = () => {
     const next = applyPrevTurn(state);
     if (next === state) return;
+    // Flag the reversal so page.tsx logs turn_revert rather than pass_turn.
+    onTurnRevert?.();
     updateState({ currentPlayerIdx: next.currentPlayerIdx, turnNumber: next.turnNumber, turnStartTime: next.turnStartTime });
   };
 
@@ -775,7 +776,7 @@ export function GameBoard({
                 startingLife={startingLife}
                 highlightMode={highlightMode}
                 seatCode={state.gameType === '2hg' ? undefined : (state.sessionSeats?.[player.position] ?? undefined)}
-                remoteConnected={state.gameType !== '2hg' && !!state.remoteCheckins?.[player.position] && Date.now() - (state.remoteCheckins[player.position] ?? 0) < 15000}
+                remoteConnected={state.gameType !== '2hg' && nowMs > 0 && !!state.remoteCheckins?.[player.position] && nowMs - (state.remoteCheckins[player.position] ?? 0) < 15000}
                 onLifeChange={handleLifeChange}
                 onPoisonChange={handlePoisonChange}
                 onCommanderTaxChange={handleCommanderTaxChange}
@@ -798,6 +799,16 @@ export function GameBoard({
                     // is broadcast to remotes. Use the reducer directly.
                     const { notes: newNotes } = applyLifeKillAttr(state, lifeKillPrompt.targetIdx, sourceIdx);
                     updateState({ notes: newNotes });
+                    // The death was already logged (eliminate); this records the
+                    // player the host credited with the life-to-0 kill.
+                    onLogEvent?.([{
+                      type: 'kill_attribution',
+                      payload: {
+                        player: players[lifeKillPrompt.targetIdx]?.playerName,
+                        source: sourceIdx != null ? players[sourceIdx]?.playerName ?? null : null,
+                        cause: 'life',
+                      },
+                    }]);
                     setLifeKillPrompt(null);
                     // Winner detection runs in the state-driven useEffect, so
                     // no explicit setWinner here.
@@ -808,6 +819,14 @@ export function GameBoard({
                   onPoisonKillSelect: (sourceIdx) => {
                     const { notes: newNotes } = applyPoisonKillAttr(state, poisonKillPrompt.targetIdx, sourceIdx);
                     updateState({ notes: newNotes });
+                    onLogEvent?.([{
+                      type: 'kill_attribution',
+                      payload: {
+                        player: players[poisonKillPrompt.targetIdx]?.playerName,
+                        source: sourceIdx != null ? players[sourceIdx]?.playerName ?? null : null,
+                        cause: 'poison',
+                      },
+                    }]);
                     setPoisonKillPrompt(null);
                   },
                 })}
@@ -833,6 +852,8 @@ export function GameBoard({
           onChooseFirstPlayer={handleChooseFirstPlayer}
           onRollAgain={handleRollAgain}
           onRestartGame={handleRestartGame}
+          onLogEvent={onLogEvent}
+          onViewLog={onViewLog}
           elapsedSeconds={elapsedSeconds}
           turnTimerSeconds={turnTimerSeconds}
           onTimerChange={(s) => {
@@ -929,8 +950,9 @@ export function GameBoard({
               : winner.playerName} wins — saving in {winnerCountdown}s
           </Typography>
           <Button size="small" variant="contained" onClick={() => {
-            const s = winnerStateRef.current ?? state;
-            setWinner(null); setWinnerCountdown(null); onSaveGame(s);
+            winnerSavedRef.current = true;
+            setWinnerCountdown(null);
+            onSaveGame(state);
           }}>
             Save Now
           </Button>

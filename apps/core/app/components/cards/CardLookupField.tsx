@@ -259,7 +259,9 @@ export function CardLookupField({
   const debounceRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef      = useRef<AbortController | null>(null);
   const resultsRef    = useRef<HTMLDivElement>(null);
-  const anchorRef     = useRef<HTMLDivElement>(null);
+  // Anchor for the result Popper. Held in state (via a callback ref) rather than
+  // a ref so it can be read during render without violating the rules-of-refs.
+  const [anchorEl, setAnchorEl] = useState<HTMLDivElement | null>(null);
   // When the user hovers the result panel, freeze the list so new searches
   // can't shift rows out from under their click.
   const hoverInResults = useRef(false);
@@ -400,11 +402,34 @@ export function CardLookupField({
       onAdd?.([collapsed]);
       onChange?.(collapsed);
 
+      // A singleton picker (commander, partner, filter selectors) commits one
+      // choice, so show the chosen card's name in the field and settle the search
+      // UI: cancel any pending/in-flight search and clear the results and the
+      // transient query-mode badge. Without this a filter-forced field (which is
+      // always in query mode) stays showing "Query mode" after selecting, and
+      // that badge overlaps whatever sits below the field. Multi-add fields are
+      // left as-is so the user can keep adding cards from the same search.
+      // Controlled callers drive the value via `value`, so only touch internal state.
+      if (singletonMode) {
+        if (!isControlled) setInternalValue(collapsed.card_name);
+        if (debounceRef.current) {
+          clearTimeout(debounceRef.current);
+          debounceRef.current = null;
+        }
+        if (abortRef.current) {
+          abortRef.current.abort();
+          abortRef.current = null;
+        }
+        setResults([]);
+        setQueryMode(false);
+        setLoading(false);
+      }
+
       setResultsHidden(true);
       setFocusIdx(-1);
       setFlashIdx(-1);
     },
-    [onAdd, onChange, singletonMode]
+    [onAdd, onChange, singletonMode, isControlled]
   );
 
   // ── Keyboard navigation ───────────────────────────────────────────────────
@@ -482,7 +507,7 @@ export function CardLookupField({
 
   return (
     <ClickAwayListener onClickAway={closeResults}>
-    <Box ref={anchorRef} sx={{ position: 'relative', width: '100%' }}>
+    <Box ref={setAnchorEl} sx={{ position: 'relative', width: '100%' }}>
       {/* ── Input ─────────────────────────────────────────────────────────── */}
       <TextField
         id={inputId}
@@ -558,13 +583,13 @@ export function CardLookupField({
       {/* ── Result list (portal'd via Popper to escape parent overflow:hidden) ── */}
       <Popper
         open={showResults}
-        anchorEl={anchorRef.current}
+        anchorEl={anchorEl}
         placement="bottom-start"
         modifiers={[
           { name: 'offset', options: { offset: [0, 4] } },
           { name: 'preventOverflow', options: { boundary: 'viewport' } },
         ]}
-        style={{ zIndex: 1400, width: anchorRef.current?.offsetWidth }}
+        style={{ zIndex: 1400, width: anchorEl?.offsetWidth }}
       >
         <Paper
           elevation={8}

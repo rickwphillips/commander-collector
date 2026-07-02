@@ -257,6 +257,39 @@ export const api = {
   deleteLiveGame: (code: string) =>
     apiFetch<{ success: boolean }>('/live-game', { method: 'DELETE', params: { code } }),
 
+  // Game event log buffer (no auth — the live session code is the credential,
+  // matching live-game). Events are buffered server-side in a fast SQLite store
+  // during play and promoted into the durable game_logs table by createGame on
+  // successful completion. All calls are fire-and-forget from the host.
+  gameLog: {
+    // Clear this session's buffer and seed the opening events (e.g. turn order).
+    start: (code: string, events: import('./types').GameLogEvent[]) =>
+      apiFetch<{ ok: boolean }>('/game-log', {
+        method: 'POST',
+        params: { action: 'start' },
+        body: JSON.stringify({ code, events }),
+      }),
+    // Append events as they happen during play.
+    append: (code: string, events: import('./types').GameLogEvent[]) =>
+      apiFetch<{ ok: boolean }>('/game-log', {
+        method: 'POST',
+        params: { action: 'append' },
+        body: JSON.stringify({ code, events }),
+      }),
+    // Discard this session's buffer (cancel / new game); nothing is persisted.
+    cancel: (code: string) =>
+      apiFetch<{ ok: boolean }>('/game-log', {
+        method: 'POST',
+        params: { action: 'cancel' },
+        body: JSON.stringify({ code }),
+      }),
+    // Read the current buffered events for a session (in-game log viewer).
+    read: (code: string) =>
+      apiFetch<{ events: import('./types').GameLogEntry[] }>('/game-log', {
+        params: { code },
+      }),
+  },
+
   // Open an SSE stream for a remote panel. Pushes state as the host writes.
   // Returns a cleanup function — call it to close the EventSource.
   openLiveGameStream: (

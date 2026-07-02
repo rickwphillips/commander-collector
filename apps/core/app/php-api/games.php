@@ -1,7 +1,8 @@
 <?php
 require_once 'config.php';
 require_once __DIR__ . '/auth/middleware.php';
-requireAuth();
+require_once __DIR__ . '/lib/game-log-buffer.php';
+$currentUser = requireAuth();
 
 $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
@@ -35,6 +36,13 @@ switch ($method) {
             ');
             $resultStmt->execute([$id]);
             $game['results'] = $resultStmt->fetchAll();
+
+            // Attach the durable event log (null when the game has none, e.g.
+            // games logged before the feature existed).
+            $logStmt = $pdo->prepare('SELECT events FROM game_logs WHERE game_id = ?');
+            $logStmt->execute([$id]);
+            $logRow = $logStmt->fetch();
+            $game['log'] = $logRow ? json_decode($logRow['events'], true) : null;
 
             sendJSON($game);
         } else {
@@ -183,7 +191,48 @@ switch ($method) {
                 ]);
             }
 
+            // Promote the game's buffered event log into one durable game_logs
+            // row. Best-effort read: a buffer glitch must never fail the game
+            // save, but a row is still written (empty array) so completion
+            // always produces exactly one game log record.
+            $sessionCode = isset($data['session_code']) ? trim((string)$data['session_code']) : '';
+            if ($sessionCode !== '') {
+                // Live game: promote its buffered event log.
+                $events = [];
+                try {
+                    $events = glbRead($sessionCode);
+                } catch (Exception $bufErr) {
+                    $events = [];
+                }
+                $pdo->prepare('INSERT INTO game_logs (game_id, events) VALUES (?, ?)')
+                    ->execute([$gameId, json_encode($events)]);
+            } else {
+                // Manual "Log Game" entry (games created from the form, not a
+                // live session): no buffered events. Record a single manual_entry
+                // event noting the user who created it.
+                $manualEvent = [[
+                    'ts' => gmdate('Y-m-d\TH:i:s\Z'),
+                    'type' => 'manual_entry',
+                    'payload' => [
+                        'created_by_user_id' => $currentUser['sub'] ?? null,
+                        'created_by' => $currentUser['username'] ?? null,
+                    ],
+                ]];
+                $pdo->prepare('INSERT INTO game_logs (game_id, events) VALUES (?, ?)')
+                    ->execute([$gameId, json_encode($manualEvent)]);
+            }
+
             $pdo->commit();
+
+            // Clear the local buffer only after the durable write is committed.
+            if ($sessionCode !== '') {
+                try {
+                    glbClear($sessionCode);
+                } catch (Exception $bufErr) {
+                    // ignore — buffer is transient and prunes itself
+                }
+            }
+
             sendJSON(['id' => $gameId], 201);
 
         } catch (Exception $e) {
@@ -299,6 +348,9 @@ switch ($method) {
             // Delete results first (due to foreign key)
             $stmt = $pdo->prepare('DELETE FROM game_results WHERE game_id = ?');
             $stmt->execute([$id]);
+
+            // Delete the game's event log (no DB-level cascade; see v5.11.0.sql)
+            $pdo->prepare('DELETE FROM game_logs WHERE game_id = ?')->execute([$id]);
 
             // Delete game
             $stmt = $pdo->prepare('DELETE FROM games WHERE id = ?');
