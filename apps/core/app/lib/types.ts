@@ -151,6 +151,8 @@ export interface DeckDetail extends Deck {
 
 export interface GameWithResults extends Game {
   results: GameResultWithDeck[];
+  /** Durable event log for this game, or null if none was recorded. */
+  log?: GameLogEntry[] | null;
 }
 
 export interface GameResultWithDeck extends GameResult {
@@ -776,4 +778,26 @@ export interface CreateGameInput {
   notes: string | null;
   game_type: GameType;
   results: GameResultInput[];
+  // Live session code, so the server can promote that game's buffered event log
+  // (see php-api/game-log.php) into the durable game_logs table on completion.
+  session_code?: string | null;
+}
+
+/**
+ * One entry in the game manager's event log. Buffered locally during play (see
+ * php-api/game-log.php) and serialized into the durable game_logs row on
+ * successful completion. `type` is a short action tag (e.g. 'die_roll',
+ * 'turn_order', 'life_change'); `payload` carries the action's details.
+ */
+export interface GameLogEvent {
+  type: string;
+  payload?: Record<string, unknown>;
+  ts?: string;
+}
+
+/** A buffered event as read back from the server (timestamp always present). */
+export interface GameLogEntry {
+  ts: string;
+  type: string;
+  payload: Record<string, unknown>;
 }

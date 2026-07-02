@@ -31,6 +31,11 @@ vi.mock('@/lib/api', () => ({
     getActiveGame:    vi.fn(),
     getGameSettings:  vi.fn(),
     openLiveGameHostStream: vi.fn(() => vi.fn()),
+    gameLog: {
+      start:  vi.fn(() => Promise.resolve({ ok: true })),
+      append: vi.fn(() => Promise.resolve({ ok: true })),
+      cancel: vi.fn(() => Promise.resolve({ ok: true })),
+    },
   },
   apiFetch: vi.fn(),
   API_BASE: '',

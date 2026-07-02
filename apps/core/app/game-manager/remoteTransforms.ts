@@ -261,7 +261,9 @@ export function applyCommanderDamageChange(
     ? `${source.commander.name} / ${source.partner.name}`
     : source.commander.name;
   const cmdKillNoteTag = `[cmdkill:${targetIdx}:${sourceIdx}]`;
-  const lifeKillNoteTag = `[lifekill:${targetIdx}]`;
+  // Include the source so the event log can attribute a life-to-0 kill dealt by
+  // commander damage. Undo below matches this same variable, so it stays consistent.
+  const lifeKillNoteTag = `[lifekill:${targetIdx}:${sourceIdx}]`;
   const cmdKillLine = `${cmdKillNoteTag} ${target.playerName} eliminated by ${cmdLabel} (${source.playerName}) commander damage (turn ${turnNumber})`;
   const lifeKillLine = `${lifeKillNoteTag} ${target.playerName} brought to 0 life by ${cmdLabel} (${source.playerName}) (turn ${turnNumber})`;
 

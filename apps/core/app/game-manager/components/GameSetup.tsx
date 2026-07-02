@@ -7,7 +7,7 @@
  * game type). Per-seat player/deck/commander selection now happens in-game
  * during the 'seating' phase via SeatPickerModal opened from each PlayerPanel.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
@@ -20,6 +20,8 @@ import {
   ToggleButtonGroup,
   ToggleButton,
   MenuItem,
+  Checkbox,
+  FormControlLabel,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import type { GameType } from '@/lib/types';
@@ -29,6 +31,8 @@ export interface GameSetupSubmit {
   startingLife: number;
   turnTimerSeconds: number;
   gameType: GameType;
+  /** Auto-fill each seat with a unique player and one of their own decks. */
+  random?: boolean;
 }
 
 interface GameSetupProps {
@@ -47,16 +51,21 @@ export function GameSetup({ onStart, initial }: GameSetupProps) {
   const [isCustomLife, setIsCustomLife] = useState(false);
   const [turnTimerSeconds, setTurnTimerSeconds] = useState<number>(initial?.turnTimerSeconds ?? 300);
   const [gameType, setGameType] = useState<GameType>(initial?.gameType ?? 'standard');
+  const [random, setRandom] = useState(false);
 
   // Two-Headed Giant is always four players (two teams of two) and starts each
   // team at 30 life per the official rules. Player count is forced to 4 in the
-  // game-type change handler below; this effect keeps the life default in sync.
-  useEffect(() => {
+  // game-type change handler below. Keep the life default in sync with player
+  // count and game type (unless a custom value is set) by adjusting during
+  // render on the dependency change, rather than in an effect.
+  const lifeSyncKey = `${playerCount}|${gameType}|${isCustomLife}`;
+  const [prevLifeSyncKey, setPrevLifeSyncKey] = useState(lifeSyncKey);
+  if (lifeSyncKey !== prevLifeSyncKey) {
+    setPrevLifeSyncKey(lifeSyncKey);
     if (!isCustomLife) {
-      if (gameType === '2hg') setStartingLife(30);
-      else setStartingLife(playerCount === 2 ? 30 : 40);
+      setStartingLife(gameType === '2hg' ? 30 : playerCount === 2 ? 30 : 40);
     }
-  }, [playerCount, isCustomLife, gameType]);
+  }
 
   const handleGameTypeChange = (val: GameType) => {
     setGameType(val);
@@ -85,7 +94,7 @@ export function GameSetup({ onStart, initial }: GameSetupProps) {
   };
 
   const handleStart = () => {
-    onStart({ playerCount, startingLife, turnTimerSeconds, gameType });
+    onStart({ playerCount, startingLife, turnTimerSeconds, gameType, random });
   };
 
   return (
@@ -183,6 +192,17 @@ export function GameSetup({ onStart, initial }: GameSetupProps) {
                   <MenuItem value="standard">Standard</MenuItem>
                   <MenuItem value="2hg">Two-Headed Giant</MenuItem>
                 </TextField>
+              </Box>
+
+              <Box>
+                <FormControlLabel
+                  control={<Checkbox checked={random} onChange={(e) => setRandom(e.target.checked)} />}
+                  label={<Typography variant="body2">Random: auto-fill seats with players and their decks</Typography>}
+                  sx={{ mx: 0 }}
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 4 }}>
+                  Each seat gets a different player and one of their own decks. You can still adjust any seat before starting.
+                </Typography>
               </Box>
             </Stack>
           </CardContent>
