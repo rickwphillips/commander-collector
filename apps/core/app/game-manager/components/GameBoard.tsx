@@ -13,6 +13,7 @@ import { TeamPanel, type TeamMember } from './TeamPanel';
 import { SeatPickerModal } from './SeatPickerModal';
 import { api } from '@/lib/api';
 import { isSeatFilled } from '@/lib/types';
+import { teamLabel, teamName } from '@/lib/teams';
 import { BracketMismatchBanner } from '@/components/BracketMismatchBanner';
 import type { Player, DeckWithPlayer, PlayerSetup, LiveGameEvent, DistributiveOmit } from '@/lib/types';
 import type { GameManagerState, PlayerState } from '../types';
@@ -48,12 +49,19 @@ function getActiveOpponents(players: PlayerState[], excludeIdx: number) {
  * roller takes the first turn. Returns the winning seat index plus a human
  * note recording every roll for the game log.
  */
-function rollForFirstTeam(
+export type TeamRollResult = {
+  winnerIdx: number;
+  detail: string;
+  rolls: { idx: number; roll: number }[];
+};
+
+export function rollForFirstTeam(
   players: PlayerState[],
   active: number[],
-): { winnerIdx: number; detail: string } {
+): TeamRollResult {
+  let rolls: { idx: number; roll: number }[] = [];
   for (let attempt = 0; attempt < 50; attempt++) {
-    const rolls = active.map((idx) => ({ idx, roll: 1 + Math.floor(Math.random() * 20) }));
+    rolls = active.map((idx) => ({ idx, roll: 1 + Math.floor(Math.random() * 20) }));
     const max = Math.max(...rolls.map((r) => r.roll));
     const top = rolls.filter((r) => r.roll === max);
     const topTeams = new Set(top.map((r) => players[r.idx].teamNumber));
@@ -64,10 +72,11 @@ function rollForFirstTeam(
     return {
       winnerIdx,
       detail: `2HG roll (d20): ${summary}. Team ${team} (${players[winnerIdx].playerName}) goes first.`,
+      rolls,
     };
   }
   const winnerIdx = active[0];
-  return { winnerIdx, detail: `2HG roll: Team ${players[winnerIdx].teamNumber} goes first.` };
+  return { winnerIdx, detail: `2HG roll: Team ${players[winnerIdx].teamNumber} goes first.`, rolls };
 }
 
 interface GameBoardProps {
@@ -108,10 +117,11 @@ export function GameBoard({
 
   const [rollState, setRollState] = useState<RollState>(IDLE_ROLL_STATE);
   const [firstPlayerSet, setFirstPlayerSet] = useState(state.firstPlayerIdx != null);
-  const [firstPlayerIdx, setFirstPlayerIdx] = useState(state.firstPlayerIdx ?? 0);
   const [winnerCountdown, setWinnerCountdown] = useState<number | null>(null);
   const [prevWinnerKey, setPrevWinnerKey] = useState<string | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
   const winnerSavedRef = useRef(false);
+  const saveAttemptsRef = useRef(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lifeKillPrompt, setLifeKillPrompt] = useState<{ targetIdx: number } | null>(null);
   const [poisonKillPrompt, setPoisonKillPrompt] = useState<{ targetIdx: number } | null>(null);
@@ -145,7 +155,6 @@ export function GameBoard({
   if (state.firstPlayerIdx !== prevStateFirstIdx) {
     setPrevStateFirstIdx(state.firstPlayerIdx);
     if (state.firstPlayerIdx != null && !firstPlayerSet) {
-      setFirstPlayerIdx(state.firstPlayerIdx);
       setFirstPlayerSet(true);
     }
   }
@@ -187,15 +196,33 @@ export function GameBoard({
     return () => clearTimeout(t);
   }, [winnerCountdown]);
 
-  // When the countdown reaches 0, auto-save the current (still-winning) board
-  // exactly once. onSaveGame navigates away; the ref guard only matters if state
-  // churns before navigation completes.
+  // Save the finished game, retrying transient failures a bounded number of
+  // times. onSaveGame navigates away on success; on failure it rejects without
+  // navigating, so we release the guard. Auto-save re-arms the countdown for
+  // another attempt up to MAX_SAVE_ATTEMPTS, then stops (banner shows a retry
+  // prompt); a manual Save Now resets the budget and always attempts.
+  const MAX_SAVE_ATTEMPTS = 3;
+  const saveWithRetry = useCallback((auto: boolean) => {
+    winnerSavedRef.current = true;
+    if (!auto) saveAttemptsRef.current = 0;
+    saveAttemptsRef.current += 1;
+    setSaveFailed(false);
+    if (!auto) setWinnerCountdown(null);
+    Promise.resolve(onSaveGame(state)).catch(() => {
+      winnerSavedRef.current = false;
+      if (auto && saveAttemptsRef.current < MAX_SAVE_ATTEMPTS) {
+        setWinnerCountdown(5); // re-arm one more bounded auto-retry
+      } else {
+        setWinnerCountdown(null);
+        setSaveFailed(true); // stop hammering; Save Now stays available
+      }
+    });
+  }, [onSaveGame, state]);
+
+  // When the countdown reaches 0, auto-save the current (still-winning) board.
   useEffect(() => {
-    if (winnerCountdown === 0 && !winnerSavedRef.current) {
-      winnerSavedRef.current = true;
-      onSaveGame(state);
-    }
-  }, [winnerCountdown, onSaveGame, state]);
+    if (winnerCountdown === 0 && !winnerSavedRef.current) saveWithRetry(true);
+  }, [winnerCountdown, saveWithRetry]);
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -251,21 +278,28 @@ export function GameBoard({
   // Wall-clock, refreshed by the per-second tick, so remote-connection freshness
   // is computed from state instead of an impure Date.now() call during render.
   const [nowMs, setNowMs] = useState(0);
-  const rollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tickTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  // 2HG: the per-player roll summary to record in notes once the roll is accepted.
-  const rollDetailRef = useRef<string | null>(null);
 
   // Tick the turn timer every second
   useEffect(() => {
     if (!firstPlayerSet) return;
     if (tickTimer.current) clearInterval(tickTimer.current);
-    tickTimer.current = setInterval(() => {
+    const tick = () => {
       const t = Date.now();
       setElapsedSeconds(Math.floor((t - turnStartTime) / 1000));
       setNowMs(t);
-    }, 1000);
-    return () => { if (tickTimer.current) clearInterval(tickTimer.current); };
+    };
+    // Seed on the next macrotask (deferred, not a synchronous setState in the
+    // effect body) so remote-connection freshness (nowMs) and the elapsed timer
+    // are correct almost immediately instead of reading 0 until the first
+    // interval callback fires ~1s later (which flashed every remote player as
+    // disconnected for that first second).
+    const seedTimer = setTimeout(tick, 0);
+    tickTimer.current = setInterval(tick, 1000);
+    return () => {
+      clearTimeout(seedTimer);
+      if (tickTimer.current) clearInterval(tickTimer.current);
+    };
   }, [firstPlayerSet, turnStartTime]);
 
   // No explicit elapsed-seconds reset on turn change: turnStartTime already
@@ -273,78 +307,20 @@ export function GameBoard({
   // and the tick effect above re-runs whenever turnStartTime changes, picking up
   // the fresh value immediately.
 
-  const startRoll = () => {
-    if (rollTimer.current) clearTimeout(rollTimer.current);
-    const active = players.map((p, i) => i).filter((i) => !players[i].isEliminated);
-    // 2HG resolves the first turn via a team roll (reroll only on cross-team
-    // ties); standard play just picks a random active seat. Either way the
-    // animation lands on finalIdx below.
-    let finalIdx: number;
-    if (state.gameType === '2hg') {
-      const { winnerIdx, detail } = rollForFirstTeam(players, active);
-      finalIdx = winnerIdx;
-      rollDetailRef.current = detail;
-    } else {
-      finalIdx = active[Math.floor(Math.random() * active.length)];
-      rollDetailRef.current = null;
-    }
-
-    // Build a sequence that cycles through active players and lands on finalIdx
-    const STEPS = 18;
-    const sequence: number[] = [];
-    let cur = 0;
-    for (let i = 0; i < STEPS - 1; i++) {
-      sequence.push(active[cur % active.length]);
-      cur++;
-    }
-    sequence.push(finalIdx);
-
-    setRollState({ phase: 'rolling', highlightIdx: sequence[0], finalIdx });
-
-    let step = 0;
-    const animate = () => {
-      step++;
-      if (step >= sequence.length) {
-        setRollState({ phase: 'done', highlightIdx: finalIdx, finalIdx });
-        return;
-      }
-      setRollState((prev) => ({ ...prev, highlightIdx: sequence[step] }));
-      const progress = step / sequence.length;
-      rollTimer.current = setTimeout(animate, 30 + (1 - Math.cos(progress * Math.PI)) / 2 * 380);
-    };
-    rollTimer.current = setTimeout(animate, 30);
-  };
-
-  const handleAcceptFirstPlayer = () => {
-    if (rollState.finalIdx === null) return;
-    const player = players[rollState.finalIdx];
-    // For 2HG, record the full team-roll summary; otherwise the simple line.
-    const note = rollDetailRef.current ?? `First player (rolled): ${player?.playerName ?? '?'}`;
-    rollDetailRef.current = null;
-    const newNotes = state.notes ? `${state.notes}\n${note}` : note;
-    onUpdate({ ...state, currentPlayerIdx: rollState.finalIdx, firstPlayerIdx: rollState.finalIdx, turnStartTime: Date.now(), notes: newNotes });
-    setRollState(IDLE_ROLL_STATE);
-    setFirstPlayerIdx(rollState.finalIdx);
-    setFirstPlayerSet(true);
-  };
-
-  const handleChooseFirstPlayer = (idx: number) => {
+  // Commit a first player. `note` overrides the default line (used by the 2HG
+  // team roll to record its full d20 summary); a plain pick falls back to
+  // "First player (chosen)".
+  const handleChooseFirstPlayer = (idx: number, note?: string) => {
     const player = players[idx];
-    const note = `First player (chosen): ${player?.playerName ?? '?'}`;
-    const newNotes = state.notes ? `${state.notes}\n${note}` : note;
+    const line = note ?? `First player (chosen): ${player?.playerName ?? '?'}`;
+    const newNotes = state.notes ? `${state.notes}\n${line}` : line;
     onUpdate({ ...state, currentPlayerIdx: idx, firstPlayerIdx: idx, turnStartTime: Date.now(), notes: newNotes });
     setRollState(IDLE_ROLL_STATE);
-    setFirstPlayerIdx(idx);
     setFirstPlayerSet(true);
-  };
-
-  const handleRollAgain = () => {
-    startRoll();
   };
 
   const handleRestartGame = () => {
     setFirstPlayerSet(false);
-    setFirstPlayerIdx(0);
     setRollState(IDLE_ROLL_STATE);
     onRestartGame(players);
   };
@@ -688,7 +664,7 @@ export function GameBoard({
     >
       <TeamPanel
         teamNumber={teamNumber}
-        teamName={state.teamNames?.[teamNumber] ?? `Team ${teamNumber}`}
+        teamName={teamName(teamNumber, state.teamNames)}
         onTeamNameChange={(name) => handleTeamNameChange(teamNumber, name)}
         members={members}
         opponents={opponents}
@@ -841,16 +817,15 @@ export function GameBoard({
           turnNumber={turnNumber}
           currentPlayerIdx={currentPlayerIdx}
           players={players}
-          rollPhase={rollState.phase}
-          rolledPlayerName={rollState.highlightIdx !== null ? players[rollState.highlightIdx]?.playerName : undefined}
           firstPlayerSet={firstPlayerSet}
           onNextTurn={handleNextTurn}
           onPrevTurn={handlePrevTurn}
           onEndGame={onEndGame}
-          onRollForFirst={startRoll}
-          onAcceptFirstPlayer={handleAcceptFirstPlayer}
           onChooseFirstPlayer={handleChooseFirstPlayer}
-          onRollAgain={handleRollAgain}
+          onRollForFirstTeam={() => {
+            const result = rollForFirstTeam(players, players.map((_, i) => i).filter((i) => !players[i].isEliminated));
+            return { ...result, winnerLabel: teamName(players[result.winnerIdx]?.teamNumber, state.teamNames) };
+          }}
           onRestartGame={handleRestartGame}
           onLogEvent={onLogEvent}
           onViewLog={onViewLog}
@@ -936,7 +911,7 @@ export function GameBoard({
       })()}
 
       {/* Winner countdown banner */}
-      {winner && winnerCountdown !== null && (
+      {winner && (winnerCountdown !== null || saveFailed) && (
         <Box sx={{
           position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 50,
           bgcolor: 'background.paper',
@@ -946,14 +921,10 @@ export function GameBoard({
         }}>
           <Typography sx={{ fontWeight: 900, fontSize: 'clamp(14px, 2.5dvh, 20px)', flex: 1 }}>
             🏆 {state.gameType === '2hg' && winner.teamNumber != null
-              ? `Team ${winner.teamNumber} (${players.filter((p) => p.teamNumber === winner.teamNumber).map((p) => p.playerName).join(' & ')})`
-              : winner.playerName} wins — saving in {winnerCountdown}s
+              ? teamLabel(winner.teamNumber, players, state.teamNames)
+              : winner.playerName} wins {saveFailed ? '— save failed, tap Save Now' : `— saving in ${winnerCountdown}s`}
           </Typography>
-          <Button size="small" variant="contained" onClick={() => {
-            winnerSavedRef.current = true;
-            setWinnerCountdown(null);
-            onSaveGame(state);
-          }}>
+          <Button size="small" variant="contained" onClick={() => saveWithRetry(false)}>
             Save Now
           </Button>
         </Box>

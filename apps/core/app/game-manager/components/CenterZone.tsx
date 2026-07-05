@@ -37,7 +37,7 @@ import { useThemeMode } from '@/components/ThemeProvider';
 import { RulesQuickLookup } from '@/components/RulesQuickLookup';
 import type { PlayerState, CommanderDamageMap } from '../types';
 import type { GameType, GameLogEvent, GameLogEntry } from '@/lib/types';
-import { describeLogEntry, logEntryTime } from '@/lib/gameLogFormat';
+import { GameLogList } from '@/components/GameLogList';
 
 const TWO_HEADED_GIANT_RULES_URL = 'https://magic.wizards.com/en/formats/two-headed-giant';
 
@@ -63,22 +63,17 @@ function D20Icon({ size = 16 }: { size?: number }) {
   );
 }
 
-type RollPhase = 'idle' | 'rolling' | 'done';
-
 interface CenterZoneProps {
   turnNumber: number;
   currentPlayerIdx: number;
   players: PlayerState[];
-  rollPhase: RollPhase;
-  rolledPlayerName?: string;
   firstPlayerSet: boolean;
   onNextTurn: () => void;
   onPrevTurn: () => void;
   onEndGame: () => void;
-  onRollForFirst: () => void;
-  onAcceptFirstPlayer: () => void;
-  onChooseFirstPlayer: (idx: number) => void;
-  onRollAgain: () => void;
+  onChooseFirstPlayer: (idx: number, note?: string) => void;
+  /** 2HG only: resolve the first team via a d20 team roll (see rollForFirstTeam). */
+  onRollForFirstTeam?: () => { winnerIdx: number; detail: string; winnerLabel: string; rolls: { idx: number; roll: number }[] };
   onRestartGame: () => void;
   elapsedSeconds: number;
   turnTimerSeconds: number;
@@ -108,16 +103,12 @@ export function CenterZone({
   turnNumber,
   currentPlayerIdx,
   players,
-  rollPhase,
-  rolledPlayerName,
   firstPlayerSet,
   onNextTurn,
   onPrevTurn,
   onEndGame,
-  onRollForFirst,
-  onAcceptFirstPlayer,
   onChooseFirstPlayer,
-  onRollAgain,
+  onRollForFirstTeam,
   onRestartGame,
   turnTimerSeconds,
   onTimerChange,
@@ -140,7 +131,7 @@ export function CenterZone({
   const [resultKey, setResultKey] = useState(0);
   const [diceCount, setDiceCount] = useState(1);
   type RollingEntry = { label: string; color: string; finalRolls: (number|string)[]; revealed: boolean[]; total: number|null; sides: number|null; labels?: string[]; done?: boolean; activeSlots?: boolean[]; lockedSlots?: boolean[] };
-  type RollOffState = { phase: 'idle' } | { phase: 'rolling'; activeIndices: number[]; originalIndices: number[] } | { phase: 'result'; winnerIdx: number; winnerName: string; originalIndices: number[] } | { phase: 'tie'; tiedIndices: number[]; originalIndices: number[]; noLonersRule?: boolean; lockedInTie?: number[] };
+  type RollOffState = { phase: 'idle' } | { phase: 'rolling'; activeIndices: number[]; originalIndices: number[] } | { phase: 'result'; winnerIdx: number; winnerName: string; originalIndices: number[]; detail?: string } | { phase: 'tie'; tiedIndices: number[]; originalIndices: number[]; noLonersRule?: boolean; lockedInTie?: number[] };
   const [rollingEntry, setRollingEntry] = useState<RollingEntry | null>(null);
   const animTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [confirmEnd, setConfirmEnd] = useState(false);
@@ -292,6 +283,29 @@ export function CenterZone({
     return roll;
   };
 
+  // Shared dice-reveal choreography for both the free-for-all roll-off and the
+  // 2HG team roll: reveal each active slot in turn, then flip all to done and run
+  // onDone. Timers are tracked in animTimers for cancellation.
+  const REVEAL_DELAY = 600;
+  const REVEAL_STAGGER = 230;
+  const scheduleReveal = (count: number, isActive: (i: number) => boolean, onDone: () => void) => {
+    let shown = 0;
+    for (let i = 0; i < count; i++) {
+      if (!isActive(i)) continue;
+      const delay = REVEAL_DELAY + shown * REVEAL_STAGGER;
+      const t = setTimeout(() => {
+        setRollingEntry((prev) => prev ? { ...prev, revealed: prev.revealed.map((v, j) => (j === i ? true : v)) } : null);
+      }, delay);
+      animTimers.current.push(t);
+      shown++;
+    }
+    const doneT = setTimeout(() => {
+      setRollingEntry((prev) => prev ? { ...prev, revealed: prev.revealed.map(() => true), done: true } : null);
+      onDone();
+    }, REVEAL_DELAY + Math.max(0, shown - 1) * REVEAL_STAGGER + 800);
+    animTimers.current.push(doneT);
+  };
+
   const startRollOff = (playerIndices: number[], originalIndices?: number[], lockedPlayers?: { playerIdx: number; roll: number }[]) => {
     const locked = lockedPlayers ?? [];
     const lockedIdxSet = new Set(locked.map(l => l.playerIdx));
@@ -337,22 +351,7 @@ export function CenterZone({
     setDiceOpen(true);
     setRollingEntry({ label: 'Roll Off', color: 'primary.main', finalRolls: allFinalRolls, revealed: initialRevealed, total: null, sides: 20, labels, activeSlots, lockedSlots });
 
-    const revealDelay = 600;
-    const stagger = 230;
-    let activeAnimIdx = 0;
-    displayIndices.forEach((_, i) => {
-      if (!activeSlots[i]) return;
-      const delay = revealDelay + activeAnimIdx * stagger;
-      const t = setTimeout(() => {
-        setRollingEntry(prev => prev ? { ...prev, revealed: prev.revealed.map((v, j) => j === i ? true : v) } : null);
-      }, delay);
-      animTimers.current.push(t);
-      activeAnimIdx++;
-    });
-
-    const lastActiveCount = activeSlots.filter(Boolean).length;
-    const doneT = setTimeout(() => {
-      setRollingEntry(prev => prev ? { ...prev, revealed: prev.revealed.map(() => true), done: true } : null);
+    scheduleReveal(displayIndices.length, (i) => activeSlots[i], () => {
       playerIndices.forEach((idx, i) => { lastRoundScores.current[players[idx].playerName] = newRolls[i]; });
 
       // Combine locked scores with new rolls for full comparison
@@ -401,8 +400,7 @@ export function CenterZone({
           animTimers.current.push(tieT);
         }
       }
-    }, revealDelay + (lastActiveCount - 1) * stagger + 800);
-    animTimers.current.push(doneT);
+    });
   };
 
   const cancelRollOff = () => {
@@ -410,6 +408,46 @@ export function CenterZone({
     animTimers.current = [];
     setRollingEntry(null);
     setRollOffState({ phase: 'idle' });
+  };
+
+  // 2HG first-turn roll: the winner (and any cross-team-tie rerolls) is resolved
+  // up front by rollForFirstTeam via onRollForFirstTeam; here we just animate the
+  // deciding round's d20s and land on that team. Plain d20 — the free-for-all
+  // house rules (aces high, no loners) do not apply to the team roll.
+  const startTeamRoll = () => {
+    if (!onRollForFirstTeam) return;
+    animTimers.current.forEach(clearTimeout);
+    animTimers.current = [];
+    const { winnerIdx, detail, winnerLabel, rolls } = onRollForFirstTeam();
+
+    const d20Audio = getDiceAudio().d20;
+    if (soundEnabled && d20Audio) {
+      d20Audio.currentTime = 0;
+      d20Audio.play().catch(() => {});
+    }
+
+    const order = rolls.map((r) => r.idx);
+    const finalRolls = rolls.map((r) => r.roll);
+    const labels = order.map((idx) => players[idx].playerName);
+
+    onLogEvent?.([{
+      type: 'roll_for_first',
+      payload: {
+        sides: 20,
+        tiebreak: false,
+        rolls: rolls.map((r) => ({ player: players[r.idx].playerName, roll: r.roll })),
+      },
+    }]);
+
+    setRollOffState({ phase: 'rolling', activeIndices: order, originalIndices: order });
+    setDiceOpen(true);
+    setRollingEntry({ label: 'Team Roll', color: 'primary.main', finalRolls, revealed: finalRolls.map(() => false), total: null, sides: 20, labels });
+
+    // The winner names the whole team (winnerLabel) and carries the roll summary
+    // (detail) for the notes; all slots reveal (no locked/tiebreak slots here).
+    scheduleReveal(finalRolls.length, () => true, () => {
+      setRollOffState({ phase: 'result', winnerIdx, winnerName: winnerLabel, originalIndices: order, detail });
+    });
   };
 
   const lastEntry = history.length > 0 ? history[history.length - 1] : null;
@@ -558,8 +596,12 @@ export function CenterZone({
               <Button
                 variant="contained"
                 onClick={() => {
-                  const activeIndices = players.map((_, i) => i).filter(i => !players[i].isEliminated);
-                  startRollOff(activeIndices);
+                  if (is2hg && onRollForFirstTeam) {
+                    startTeamRoll();
+                  } else {
+                    const activeIndices = players.map((_, i) => i).filter(i => !players[i].isEliminated);
+                    startRollOff(activeIndices);
+                  }
                 }}
                 disabled={rollOffState.phase === 'rolling' || rollOffState.phase === 'tie'}
                 sx={{ width: btnRollSize, height: btnRollSize, flexDirection: 'column', gap: 0, fontSize: fsPlayerName, fontWeight: 700, borderRadius: 2, flexShrink: 0 }}
@@ -872,27 +914,14 @@ export function CenterZone({
           <DialogContent dividers sx={{ p: 0 }}>
             {logLoading ? (
               <Typography sx={{ p: 2, color: 'text.secondary', fontSize: 13 }}>Loading...</Typography>
-            ) : logEntries.length === 0 ? (
-              <Typography sx={{ p: 2, color: 'text.secondary', fontSize: 13 }}>No events logged yet.</Typography>
             ) : (
-              <Box component="ol" sx={{ m: 0, p: 0, listStyle: 'none' }}>
-                {/* Newest first: the buffer returns events oldest-first. */}
-                {logEntries.slice().reverse().map((e, i) => (
-                  <Box
-                    component="li"
-                    key={i}
-                    sx={{
-                      display: 'flex', gap: 1, px: 2, py: 0.75,
-                      borderTop: i > 0 ? '1px solid' : 'none', borderColor: 'divider',
-                    }}
-                  >
-                    <Typography component="span" sx={{ color: 'text.disabled', fontVariantNumeric: 'tabular-nums', fontSize: 11, minWidth: 60, flexShrink: 0 }}>
-                      {logEntryTime(e.ts)}
-                    </Typography>
-                    <Typography component="span" sx={{ fontSize: 13 }}>{describeLogEntry(e)}</Typography>
-                  </Box>
-                ))}
-              </Box>
+              <GameLogList
+                entries={logEntries}
+                emptyText="No events logged yet."
+                timeFontSize={11}
+                textFontSize={13}
+                timeMinWidth={60}
+              />
             )}
           </DialogContent>
         </Dialog>
@@ -1016,7 +1045,13 @@ export function CenterZone({
                     (r, i) => {
                       const isActive = !rollingEntry.activeSlots || rollingEntry.activeSlots[i];
                       const isLocked = rollingEntry.lockedSlots?.[i] ?? false;
-                      const isWinner = rollOffState.phase === 'result' && rollingEntry.labels?.[i] === rollOffState.winnerName;
+                      // In 2HG the winner is a team, so highlight both winning
+                      // teammates (winnerName holds the team label, not a seat name).
+                      const isWinner = rollOffState.phase === 'result' && (
+                        is2hg
+                          ? players.find((p) => p.playerName === rollingEntry.labels?.[i])?.teamNumber === players[rollOffState.winnerIdx]?.teamNumber
+                          : rollingEntry.labels?.[i] === rollOffState.winnerName
+                      );
                       const lockedInTieNames = rollOffState.phase === 'tie' ? (rollOffState.lockedInTie ?? []).map(j => players[j].playerName) : [];
                       const isLockedHighest = isLocked && rollOffState.phase === 'tie' && lockedInTieNames.includes(rollingEntry.labels?.[i] ?? '');
                       const tiedNames = rollOffState.phase === 'tie' ? rollOffState.tiedIndices.map(j => players[j].playerName) : [];
@@ -1109,7 +1144,9 @@ export function CenterZone({
                   disabled={rollOffState.phase === 'rolling' || rollOffState.phase === 'tie'}
                   onClick={() => {
                     if (rollOffState.phase === 'result') {
-                      onChooseFirstPlayer(rollOffState.winnerIdx);
+                      // winnerName is the team label in 2HG (player name otherwise);
+                      // detail carries the team-roll summary for the notes.
+                      onChooseFirstPlayer(rollOffState.winnerIdx, rollOffState.detail);
                       setRollingEntry(null);
                       setRollOffState({ phase: 'idle' });
                       setDiceOpen(false);
@@ -1125,7 +1162,11 @@ export function CenterZone({
                   disabled={rollOffState.phase === 'rolling' || rollOffState.phase === 'tie'}
                   onClick={() => {
                     if (rollOffState.phase === 'result') {
-                      startRollOff(rollOffState.originalIndices);
+                      if (is2hg && onRollForFirstTeam) {
+                        startTeamRoll();
+                      } else {
+                        startRollOff(rollOffState.originalIndices);
+                      }
                     }
                   }}
                   sx={{ fontSize: 12, py: 'clamp(3px, 0.7dvh, 7px)' }}

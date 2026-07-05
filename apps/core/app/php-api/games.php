@@ -38,11 +38,19 @@ switch ($method) {
             $game['results'] = $resultStmt->fetchAll();
 
             // Attach the durable event log (null when the game has none, e.g.
-            // games logged before the feature existed).
-            $logStmt = $pdo->prepare('SELECT events FROM game_logs WHERE game_id = ?');
-            $logStmt->execute([$id]);
-            $logRow = $logStmt->fetch();
-            $game['log'] = $logRow ? json_decode($logRow['events'], true) : null;
+            // games logged before the feature existed). Best-effort: a missing
+            // game_logs table (v5.11.0 migration skipped on an environment) or
+            // any query error must not 500 the detail endpoint, so the log
+            // falls back to null rather than propagating the exception.
+            $game['log'] = null;
+            try {
+                $logStmt = $pdo->prepare('SELECT events FROM game_logs WHERE game_id = ?');
+                $logStmt->execute([$id]);
+                $logRow = $logStmt->fetch();
+                $game['log'] = $logRow ? json_decode($logRow['events'], true) : null;
+            } catch (Exception $logErr) {
+                $game['log'] = null;
+            }
 
             sendJSON($game);
         } else {
@@ -191,41 +199,49 @@ switch ($method) {
                 ]);
             }
 
-            // Promote the game's buffered event log into one durable game_logs
-            // row. Best-effort read: a buffer glitch must never fail the game
-            // save, but a row is still written (empty array) so completion
-            // always produces exactly one game log record.
+            $pdo->commit();
+
+            // Promote the game's event log into one durable game_logs row. This
+            // runs AFTER the game+results commit and is fully wrapped, so it is a
+            // best-effort side channel: a missing game_logs table (v5.11.0
+            // migration skipped on an environment) or any log write failure loses
+            // the log only, never the already-committed game record.
             $sessionCode = isset($data['session_code']) ? trim((string)$data['session_code']) : '';
-            if ($sessionCode !== '') {
-                // Live game: promote its buffered event log.
-                $events = [];
-                try {
-                    $events = glbRead($sessionCode);
-                } catch (Exception $bufErr) {
+            $logWritten = false;
+            try {
+                if ($sessionCode !== '') {
+                    // Live game: promote its buffered event log.
                     $events = [];
+                    try {
+                        $events = glbRead($sessionCode);
+                    } catch (Exception $bufErr) {
+                        $events = [];
+                    }
+                } else {
+                    // Manual "Log Game" entry (games created from the form, not a
+                    // live session): no buffered events. Record a single manual_entry
+                    // event noting the user who created it.
+                    $events = [[
+                        'ts' => gmdate('Y-m-d\TH:i:s\Z'),
+                        'type' => 'manual_entry',
+                        'payload' => [
+                            'created_by_user_id' => $currentUser['sub'] ?? null,
+                            'created_by' => $currentUser['username'] ?? null,
+                        ],
+                    ]];
                 }
                 $pdo->prepare('INSERT INTO game_logs (game_id, events) VALUES (?, ?)')
                     ->execute([$gameId, json_encode($events)]);
-            } else {
-                // Manual "Log Game" entry (games created from the form, not a
-                // live session): no buffered events. Record a single manual_entry
-                // event noting the user who created it.
-                $manualEvent = [[
-                    'ts' => gmdate('Y-m-d\TH:i:s\Z'),
-                    'type' => 'manual_entry',
-                    'payload' => [
-                        'created_by_user_id' => $currentUser['sub'] ?? null,
-                        'created_by' => $currentUser['username'] ?? null,
-                    ],
-                ]];
-                $pdo->prepare('INSERT INTO game_logs (game_id, events) VALUES (?, ?)')
-                    ->execute([$gameId, json_encode($manualEvent)]);
+                $logWritten = true;
+            } catch (Exception $logErr) {
+                // ignore — the durable log is a best-effort side channel; the
+                // game and its results are already committed above.
             }
 
-            $pdo->commit();
-
-            // Clear the local buffer only after the durable write is committed.
-            if ($sessionCode !== '') {
+            // Clear the local buffer only if the durable write actually landed;
+            // otherwise leave the buffered events in place (they prune themselves)
+            // rather than discarding them for a log row that was never written.
+            if ($sessionCode !== '' && $logWritten) {
                 try {
                     glbClear($sessionCode);
                 } catch (Exception $bufErr) {
@@ -349,9 +365,6 @@ switch ($method) {
             $stmt = $pdo->prepare('DELETE FROM game_results WHERE game_id = ?');
             $stmt->execute([$id]);
 
-            // Delete the game's event log (no DB-level cascade; see v5.11.0.sql)
-            $pdo->prepare('DELETE FROM game_logs WHERE game_id = ?')->execute([$id]);
-
             // Delete game
             $stmt = $pdo->prepare('DELETE FROM games WHERE id = ?');
             $stmt->execute([$id]);
@@ -362,6 +375,16 @@ switch ($method) {
             }
 
             $pdo->commit();
+
+            // Delete the game's event log (no DB-level cascade; see v5.11.0.sql).
+            // Best-effort, after commit: a missing game_logs table must not fail
+            // the game deletion. A leftover log row is harmless if it ever occurs.
+            try {
+                $pdo->prepare('DELETE FROM game_logs WHERE game_id = ?')->execute([$id]);
+            } catch (Exception $logErr) {
+                // ignore — the game itself is already deleted above.
+            }
+
             sendJSON(['success' => true]);
 
         } catch (Exception $e) {

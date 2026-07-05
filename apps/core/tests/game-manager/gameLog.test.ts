@@ -53,6 +53,17 @@ const FOUR = () => [
   player('Jo', { position: 'right' }),
 ];
 
+// 2HG: team 1 = Rick + Sam, team 2 = Amy + Jo. reconcileTeams mirrors shared
+// life/poison across teammates, so in a real diff both team members move together.
+const TEAMS = () => [
+  player('Rick', { position: 'bottom', teamNumber: 1 }),
+  player('Sam', { position: 'left', teamNumber: 1 }),
+  player('Amy', { position: 'top', teamNumber: 2 }),
+  player('Jo', { position: 'right', teamNumber: 2 }),
+];
+const twoHG = (players: PlayerState[], overrides: Partial<GameManagerState> = {}) =>
+  baseState(players, { gameType: '2hg', ...overrides });
+
 describe('diffGameEvents', () => {
   it('emits nothing when nothing meaningful changes', () => {
     const s = baseState(FOUR(), { firstPlayerIdx: 0 });
@@ -184,6 +195,95 @@ describe('diffGameEvents elimination attribution', () => {
     const next = baseState(players, { firstPlayerIdx: 0, turnNumber: 8, notes: '' });
     const evt = diffGameEvents(prev, next).find((e) => e.type === 'eliminate');
     expect(evt?.payload).toMatchObject({ player: 'Amy', cause: 'life' });
+  });
+});
+
+describe('diffGameEvents 2HG team labels', () => {
+  it('turn_order lists the two teams, using the editable team name with a Team N fallback', () => {
+    const prev = twoHG(TEAMS());
+    const next = twoHG(TEAMS(), { firstPlayerIdx: 0, currentPlayerIdx: 0, teamNames: { 1: 'The Berries' } });
+    const to = diffGameEvents(prev, next).find((e) => e.type === 'turn_order')?.payload;
+    expect(to).toMatchObject({
+      firstPlayer: 'The Berries (Rick / Sam)',
+      order: ['The Berries (Rick / Sam)', 'Team 2 (Amy / Jo)'],
+    });
+  });
+
+  it('pass_turn and turn_revert name the whole team', () => {
+    const prev = twoHG(TEAMS(), { firstPlayerIdx: 0, currentPlayerIdx: 0 });
+    const next = twoHG(TEAMS(), { firstPlayerIdx: 0, currentPlayerIdx: 2 });
+    expect(diffGameEvents(prev, next).find((e) => e.type === 'pass_turn')?.payload)
+      .toMatchObject({ to: 'Team 2 (Amy / Jo)', turn: 1 });
+    expect(diffGameEvents(prev, next, { reverse: true }).find((e) => e.type === 'turn_revert')?.payload)
+      .toMatchObject({ to: 'Team 2 (Amy / Jo)' });
+  });
+
+  it('collapses mirrored shared life/poison to a single team-labelled entry', () => {
+    const prev = twoHG(TEAMS(), { firstPlayerIdx: 0 });
+    const nextPlayers = TEAMS();
+    nextPlayers[0] = { ...nextPlayers[0], life: 34, poison: 2 };
+    nextPlayers[1] = { ...nextPlayers[1], life: 34, poison: 2 };
+    const events = diffGameEvents(prev, twoHG(nextPlayers, { firstPlayerIdx: 0 }));
+    const life = events.filter((e) => e.type === 'life_change');
+    const poison = events.filter((e) => e.type === 'poison_change');
+    expect(life).toHaveLength(1);
+    expect(life[0].payload).toMatchObject({ player: 'Team 1 (Rick / Sam)', from: 40, to: 34, delta: -6 });
+    expect(poison).toHaveLength(1);
+    expect(poison[0].payload).toMatchObject({ player: 'Team 1 (Rick / Sam)', from: 0, to: 2 });
+  });
+
+  it('collapses a joint elimination to one team entry and team-labels the source', () => {
+    const prev = twoHG(TEAMS(), { firstPlayerIdx: 0 });
+    const nextPlayers = TEAMS();
+    nextPlayers[2] = { ...nextPlayers[2], isEliminated: true };
+    nextPlayers[3] = { ...nextPlayers[3], isEliminated: true };
+    // cmdkill tag targets seat 2 (Amy), dealt by seat 0 (Rick, team 1).
+    const next = twoHG(nextPlayers, { firstPlayerIdx: 0, turnNumber: 7, notes: '[cmdkill:2:0]' });
+    const elim = diffGameEvents(prev, next).filter((e) => e.type === 'eliminate');
+    expect(elim).toHaveLength(1);
+    expect(elim[0].payload).toMatchObject({
+      player: 'Team 2 (Amy / Jo)',
+      cause: 'commander_damage',
+      source: 'Team 1 (Rick / Sam)',
+      turn: 7,
+    });
+  });
+
+  it('gathers joint-elimination attribution from whichever teammate carries the kill tag', () => {
+    const prev = twoHG(TEAMS(), { firstPlayerIdx: 0 });
+    const nextPlayers = TEAMS();
+    nextPlayers[2] = { ...nextPlayers[2], isEliminated: true };
+    nextPlayers[3] = { ...nextPlayers[3], isEliminated: true };
+    // Tag sits on seat 3 (Jo), the SECOND teammate processed. The dedup emits at
+    // seat 2 (Amy), so attribution must still be found on seat 3.
+    const next = twoHG(nextPlayers, { firstPlayerIdx: 0, turnNumber: 9, notes: '[cmdkill:3:0]' });
+    const elim = diffGameEvents(prev, next).filter((e) => e.type === 'eliminate');
+    expect(elim).toHaveLength(1);
+    expect(elim[0].payload).toMatchObject({
+      player: 'Team 2 (Amy / Jo)',
+      cause: 'commander_damage',
+      source: 'Team 1 (Rick / Sam)',
+      turn: 9,
+    });
+  });
+
+  it('keeps per-player counters (monarch, energy) individual in 2HG', () => {
+    const prev = twoHG(TEAMS(), { firstPlayerIdx: 0 });
+    const nextPlayers = TEAMS();
+    nextPlayers[2] = { ...nextPlayers[2], isMonarch: true, energy: 3 };
+    const events = diffGameEvents(prev, twoHG(nextPlayers, { firstPlayerIdx: 0 }));
+    expect(events.find((e) => e.type === 'monarch')?.payload).toMatchObject({ player: 'Amy', value: true });
+    expect(events.find((e) => e.type === 'energy_change')?.payload).toMatchObject({ player: 'Amy', to: 3 });
+  });
+
+  it('falls back to "Team N" when the team name is blank or unset', () => {
+    const prev = twoHG(TEAMS(), { firstPlayerIdx: 0 });
+    const nextPlayers = TEAMS();
+    nextPlayers[0] = { ...nextPlayers[0], life: 38 };
+    nextPlayers[1] = { ...nextPlayers[1], life: 38 };
+    const next = twoHG(nextPlayers, { firstPlayerIdx: 0, teamNames: { 1: '   ' } });
+    expect(diffGameEvents(prev, next).find((e) => e.type === 'life_change')?.payload)
+      .toMatchObject({ player: 'Team 1 (Rick / Sam)' });
   });
 });
 
