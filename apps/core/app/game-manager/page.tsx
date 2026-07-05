@@ -208,6 +208,9 @@ export default function GameManagerPage() {
   const loggedSessionRef = useRef<string | null>(null);
   const pendingLogRef = useRef<GameLogEvent[]>([]);
   const logFlushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Set when the game started before its live session existed; the effect below
+  // seeds logging as soon as sessionCode arrives.
+  const pendingLogSeedRef = useRef(false);
   // Set by a host long-press (step turn backwards) so the next diffed turn
   // change logs as turn_revert instead of pass_turn.
   const turnRevertRef = useRef(false);
@@ -218,20 +221,36 @@ export default function GameManagerPage() {
       logFlushTimer.current = null;
     }
     const code = loggedSessionRef.current;
-    const events = pendingLogRef.current;
-    if (!code || events.length === 0) return;
-    pendingLogRef.current = [];
-    try {
-      await api.gameLog.append(code, events);
-    } catch {
-      /* best-effort: logging never blocks play */
+    if (!code) return;
+    // Best-effort drain, retrying a transient failure a few times within this
+    // call so a batch (possibly the game's final events, flushed synchronously
+    // by handleSaveGame before it promotes the buffer) is not stranded. Never
+    // throws, never blocks play. A batch that fails all attempts stays queued
+    // for the next flush.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const events = pendingLogRef.current;
+      if (events.length === 0) return;
+      pendingLogRef.current = [];
+      try {
+        await api.gameLog.append(code, events);
+        return;
+      } catch {
+        // Re-queue ahead of anything buffered during the await, then back off.
+        pendingLogRef.current = [...events, ...pendingLogRef.current];
+        if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 300));
+      }
     }
   }, []);
 
   const logEvents = useCallback(
     (events: GameLogEvent[]) => {
-      if (!events.length || !loggedSessionRef.current) return;
+      // Buffer while logging, and also while a seed is pending (the game started
+      // before its live session arrived) so opening events like the first-player
+      // roll are captured; seedLogging folds the buffer into its start call.
+      if (!events.length || (!loggedSessionRef.current && !pendingLogSeedRef.current)) return;
       pendingLogRef.current.push(...events);
+      // Only flush once there is a session to append to; pre-seed events wait.
+      if (!loggedSessionRef.current) return;
       if (logFlushTimer.current) clearTimeout(logFlushTimer.current);
       logFlushTimer.current = setTimeout(() => {
         flushLog();
@@ -248,6 +267,21 @@ export default function GameManagerPage() {
     turnRevertRef.current = true;
   }, []);
 
+  // Seed the durable log for a freshly started game: reset the server buffer and
+  // record the opening event. Safe to call only once the live session exists.
+  const seedLogging = useCallback((s: GameManagerState) => {
+    if (!s.sessionCode) return;
+    loggedSessionRef.current = s.sessionCode;
+    prevStateRef.current = s;
+    pendingLogSeedRef.current = false;
+    // Fold any events buffered before the session existed (e.g. the opening
+    // roll) into the start call: glbStart clears the buffer then inserts all of
+    // these atomically, so nothing is lost and no append races the clear.
+    const buffered = pendingLogRef.current;
+    pendingLogRef.current = [];
+    api.gameLog.start(s.sessionCode, [buildGameStartedEvent(s), ...buffered]).catch(() => {});
+  }, []);
+
   const discardLog = useCallback((code: string | null | undefined) => {
     if (logFlushTimer.current) {
       clearTimeout(logFlushTimer.current);
@@ -255,6 +289,7 @@ export default function GameManagerPage() {
     }
     pendingLogRef.current = [];
     loggedSessionRef.current = null;
+    pendingLogSeedRef.current = false;
     if (code) api.gameLog.cancel(code).catch(() => {});
   }, []);
 
@@ -271,6 +306,16 @@ export default function GameManagerPage() {
       return [];
     }
   }, [flushLog, state.sessionCode]);
+
+  // If the game started before its live session was ready, seed logging as soon
+  // as sessionCode arrives (guarded so it runs once; resume does not set the
+  // pending flag, so it never re-seeds an in-progress buffer).
+  useEffect(() => {
+    if (pendingLogSeedRef.current && state.phase === 'playing' && state.sessionCode
+        && loggedSessionRef.current !== state.sessionCode) {
+      seedLogging(state);
+    }
+  }, [state, seedLogging]);
 
   // Derive and buffer log events whenever state advances during an actively
   // logged game. Idempotent: re-running with an unchanged state diffs to nothing.
@@ -426,14 +471,16 @@ export default function GameManagerPage() {
     if (!state.players.every(isSeatFilled)) return;
     const next: GameManagerState = { ...state, phase: 'playing', turnStartTime: Date.now() };
     commit(next);
-    // Begin logging this game: reset the server buffer and seed the opening
-    // event. This is the only genuine seating -> playing transition; resume
-    // does not pass through here, so an in-progress buffer is never cleared.
+    // Begin logging. Starting is never blocked on the live session (Random fill
+    // enables Start instantly while createLiveGame is still in flight, and the
+    // create may even fail): seed now if the session exists, otherwise mark it
+    // pending so the effect seeds as soon as sessionCode arrives. This is the
+    // only genuine seating -> playing transition; resume does not pass through
+    // here, so an in-progress buffer is never cleared.
     if (next.sessionCode) {
-      loggedSessionRef.current = next.sessionCode;
-      prevStateRef.current = next;
-      pendingLogRef.current = [];
-      api.gameLog.start(next.sessionCode, [buildGameStartedEvent(next)]).catch(() => {});
+      seedLogging(next);
+    } else {
+      pendingLogSeedRef.current = true;
     }
   };
 

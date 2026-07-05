@@ -12,15 +12,12 @@
 
 import type { GameManagerState } from './types';
 import type { GameLogEvent } from '@/lib/types';
+import { teamLabel as formatTeamLabel } from '@/lib/teams';
 
 // Names in clockwise play order starting from the first player: 1st, 2nd, 3rd, 4th.
 function playOrderNames(state: GameManagerState, firstIdx: number): string[] {
   const n = state.players.length;
-  const order: string[] = [];
-  for (let k = 0; k < n; k++) {
-    order.push(state.players[(firstIdx + k) % n]?.playerName ?? '');
-  }
-  return order;
+  return Array.from({ length: n }, (_, k) => state.players[(firstIdx + k) % n]?.playerName ?? '');
 }
 
 // The opening event: who is seated, in what order, with which decks.
@@ -67,19 +64,14 @@ function parseKillAttribution(
   notes: string,
   targetIdx: number,
 ): { cause: string; sourceIdx: number | null } {
-  let result: { cause: string; sourceIdx: number | null } = { cause: 'unknown', sourceIdx: null };
-  if (!notes) return result;
-  KILL_TAG_RE.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = KILL_TAG_RE.exec(notes)) !== null) {
-    if (Number(m[2]) !== targetIdx) continue;
-    const cause = CAUSE_BY_KIND[m[1]];
-    const sourceIdx = m[3] != null ? Number(m[3]) : null;
-    if (result.cause === 'unknown' || (sourceIdx != null && result.sourceIdx == null)) {
-      result = { cause, sourceIdx };
-    }
-  }
-  return result;
+  const tagsForTarget = notes
+    ? [...notes.matchAll(KILL_TAG_RE)]
+        .filter((m) => Number(m[2]) === targetIdx)
+        .map((m) => ({ cause: CAUSE_BY_KIND[m[1]], sourceIdx: m[3] != null ? Number(m[3]) : null }))
+    : [];
+  // Prefer the first tag that names a source; otherwise the first tag at all;
+  // otherwise unknown.
+  return tagsForTarget.find((t) => t.sourceIdx != null) ?? tagsForTarget[0] ?? { cause: 'unknown', sourceIdx: null };
 }
 
 // Compare two consecutive states and emit the meaningful actions between them.
@@ -93,15 +85,30 @@ export function diffGameEvents(
   const events: GameLogEvent[] = [];
   const P = prev.players;
   const N = next.players;
+  const is2hg = next.gameType === '2hg';
+
+  // 2HG resolves turns, shared life/poison, and joint elimination at the team
+  // level, so those actions name the whole team ("Team N (A / B)") via the shared
+  // teamLabel helper; per-player counters (monarch, energy, XP, commander tax)
+  // stay individual.
+  const teamLabel = (teamNumber: number | null | undefined): string =>
+    formatTeamLabel(teamNumber, N, next.teamNames);
+  const teamActor = (idx: number): string => {
+    const t = N[idx]?.teamNumber;
+    return is2hg && t != null ? teamLabel(t) : (N[idx]?.playerName ?? '');
+  };
 
   // Turn order established: a first player was chosen (via roll-off or pick).
   if (prev.firstPlayerIdx == null && next.firstPlayerIdx != null) {
+    const first = next.firstPlayerIdx;
+    const seatOrder = Array.from({ length: N.length }, (_, k) => (first + k) % N.length);
+    // 2HG: the distinct teams in play order; standard: individual seats.
+    const order = is2hg
+      ? [...new Set(seatOrder.map((idx) => N[idx]?.teamNumber).filter((t): t is number => t != null))].map(teamLabel)
+      : playOrderNames(next, first);
     events.push({
       type: 'turn_order',
-      payload: {
-        firstPlayer: N[next.firstPlayerIdx]?.playerName ?? '',
-        order: playOrderNames(next, next.firstPlayerIdx),
-      },
+      payload: { firstPlayer: teamActor(first), order },
     });
   }
 
@@ -111,7 +118,7 @@ export function diffGameEvents(
     events.push({
       type: opts?.reverse ? 'turn_revert' : 'pass_turn',
       payload: {
-        to: N[next.currentPlayerIdx]?.playerName ?? '',
+        to: teamActor(next.currentPlayerIdx),
         turn: next.turnNumber,
       },
     });
@@ -122,25 +129,50 @@ export function diffGameEvents(
     });
   }
 
-  // Per-player field changes (players are index-stable during play).
+  // Per-player field changes (players are index-stable during play). In 2HG the
+  // shared/team fields (life, poison, elimination, concede) are mirrored across
+  // both teammates, so they collapse to a single team-labelled entry;
+  // firstForTeam returns true only the first time a given team hits each kind.
   const len = Math.min(P.length, N.length);
+  const teamEmitted = { life: new Set<number>(), poison: new Set<number>(), elim: new Set<number>(), concede: new Set<number>() };
+  const firstForTeam = (kind: keyof typeof teamEmitted, teamNumber: number | null | undefined): boolean => {
+    if (!is2hg || teamNumber == null) return true;
+    if (teamEmitted[kind].has(teamNumber)) return false;
+    teamEmitted[kind].add(teamNumber);
+    return true;
+  };
+  // Seats freshly eliminated this diff on a given team. A 2HG joint elimination
+  // flips both teammates at once but the kill tag sits on only one seat, so the
+  // team's attribution must be gathered across every newly-eliminated member,
+  // not just the first one the loop reaches.
+  const newlyEliminatedSeats = (teamNumber: number | null | undefined): number[] =>
+    N.map((_, idx) => idx).filter((idx) => N[idx]?.teamNumber === teamNumber && !P[idx]?.isEliminated && N[idx]?.isEliminated);
   for (let i = 0; i < len; i++) {
     const a = P[i];
     const b = N[i];
     if (!a || !b) continue;
-    const player = b.playerName;
-    if (a.life !== b.life) {
-      events.push({ type: 'life_change', payload: { player, from: a.life, to: b.life, delta: b.life - a.life } });
+    const player = b.playerName;   // per-player counters
+    const actor = teamActor(i);    // shared/team actions
+    const team = b.teamNumber;
+    if (a.life !== b.life && firstForTeam('life', team)) {
+      events.push({ type: 'life_change', payload: { player: actor, from: a.life, to: b.life, delta: b.life - a.life } });
     }
-    if (a.poison !== b.poison) {
-      events.push({ type: 'poison_change', payload: { player, from: a.poison, to: b.poison } });
+    if (a.poison !== b.poison && firstForTeam('poison', team)) {
+      events.push({ type: 'poison_change', payload: { player: actor, from: a.poison, to: b.poison } });
     }
-    if (!a.isEliminated && b.isEliminated) {
-      const payload: Record<string, unknown> = { player, turn: next.turnNumber };
+    if (!a.isEliminated && b.isEliminated && firstForTeam('elim', team)) {
+      const payload: Record<string, unknown> = { player: actor, turn: next.turnNumber };
       if (b.isConceded) {
         payload.cause = 'concede';
       } else {
-        const attr = parseKillAttribution(next.notes, i);
+        // Gather attribution across every newly-eliminated seat of this team
+        // (2HG tags only one teammate); prefer a tag that names a source, then
+        // any known cause. Standard games look at just this seat.
+        const seats = is2hg && team != null ? newlyEliminatedSeats(team) : [i];
+        const attrs = seats.map((idx) => parseKillAttribution(next.notes, idx));
+        const attr = attrs.find((x) => x.sourceIdx != null)
+          ?? attrs.find((x) => x.cause !== 'unknown')
+          ?? { cause: 'unknown', sourceIdx: null };
         let cause = attr.cause;
         // Life/poison kills flip elimination before the host attributes a
         // source, so the kill tag may not be present yet. Infer the cause from
@@ -151,15 +183,15 @@ export function diffGameEvents(
           else if (b.life <= 0) cause = 'life';
         }
         payload.cause = cause;
-        if (attr.sourceIdx != null) payload.source = N[attr.sourceIdx]?.playerName ?? '';
+        if (attr.sourceIdx != null) payload.source = teamActor(attr.sourceIdx);
       }
       events.push({ type: 'eliminate', payload });
     }
     // A concede that also eliminates is already covered by the eliminate event
     // above (cause=concede). Only emit a standalone concede if it did not
     // coincide with a fresh elimination.
-    if (!a.isConceded && b.isConceded && a.isEliminated === b.isEliminated) {
-      events.push({ type: 'concede', payload: { player, turn: next.turnNumber } });
+    if (!a.isConceded && b.isConceded && a.isEliminated === b.isEliminated && firstForTeam('concede', team)) {
+      events.push({ type: 'concede', payload: { player: actor, turn: next.turnNumber } });
     }
     if (a.isMonarch !== b.isMonarch) {
       events.push({ type: 'monarch', payload: { player, value: b.isMonarch } });
@@ -184,27 +216,26 @@ export function diffGameEvents(
   // Commander damage changes: commanderDamage[target][source] = [fromCmd, fromPartner].
   const pcd = prev.commanderDamage || {};
   const ncd = next.commanderDamage || {};
-  for (const targetKey of Object.keys(ncd)) {
+  events.push(...Object.keys(ncd).flatMap((targetKey) => {
     const ti = Number(targetKey);
     const pRow = pcd[ti] || {};
     const nRow = ncd[ti] || {};
-    for (const sourceKey of Object.keys(nRow)) {
+    return Object.keys(nRow).flatMap((sourceKey): GameLogEvent[] => {
       const si = Number(sourceKey);
       const pTotal = cmdDamageTotal(pRow[si]);
       const nTotal = cmdDamageTotal(nRow[si]);
-      if (pTotal !== nTotal) {
-        events.push({
-          type: 'commander_damage',
-          payload: {
-            source: N[si]?.playerName ?? '',
-            target: N[ti]?.playerName ?? '',
-            from: pTotal,
-            to: nTotal,
-          },
-        });
-      }
-    }
-  }
+      if (pTotal === nTotal) return [];
+      return [{
+        type: 'commander_damage',
+        payload: {
+          source: N[si]?.playerName ?? '',
+          target: N[ti]?.playerName ?? '',
+          from: pTotal,
+          to: nTotal,
+        },
+      }];
+    });
+  }));
 
   return events;
 }
