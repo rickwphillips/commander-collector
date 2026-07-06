@@ -60,6 +60,7 @@ import {
 } from '@commander/shared/components/cardNameUtils';
 import { loadCardCatalog, isKnownCardName } from '@commander/shared/lib/cardCatalog';
 import type { ActiveGameContext, RulesConversation, RulesMessage, RulesPattern } from '../lib/types';
+import { formatBoardStateLines, mapRawGameContext } from '../lib/gameContext';
 
 // ── Local message type (includes pending_pattern for new messages) ──────────
 interface LocalMessage {
@@ -399,52 +400,17 @@ export default function ChatPage() {
       setIsEmbedded(true);
       try {
         const raw = JSON.parse(atob(decodeURIComponent(ctxParam)));
-        // Map to ActiveGameContext shape (players only — life/poison are extra but harmless)
-        const ctx: ActiveGameContext = {
-          players: (raw.players ?? []).map((p: Record<string, unknown>) => ({
-            playerName: p.playerName ?? 'Unknown',
-            deckName: p.deckName ?? '',
-            commander: p.commander ?? null,
-            partner: p.partner ?? null,
-            deckId: p.deckId ?? null,
-            cards: [],
-          })),
-          focusPlayerName: raw.focusPlayerName,
-        };
+        const ctx = mapRawGameContext(raw as Record<string, unknown>);
         setGameContext(ctx);
-        // Also store turn/life state for display in system message
+        liveGameStateRef.current = ctx;
+        // Opening UI message — mirrors board state the backend now receives too
         if (raw.turnNumber || raw.currentPlayer) {
-          const playerLines = (raw.players ?? [])
-            .map((p: Record<string, unknown>) => {
-              const name = p.playerName ?? '?';
-              const life = p.life ?? '?';
-              const parts: string[] = [`${life} life`];
-              if ((p.poison as number) > 0) parts.push(`${p.poison} poison`);
-              if ((p.energy as number) > 0) parts.push(`${p.energy} energy`);
-              if ((p.experience as number) > 0) parts.push(`${p.experience} experience`);
-              if ((p.commanderTax as number) > 0) parts.push(`commander tax +${(p.commanderTax as number) * 2}`);
-              const badges: string[] = [];
-              if (p.isMonarch) badges.push('Monarch');
-              if (p.hasInitiative) badges.push('Initiative');
-              if (p.hasCitysBlessing) badges.push("City's Blessing");
-              if (badges.length) parts.push(badges.join(', '));
-              if (p.isEliminated) parts.push('eliminated');
-              let line = `  • ${name}: ${parts.join(', ')}`;
-              // Commander damage received
-              const dmg = p.commanderDamage as Record<string, number[]> | undefined;
-              if (dmg && Object.keys(dmg).length > 0) {
-                const dmgParts = Object.entries(dmg).map(([src, vals]) =>
-                  vals.length > 1 ? `${vals[0]}+${vals[1]} from ${src}` : `${vals[0]} from ${src}`
-                );
-                line += ` (cmd dmg: ${dmgParts.join(', ')})`;
-              }
-              return line;
-            })
-            .join('\n');
-          const systemMsg = [
-            `**Active game — Turn ${raw.turnNumber ?? '?'}, ${raw.currentPlayer ?? '?'}\'s turn**`,
-            playerLines,
-          ].join('\n');
+          const playerLines = formatBoardStateLines(ctx).join('\n');
+          const formatLabel = ctx.gameType === '2hg' ? '2HG' : 'Commander';
+          const turnLabel = ctx.currentTeam
+            ? `Turn ${raw.turnNumber ?? '?'}, ${ctx.currentTeam}'s turn`
+            : `Turn ${raw.turnNumber ?? '?'}, ${raw.currentPlayer ?? '?'}'s turn`;
+          const systemMsg = [`**Active ${formatLabel} game — ${turnLabel}**`, playerLines].join('\n');
           // Build hidden timer note for AI context (not shown to user)
           if (raw.timerSeconds && raw.currentPlayer) {
             const elapsed = (raw.elapsedSeconds as number) ?? 0;
@@ -488,6 +454,7 @@ export default function ChatPage() {
 
   // Real-time timer state pushed from parent every second
   const liveTimerRef = useRef<ActiveGameContext['_liveTimer']>(undefined);
+  const liveGameStateRef = useRef<Partial<ActiveGameContext> | null>(null);
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       if (event.data?.type === 'rules_timer_update') {
@@ -498,6 +465,9 @@ export default function ChatPage() {
           currentPlayer:  event.data.currentPlayer,
           turnNumber:     event.data.turnNumber,
         };
+      }
+      if (event.data?.type === 'rules_game_state_update') {
+        liveGameStateRef.current = mapRawGameContext(event.data as Record<string, unknown>);
       }
     };
     window.addEventListener('message', handler);
@@ -600,9 +570,16 @@ export default function ChatPage() {
 
     for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
       try {
-        const contextWithTimer = gameContext
-          ? { ...gameContext, _liveTimer: liveTimerRef.current ?? gameContext._liveTimer }
-          : undefined;
+        const contextWithTimer = (() => {
+          if (!gameContext) return undefined;
+          const live = liveGameStateRef.current;
+          return {
+            ...gameContext,
+            ...(live ?? {}),
+            players: live?.players ?? gameContext.players,
+            _liveTimer: liveTimerRef.current ?? gameContext._liveTimer,
+          };
+        })();
         res = await rulesApi.sendMessage({
           message: resolved,
           conversation_id: conversationId ?? undefined,

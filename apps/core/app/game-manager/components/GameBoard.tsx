@@ -851,6 +851,7 @@ export function GameBoard({
           notes={state.notes}
           onNotesChange={(n) => updateState({ notes: n })}
           gameType={state.gameType}
+          teamNames={state.teamNames}
           highlightMode={highlightMode}
           onToggleHighlightMode={() => {
             const newVal = !highlightMode;

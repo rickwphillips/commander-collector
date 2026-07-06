@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "commander-collector": {
+      "command": "uv",
+      "args": ["run", "commander-mcp"],
+      "cwd": "/Users/rickphillips/FreddyRhetorickContexts/commander-mcp"
+    }
+  }
+}

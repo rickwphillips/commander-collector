@@ -93,6 +93,40 @@ describe('useDeckBracket', () => {
     expect(result.current.bracket).toBeNull();
   });
 
+  it('handles a profile with no cards field', async () => {
+    vi.spyOn(apiModule.api, 'getDeckProfile').mockResolvedValue({} as never);
+    const { result } = renderHook(() => useDeckBracket('deck-nocards'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.caveats[0]).toMatch(/no card list/i);
+  });
+
+  it('filters out cards with empty or non-string names', async () => {
+    vi.spyOn(apiModule.api, 'getDeckProfile').mockResolvedValue({
+      cards: [{ card_name: '' }, { card_name: null }, { card_name: 'Sol Ring' }],
+    } as never);
+    const scoreSpy = mockScoreDeck(CERTAIN_BRACKET);
+    const { result } = renderHook(() => useDeckBracket('deck-filter'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.bracket).toBe(3);
+    expect(scoreSpy).toHaveBeenCalledWith(['Sol Ring'], undefined);
+  });
+
+  it('uses a default caveat when the unknown band returns no caveats', async () => {
+    mockGetDeckProfile(['Sol Ring']);
+    mockScoreDeck({ band: 'unknown', data: null, sources: [], caveats: [] } as never);
+    const { result } = renderHook(() => useDeckBracket('deck-unknown2'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.caveats[0]).toMatch(/MCP unreachable/i);
+  });
+
+  it('defaults caveats to [] on success when none are returned', async () => {
+    mockGetDeckProfile(['Sol Ring']);
+    mockScoreDeck({ ...CERTAIN_BRACKET, caveats: undefined } as never);
+    const { result } = renderHook(() => useDeckBracket('deck-nocaveat'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.caveats).toEqual([]);
+  });
+
   it('caches result so getDeckProfile is not called twice for same deckId', async () => {
     const profileSpy = mockGetDeckProfile(['Sol Ring']);
     mockScoreDeck(CERTAIN_BRACKET);

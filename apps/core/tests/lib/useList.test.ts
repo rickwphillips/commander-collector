@@ -362,4 +362,241 @@ describe('useList', () => {
       expect(result.current.resolving).toBe(false);
     });
   });
+
+  // ── E) fetchById error + no-op when no opts ──────────────────────────────
+
+  describe('fetchById + effect', () => {
+    it('sets error when the initial load fails', async () => {
+      mockApiFetch.mockRejectedValueOnce(new Error('Failed to fetch list'));
+      const { result } = renderHook(() => useList({ id: 'list-uuid-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.error).toBe('Failed to fetch list');
+    });
+
+    it('does nothing when neither id nor deckId is provided', async () => {
+      const { result } = renderHook(() => useList({}));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(mockApiFetch).not.toHaveBeenCalled();
+      expect(result.current.list).toBeNull();
+    });
+  });
+
+  // ── F) fetchByDeckId (all branches) ──────────────────────────────────────
+
+  describe('fetchByDeckId', () => {
+    it('loads via the deck_id+role query when supported', async () => {
+      mockApiFetch.mockResolvedValueOnce(makeListDetail());
+      const { result } = renderHook(() => useList({ deckId: 'deck-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.list?.id).toBe('list-uuid-1');
+      expect(mockApiFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to /decks?id when the deck_id+role query is unsupported', async () => {
+      mockApiFetch
+        .mockRejectedValueOnce(new Error('no route'))
+        .mockResolvedValueOnce({ main_list_id: 'L9' })
+        .mockResolvedValueOnce(makeListDetail());
+      const { result } = renderHook(() => useList({ deckId: 'deck-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.list?.id).toBe('list-uuid-1');
+      expect(mockApiFetch).toHaveBeenCalledTimes(3);
+    });
+
+    it('returns list=null when the deck has no main list', async () => {
+      mockApiFetch
+        .mockRejectedValueOnce(new Error('no route'))
+        .mockResolvedValueOnce({});
+      const { result } = renderHook(() => useList({ deckId: 'deck-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.list).toBeNull();
+      expect(result.current.cards).toEqual([]);
+      expect(result.current.error).toBeNull();
+    });
+
+    it('sets error when the fallback deck fetch fails', async () => {
+      mockApiFetch
+        .mockRejectedValueOnce(new Error('no route'))
+        .mockRejectedValueOnce(new Error('deck boom'));
+      const { result } = renderHook(() => useList({ deckId: 'deck-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.error).toBe('deck boom');
+    });
+  });
+
+  // ── G) refresh ───────────────────────────────────────────────────────────
+
+  describe('refresh', () => {
+    it('re-fetches by the loaded list id', async () => {
+      mockApiFetch
+        .mockResolvedValueOnce(makeListDetail([{ card_name: 'Original' }]))
+        .mockResolvedValueOnce(makeListDetail([{ card_name: 'Refreshed' }]));
+      const { result } = renderHook(() => useList({ id: 'list-uuid-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(() => result.current.refresh());
+      expect(result.current.cards[0].card_name).toBe('Refreshed');
+    });
+
+    it('re-fetches by deckId when no list is loaded', async () => {
+      mockApiFetch
+        .mockRejectedValueOnce(new Error('no route'))
+        .mockResolvedValueOnce({}) // no main list → list stays null
+        .mockResolvedValueOnce(makeListDetail());
+      const { result } = renderHook(() => useList({ deckId: 'deck-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.list).toBeNull();
+
+      await act(() => result.current.refresh());
+      expect(result.current.list?.id).toBe('list-uuid-1');
+    });
+
+    it('re-fetches via opts.id after a failed initial load', async () => {
+      mockApiFetch
+        .mockRejectedValueOnce(new Error('fail'))
+        .mockResolvedValueOnce(makeListDetail());
+      const { result } = renderHook(() => useList({ id: 'list-uuid-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.list).toBeNull();
+
+      await act(() => result.current.refresh());
+      expect(result.current.list?.id).toBe('list-uuid-1');
+    });
+  });
+
+  describe('fetchByDeckId resolver', () => {
+    it('fires the resolver in the deckId fallback path when metadata is missing', async () => {
+      mockApiFetch
+        .mockRejectedValueOnce(new Error('no route'))
+        .mockResolvedValueOnce({ main_list_id: 'L9' })
+        .mockResolvedValueOnce(makeListDetail([
+          { scryfall_id: null, type_line: null, image_uri: null, colors: undefined, color_identity: undefined },
+        ]))
+        .mockResolvedValueOnce({ updated: [], remaining: 1 });
+      const { result } = renderHook(() => useList({ deckId: 'deck-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await waitFor(() => expect(result.current.resolveError).not.toBeNull());
+    });
+  });
+
+  // ── H) save / addCards / removeCard / updateCard ─────────────────────────
+
+  describe('save and derived mutators', () => {
+    const cardInput = [
+      { id: 'x1', card_name: 'Sol Ring', scryfall_id: 's1', quantity: 1, is_commander: false, is_proxy: false },
+    ] as never;
+
+    it('save sets an error when the list is not loaded', async () => {
+      const { result } = renderHook(() => useList({}));
+      await act(() => result.current.save(cardInput));
+      expect(result.current.error).toBe('Cannot save: list not loaded');
+    });
+
+    it('save PATCHes and updates version + cards on success', async () => {
+      mockApiFetch
+        .mockResolvedValueOnce(makeListDetail())
+        .mockResolvedValueOnce({ success: true, version: 2 });
+      const { result } = renderHook(() => useList({ id: 'list-uuid-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(() => result.current.save(cardInput));
+      expect(result.current.list?.version).toBe(2);
+      expect(result.current.cards[0].card_name).toBe('Sol Ring');
+      expect(result.current.error).toBeNull();
+    });
+
+    it('save flags a conflict on a 409-style error', async () => {
+      mockApiFetch
+        .mockResolvedValueOnce(makeListDetail())
+        .mockRejectedValueOnce(new Error('conflict'));
+      const { result } = renderHook(() => useList({ id: 'list-uuid-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(() => result.current.save(cardInput));
+      expect(result.current.conflict).toBe(true);
+      expect(result.current.error).toMatch(/Save conflict/);
+    });
+
+    it('save surfaces a non-conflict error without setting the conflict flag', async () => {
+      mockApiFetch
+        .mockResolvedValueOnce(makeListDetail())
+        .mockRejectedValueOnce(new Error('boom'));
+      const { result } = renderHook(() => useList({ id: 'list-uuid-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(() => result.current.save(cardInput));
+      expect(result.current.conflict).toBe(false);
+      expect(result.current.error).toBe('boom');
+    });
+
+    it('addCards merges then saves', async () => {
+      mockApiFetch
+        .mockResolvedValueOnce(makeListDetail([{ card_name: 'Island', scryfall_id: 'isl' }]))
+        .mockResolvedValueOnce({ success: true, version: 2 });
+      const { result } = renderHook(() => useList({ id: 'list-uuid-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(() => result.current.addCards([
+        { id: 'y1', card_name: 'Forest', scryfall_id: 'for', quantity: 1, is_commander: false, is_proxy: false },
+      ] as never));
+      expect(mockApiFetch).toHaveBeenCalledTimes(2);
+      expect(result.current.error).toBeNull();
+    });
+
+    it('removeCard filters out the card by id then saves', async () => {
+      mockApiFetch
+        .mockResolvedValueOnce(makeListDetail([{ id: 'c0', card_name: 'A' }, { id: 'c1', card_name: 'B' }]))
+        .mockResolvedValueOnce({ success: true, version: 2 });
+      const { result } = renderHook(() => useList({ id: 'list-uuid-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(() => result.current.removeCard('c0'));
+      expect(result.current.cards.some((c) => String(c.id) === 'c0')).toBe(false);
+    });
+
+    it('updateCard applies a patch by id then saves', async () => {
+      mockApiFetch
+        .mockResolvedValueOnce(makeListDetail([{ id: 'c0', card_name: 'A', quantity: 1 }]))
+        .mockResolvedValueOnce({ success: true, version: 2 });
+      const { result } = renderHook(() => useList({ id: 'list-uuid-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(() => result.current.updateCard('c0', { quantity: 4 } as never));
+      expect(result.current.cards[0].quantity).toBe(4);
+    });
+  });
+
+  // ── I) attachToDeck ──────────────────────────────────────────────────────
+
+  describe('attachToDeck', () => {
+    it('sets an error when the list is not loaded', async () => {
+      const { result } = renderHook(() => useList({}));
+      await act(() => result.current.attachToDeck('deck-1'));
+      expect(result.current.error).toBe('Cannot attach: list not loaded');
+    });
+
+    it('POSTs the attach action and clears error on success', async () => {
+      mockApiFetch
+        .mockResolvedValueOnce(makeListDetail())
+        .mockResolvedValueOnce({ success: true });
+      const { result } = renderHook(() => useList({ id: 'list-uuid-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(() => result.current.attachToDeck('deck-1'));
+      expect(result.current.error).toBeNull();
+      const lastCall = mockApiFetch.mock.calls.at(-1)!;
+      expect(lastCall[0]).toContain('action=attach_deck');
+    });
+
+    it('sets an error when the attach call fails', async () => {
+      mockApiFetch
+        .mockResolvedValueOnce(makeListDetail())
+        .mockRejectedValueOnce(new Error('attach boom'));
+      const { result } = renderHook(() => useList({ id: 'list-uuid-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(() => result.current.attachToDeck('deck-1'));
+      expect(result.current.error).toBe('attach boom');
+    });
+  });
 });

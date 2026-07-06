@@ -5,10 +5,28 @@ export interface GameContextPlayer {
   partner: string | null;
   deckId: string | null;
   cards: string[];
+  /** Live board state from the game manager */
+  life?: number;
+  poison?: number;
+  energy?: number;
+  experience?: number;
+  commanderTax?: number;
+  isEliminated?: boolean;
+  isConceded?: boolean;
+  isMonarch?: boolean;
+  hasInitiative?: boolean;
+  hasCitysBlessing?: boolean;
+  commanderDamage?: Record<string, number[]>;
+  teamNumber?: number;
+  teamName?: string;
 }
 
 export interface ActiveGameContext {
   players: GameContextPlayer[];
+  gameType?: 'commander' | '2hg';
+  turnNumber?: number | null;
+  currentPlayer?: string | null;
+  currentTeam?: string | null;
   focusPlayerName?: string;
   _timerNote?: string;
   _liveTimer?: {
