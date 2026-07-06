@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { apiFetch, api, API_BASE } from '@/lib/api';
+import { apiFetch, api, API_BASE, getDeviceId } from '@/lib/api';
 
 const AUTH_TOKEN_KEY = 'auth_token';
 
@@ -9,6 +9,25 @@ function mockFetch(status: number, body: unknown) {
     ok: status >= 200 && status < 300,
     json: () => Promise.resolve(body),
   });
+}
+
+// Build a fetch mock that returns a queued sequence of responses (for methods
+// that make multiple apiFetch calls, e.g. saveDeckCards).
+function mockFetchSeq(...responses: { status?: number; body: unknown }[]) {
+  const f = vi.fn();
+  for (const r of responses) {
+    const status = r.status ?? 200;
+    f.mockResolvedValueOnce({
+      status,
+      ok: status >= 200 && status < 300,
+      json: () => Promise.resolve(r.body),
+    });
+  }
+  return f;
+}
+
+function lastCalls() {
+  return (fetch as ReturnType<typeof vi.fn>).mock.calls;
 }
 
 describe('apiFetch', () => {
@@ -718,5 +737,446 @@ describe('api.sendCoachMessage — SSE stream', () => {
     const body = JSON.parse(opts.body);
     expect(body.active_deck.id).toBe('deck-1');
     expect(body.active_deck.commander).toBe('Atraxa');
+  });
+
+  it('includes active_list in POST body when provided', async () => {
+    const fetchMock = mockSseFetch([{ event: 'done', data: { response: 'r', tools_used: [] } }]);
+    await api.sendCoachMessage('Hi', [], undefined, {
+      listId: 'l-1',
+      listName: 'My List',
+      cardCount: 10,
+    });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.active_list.id).toBe('l-1');
+    expect(body.active_list.card_count).toBe(10);
+  });
+
+  it('throws a status-based coach error when the response is not ok', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      status: 500,
+      ok: false,
+      json: () => Promise.resolve({}),
+    }));
+    await expect(api.sendCoachMessage('Hi', [])).rejects.toThrow('Coach error 500');
+  });
+});
+
+describe('getDeviceId', () => {
+  const DEVICE_ID_KEY = 'commander_device_id';
+  beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); });
+  afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+  it('generates and persists a stable id', () => {
+    const first = getDeviceId();
+    expect(first).toBeTruthy();
+    expect(localStorage.getItem(DEVICE_ID_KEY)).toBe(first);
+    expect(getDeviceId()).toBe(first);
+  });
+
+  it('returns "ssr" when there is no window', () => {
+    vi.stubGlobal('window', undefined);
+    expect(getDeviceId()).toBe('ssr');
+  });
+});
+
+describe('api — live game + game log', () => {
+  beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('createLiveGame POSTs state, seats and user_id', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, {}));
+    await api.createLiveGame({ foo: 'bar' } as never, ['A', 'B'], 'u1');
+    const [url, opts] = lastCalls()[0];
+    expect(url).toContain('live-game.php');
+    expect(opts.method).toBe('POST');
+    const body = JSON.parse(opts.body);
+    expect(body.seats).toEqual(['A', 'B']);
+    expect(body.user_id).toBe('u1');
+  });
+
+  it('getLiveGame adds consume=1 when requested and omits it otherwise', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, {}));
+    await api.getLiveGame('CODE', true);
+    expect(lastCalls()[0][0]).toContain('consume=1');
+  });
+
+  it('getLiveGame omits consume when not requested', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, {}));
+    await api.getLiveGame('CODE');
+    expect(lastCalls()[0][0]).not.toContain('consume');
+  });
+
+  it('updateLiveGame PUTs state by code', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, {}));
+    await api.updateLiveGame('CODE', { x: 1 } as never);
+    const [url, opts] = lastCalls()[0];
+    expect(url).toContain('live-game.php?code=CODE');
+    expect(opts.method).toBe('PUT');
+  });
+
+  it('sendLiveGameEvent POSTs an event with action=event', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, {}));
+    await api.sendLiveGameEvent('CODE', { type: 'life' } as never);
+    const [url, opts] = lastCalls()[0];
+    expect(url).toContain('action=event');
+    expect(opts.method).toBe('POST');
+  });
+
+  it('deleteLiveGame DELETEs by code', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, { success: true }));
+    await api.deleteLiveGame('CODE');
+    const [url, opts] = lastCalls()[0];
+    expect(url).toContain('live-game.php?code=CODE');
+    expect(opts.method).toBe('DELETE');
+  });
+
+  it('gameLog.start/append/cancel POST with the right action, read GETs', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, { ok: true }));
+    await api.gameLog.start('CODE', []);
+    await api.gameLog.append('CODE', []);
+    await api.gameLog.cancel('CODE');
+    await api.gameLog.read('CODE');
+    const calls = lastCalls();
+    expect(calls[0][0]).toContain('action=start');
+    expect(calls[1][0]).toContain('action=append');
+    expect(calls[2][0]).toContain('action=cancel');
+    expect(calls[3][0]).toContain('game-log.php?code=CODE');
+  });
+
+  it('getActiveGame GETs the active-game endpoint', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, {}));
+    await api.getActiveGame();
+    expect(lastCalls()[0][0]).toContain('active-game.php');
+  });
+});
+
+describe('api — SSE EventSource streams', () => {
+  class MockEventSource {
+    static last: MockEventSource | null = null;
+    url: string;
+    readyState = 0;
+    onopen: (() => void) | null = null;
+    onmessage: ((e: { data: string }) => void) | null = null;
+    onerror: (() => void) | null = null;
+    closed = false;
+    constructor(url: string) {
+      this.url = url;
+      MockEventSource.last = this;
+    }
+    close() { this.closed = true; }
+  }
+
+  beforeEach(() => {
+    MockEventSource.last = null;
+    vi.stubGlobal('EventSource', MockEventSource as unknown as typeof EventSource);
+  });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('openLiveGameStream delivers state, handles inactive, malformed, open and error', () => {
+    const onState = vi.fn();
+    const onInactive = vi.fn();
+    const onError = vi.fn();
+    const cleanup = api.openLiveGameStream('CODE', onState, onInactive, onError);
+    const es = MockEventSource.last!;
+    expect(es.url).toContain('live-game-stream.php?code=CODE');
+
+    es.onopen!();
+    expect(window._sseReadyState).toBe(1);
+
+    es.onmessage!({ data: JSON.stringify({ type: 'state', state: { hp: 40 } }) });
+    expect(onState).toHaveBeenCalledWith({ hp: 40 });
+
+    es.onmessage!({ data: 'not json' });
+    es.onmessage!({ data: JSON.stringify({ type: 'inactive' }) });
+    expect(onInactive).toHaveBeenCalled();
+    expect(es.closed).toBe(true);
+
+    es.onerror!();
+    expect(onError).toHaveBeenCalled();
+
+    cleanup();
+  });
+
+  it('openLiveGameHostStream delivers events and handles inactive/error', () => {
+    const onEvents = vi.fn();
+    const onInactive = vi.fn();
+    const onError = vi.fn();
+    const cleanup = api.openLiveGameHostStream('CODE', onEvents, onInactive, onError);
+    const es = MockEventSource.last!;
+    expect(es.url).toContain('role=host');
+
+    es.onmessage!({ data: JSON.stringify({ type: 'events', events: [{ type: 'life' }] }) });
+    expect(onEvents).toHaveBeenCalledWith([{ type: 'life' }]);
+
+    es.onmessage!({ data: 'garbage' });
+    es.onmessage!({ data: JSON.stringify({ type: 'inactive' }) });
+    expect(onInactive).toHaveBeenCalled();
+
+    es.onerror!();
+    expect(onError).toHaveBeenCalled();
+
+    cleanup();
+    expect(es.closed).toBe(true);
+  });
+
+  it('stream onmessage without a handler for the type is a no-op', () => {
+    const onEvents = vi.fn();
+    api.openLiveGameHostStream('CODE', onEvents, vi.fn());
+    const es = MockEventSource.last!;
+    es.onmessage!({ data: JSON.stringify({ type: 'events', events: [] }) });
+    expect(onEvents).not.toHaveBeenCalled();
+  });
+});
+
+describe('api — deck cards + lists', () => {
+  beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('getDeckCards maps the main list cards', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, { id: 'L1', cards: [] }));
+    const cards = await api.getDeckCards('deck-1');
+    expect(cards).toEqual([]);
+    expect(lastCalls()[0][0]).toContain('lists.php?deck_id=deck-1&role=main');
+  });
+
+  it('getDeckCards returns [] when the deck has no main list (not found)', async () => {
+    vi.stubGlobal('fetch', mockFetch(404, { error: 'List not found' }));
+    expect(await api.getDeckCards('deck-1')).toEqual([]);
+  });
+
+  it('getDeckCards rethrows non-404 errors', async () => {
+    vi.stubGlobal('fetch', mockFetch(500, { error: 'boom' }));
+    await expect(api.getDeckCards('deck-1')).rejects.toThrow('boom');
+  });
+
+  it('getDeckProfile includes id param', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, {}));
+    await api.getDeckProfile('deck-1');
+    expect(lastCalls()[0][0]).toContain('deck-profile.php?id=deck-1');
+  });
+
+  it('saveDeckCards PATCHes the existing main list', async () => {
+    vi.stubGlobal('fetch', mockFetchSeq(
+      { body: { id: 'L1' } },
+      { body: { success: true } },
+    ));
+    const res = await api.saveDeckCards('deck-1', []);
+    expect(res).toEqual({ success: true, deck_id: 'deck-1' });
+    const calls = lastCalls();
+    expect(calls[1][1].method).toBe('PATCH');
+  });
+
+  it('saveDeckCards creates and attaches a list when none exists', async () => {
+    vi.stubGlobal('fetch', mockFetchSeq(
+      { status: 404, body: { error: 'List not found' } },
+      { body: { success: true, list_id: 'L2' } },
+      { body: { success: true } },
+      { body: { success: true } },
+    ));
+    const res = await api.saveDeckCards('deck-1', []);
+    expect(res.success).toBe(true);
+    expect(lastCalls()).toHaveLength(4);
+  });
+
+  it('saveDeckCards rethrows non-not-found lookup errors', async () => {
+    vi.stubGlobal('fetch', mockFetch(500, { error: 'boom' }));
+    await expect(api.saveDeckCards('deck-1', [])).rejects.toThrow('boom');
+  });
+
+  it('deleteDeckCards clears the existing main list', async () => {
+    vi.stubGlobal('fetch', mockFetchSeq(
+      { body: { id: 'L1' } },
+      { body: { success: true } },
+    ));
+    const res = await api.deleteDeckCards('deck-1');
+    expect(res.success).toBe(true);
+    expect(lastCalls()[1][1].method).toBe('PATCH');
+  });
+
+  it('deleteDeckCards is a no-op when there is no main list', async () => {
+    vi.stubGlobal('fetch', mockFetch(404, { error: 'List not found' }));
+    expect(await api.deleteDeckCards('deck-1')).toEqual({ success: true });
+  });
+
+  it('deleteDeckCards rethrows non-not-found errors', async () => {
+    vi.stubGlobal('fetch', mockFetch(500, { error: 'boom' }));
+    await expect(api.deleteDeckCards('deck-1')).rejects.toThrow('boom');
+  });
+
+  it('list CRUD wrappers hit the lists endpoint with correct verbs', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, { cards: [] }));
+    await api.getLists();
+    await api.getList('L1');
+    await api.createList('Name', 'desc', []);
+    await api.updateList('L1', { name: 'x' });
+    await api.deleteList('L1');
+    await api.detachDeckToList('deck-1', 'Copy');
+    await api.attachListToDeck('L1', 'deck-1');
+    const calls = lastCalls();
+    expect(calls[0][0]).toContain('lists.php');
+    expect(calls[1][0]).toContain('lists.php?id=L1');
+    expect(calls[2][1].method).toBe('POST');
+    expect(calls[3][1].method).toBe('PATCH');
+    expect(calls[4][1].method).toBe('DELETE');
+    expect(calls[5][0]).toContain('action=detach_deck');
+    expect(calls[6][0]).toContain('action=attach_deck');
+  });
+
+  it('lists v2 wrappers hit the lists endpoint with correct verbs/params', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, { cards: [], updated: [] }));
+    await api.getListByDeckId('deck-1');
+    await api.saveListCards('L1', [], 3);
+    await api.attachListToDeckV2('L1', 'deck-1');
+    await api.detachListFromDeck('L1');
+    await api.resolveListImages('L1');
+    const calls = lastCalls();
+    expect(calls[0][0]).toContain('deck_id=deck-1&role=main');
+    expect(calls[1][0]).toContain('lists.php?id=L1');
+    expect(JSON.parse(calls[1][1].body).version).toBe(3);
+    expect(calls[2][0]).toContain('action=attach_deck');
+    expect(calls[3][0]).toContain('action=detach_deck');
+    expect(calls[4][0]).toContain('list-image-resolve.php');
+  });
+});
+
+describe('api — scryfall / scan / image / buffer / settings / misc', () => {
+  beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('lookupCard and bulkLookupCards hit scryfall-cache', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, { results: [] }));
+    await api.lookupCard('Sol Ring');
+    await api.bulkLookupCards(['Sol Ring']);
+    const calls = lastCalls();
+    expect(calls[0][0]).toContain('scryfall-cache.php?name=Sol+Ring');
+    expect(calls[1][1].method).toBe('POST');
+  });
+
+  it('scanDeck and findCardCrop POST to scan', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, { cards: [] }));
+    await api.scanDeck('base64', 'image/png');
+    await api.findCardCrop('base64', 'image/png', 'Sol Ring');
+    const calls = lastCalls();
+    expect(calls[0][1].method).toBe('POST');
+    expect(JSON.parse(calls[1][1].body).find_card).toBe('Sol Ring');
+  });
+
+  it('getCardImage includes url param only when provided', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, {}));
+    await api.getCardImage('sid');
+    await api.getCardImage('sid', 'http://img');
+    const calls = lastCalls();
+    expect(calls[0][0]).not.toContain('url=');
+    expect(calls[1][0]).toContain('url=http');
+  });
+
+  it('getCardPrints includes name param', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, { prints: [] }));
+    await api.getCardPrints('Sol Ring');
+    expect(lastCalls()[0][0]).toContain('card-prints.php?name=Sol+Ring');
+  });
+
+  it('buffer draft methods hit buffer-draft with correct verbs', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, { state: null }));
+    await api.getBufferDraft('dev', 'scan');
+    await api.saveBufferDraft('dev', 'scan', 'ref', {} as never);
+    await api.clearBufferDraft('dev', 'scan');
+    const calls = lastCalls();
+    expect(calls[0][0]).toContain('buffer-draft.php');
+    expect(calls[1][1].method).toBe('POST');
+    expect(calls[2][1].method).toBe('DELETE');
+  });
+
+  it('game settings get/update hit game-settings', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, {}));
+    await api.getGameSettings();
+    await api.updateGameSettings({ sound_enabled: false });
+    const calls = lastCalls();
+    expect(calls[0][0]).toContain('game-settings.php');
+    expect(calls[1][1].method).toBe('POST');
+  });
+
+  it('exportTTS uses deck_id or list_id depending on the arg', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, {}));
+    await api.exportTTS({ deckId: 'deck-1' });
+    await api.exportTTS({ listId: 'L1' });
+    const calls = lastCalls();
+    expect(calls[0][0]).toContain('deck_id=deck-1');
+    expect(calls[1][0]).toContain('list_id=L1');
+  });
+
+  it('changelog / collection / coach-notes wrappers', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, []));
+    await api.getChangelog();
+    await api.getMyCollection();
+    await api.getCoachNotes();
+    await api.getAllCoachNotes();
+    await api.updateCoachNote('N1', { topic: 't' });
+    await api.deleteCoachNote('N1');
+    const calls = lastCalls();
+    expect(calls[0][0]).toContain('changelog.php');
+    expect(calls[1][0]).toContain('my-collection.php');
+    expect(calls[2][0]).toContain('coach-notes.php');
+    expect(calls[3][0]).toContain('all=1');
+    expect(calls[4][1].method).toBe('PUT');
+    expect(calls[5][1].method).toBe('DELETE');
+  });
+
+  it('submitChatFeedback POSTs a snake_cased body to chat-feedback', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, {}));
+    await api.submitChatFeedback({
+      surface: 'coach',
+      messageUuid: 'm-1',
+      kind: 'card',
+      targetId: 'Sol Ring',
+      rating: 'good',
+    });
+    const [url, opts] = lastCalls()[0];
+    expect(url).toContain('chat-feedback.php');
+    const body = JSON.parse(opts.body);
+    expect(body.message_uuid).toBe('m-1');
+    expect(body.target_id).toBe('Sol Ring');
+  });
+
+  it('getCardNote adds the archetype param when provided', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, { band: 'certain', data: {}, sources: [], caveats: [] }));
+    await api.getCardNote('Sol Ring', 'commander', 'aggro');
+    expect(lastCalls()[0][0]).toContain('archetype=aggro');
+  });
+});
+
+describe('api — comparison color modes + opponent/exclude filters', () => {
+  beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('emits color-mode flags, opponent filters, exclusions and toggles', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, {}));
+    await api.getComparison({
+      groupBy: 'player',
+      metrics: ['win_rate'],
+      top_n: 5,
+      conditions: {
+        must_include_colors: ['W'],
+        color_mode: 'or',
+        opponent_colors: ['U'],
+        opponent_color_mode: 'or',
+        opponent_player_ids: ['9'],
+        opponent_commanders: ['Kenrith'],
+        exclude_player_ids: ['3'],
+        my_games_only: true,
+        my_decks_only: true,
+      },
+      entityFilter: { colors: ['R'], color_mode: 'or' },
+    });
+    const [url] = lastCalls()[0];
+    expect(url).toContain('color_mode=or');
+    expect(url).toContain('filter_color_mode=or');
+    expect(url).toContain('opponent_color_mode=or');
+    expect(url).toContain('opponent_player_ids[]=9');
+    expect(url).toContain('opponent_commanders[]=Kenrith');
+    expect(url).toContain('exclude_player_ids[]=3');
+    expect(url).toContain('my_games_only=1');
+    expect(url).toContain('my_decks_only=1');
+    expect(url).toContain('top_n=5');
   });
 });

@@ -95,6 +95,15 @@ describe('rulesApi — feedback methods', () => {
     expect(url).toContain('flagged=1');
     expect(url).toContain('rating=down');
   });
+
+  it('getFeedbackReview appends limit and offset params', async () => {
+    const mock = mockFetch(200, { items: [], total: 0, limit: 10, offset: 20 });
+    vi.stubGlobal('fetch', mock);
+    await rulesApi.getFeedbackReview({ limit: 10, offset: 20 });
+    const [url] = mock.mock.calls[0];
+    expect(url).toContain('limit=10');
+    expect(url).toContain('offset=20');
+  });
 });
 
 describe('rulesApi.sendMessage — SSE stream', () => {
@@ -197,5 +206,137 @@ describe('rulesApi.sendMessage — SSE stream', () => {
 
     const result = await rulesApi.sendMessage({ message: 'test' });
     expect(result.response).toBe(COMPLETE_PAYLOAD.response);
+  });
+
+  it('rejects when the stream ends without a complete or error event', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(SUBMIT_RESPONSE) })
+      .mockResolvedValueOnce({ ok: true, body: makeStream([': keepalive\n\n']) }));
+
+    await expect(rulesApi.sendMessage({ message: 'test' })).rejects.toThrow(
+      'Stream ended without a response'
+    );
+  });
+
+  it('rejects immediately when the signal is already aborted after submit', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(SUBMIT_RESPONSE) }));
+
+    await expect(
+      rulesApi.sendMessage({ message: 'test' }, controller.signal)
+    ).rejects.toThrow();
+  });
+
+  it('uses a generic message when an error event omits the error field', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(SUBMIT_RESPONSE) })
+      .mockResolvedValueOnce({ ok: true, body: makeStream(['event: error\ndata: {"foo":1}\n\n']) }));
+
+    await expect(rulesApi.sendMessage({ message: 'test' })).rejects.toThrow('Stream error');
+  });
+});
+
+describe('rulesApi — CRUD methods + apiFetch behavior', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem('auth_token', TOKEN);
+    vi.clearAllMocks();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('getPatterns GETs the patterns endpoint', async () => {
+    const mock = mockFetch(200, { patterns: [] });
+    vi.stubGlobal('fetch', mock);
+    await rulesApi.getPatterns();
+    expect(mock.mock.calls[0][0]).toContain('/rules/patterns.php');
+  });
+
+  it('savePattern POSTs the pattern body', async () => {
+    const mock = mockFetch(200, { pattern: {} });
+    vi.stubGlobal('fetch', mock);
+    await rulesApi.savePattern({ title: 'T', body: 'B' } as never);
+    const [url, opts] = mock.mock.calls[0];
+    expect(url).toContain('/rules/patterns.php');
+    expect(opts.method).toBe('POST');
+  });
+
+  it('getConversations GETs the conversations endpoint', async () => {
+    const mock = mockFetch(200, { conversations: [] });
+    vi.stubGlobal('fetch', mock);
+    await rulesApi.getConversations();
+    expect(mock.mock.calls[0][0]).toContain('/rules/conversations.php');
+  });
+
+  it('getConversation includes the id query', async () => {
+    const mock = mockFetch(200, { conversation: {}, messages: [] });
+    vi.stubGlobal('fetch', mock);
+    await rulesApi.getConversation(7);
+    expect(mock.mock.calls[0][0]).toContain('conversations.php?id=7');
+  });
+
+  it('deleteConversation DELETEs by id', async () => {
+    const mock = mockFetch(200, { deleted: 1 });
+    vi.stubGlobal('fetch', mock);
+    await rulesApi.deleteConversation(7);
+    const [url, opts] = mock.mock.calls[0];
+    expect(url).toContain('conversations.php?id=7');
+    expect(opts.method).toBe('DELETE');
+  });
+
+  it('getActiveGame GETs the active-game endpoint', async () => {
+    const mock = mockFetch(200, { game: null });
+    vi.stubGlobal('fetch', mock);
+    await rulesApi.getActiveGame();
+    expect(mock.mock.calls[0][0]).toContain('/rules/active-game.php');
+  });
+
+  it('rateQaLog POSTs the rating payload', async () => {
+    const mock = mockFetch(200, { success: true });
+    vi.stubGlobal('fetch', mock);
+    await rulesApi.rateQaLog({ qa_log_id: 1, correctness: 5, rating_notes: 'good' });
+    const [url, opts] = mock.mock.calls[0];
+    expect(url).toContain('/rules/qa-log-rate.php');
+    expect(opts.method).toBe('POST');
+  });
+
+  it('omits the auth header when no token is stored', async () => {
+    localStorage.removeItem('auth_token');
+    const mock = mockFetch(200, { patterns: [] });
+    vi.stubGlobal('fetch', mock);
+    await rulesApi.getPatterns();
+    expect(mock.mock.calls[0][1].headers.Authorization).toBeUndefined();
+  });
+
+  it('omits the auth header server-side (no window)', async () => {
+    const mock = mockFetch(200, { patterns: [] });
+    vi.stubGlobal('fetch', mock);
+    vi.stubGlobal('window', undefined);
+    await rulesApi.getPatterns();
+    expect(mock.mock.calls[0][1].headers.Authorization).toBeUndefined();
+  });
+
+  it('redirects and throws on a 401 response', async () => {
+    vi.stubGlobal('fetch', mockFetch(401, { error: 'Unauthorized' }));
+    const locationSpy = vi
+      .spyOn(window, 'location', 'get')
+      .mockReturnValue({ ...window.location, href: 'http://localhost:3003' } as Location);
+
+    await expect(rulesApi.getPatterns()).rejects.toThrow('Authentication required');
+    locationSpy.mockRestore();
+  });
+
+  it('throws the server-provided error message on a failed request', async () => {
+    vi.stubGlobal('fetch', mockFetch(500, { error: 'boom' }));
+    await expect(rulesApi.getPatterns()).rejects.toThrow('boom');
+  });
+
+  it('falls back to a status-based message when the error body lacks an error field', async () => {
+    vi.stubGlobal('fetch', mockFetch(500, {}));
+    await expect(rulesApi.getPatterns()).rejects.toThrow('API error 500');
   });
 });

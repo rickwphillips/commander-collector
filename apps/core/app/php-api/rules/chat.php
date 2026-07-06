@@ -1,6 +1,11 @@
 <?php
 require_once dirname(__DIR__) . '/config.php';
 require_once dirname(__DIR__) . '/auth/middleware.php';
+// Rules Guru tool calls hit commander-mcp (prod: 127.0.0.1:8001). Allow extra time per call.
+if (!defined('MCP_TIMEOUT_SECONDS')) {
+    define('MCP_TIMEOUT_SECONDS', 12);
+}
+require_once dirname(__DIR__) . '/lib/mcp-client.php';
 requireAuth();
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -50,8 +55,13 @@ if ($method !== 'POST') {
 set_time_limit(300);
 ignore_user_abort(true);
 
+// In dev mode, use local Claude CLI with MCP; in prod, use Anthropic API
+$useLocalClaude = $isLocalDev;
 $apiKey = defined('ANTHROPIC_API_KEY') ? ANTHROPIC_API_KEY : null;
-if (!$apiKey) sendError('Anthropic API key not configured', 500);
+
+if (!$useLocalClaude && !$apiKey) {
+    sendError('Anthropic API key not configured', 500);
+}
 
 $input          = getJSONInput();
 $userMessage    = trim($input['message'] ?? '');
@@ -135,7 +145,8 @@ foreach ($allPatterns as $i => $p) {
 }
 arsort($scored);
 
-$patternsContext = "\n\n---\n\n## Interaction Pattern Library\n\nUse `get_pattern` to look up any pattern by ID.\n\n";
+$patternsContext = "\n\n---\n\n## Interaction Pattern Library (pre-matched)\n\n";
+$patternsContext .= "Use `get_pattern`, `search_verified_patterns`, or `lookup_interaction` via commander-mcp for more.\n\n";
 $rank = 0;
 foreach ($scored as $i => $_) {
     if ($rank >= 3) break;
@@ -143,215 +154,271 @@ foreach ($scored as $i => $_) {
     $rank++;
 }
 
-// ── System prompt ──────────────────────────────────────────────────────────
+// ── System prompt (MCP-backed — no inlined CR; lookups via commander-mcp) ─
 $systemPrompt = <<<PROMPT
-You are an expert Magic: The Gathering rules advisor. All CR excerpts below were extracted verbatim from the official Comprehensive Rules (CR 20260227). Answer with precision, cite CR section numbers, and always reach a **definitive conclusion** — the rules are precise enough to always give a concrete answer.
+You are an expert Magic: The Gathering rules advisor. Answer with precision, cite CR section numbers, and always reach a **definitive conclusion** — the rules are precise enough to always give a concrete answer.
 
-## Step 1: Card Lookup
+Knowledge tools route through commander-mcp (Comprehensive Rules DB, verified pattern library, Scryfall). **Never describe a card, CR rule, pattern, or glossary mechanic from memory** — look it up first.
 
-When card names are mentioned, use the `lookup_card` tool to fetch current Oracle text and official rulings. Always use Oracle text — cards get errata. If a ruling directly addresses the question, cite it.
+## Lookup Required Before Citing
 
-**Card name formatting:** Always bold card names using markdown: **Lightning Bolt**, **Teysa Karlov**. This renders them as interactive card previews in the UI. Use the exact full Oracle name. Never use plain text for card names — always bold them.
+1. **Cards** — call `lookup_card` for exact Oracle text and rulings before describing any card.
+2. **Comprehensive Rules** — call `lookup_comprehensive_rule` for every CR number you cite. Use `search_comprehensive_rules` when you know the topic but not the rule number.
+3. **Patterns** — call `get_pattern` for any P### you reference. Use `search_verified_patterns` or `lookup_interaction` when matching by cards or topic.
+4. **Mechanics / keywords** — call `lookup_glossary_term` before explaining how a keyword works.
 
-## Step 2: Pattern Match
+If a lookup returns `band: "unknown"` or an error, say you could not verify it — do not guess from training data.
 
-The top matching patterns are pre-loaded below. If none match, use `get_pattern` with a known ID. When applying a pattern, say: *"This looks like it falls under [Pattern Name] (P###) — applying that logic here..."* then state the definitive ruling.
+## Answer Structure
 
-If the user corrects a pattern application:
-1. Do NOT immediately accept the correction.
-2. Ask for their reasoning.
-3. Verify against the CR before accepting.
+1. Lead with the ruling ("Yes" / "No" / "The result is X").
+2. Cite verified CR numbers and patterns.
+3. Flag common misconceptions when relevant.
+4. When applying a pre-loaded pattern below, say: *"This looks like [Pattern Name] (P###) — applying that logic..."*
 
-## Step 3: Answer with a Definitive Conclusion
+If the user corrects a pattern application: ask for reasoning, then verify against CR before accepting.
 
-Lead with the ruling ("Yes, this works" / "No, this is illegal" / "The result is X"), cite CR numbers, explain the mechanic, reference the matched pattern, and flag common misconceptions.
+## Self-Correct and Propose
 
-## Step 4: Self-Correct When Wrong
+- Wrong earlier answer? Call `log_correction` immediately with severity, what was wrong, and unchecked assumptions.
+- Novel interaction not covered? Call `propose_pattern` after answering.
 
-If you realize during this conversation that a previous answer was incorrect — wrong CR citation, misapplied rule, bad ruling — use the `log_correction` tool immediately. Don't wait for the user to catch it. Be specific about what was wrong and what the correct answer is. You MUST also state what assumptions you made without looking them up first — e.g. assumed a card had an ability it doesn't, assumed a CR rule worked a certain way without checking, assumed an interaction based on similar cards. Your correction is saved to the `rules_ai_corrections` table with: `severity` (1–4), `correction` (what was wrong and the correct answer), `assumptions` (your unchecked assumptions), and a link back to the `rules_qa_log` entry. This data is used to track accuracy patterns and improve future answers.
+## Card Reference Manifest
 
-## Step 5: Propose New Patterns
-
-After answering — if the question reveals a novel interaction not covered by any existing pattern — use the `propose_pattern` tool with a fully formed pattern definition. This flags the pattern for the user to review and optionally save. Do not propose patterns that are already covered.
-
-## Step 6: Card Reference Manifest
-
-At the very end of EVERY response, after all other content, append exactly one line in this format:
+At the very end of EVERY response, after all other content, append exactly one line:
 
 CARDS: [[Full Card Name]], [[Another Card Name]]
 
-List every Magic: The Gathering card you referenced anywhere in your answer by its exact, full Oracle name (e.g. "Lightning Bolt", not "bolt"; "Teysa Karlov", not "Teysa"). If a card has a DFC name, use the front face only. If no cards were mentioned, omit the CARDS line entirely. Do not include mechanics, keywords, rules concepts, or game terms — only named cards.
+List every card referenced by exact Oracle name. Omit the line if no cards were mentioned.
 
----
-
-## CR 117: Timing and Priority
-
-**117.1** The player with priority may cast spells, activate abilities, and take special actions.
-- **117.1a** Instant: any time you have priority. Noninstant: during your main phase, stack empty.
-- **117.1b** Activated ability: any time you have priority.
-- **117.1d** Mana ability: any time you have priority, OR any time a mana payment is required.
-
-**117.2a** Triggered abilities can trigger at any time. Nothing happens at trigger time — they go on the stack the next time a player would receive priority.
-**117.2b** Static abilities continuously affect the game.
-**117.2d** State-based actions happen automatically before a player would receive priority.
-**117.2e** No player has priority while a spell or ability is resolving.
-
-**117.3a** Active player gets priority at the beginning of most steps/phases.
-**117.3b** Active player gets priority after a spell/ability resolves.
-**117.4** Stack resolves when ALL players pass in succession without acting.
-
-**117.5** Before any player receives priority:
-1. Perform all applicable state-based actions simultaneously
-2. Repeat until no SBAs remain
-3. Put all triggered abilities onto the stack (APNAP order)
-4. Repeat 1–3 until clean
-5. Then player receives priority
-
-**117.7** Casting "in response" = new spell/ability resolves first (LIFO stack).
-
----
-
-## CR 613: Interaction of Continuous Effects — The Layer System
-
-| Layer | What it modifies |
-|-------|-----------------|
-| 1 | Copy effects |
-| 2 | Control-changing effects |
-| 3 | Text-changing effects |
-| 4 | Type, subtype, supertype changes |
-| 5 | Color-changing effects |
-| 6 | Ability-adding/removing effects |
-| 7 | Power/toughness changes |
-
-**Layer 7 Sub-layers:**
-- **7a**: Characteristic-defining abilities (CDAs) that define P/T
-- **7b**: Effects that **set** P/T to a specific value
-- **7c**: Effects and counters that **modify** P/T (pump spells, +1/+1 counters, -1/-1 counters)
-- **7d**: Effects that **switch** power and toughness
-
-**613.7 Timestamp Rule**: Within a layer, effects apply in timestamp order (earlier first).
-**613.8 Dependency Rule**: If Effect A depends on Effect B (applying B would change A's targets or existence), B applies first regardless of timestamp.
-
----
-
-## CR 614: Replacement Effects
-
-**614.1** Watch for a particular event and completely or partially replace it with a different event.
-Types: "instead" (614.1a), "skip" (614.1b), "enters with…" (614.1c–d), "as…is turned face up" (614.1e).
-
-**614.4** Must exist before the event.
-**614.5** Applies only once to any given event.
-**614.8 Regeneration** = destruction-replacement effect. Damage-dealt triggers still fire.
-**614.17** "Can't" effects: can't happen events can only be modified by self-replacement effects.
-
----
-
-## CR 603: Handling Triggered Abilities
-
-**603.2** Trigger automatically; nothing happens at trigger time.
-**603.3** Put on stack next time a player would receive priority.
-**603.3b** Multiple simultaneous triggers: APNAP order.
-**603.4 Intervening "if" clause**: Condition checked at trigger time AND at resolution. If false at resolution, ability does nothing.
-**603.6c** Leaves-the-battlefield abilities use last known information.
-**603.6d** "Enters with…" text is a static ability — not triggered.
-
----
-
-## CR 704: State-Based Actions
-
-Checked whenever a player would get priority. All applicable SBAs performed simultaneously.
-
-Key SBAs:
-- 704.5a: 0 or less life → lose
-- 704.5c: 10+ poison → lose
-- 704.5f: toughness ≤ 0 → graveyard
-- 704.5g: lethal damage → destroyed
-- 704.5h: deathtouch damage → destroyed
-- 704.5i: planeswalker at 0 loyalty → graveyard
-- 704.5j: legend rule (same legendary permanent name, same controller)
-- 704.5q: +1/+1 and -1/-1 counters cancel each other
-- **704.6c** Commander: 21+ combat damage from same commander → lose
-- **704.6d** Commander in graveyard/exile → owner may return to command zone
-
----
-
-## CR 903: Commander
-
-**903.3** Commander = legendary creature, legendary Vehicle, or legendary Spacecraft.
-**903.4** Color identity = mana symbols in cost + rules text + color indicators + back face.
-**903.5a** Exactly 100 cards including commander (singleton).
-**903.7** Starting life: **40**.
-**903.8** Commander Tax: {2} per previous cast from command zone.
-**903.9a** Graveyard/exile → SBA, owner may return to command zone.
-**903.9b** Hand/library → replacement effect, owner may put in command zone instead.
-**903.10a** 21+ combat damage by same commander over game → lose (SBA 704.6c).
-
----
-
-## Turn Structure
-
-**Beginning Phase:** Untap (no priority) → Upkeep → Draw
-**Main Phase:** Cast any spell, play a land (stack empty)
-**Combat:** Beginning of combat → Declare attackers → Declare blockers → Combat damage → End of combat
-**Ending Phase:** End step → Cleanup (damage removed, "until end of turn" effects end)
-
-**Combat notes:**
-- A creature is "blocked" even if all blockers leave before damage (CR 509.1h)
-- Trample (702.19b): assign lethal to each blocker in order; excess to player
-- With deathtouch: 1 damage = lethal per blocker
-
----
-
-## Key Keywords
-
-| Keyword | Key Notes |
-|---------|-----------|
-| Deathtouch | Any nonzero damage from this source is lethal (SBA 704.5h). With trample: 1 damage satisfies lethal per blocker |
-| Double Strike | Deals damage in both first-strike and regular steps |
-| First Strike | Deals damage only in the first combat damage step |
-| Flash | Can be cast any time you could cast an instant |
-| Flying | Can only be blocked by flyers or reach creatures |
-| Haste | Can attack and use {T} abilities the turn it enters |
-| Hexproof | Can't be targeted by opponents'. You CAN target your own hexproof permanents |
-| Indestructible | Can't be destroyed. -X/-X, exile, toughness-0 SBA still apply |
-| Lifelink | Static ability; life gain is simultaneous with damage — NOT triggered |
-| Menace | Must be blocked by 2 or more |
-| Protection | DEBT: can't be Damaged/Enchanted/Blocked/Targeted by stated quality |
-| Reach | Can block flying |
-| Shroud | Can't be targeted by ANY spells or abilities (contrast: hexproof) |
-| Trample | Assign lethal to blockers, excess to player/planeswalker |
-| Vigilance | Doesn't tap when attacking |
-| Ward | When targeted by opponent, counter it unless they pay the ward cost |
-
----
-
-## Common Misconceptions
-
-| Claim | Reality | CR |
-|-------|---------|-----|
-| Deathtouch requires exactly 1 damage | Any nonzero damage from deathtouch source is lethal | 704.5h |
-| Lifelink is triggered | Static; life gain is simultaneous with damage | 702.15 |
-| Hexproof protects from your own spells | Only opponents'; shroud blocks all | 702.11 |
-| "Destroy" kills indestructible | Indestructible not destroyed by "destroy" or lethal damage; use exile or -X/-X | 702.12 |
-| Tokens go to graveyard permanently | Token enters graveyard (triggers "dies"), then ceases to exist (SBA 704.5d) | 704.5d |
-| Mana abilities can be responded to | Mana abilities don't use the stack (CR 605.1) | 605.1 |
-| Commander damage includes non-combat | Only combat damage counts | 903.10a |
-| Layer 7 has 5 sub-layers | Only 4: 7a/7b/7c/7d | 613.4 |
-| Counters apply in their own layer | Counters and pump are both in layer 7c | 613.4c |
-| Summoning sickness prevents all abilities | Only attacking and {T}/{Q} abilities | 302.6 |
-| Commander returns to command zone instantly | Graveyard/exile: SBA (after the fact); hand/library: replacement (instead) | 903.9 |
-| Commander starts at 20 life | Commander starts at 40 life | 903.7 |
+**Card name formatting:** Always bold card names: **Lightning Bolt**. Use exact full Oracle names.
 PROMPT;
 
 $systemPrompt .= $patternsContext;
 
+// ── formatPlayerStateLine: live board state for one seat ───────────────────
+function formatPlayerStateLine(array $player): string {
+    $parts = [];
+    if (isset($player['life'])) {
+        $parts[] = "{$player['life']} life";
+    }
+    if (!empty($player['poison'])) {
+        $parts[] = "{$player['poison']} poison";
+    }
+    if (!empty($player['energy'])) {
+        $parts[] = "{$player['energy']} energy";
+    }
+    if (!empty($player['experience'])) {
+        $parts[] = "{$player['experience']} experience";
+    }
+    if (!empty($player['commanderTax'])) {
+        $tax = (int)$player['commanderTax'] * 2;
+        $parts[] = "commander tax +{$tax}";
+    }
+    $badges = [];
+    if (!empty($player['isMonarch'])) $badges[] = 'Monarch';
+    if (!empty($player['hasInitiative'])) $badges[] = 'Initiative';
+    if (!empty($player['hasCitysBlessing'])) $badges[] = "City's Blessing";
+    if ($badges) $parts[] = implode(', ', $badges);
+    if (!empty($player['isEliminated'])) $parts[] = 'eliminated';
+    if (!empty($player['isConceded'])) $parts[] = 'conceded';
+
+    $line = $parts ? implode(', ', $parts) : 'in game';
+
+    if (!empty($player['commanderDamage']) && is_array($player['commanderDamage'])) {
+        $dmgParts = [];
+        foreach ($player['commanderDamage'] as $src => $vals) {
+            if (!is_array($vals)) continue;
+            $regular = (int)($vals[0] ?? 0);
+            $partner = (int)($vals[1] ?? 0);
+            if ($partner > 0) {
+                $dmgParts[] = "{$regular}+{$partner} from {$src}";
+            } elseif ($regular > 0) {
+                $dmgParts[] = "{$regular} from {$src}";
+            }
+        }
+        if ($dmgParts) {
+            $line .= ' (cmdr dmg received: ' . implode(', ', $dmgParts) . ')';
+        }
+    }
+
+    return $line;
+}
+
+/** Per-head line for 2HG — life/poison shown at team level, not repeated per head. */
+function formatHeadStateLine(array $player): string {
+    $parts = [];
+    if (!empty($player['energy'])) {
+        $parts[] = "{$player['energy']} energy";
+    }
+    if (!empty($player['experience'])) {
+        $parts[] = "{$player['experience']} experience";
+    }
+    if (!empty($player['commanderTax'])) {
+        $tax = (int)$player['commanderTax'] * 2;
+        $parts[] = "commander tax +{$tax}";
+    }
+    $badges = [];
+    if (!empty($player['isMonarch'])) $badges[] = 'Monarch';
+    if (!empty($player['hasInitiative'])) $badges[] = 'Initiative';
+    if (!empty($player['hasCitysBlessing'])) $badges[] = "City's Blessing";
+    if ($badges) $parts[] = implode(', ', $badges);
+    if (!empty($player['isEliminated'])) $parts[] = 'eliminated';
+    if (!empty($player['isConceded'])) $parts[] = 'conceded';
+
+    if (!empty($player['commanderDamage']) && is_array($player['commanderDamage'])) {
+        $dmgParts = [];
+        foreach ($player['commanderDamage'] as $src => $vals) {
+            if (!is_array($vals)) continue;
+            $regular = (int)($vals[0] ?? 0);
+            $partner = (int)($vals[1] ?? 0);
+            if ($partner > 0) {
+                $dmgParts[] = "{$regular}+{$partner} cmdr dmg from {$src}";
+            } elseif ($regular > 0) {
+                $dmgParts[] = "{$regular} cmdr dmg from {$src}";
+            }
+        }
+        if ($dmgParts) {
+            $parts[] = implode(', ', $dmgParts);
+        }
+    }
+
+    return $parts ? implode('; ', $parts) : 'no notable status';
+}
+
+function appendFormatModeBlock(string &$systemPrompt, string $gameType): void {
+    if ($gameType === '2hg') {
+        $systemPrompt .= <<<MODE
+
+---
+
+## FORMAT MODE: Two-Headed Giant + Commander (ACTIVE — overrides free-for-all)
+
+**This is NOT a free-for-all Commander game.** The table is 2HG: two teams of two, each head running a Commander deck. Commander rules and 2HG rules both apply.
+
+**Apply these 2HG overrides (verify via `lookup_comprehensive_rule` before citing):**
+- **Shared team life** — one life total per team (starts at 30, not 40 per player). CR 810 / 704.6a.
+- **Shared team poison** — poison counters pool on the team; **15** ends the game (NOT 10 per player). CR 810.8 / 704.6b.
+- **Per-player losses drag the team** — empty library, "you lose the game", etc. on one head eliminates the whole team.
+- **Commander damage stays per head** — 21 combat damage from one commander source to one player still loses that player (and thus the team). Not pooled across teammates.
+- **Shared team turn** — teammates share a turn and priority; each controls only their own permanents/spells.
+- **Little head / big head** — on the starting team's first turn only, big head skips draw, little head draws.
+- **"You" vs "your team"** — "you" = one head; team-wide effects say "your team" or "each player on a team".
+
+**Do NOT apply free-for-all assumptions:** independent life totals, 10-poison-per-player, individual turns, or "each opponent" counting teammates as opponents.
+
+MODE;
+        return;
+    }
+
+    $systemPrompt .= <<<MODE
+
+---
+
+## FORMAT MODE: Commander Free-For-All (ACTIVE — not Two-Headed Giant)
+
+**This is a standard multiplayer Commander game** — each player is an independent competitor, not on a shared team.
+
+**Apply these Commander FFA defaults (verify via `lookup_comprehensive_rule` before citing):**
+- **40 life per player** — each player tracks their own life (CR 903.7 / 704.5a).
+- **10 poison per player** — a player with 10+ poison counters loses independently (704.5c).
+- **Commander damage per source** — 21+ combat damage from the same commander to one player → that player loses (704.6c).
+- **Individual turns** — one active player at a time; no shared team turn.
+- **"Each opponent" / "each player"** — includes every other player; no teammates exist.
+
+**Do NOT apply 2HG assumptions:** no shared team life, no team poison at 15, no shared turns, no little/big head draw.
+
+MODE;
+}
+
 // ── Active game context (personalization) ──────────────────────────────────
 if (!empty($gameContext['players'])) {
+    $ctxGameType = $gameContext['gameType'] ?? 'commander';
+    // Infer 2HG if team numbers are present but gameType was omitted
+    if ($ctxGameType !== '2hg') {
+        foreach ($gameContext['players'] as $p) {
+            if (isset($p['teamNumber'])) {
+                $ctxGameType = '2hg';
+                break;
+            }
+        }
+    }
+    $is2hgCtx = $ctxGameType === '2hg';
+
     $systemPrompt .= "\n\n---\n\n## Active Game Context\n\n";
-    $systemPrompt .= "A Commander game is currently in progress. Use this to personalize your answers: ";
-    $systemPrompt .= "reference specific cards from these decks when relevant, point out tricky interactions ";
-    $systemPrompt .= "that may come up given these commanders and card combinations, and address rules questions ";
-    $systemPrompt .= "in the context of what the players are actually running.\n\n";
+    appendFormatModeBlock($systemPrompt, $ctxGameType);
+
+    if ($is2hgCtx) {
+        $systemPrompt .= "\nUse **team names** from the roster below when discussing teams. ";
+        $systemPrompt .= "When the asker is a specific head, personalize with \"you/your\"; for team-wide effects use \"your team\".\n\n";
+        if (!empty($gameContext['currentTeam'])) {
+            $teamEsc = htmlspecialchars((string)$gameContext['currentTeam'], ENT_QUOTES);
+            $systemPrompt .= "**Active team this turn:** {$teamEsc}\n\n";
+        }
+    } else {
+        $systemPrompt .= "\nEach player competes independently — reference individuals by name and their own life/poison totals.\n\n";
+    }
+    $systemPrompt .= "Reference specific cards from these decks when relevant and address rules in context of what players are running.\n\n";
+    $systemPrompt .= "Use the **current board state** below for life totals, poison, commander damage, and status effects. ";
+    $systemPrompt .= "This updates with each message while the in-game chat is open.\n\n";
+
+    $turnNum   = $gameContext['turnNumber'] ?? null;
+    $curPlayer = $gameContext['currentPlayer'] ?? null;
+    if ($turnNum || $curPlayer) {
+        if ($is2hgCtx && !empty($gameContext['currentTeam'])) {
+            $teamEsc = htmlspecialchars((string)$gameContext['currentTeam'], ENT_QUOTES);
+            $turnHead = $turnNum ? "**Turn {$turnNum}, {$teamEsc}'s turn**" : "**{$teamEsc}'s turn**";
+        } elseif ($curPlayer) {
+            $curEsc = htmlspecialchars((string)$curPlayer, ENT_QUOTES);
+            $turnHead = $turnNum ? "**Turn {$turnNum}, {$curEsc}'s turn**" : "**{$curEsc}'s turn**";
+        } else {
+            $turnHead = "**Turn {$turnNum}**";
+        }
+        $systemPrompt .= "{$turnHead}\n\n**Current board state:**\n";
+
+        if ($is2hgCtx) {
+            // Group by team so shared life/poison is not mistaken for four independent players
+            $teams = [];
+            foreach ($gameContext['players'] as $player) {
+                $tNum  = (int)($player['teamNumber'] ?? 0);
+                $tName = htmlspecialchars($player['teamName'] ?? "Team {$tNum}", ENT_QUOTES);
+                if (!isset($teams[$tNum])) {
+                    $teams[$tNum] = [
+                        'name'   => $tName,
+                        'life'   => $player['life'] ?? null,
+                        'poison' => (int)($player['poison'] ?? 0),
+                        'heads'  => [],
+                    ];
+                }
+                $headName = htmlspecialchars($player['playerName'] ?? 'Unknown', ENT_QUOTES);
+                $headState = htmlspecialchars(formatHeadStateLine($player), ENT_QUOTES);
+                $teams[$tNum]['heads'][] = "**{$headName}**: {$headState}";
+            }
+            foreach ($teams as $team) {
+                $shared = [];
+                if ($team['life'] !== null) {
+                    $shared[] = "{$team['life']} shared life";
+                }
+                if ($team['poison'] > 0) {
+                    $shared[] = "{$team['poison']} shared poison";
+                }
+                $sharedStr = $shared ? implode(', ', $shared) : 'shared totals unknown';
+                $systemPrompt .= "- **{$team['name']}** — {$sharedStr}\n";
+                foreach ($team['heads'] as $headLine) {
+                    $systemPrompt .= "  - {$headLine}\n";
+                }
+            }
+        } else {
+            foreach ($gameContext['players'] as $player) {
+                $name = htmlspecialchars($player['playerName'] ?? 'Unknown', ENT_QUOTES);
+                $stateLine = htmlspecialchars(formatPlayerStateLine($player), ENT_QUOTES);
+                $systemPrompt .= "- **{$name}**: {$stateLine}\n";
+            }
+        }
+        $systemPrompt .= "\n";
+    }
+
+    $systemPrompt .= "**Decks in play:**\n\n";
     $systemPrompt .= "Each player below may have a deck_id. Use `lookup_decklist` when the question benefits ";
     $systemPrompt .= "from knowing one player's full list — e.g. \"can my deck do X?\", combo identification, ";
     $systemPrompt .= "threat assessment. Use `compare_decklists` when the question spans multiple players — ";
@@ -371,7 +438,13 @@ if (!empty($gameContext['players'])) {
         $deckId       = isset($player['deckId']) ? (string)$player['deckId'] : null;
         $commanderStr = $partner ? "{$commander} + {$partner} (Partner)" : $commander;
         $deckIdStr    = $deckId ? " (deck_id: {$deckId})" : '';
-        $systemPrompt .= "**{$playerName}** — \"{$deckName}\" — Commander: *{$commanderStr}*{$deckIdStr}\n";
+        $teamStr      = '';
+        if ($is2hgCtx && isset($player['teamNumber'])) {
+            $tNum  = (int)$player['teamNumber'];
+            $tName = htmlspecialchars($player['teamName'] ?? "Team {$tNum}", ENT_QUOTES);
+            $teamStr = " — Team: **{$tName}**";
+        }
+        $systemPrompt .= "**{$playerName}** — \"{$deckName}\" — Commander: *{$commanderStr}*{$deckIdStr}{$teamStr}\n";
 
         if (!empty($cards)) {
             // Filter out lands to keep context focused on spells/threats
@@ -435,34 +508,83 @@ function distillPattern(array $p): string {
 $tools = [
     [
         'name'        => 'lookup_card',
-        'description' => 'Look up a Magic: The Gathering card by name using the Scryfall API. Returns Oracle text, type line, mana cost, and official Gatherer rulings.',
+        'description' => 'Look up a card via commander-mcp (Scryfall). Returns Oracle text, type line, mana cost, keywords, and official rulings.',
         'input_schema' => [
             'type'       => 'object',
             'properties' => [
-                'name' => [
-                    'type'        => 'string',
-                    'description' => 'The card name to look up (fuzzy matching supported)',
-                ],
+                'name' => ['type' => 'string', 'description' => 'Card name (fuzzy match supported)'],
             ],
             'required' => ['name'],
         ],
     ],
     [
-        'name'        => 'get_pattern',
-        'description' => 'Fetch a pattern by ID. Returns a distilled summary (Abstract, Pattern pseudocode, Definitive Conclusions) by default. Set full_content=true only if you need the complete examples and CR text.',
+        'name'        => 'lookup_comprehensive_rule',
+        'description' => 'Look up an exact CR rule or section via commander-mcp. Required before citing any rule number.',
         'input_schema' => [
             'type'       => 'object',
             'properties' => [
-                'pattern_id' => [
-                    'type'        => 'string',
-                    'description' => 'The pattern ID to fetch, e.g. "p001" or "P001"',
-                ],
-                'full_content' => [
-                    'type'        => 'boolean',
-                    'description' => 'Set true to receive the full markdown content instead of the distilled summary',
-                ],
+                'rule_number' => ['type' => 'string', 'description' => 'e.g. "117.3c", "613", "903.10a"'],
+            ],
+            'required' => ['rule_number'],
+        ],
+    ],
+    [
+        'name'        => 'search_comprehensive_rules',
+        'description' => 'Full-text search across the Comprehensive Rules when you know the topic but not the rule number.',
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => [
+                'query'       => ['type' => 'string', 'description' => 'Search terms, e.g. "state-based action", "layer 7"'],
+                'max_results' => ['type' => 'integer', 'description' => 'Max results (default 10)'],
+            ],
+            'required' => ['query'],
+        ],
+    ],
+    [
+        'name'        => 'lookup_glossary_term',
+        'description' => 'Look up a mechanic or keyword in the CR glossary before describing how it works.',
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => [
+                'term' => ['type' => 'string', 'description' => 'e.g. "trample", "deathtouch", "prowess"'],
+            ],
+            'required' => ['term'],
+        ],
+    ],
+    [
+        'name'        => 'get_pattern',
+        'description' => 'Fetch a verified interaction pattern by ID from commander-mcp. Set full_content=true only if you need the complete markdown.',
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => [
+                'pattern_id'   => ['type' => 'string', 'description' => 'e.g. "p001" or "P001"'],
+                'full_content' => ['type' => 'boolean', 'description' => 'Return full body instead of distilled summary'],
             ],
             'required' => ['pattern_id'],
+        ],
+    ],
+    [
+        'name'        => 'search_verified_patterns',
+        'description' => 'Full-text search the verified pattern library by mechanic or interaction topic.',
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => [
+                'query'       => ['type' => 'string', 'description' => 'e.g. "deathtouch trample", "landfall clue"'],
+                'max_results' => ['type' => 'integer', 'description' => 'Max results (default 10)'],
+            ],
+            'required' => ['query'],
+        ],
+    ],
+    [
+        'name'        => 'lookup_interaction',
+        'description' => 'Look up verified patterns naming both cards — use for "does X work with Y?" questions.',
+        'input_schema' => [
+            'type'       => 'object',
+            'properties' => [
+                'card_a' => ['type' => 'string', 'description' => 'First card name'],
+                'card_b' => ['type' => 'string', 'description' => 'Second card name'],
+            ],
+            'required' => ['card_a', 'card_b'],
         ],
     ],
     [
@@ -546,67 +668,57 @@ foreach ($history as $msg) {
     $messages[] = ['role' => $msg['role'], 'content' => $msg['content']];
 }
 
-// ── Tool execution helper ──────────────────────────────────────────────────
-function executeTool(string $name, array $input): string {
-    if ($name === 'get_pattern') {
-        global $db;
-        $pid  = strtolower(trim($input['pattern_id'] ?? ''));
-        $stmt = $db->prepare("SELECT pattern_id, name, category, cr_refs, tags, content, examples_count FROM rules_patterns WHERE LOWER(pattern_id) = ?");
-        $stmt->execute([$pid]);
-        $row = $stmt->fetch();
-        if (!$row) {
-            return json_encode(['error' => "Pattern not found: {$input['pattern_id']}"]);
-        }
-        // Return distilled view by default; full content only if explicitly requested
-        $full = !empty($input['full_content']);
-        return json_encode([
-            'pattern_id'     => $row['pattern_id'],
-            'name'           => $row['name'],
-            'category'       => $row['category'],
-            'cr_refs'        => $row['cr_refs'],
-            'tags'           => $row['tags'],
-            'examples_count' => $row['examples_count'],
-            'content'        => $full ? $row['content'] : distillPattern($row),
-        ]);
+// ── Tool execution helper (MCP for knowledge; PHP for game DB + writes) ───
+function rulesMcpEnvelope(string $tool, array $args, string $unreachableMsg): ?array {
+    $result = mcpCallTool($tool, $args);
+    if ($result === null) {
+        return ['band' => 'unknown', 'error' => $unreachableMsg];
     }
+    return $result;
+}
 
-    if ($name === 'lookup_card') {
-        $cardName = urlencode($input['name'] ?? '');
-        $cardUrl  = "https://api.scryfall.com/cards/named?fuzzy=$cardName";
-
-        $ch = curl_init($cardUrl);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 10,
-            CURLOPT_USERAGENT      => 'CommanderCollector/2.4 (rules-guru)',
-        ]);
-        $body   = curl_exec($ch);
-        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-        if ($status !== 200 || !$body) {
-            return json_encode(['error' => "Card not found: {$input['name']}"]);
+function distillMcpPattern(array $pattern): string {
+    $content = $pattern['body'] ?? $pattern['content'] ?? '';
+    $pid     = $pattern['pattern_id'] ?? 'p???';
+    $name    = $pattern['name'] ?? 'Unknown';
+    $cat     = $pattern['category'] ?? '';
+    $out     = "**{$pid} — {$name}** ({$cat})\n";
+    if (!empty($pattern['abstract'])) {
+        $out .= "\n**Abstract:**\n" . trim($pattern['abstract']) . "\n";
+    }
+    foreach (['The Pattern', 'Definitive Conclusions'] as $section) {
+        if (preg_match('/##\s+' . preg_quote($section, '/') . '\s*\n+(.*?)(?=\n##\s|\z)/s', $content, $m)) {
+            $text = trim(preg_replace('/###.*$/s', '', trim($m[1])));
+            $out .= "\n**{$section}:**\n{$text}\n";
         }
+    }
+    return $out . "\n";
+}
 
-        $card = json_decode($body, true);
+function executeTool(string $name, array $input): string {
+    if ($name === 'lookup_card') {
+        $cardName = trim($input['name'] ?? '');
+        if ($cardName === '') return json_encode(['error' => 'name is required']);
 
-        // Fetch rulings
+        $cardEnv = rulesMcpEnvelope('get_card', ['name' => $cardName], 'commander-mcp unreachable');
+        if (($cardEnv['band'] ?? '') === 'unknown') {
+            $msg = $cardEnv['error'] ?? ($cardEnv['caveats'][0] ?? "Card not found: {$cardName}");
+            return json_encode(['error' => $msg]);
+        }
+        $card = $cardEnv['data'] ?? [];
+
         $rulings = [];
-        if (!empty($card['rulings_uri'])) {
-            $rch = curl_init($card['rulings_uri']);
-            curl_setopt_array($rch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT        => 10,
-                CURLOPT_USERAGENT      => 'CommanderCollector/2.4 (rules-guru)',
-            ]);
-            $rbody = curl_exec($rch);
-            if ($rbody) {
-                $rdata   = json_decode($rbody, true);
-                $rulings = array_map(fn($r) => $r['comment'], $rdata['data'] ?? []);
+        $rulingEnv = rulesMcpEnvelope('get_card_rulings', ['name' => $cardName], 'commander-mcp unreachable');
+        if (($rulingEnv['band'] ?? '') !== 'unknown' && !empty($rulingEnv['data']['rulings'])) {
+            foreach ($rulingEnv['data']['rulings'] as $r) {
+                if (is_array($r) && !empty($r['comment'])) {
+                    $rulings[] = $r['comment'];
+                }
             }
         }
 
         return json_encode([
-            'name'        => $card['name']        ?? '',
+            'name'        => $card['name']        ?? $cardName,
             'mana_cost'   => $card['mana_cost']   ?? '',
             'type_line'   => $card['type_line']   ?? '',
             'oracle_text' => $card['oracle_text'] ?? '',
@@ -615,6 +727,78 @@ function executeTool(string $name, array $input): string {
             'keywords'    => $card['keywords']    ?? [],
             'rulings'     => $rulings,
         ]);
+    }
+
+    if ($name === 'lookup_comprehensive_rule') {
+        $ruleNumber = strtolower(trim($input['rule_number'] ?? ''));
+        if ($ruleNumber === '') return json_encode(['error' => 'rule_number is required']);
+        return json_encode(rulesMcpEnvelope(
+            'lookup_comprehensive_rule',
+            ['rule_number' => $ruleNumber],
+            'commander-mcp unreachable; do not cite this rule'
+        ));
+    }
+
+    if ($name === 'search_comprehensive_rules') {
+        $query = trim($input['query'] ?? '');
+        if ($query === '') return json_encode(['error' => 'query is required']);
+        $args = ['query' => $query];
+        if (isset($input['max_results'])) $args['max_results'] = (int)$input['max_results'];
+        return json_encode(rulesMcpEnvelope(
+            'search_comprehensive_rules',
+            $args,
+            'commander-mcp unreachable'
+        ));
+    }
+
+    if ($name === 'lookup_glossary_term') {
+        $term = trim($input['term'] ?? '');
+        if ($term === '') return json_encode(['error' => 'term is required']);
+        return json_encode(rulesMcpEnvelope(
+            'lookup_glossary_term',
+            ['term' => $term],
+            'commander-mcp unreachable; do not describe this mechanic'
+        ));
+    }
+
+    if ($name === 'get_pattern') {
+        $pid = strtolower(trim($input['pattern_id'] ?? ''));
+        if ($pid === '') return json_encode(['error' => 'pattern_id is required']);
+
+        $env = rulesMcpEnvelope('get_verified_pattern', ['pattern_id' => $pid], 'commander-mcp unreachable');
+        if (($env['band'] ?? '') === 'unknown') {
+            $msg = $env['error'] ?? ($env['caveats'][0] ?? "Pattern not found: {$input['pattern_id']}");
+            return json_encode(['error' => $msg]);
+        }
+        $row = $env['data'] ?? [];
+        $full = !empty($input['full_content']);
+        return json_encode([
+            'pattern_id' => $row['pattern_id'] ?? $pid,
+            'name'       => $row['name'] ?? '',
+            'category'   => $row['category'] ?? null,
+            'cr_refs'    => $row['cr_refs'] ?? [],
+            'tags'       => $row['tags'] ?? [],
+            'content'    => $full ? ($row['body'] ?? '') : distillMcpPattern($row),
+        ]);
+    }
+
+    if ($name === 'search_verified_patterns') {
+        $query = trim($input['query'] ?? '');
+        if ($query === '') return json_encode(['error' => 'query is required']);
+        $args = ['query' => $query];
+        if (isset($input['max_results'])) $args['max_results'] = (int)$input['max_results'];
+        return json_encode(rulesMcpEnvelope('search_verified_patterns', $args, 'commander-mcp unreachable'));
+    }
+
+    if ($name === 'lookup_interaction') {
+        $cardA = trim($input['card_a'] ?? '');
+        $cardB = trim($input['card_b'] ?? '');
+        if ($cardA === '' || $cardB === '') return json_encode(['error' => 'card_a and card_b are required']);
+        return json_encode(rulesMcpEnvelope(
+            'lookup_interaction',
+            ['card_a' => $cardA, 'card_b' => $cardB],
+            'commander-mcp unreachable'
+        ));
     }
 
     if ($name === 'compare_decklists') {
@@ -749,24 +933,70 @@ function executeTool(string $name, array $input): string {
     return json_encode(['error' => "Unknown tool: $name"]);
 }
 
-// ── Claude API tool-use loop ───────────────────────────────────────────────
-$maxIter         = 8;
-$iter            = 0;
-$pendingPattern  = null;
+// ── Local Claude CLI path (dev mode) ──────────────────────────────────────
+$iter = 0;
+$pendingPattern = null;
 $assistantContent = '';
 
-while ($iter < $maxIter) {
-    $iter++;
+if ($useLocalClaude) {
+    // claude CLI with --bare mode uses ANTHROPIC_API_KEY env var
+    if (!$apiKey) {
+        sendError('Local dev mode requires ANTHROPIC_API_KEY. Get free $5 credits at https://console.anthropic.com/ and add to ~/auth_secrets_dev.php: define(\'ANTHROPIC_API_KEY\', \'sk-ant-...\');', 500);
+    }
+    
+    // Build a single consolidated prompt with history
+    $consolidatedPrompt = "=== SYSTEM ===\n\n" . $systemPrompt . "\n\n=== CONVERSATION ===\n\n";
+    
+    foreach ($history as $msg) {
+        $role = strtoupper($msg['role']);
+        $consolidatedPrompt .= "[$role]:\n" . $msg['content'] . "\n\n";
+    }
+    
+    $consolidatedPrompt .= "[USER]:\n" . $userMessage . "\n\n[ASSISTANT]:";
+    
+    // Write prompt to temp file (claude CLI reads from stdin or file)
+    $tmpPrompt = tempnam(sys_get_temp_dir(), 'rules_prompt_');
+    file_put_contents($tmpPrompt, $consolidatedPrompt);
+    
+    // MCP config path
+    $mcpConfig = dirname(__DIR__, 3) . '/rules-guru/mcp-config.json';
+    
+    // Set ANTHROPIC_API_KEY in environment for claude CLI
+    putenv('ANTHROPIC_API_KEY=' . $apiKey);
+    
+    // Call claude CLI with --bare (uses ANTHROPIC_API_KEY) and MCP config
+    $cmd = sprintf(
+        'claude --print --bare --mcp-config %s --model claude-haiku-4-5-20251001 < %s 2>&1',
+        escapeshellarg($mcpConfig),
+        escapeshellarg($tmpPrompt)
+    );
+    
+    exec($cmd, $output, $exitCode);
+    unlink($tmpPrompt);
+    
+    if ($exitCode !== 0) {
+        error_log("[rules/chat.php] Claude CLI error: " . implode("\n", $output));
+        $assistantContent = "I hit an error trying to answer that (Claude CLI exit $exitCode). Please try again.";
+    } else {
+        $assistantContent = implode("\n", $output);
+    }
+    
+    // No tool loop needed - claude CLI handles MCP tool calling internally
+} else {
+    // ── Anthropic API tool-use loop (production) ──────────────────────────────
+    $maxIter = 6;
+    while ($iter < $maxIter) {
+        $iter++;
 
-    $payload = [
-        'model'      => 'claude-haiku-4-5-20251001',
-        'max_tokens' => 4096,
-        'system'     => $systemPrompt,
-        'tools'      => $tools,
-        'messages'   => $messages,
-    ];
+        $payload = [
+            'model'      => 'claude-haiku-4-5-20251001',
+            'max_tokens' => 4096,
+            'system'     => $systemPrompt,
+            'tools'      => $tools,
+            'messages'   => $messages,
+        ];
 
-    $ch = curl_init('https://api.anthropic.com/v1/messages');
+        $ch = curl_init('https://api.anthropic.com/v1/messages');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST           => true,
@@ -839,7 +1069,8 @@ while ($iter < $maxIter) {
     }
 
     $messages[] = ['role' => 'user', 'content' => $toolResults];
-}
+    }
+} // end anthropic API path
 
 // ── Save assistant message to DB ───────────────────────────────────────────
 // Guard: if the loop produced no text (all tool_use, maxIter exhausted, etc.), log and substitute a fallback

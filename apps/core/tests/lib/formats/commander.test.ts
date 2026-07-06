@@ -5,6 +5,7 @@ import type { Card } from '@/lib/cards/types';
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
 type CardFull = Card & {
+  oracle_text?: string;
   keywords?: string[];
   legalities?: Record<string, string>;
   power?: string | number | null;
@@ -295,6 +296,134 @@ describe('commanderValidator — generic Partner keyword', () => {
     const result = commanderValidator.validate([cmdA, cmdB]);
     const cmdErr = result.violations.find(v => v.rule === 'commander_legality');
     expect(cmdErr).toBeUndefined();
+  });
+});
+
+// ── Commander setup edge cases ────────────────────────────────────────────────
+
+describe('commanderValidator — commander setup edge cases', () => {
+  it('flags more than two commander/partner flags', () => {
+    const a = legendaryCreature({ card_name: 'A', role: 'commander' as const });
+    const b = legendaryCreature({ card_name: 'B', role: 'commander' as const });
+    const c = legendaryCreature({ card_name: 'C', role: 'commander' as const });
+    const result = commanderValidator.validate([a, b, c]);
+    const err = result.violations.find(
+      (v) => v.rule === 'commander_legality' && /too many/i.test(v.message),
+    );
+    expect(err).toBeDefined();
+    expect(result.legal).toBe(false);
+  });
+
+  it('flags a single illegal commander', () => {
+    const cmd = makeCard({ card_name: 'Not Legendary', role: 'commander' as const, type_line: 'Instant' });
+    const result = commanderValidator.validate([cmd]);
+    const err = result.violations.find(
+      (v) => v.rule === 'commander_legality' && /not a legal commander/i.test(v.message),
+    );
+    expect(err).toBeDefined();
+  });
+
+  it('accepts a card with "can be your commander" oracle text', () => {
+    const cmd = makeCard({
+      card_name: 'PW Commander',
+      role: 'commander' as const,
+      type_line: 'Legendary Planeswalker',
+      oracle_text: 'This card can be your commander.',
+    });
+    const result = commanderValidator.validate([cmd]);
+    expect(result.violations.find((v) => v.rule === 'commander_legality')).toBeUndefined();
+  });
+});
+
+describe('commanderValidator — partner pairs', () => {
+  it('flags an individually-illegal card in an otherwise-valid Partner pair', () => {
+    const a = legendaryCreature({ card_name: 'Legal Partner', role: 'commander' as const, keywords: ['Partner'] });
+    const b = makeCard({ card_name: 'Illegal Partner', role: 'commander' as const, type_line: 'Instant', keywords: ['Partner'] });
+    const result = commanderValidator.validate([a, b]);
+    const err = result.violations.find(
+      (v) => v.rule === 'commander_legality' && /Illegal Partner/.test(v.message) && /not a legal commander/i.test(v.message),
+    );
+    expect(err).toBeDefined();
+  });
+
+  it('accepts a "Partner with" named pair', () => {
+    const a = legendaryCreature({ card_name: 'Alpha', role: 'commander' as const, oracle_text: 'Partner with Beta' });
+    const b = legendaryCreature({ card_name: 'Beta', role: 'commander' as const });
+    const result = commanderValidator.validate([a, b]);
+    const pairErr = result.violations.find(
+      (v) => v.rule === 'commander_legality' && /partner pair/i.test(v.message),
+    );
+    expect(pairErr).toBeUndefined();
+  });
+
+  it('strips colorless from a mixed partner-pair color identity', () => {
+    const a = legendaryCreature({ card_name: 'Colored', role: 'commander' as const, color_identity: 'W', keywords: ['Partner'] });
+    const b = legendaryCreature({ card_name: 'Colorless', role: 'commander' as const, color_identity: '', mana_cost: undefined, keywords: ['Partner'] });
+    const white = makeCard({ card_name: 'White Card', color_identity: 'W', mana_cost: '{W}' });
+    const result = commanderValidator.validate([a, b, white]);
+    expect(result.violations.find((v) => v.rule === 'color_identity')).toBeUndefined();
+  });
+});
+
+describe('commanderValidator — commander + partner-role card', () => {
+  it('accepts Choose a Background + a Background partner', () => {
+    const cmd = legendaryCreature({ card_name: 'Wilson', role: 'commander' as const, oracle_text: 'Choose a Background' });
+    const bg = makeCard({ card_name: 'Cult Background', role: 'partner' as const, type_line: 'Legendary Enchantment — Background' });
+    const result = commanderValidator.validate([cmd, bg]);
+    expect(result.violations.find((v) => v.rule === 'commander_legality')).toBeUndefined();
+  });
+
+  it('flags Choose a Background paired with a non-Background', () => {
+    const cmd = legendaryCreature({ card_name: 'Wilson', role: 'commander' as const, oracle_text: 'Choose a Background' });
+    const notBg = legendaryCreature({ card_name: 'Just A Creature', role: 'partner' as const });
+    const result = commanderValidator.validate([cmd, notBg]);
+    expect(result.violations.find((v) => /is not a Background/i.test(v.message))).toBeDefined();
+  });
+
+  it("accepts a Doctor + Doctor's companion", () => {
+    const cmd = legendaryCreature({ card_name: 'The Doctor', role: 'commander' as const, type_line: 'Legendary Creature — Time Lord Doctor' });
+    const comp = legendaryCreature({ card_name: 'Companion', role: 'partner' as const, keywords: ["Doctor's companion"] });
+    const result = commanderValidator.validate([cmd, comp]);
+    expect(result.violations.find((v) => v.rule === 'commander_legality')).toBeUndefined();
+  });
+
+  it("flags a Doctor without a Doctor's companion partner", () => {
+    const cmd = legendaryCreature({ card_name: 'The Doctor', role: 'commander' as const, type_line: 'Legendary Creature — Time Lord Doctor' });
+    const comp = legendaryCreature({ card_name: 'Random', role: 'partner' as const });
+    const result = commanderValidator.validate([cmd, comp]);
+    expect(result.violations.find((v) => /Doctor's companion/i.test(v.message))).toBeDefined();
+  });
+
+  it('flags a commander that cannot use a partner-role card', () => {
+    const cmd = legendaryCreature({ card_name: 'Plain Commander', role: 'commander' as const });
+    const partner = legendaryCreature({ card_name: 'Partner Card', role: 'partner' as const });
+    const result = commanderValidator.validate([cmd, partner]);
+    expect(result.violations.find((v) => /cannot pair with/i.test(v.message))).toBeDefined();
+  });
+
+  it('flags an illegal commander even in a commander+partner setup', () => {
+    const cmd = makeCard({ card_name: 'Bad Cmd', role: 'commander' as const, type_line: 'Instant', oracle_text: 'Choose a Background' });
+    const bg = makeCard({ card_name: 'BG', role: 'partner' as const, type_line: 'Background' });
+    const result = commanderValidator.validate([cmd, bg]);
+    expect(
+      result.violations.find((v) => /"Bad Cmd" is not a legal commander/.test(v.message)),
+    ).toBeDefined();
+  });
+});
+
+describe('commanderValidator — format legality + color override', () => {
+  it('flags cards not legal in the format', () => {
+    const cmd = legendaryCreature({ card_name: 'Cmd', role: 'commander' as const });
+    const illegal = makeCard({ card_name: 'Illegal', color_identity: 'W', legalities: { commander: 'not_legal' } });
+    const result = commanderValidator.validate([cmd, illegal]);
+    expect(result.violations.find((v) => v.rule === 'format_legality')).toBeDefined();
+  });
+
+  it('honors an explicit deck.colorIdentity override', () => {
+    const cmd = legendaryCreature({ card_name: 'Cmd', role: 'commander' as const, color_identity: 'W' });
+    const green = makeCard({ card_name: 'Elf', color_identity: 'G', mana_cost: '{G}', type_line: 'Creature — Elf' });
+    const result = commanderValidator.validate([cmd, green], { colorIdentity: ['W', 'G'] } as never);
+    expect(result.violations.find((v) => v.rule === 'color_identity')).toBeUndefined();
   });
 });
 

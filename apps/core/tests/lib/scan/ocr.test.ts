@@ -413,6 +413,25 @@ describe('retryNotFoundCards', () => {
     expect(cards[0].notFound).toBe(true);
   });
 
+  it('applies fallbacks when the enriched data omits optional fields', async () => {
+    const mockLookup = vi.mocked(api.lookupCard);
+    // No name, no image/type/mana/color/back → exercise every ?? fallback
+    mockLookup.mockResolvedValue({ scryfall_id: 'fz' } as never);
+
+    const card = makeScannedCard({ notFound: true, card_name: 'Lost' });
+    const cards = [card];
+    await retryNotFoundCards(cards);
+
+    expect(cards[0].card_name).toBe('Lost'); // name fallback
+    expect(cards[0].scryfall_id).toBe('fz');
+    expect(cards[0].image_uri).toBeNull();
+    expect(cards[0].back_image_uri).toBeNull();
+    expect(cards[0].color_identity).toBe('');
+    expect(cards[0].type_line).toBeNull();
+    expect(cards[0].mana_cost).toBeNull();
+    expect(cards[0].notFound).toBe(false);
+  });
+
   it('returns only the cards that were successfully enriched', async () => {
     const mockLookup = vi.mocked(api.lookupCard);
     const enriched = makeScryfallCard({ name: 'Found Now' });

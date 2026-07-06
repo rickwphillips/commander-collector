@@ -88,6 +88,7 @@ interface CenterZoneProps {
   onToggleSound: () => void;
   commanderDamage: CommanderDamageMap;
   gameType?: GameType;
+  teamNames?: Record<number, string> | null;
   /** Record die-roll events into the game log (values live only here). */
   onLogEvent?: (events: GameLogEvent[]) => void;
   /** Fetch the current game's buffered log entries for the in-game viewer. */
@@ -98,6 +99,76 @@ function rollDie(sides: number): number {
   return Math.floor(Math.random() * sides) + 1;
 }
 
+/** Payload frozen into the Rules Guru iframe URL and pushed live via postMessage. */
+function buildRulesGuruContext(
+  players: PlayerState[],
+  commanderDamage: CommanderDamageMap,
+  {
+    gameType,
+    teamNames,
+    turnNumber,
+    currentPlayerIdx,
+    firstPlayerSet,
+    turnTimerSeconds,
+    elapsedSeconds,
+    is2hg,
+    activeTeam,
+  }: {
+    gameType?: GameType;
+    teamNames?: Record<number, string> | null;
+    turnNumber: number;
+    currentPlayerIdx: number;
+    firstPlayerSet: boolean;
+    turnTimerSeconds: number;
+    elapsedSeconds: number;
+    is2hg: boolean;
+    activeTeam: number | null;
+  },
+) {
+  return {
+    gameType: gameType ?? 'commander',
+    players: players.map((p, idx) => {
+      const entry: Record<string, unknown> = {
+        playerName: p.playerName,
+        deckName: p.deckName,
+        commander: p.commander?.name ?? null,
+        partner: p.partner?.name ?? null,
+        deckId: p.deckId,
+        life: p.life,
+        isEliminated: p.isEliminated,
+        isConceded: p.isConceded,
+      };
+      if (p.teamNumber != null) {
+        entry.teamNumber = p.teamNumber;
+        entry.teamName = teamNames?.[p.teamNumber] ?? `Team ${p.teamNumber}`;
+      }
+      if (p.poison > 0) entry.poison = p.poison;
+      if (p.energy > 0) entry.energy = p.energy;
+      if (p.experience > 0) entry.experience = p.experience;
+      if (p.commanderTax > 0) entry.commanderTax = p.commanderTax;
+      if (p.isMonarch) entry.isMonarch = true;
+      if (p.hasInitiative) entry.hasInitiative = true;
+      if (p.hasCitysBlessing) entry.hasCitysBlessing = true;
+      const dmgReceived = commanderDamage[idx];
+      if (dmgReceived) {
+        const dmg: Record<string, number[]> = {};
+        for (const [srcIdx, vals] of Object.entries(dmgReceived)) {
+          const [regular, partner] = vals as [number, number];
+          if (regular > 0 || partner > 0) {
+            dmg[players[Number(srcIdx)]?.playerName ?? srcIdx] = partner > 0 ? [regular, partner] : [regular];
+          }
+        }
+        if (Object.keys(dmg).length > 0) entry.commanderDamage = dmg;
+      }
+      return entry;
+    }),
+    turnNumber: firstPlayerSet ? turnNumber : null,
+    currentPlayer: firstPlayerSet ? (players[currentPlayerIdx]?.playerName ?? null) : null,
+    currentTeam: firstPlayerSet && is2hg && activeTeam != null ? (teamNames?.[activeTeam] ?? `Team ${activeTeam}`) : null,
+    timerSeconds: turnTimerSeconds > 0 ? turnTimerSeconds : null,
+    elapsedSeconds: turnTimerSeconds > 0 ? elapsedSeconds : null,
+  };
+}
 
 export function CenterZone({
   turnNumber,
@@ -123,6 +194,7 @@ export function CenterZone({
   onToggleSound,
   commanderDamage,
   gameType,
+  teamNames,
   onLogEvent,
   onViewLog,
 }: CenterZoneProps) {
@@ -190,11 +262,15 @@ export function CenterZone({
     return diceAudio.current;
   };
 
-  // Push real-time timer state to the iframe every second while chat is open
+  // Push real-time timer + board state to the iframe while chat is open
   useEffect(() => {
-    if (!(chatOpen || chatMinimized) || !turnTimerSeconds) return;
+    if (!(chatOpen || chatMinimized)) return;
     const iframeWin = chatIframeRef.current?.contentWindow;
     if (!iframeWin) return;
+
+    const is2hgNow = gameType === '2hg';
+    const activeTeamNow = is2hgNow ? (players[currentPlayerIdx]?.teamNumber ?? null) : null;
+
     iframeWin.postMessage({
       type: 'rules_timer_update',
       timerSeconds: turnTimerSeconds,
@@ -203,7 +279,25 @@ export function CenterZone({
       currentPlayer: firstPlayerSet ? (players[currentPlayerIdx]?.playerName ?? null) : null,
       turnNumber: firstPlayerSet ? turnNumber : null,
     }, '*');
-  }, [elapsedSeconds, chatOpen, chatMinimized, turnTimerSeconds, firstPlayerSet, players, currentPlayerIdx, turnNumber]);
+
+    iframeWin.postMessage({
+      type: 'rules_game_state_update',
+      ...buildRulesGuruContext(players, commanderDamage, {
+        gameType,
+        teamNames,
+        turnNumber,
+        currentPlayerIdx,
+        firstPlayerSet,
+        turnTimerSeconds,
+        elapsedSeconds,
+        is2hg: is2hgNow,
+        activeTeam: activeTeamNow,
+      }),
+    }, '*');
+  }, [
+    elapsedSeconds, chatOpen, chatMinimized, turnTimerSeconds, firstPlayerSet,
+    players, currentPlayerIdx, turnNumber, commanderDamage, gameType, teamNames,
+  ]);
 
   // Listen for save-to-notes and new-content messages from the embedded Rules Guru iframe
   useEffect(() => {
@@ -702,43 +796,18 @@ export function CenterZone({
                 setChatMinimized(false);
                 setChatHasNewContent(false);
               } else {
-                // Build and freeze the URL once when opening fresh
-                const ctx = {
-                  players: players.map((p, idx) => {
-                    const entry: Record<string, unknown> = {
-                      playerName: p.playerName,
-                      deckName: p.deckName,
-                      commander: p.commander?.name ?? null,
-                      partner: p.partner?.name ?? null,
-                      deckId: p.deckId,
-                      life: p.life,
-                      isEliminated: p.isEliminated,
-                    };
-                    if (p.poison > 0) entry.poison = p.poison;
-                    if (p.energy > 0) entry.energy = p.energy;
-                    if (p.experience > 0) entry.experience = p.experience;
-                    if (p.commanderTax > 0) entry.commanderTax = p.commanderTax;
-                    if (p.isMonarch) entry.isMonarch = true;
-                    if (p.hasInitiative) entry.hasInitiative = true;
-                    if (p.hasCitysBlessing) entry.hasCitysBlessing = true;
-                    const dmgReceived = commanderDamage[idx];
-                    if (dmgReceived) {
-                      const dmg: Record<string, number[]> = {};
-                      for (const [srcIdx, vals] of Object.entries(dmgReceived)) {
-                        const [regular, partner] = vals as [number, number];
-                        if (regular > 0 || partner > 0) {
-                          dmg[players[Number(srcIdx)]?.playerName ?? srcIdx] = partner > 0 ? [regular, partner] : [regular];
-                        }
-                      }
-                      if (Object.keys(dmg).length > 0) entry.commanderDamage = dmg;
-                    }
-                    return entry;
-                  }),
-                  turnNumber: firstPlayerSet ? turnNumber : null,
-                  currentPlayer: firstPlayerSet ? (players[currentPlayerIdx]?.playerName ?? null) : null,
-                  timerSeconds: turnTimerSeconds > 0 ? turnTimerSeconds : null,
-                  elapsedSeconds: turnTimerSeconds > 0 ? elapsedSeconds : null,
-                };
+              // Build and freeze the URL once when opening fresh
+              const ctx = buildRulesGuruContext(players, commanderDamage, {
+                gameType,
+                teamNames,
+                turnNumber,
+                currentPlayerIdx,
+                firstPlayerSet,
+                turnTimerSeconds,
+                elapsedSeconds,
+                is2hg,
+                activeTeam,
+              });
                 const ctxParam = encodeURIComponent(btoa(JSON.stringify(ctx)));
                 const base = typeof window !== 'undefined' && process.env.NODE_ENV === 'development'
                   ? 'http://localhost:3003'
