@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Box, Typography, TextField, Button, Stack, CircularProgress, IconButton, Chip, Fab } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { PlayerPanel } from '../components/PlayerPanel';
+import { TeamPanel } from '../components/TeamPanel';
 import { api } from '@/lib/api';
 import type { GameManagerState, PlayerState, LiveGameEvent, DistributiveOmit } from '@/lib/types';
 import { applyEvent } from '../remoteTransforms';
@@ -446,6 +447,17 @@ function RemotePageInner() {
 
   const isMyTurn = state.players[state.currentPlayerIdx]?.position === seat;
 
+  // 2HG: the phone controls the connected seat's whole team via the same
+  // TeamPanel the table renders. Members/opponents come straight off teamNumber;
+  // every mutation routes through the existing per-idx handlers, which the host
+  // reconciles (shared life/poison mirrored across heads).
+  const is2hg = state.gameType === '2hg';
+  const myTeam = player?.teamNumber ?? null;
+  const teamMembers = state.players.map((p, idx) => ({ player: p, idx })).filter((m) => m.player.teamNumber === myTeam);
+  const teamOpponents = state.players.map((p, idx) => ({ player: p, idx })).filter((m) => m.player.teamNumber !== myTeam);
+  const teamActive = myTeam != null && state.players[state.currentPlayerIdx]?.teamNumber === myTeam;
+  const teamName2hg = (myTeam != null && state.teamNames?.[myTeam]) || `Team ${myTeam ?? ''}`;
+
   return (
     <Box
       ref={containerRef}
@@ -466,6 +478,33 @@ function RemotePageInner() {
           <Chip label="Reconnect" size="small" onClick={() => connect(code)} sx={{ fontWeight: 700, cursor: 'pointer' }} />
         </Box>
       )}
+      {is2hg ? (
+        <TeamPanel
+          teamNumber={myTeam ?? 1}
+          teamName={teamName2hg}
+          onTeamNameChange={() => { /* host owns team names; phone is read-only here */ }}
+          members={teamMembers}
+          opponents={teamOpponents}
+          commanderDamage={state.commanderDamage}
+          startingLife={state.startingLife}
+          isActiveTeam={teamActive}
+          elapsedSeconds={teamActive ? elapsedSeconds : 0}
+          turnTimerSeconds={state.turnTimerSeconds}
+          highlightMode={true}
+          remoteMode={true}
+          onLifeChange={handleLifeChange}
+          onPoisonChange={handlePoisonChange}
+          onCommanderTaxChange={handleCommanderTaxChange}
+          onEnergyChange={handleEnergyChange}
+          onExperienceChange={handleExperienceChange}
+          onToggleMonarch={handleToggleMonarch}
+          onToggleInitiative={handleToggleInitiative}
+          onToggleCitysBlessing={handleToggleCitysBlessing}
+          onCommanderDamageChange={handleCommanderDamageChange}
+          onEliminate={handleEliminate}
+          onUndoEliminate={handleUndoEliminate}
+        />
+      ) : (
       <PlayerPanel
         player={displayPlayer}
         playerIdx={playerIdx}
@@ -516,6 +555,7 @@ function RemotePageInner() {
           },
         })}
       />
+      )}
 
 
       {/* Read-only overlay — view another player's panel */}

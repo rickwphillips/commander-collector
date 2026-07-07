@@ -390,11 +390,12 @@ export default function GameManagerPage() {
   }, [state.phase]);
 
   // SSE stream for remote events (host side). Only runs in 'playing' phase;
-  // remotes should never connect before the game has actually started. Remote
-  // phone panels are disabled for 2HG, so the host does not listen there.
+  // remotes should never connect before the game has actually started. In 2HG
+  // each seat still has its own code; the phone renders a team controller and
+  // the host reconciles shared life/poison on every applied event, so the same
+  // listener drives both modes.
   useEffect(() => {
     if (state.phase !== 'playing' || !state.sessionCode || !dbCheckComplete) return;
-    if (state.gameType === '2hg') return;
     const code = state.sessionCode;
     const closeStream = api.openLiveGameHostStream(
       code,

@@ -8,6 +8,7 @@ import { useDamageFlash } from '@/game-manager/hooks/useDamageFlash';
 import { useMonarchTransition } from '@/game-manager/hooks/useMonarchTransition';
 import { useCitysBlessingExit } from '@/game-manager/hooks/useCitysBlessingExit';
 import { useLongPress } from '@/game-manager/hooks/useLongPress';
+import { useTimerTokens } from '@/game-manager/hooks/useTimerTokens';
 import InitiativeIcon from '@mui/icons-material/Castle';
 import type { PlayerState, CommanderDamageMap } from '../types';
 import { PlayerCard, type PlayerCardProps, type KillOpponent } from './PlayerCard';
@@ -191,40 +192,8 @@ export function PlayerPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ─── Derived: timer ──────────────────────────────────────────────────────
-  const timerOff = turnTimerSeconds === 0;
-  const timerProgress = timerOff ? 0 : Math.min(elapsedSeconds / turnTimerSeconds, 1);
-  const isTimerExpired = isCurrentPlayer && !timerOff && elapsedSeconds >= turnTimerSeconds;
-
-  function timerColorChannels(): [number, number, number] {
-    if (timerOff) return [66, 165, 245];
-    if (timerProgress <= 0.5) {
-      const p = timerProgress * 2;
-      return [Math.round(102 + 153 * p), Math.round(187 - 20 * p), Math.round(106 - 68 * p)];
-    }
-    const p = (timerProgress - 0.5) * 2;
-    return [Math.round(255 - 26 * p), Math.round(167 - 110 * p), Math.round(38 + 15 * p)];
-  }
-  function timerColorStr(): string {
-    const [r, g, b] = timerColorChannels();
-    return `rgb(${r},${g},${b})`;
-  }
-  const timerColor = timerColorStr();
-  const timerColorRgba = useCallback((alpha: number): string => {
-    if (timerOff) return `rgba(66,165,245,${alpha})`;
-    let r: number, g: number, b: number;
-    if (timerProgress <= 0.5) {
-      const p = timerProgress * 2;
-      r = Math.round(102 + 153 * p); g = Math.round(187 - 20 * p); b = Math.round(106 - 68 * p);
-    } else {
-      const p = (timerProgress - 0.5) * 2;
-      r = Math.round(255 - 26 * p); g = Math.round(167 - 110 * p); b = Math.round(38 + 15 * p);
-    }
-    return `rgba(${r},${g},${b},${alpha})`;
-  }, [timerOff, timerProgress]);
-
-  const currentPlayerBorder = isCurrentPlayer ? `3px solid ${timerColor}` : undefined;
-  const currentPlayerShadow = isCurrentPlayer ? `0 0 16px 4px ${timerColor}88` : undefined;
+  // ─── Derived: timer (shared with the 2HG TeamPanel via useTimerTokens) ─────
+  const timer = useTimerTokens(elapsedSeconds, turnTimerSeconds, isCurrentPlayer);
 
   // ─── Derived: life / poison / warning ────────────────────────────────────
   function lifeColor(life: number): string {
@@ -402,16 +371,6 @@ export function PlayerPanel({
       },
     };
   }, [player.position]);
-
-  const timer = useMemo<PlayerCardProps['timer']>(() => ({
-    timerOff,
-    timerProgress,
-    isTimerExpired,
-    timerColor,
-    timerColorRgba,
-    currentPlayerBorder,
-    currentPlayerShadow,
-  }), [timerOff, timerProgress, isTimerExpired, timerColor, timerColorRgba, currentPlayerBorder, currentPlayerShadow]);
 
   const animations = useMemo<PlayerCardProps['animations']>(() => ({
     damageFlash,

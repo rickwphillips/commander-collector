@@ -864,19 +864,40 @@ export function CenterZone({
           )}
         </CardContent>
 
-        {/* Settings overlay */}
+        {/* Settings overlay. Rendered as a viewport-centered panel (not pinned to
+            the short center strip) so its rows never overflow into the team
+            panels; the backdrop closes it. */}
         {settingsOpen && (
-          <Box sx={{
-            position: 'absolute',
-            inset: 0,
-            bgcolor: (theme) => theme.palette.mode === 'dark' ? '#1A1410EE' : '#FFF8F0EE',
-            zIndex: 10,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 1,
-            p: 1,
+          <Box
+            onClick={() => setSettingsOpen(false)}
+            sx={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 1300,
+              bgcolor: 'rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              p: 2,
+            }}
+          >
+          <Box
+            onClick={(e) => e.stopPropagation()}
+            sx={{
+              width: '100%',
+              maxWidth: 720,
+              maxHeight: '85dvh',
+              overflowY: 'auto',
+              bgcolor: (theme) => theme.palette.mode === 'dark' ? '#1A1410' : '#FFF8F0',
+              border: (theme) => `1px solid ${theme.palette.divider}`,
+              borderRadius: 2,
+              boxShadow: 6,
+              zIndex: 10,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 1,
+              p: 2,
           }}>
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '100%' }}>
               <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -921,29 +942,32 @@ export function CenterZone({
                 label={<Typography sx={{ fontSize: 12 }}>Dark</Typography>}
                 sx={{ mx: 0 }}
               />
+            </Stack>
+
+            <Stack direction="row" spacing={1} sx={{ width: '100%' }}>
               <Button
                 variant="outlined"
                 size="small"
                 onClick={() => { setSettingsOpen(false); setNotesDraft(notes); setNotesOpen(true); }}
                 startIcon={<TextFieldsIcon sx={{ fontSize: 14 }} />}
+                fullWidth
                 sx={{ fontSize: 11, py: 0.5, color: notes.trim() ? 'primary.main' : undefined, borderColor: notes.trim() ? 'primary.main' : undefined }}
               >
                 Notes
               </Button>
+              {onViewLog && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  fullWidth
+                  onClick={() => { setSettingsOpen(false); openLog(); }}
+                  startIcon={<FormatListBulletedIcon sx={{ fontSize: 14 }} />}
+                  sx={{ fontSize: 11, py: 0.5 }}
+                >
+                  Game Log
+                </Button>
+              )}
             </Stack>
-
-            {onViewLog && (
-              <Button
-                variant="outlined"
-                size="small"
-                fullWidth
-                onClick={() => { setSettingsOpen(false); openLog(); }}
-                startIcon={<FormatListBulletedIcon sx={{ fontSize: 14 }} />}
-                sx={{ fontSize: 11, py: 0.5, width: '100%' }}
-              >
-                Game Log
-              </Button>
-            )}
 
             <Stack direction="row" spacing={1} sx={{ width: '100%' }}>
               <Button
@@ -969,6 +993,7 @@ export function CenterZone({
               </Button>
             </Stack>
 
+          </Box>
           </Box>
         )}
 

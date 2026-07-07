@@ -25,6 +25,8 @@ import { ControlFocusModal } from './ControlFocusModal';
 import { LifeTotal } from './LifeTotal';
 import { useXpKeyframes } from './PlayerCard.keyframes';
 import { useLocalStorageBool } from '@/game-manager/hooks/useLocalStorageBool';
+import { TIMER_EXPIRED_BORDER_BLINK, TIMER_EXPIRED_HEADER_BLINK } from '@/game-manager/hooks/useTimerTokens';
+import type { TimerTokens } from '@/game-manager/hooks/useTimerTokens';
 
 const XP_ICON_SRC = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRPxc2Yz21vbnc5VP3Muxnx5VtQGAynItuNWg&s';
 
@@ -457,16 +459,8 @@ export interface PositionTokens {
   };
 }
 
-// ─── Timer presentation (derived in orchestrator from elapsed/total) ───────
-export interface TimerTokens {
-  timerOff: boolean;
-  timerProgress: number;
-  isTimerExpired: boolean;
-  timerColor: string;
-  timerColorRgba: (alpha: number) => string;
-  currentPlayerBorder?: string;
-  currentPlayerShadow?: string;
-}
+// ─── Timer presentation (derived via useTimerTokens; re-exported for callers) ─
+export type { TimerTokens };
 
 // ─── Animation flags surfaced from extracted hooks ─────────────────────────
 export interface AnimationFlags {
@@ -868,13 +862,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
           : isHighlighted
           ? '0 0 24px 6px rgba(218,165,32,0.6)'
           : (!highlightMode ? timer.currentPlayerShadow : null) ?? 'none',
-        ...(!highlightMode && timer.isTimerExpired && {
-          animation: 'timerBlink 0.5s step-end infinite',
-          '@keyframes timerBlink': {
-            '0%, 100%': { borderColor: '#e53935', boxShadow: '0 0 24px 6px rgba(229,57,53,0.6)' },
-            '50%': { borderColor: 'transparent', boxShadow: 'none' },
-          },
-        }),
+        ...(!highlightMode && timer.isTimerExpired && TIMER_EXPIRED_BORDER_BLINK),
         transition: 'box-shadow 0.1s ease, border 0.1s ease, filter 1s ease',
         '& .MuiTypography-root': { textShadow: energyGlow, transition: 'font-size 0.2s ease, margin 0.2s ease, text-shadow 0.4s ease' },
         filter: poisonProgress > 0 ? `saturate(${1 + poisonProgress * 0.5})` : 'none',
@@ -892,13 +880,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
           ? `linear-gradient(90deg, ${timer.timerColorRgba(0.3)} 0%, ${timer.timerColorRgba(0.7)} 50%, ${timer.timerColorRgba(0.3)} 100%)`
           : 'rgba(0,0,0,0.08)',
         transition: 'background-color 0.3s ease',
-        ...(timer.isTimerExpired && highlightMode && {
-          animation: 'headerBlink 0.5s step-end infinite',
-          '@keyframes headerBlink': {
-            '0%, 100%': { background: '#e9353540' },
-            '50%': { background: 'rgba(0,0,0,0.08)' },
-          },
-        }),
+        ...(timer.isTimerExpired && highlightMode && TIMER_EXPIRED_HEADER_BLINK),
       }}>
         {/* Left: commander art + tax */}
         <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0, zIndex: 1 }}>
