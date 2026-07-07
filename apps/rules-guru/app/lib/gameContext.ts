@@ -91,7 +91,7 @@ export function formatBoardStateLines(ctx: ActiveGameContext): string[] {
     return [...teams.values()].flatMap((team) => {
       const shared: string[] = [];
       if (team.life != null) shared.push(`${team.life} shared life`);
-      if (team.poison > 0) shared.push(`${team.poison} shared poison`);
+      if (team.poison != null && team.poison > 0) shared.push(`${team.poison} shared poison`);
       const lines = [`  • ${team.name} — ${shared.join(', ') || 'in game'}`];
       lines.push(...team.heads);
       return lines;
