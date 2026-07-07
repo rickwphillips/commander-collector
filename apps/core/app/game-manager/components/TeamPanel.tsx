@@ -132,23 +132,26 @@ const SZ_TABLE: Sz = {
   life: 'clamp(52px, 9dvh, 96px)', big: false,
 };
 
+// Phone: scale to dvmin (the panel's SHORT/constraining dimension), not dvmax —
+// this strip is wide and short, so dvmax tracked the large side and ballooned on
+// wide screens. dvmin sizes to what's actually tight, so the caps don't overshoot.
 const SZ_PHONE: Sz = {
-  art: 'clamp(38px, 5dvmax, 52px)',
-  briefName: 'clamp(13px, 1.4dvmax, 17px)',
-  briefSub: 'clamp(10px, 1.2dvmax, 14px)',
-  miniGlyph: 'clamp(12px, 1.4dvmax, 16px)',
-  xsLabel: 'clamp(10px, 1.2dvmax, 14px)',
-  val: 'clamp(14px, 1.7dvmax, 18px)',
-  btnSm: 'clamp(14px, 1.7dvmax, 18px)',
-  btnCmd: 'clamp(15px, 1.8dvmax, 20px)',
-  btnPoison: 'clamp(16px, 2.0dvmax, 22px)',
-  btnLife: 'clamp(26px, 3.6dvmax, 40px)',
-  ability: 'clamp(15px, 1.9dvmax, 20px)',
-  sectionLabel: 'clamp(10px, 1.3dvmax, 14px)',
-  poisonVal: 'clamp(20px, 2.4dvmax, 28px)',
-  cmdLabel: 'clamp(13px, 1.5dvmax, 17px)',
-  cmdVal: 'clamp(15px, 1.8dvmax, 20px)',
-  life: 'clamp(52px, 8dvmax, 100px)',
+  art: 'clamp(36px, 11dvmin, 54px)',
+  briefName: 'clamp(13px, 3.6dvmin, 18px)',
+  briefSub: 'clamp(10px, 3dvmin, 14px)',
+  miniGlyph: 'clamp(12px, 3.4dvmin, 16px)',
+  xsLabel: 'clamp(10px, 3dvmin, 14px)',
+  val: 'clamp(14px, 4dvmin, 19px)',
+  btnSm: 'clamp(14px, 4dvmin, 19px)',
+  btnCmd: 'clamp(15px, 4.2dvmin, 20px)',
+  btnPoison: 'clamp(16px, 4.5dvmin, 22px)',
+  btnLife: 'clamp(28px, 9dvmin, 42px)',
+  ability: 'clamp(15px, 4.2dvmin, 20px)',
+  sectionLabel: 'clamp(10px, 3dvmin, 14px)',
+  poisonVal: 'clamp(20px, 6dvmin, 28px)',
+  cmdLabel: 'clamp(13px, 3.7dvmin, 18px)',
+  cmdVal: 'clamp(15px, 4.2dvmin, 20px)',
+  life: 'clamp(52px, 20dvmin, 100px)',
   big: true,
 };
 
@@ -516,8 +519,12 @@ export function TeamPanel({
       )}
 
       {/* Body: landscape stat row (pilots | shared life | commander damage).
-          Same layout on table and phone; only the sizes scale (see sz). */}
-      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', alignItems: 'stretch', gap: 1.5, p: 1.5 }}>
+          Row on the table and on a phone held landscape; a phone in PORTRAIT
+          stacks the three sections into a column (scrollable). */}
+      <Box sx={{
+        flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', alignItems: 'stretch', gap: 1.5, p: 1.5,
+        ...(remoteMode && { '@media (orientation: portrait)': { flexDirection: 'column', overflowY: 'auto', gap: 2 } }),
+      }}>
       {/* Section A: pilots + per-commander tax */}
       <Stack spacing={0.75} sx={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
         {members.map((m) => (
