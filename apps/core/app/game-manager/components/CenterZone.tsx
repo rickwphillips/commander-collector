@@ -31,7 +31,7 @@ import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import TextFieldsIcon from '@mui/icons-material/TextFields';
 import ChatIcon from '@mui/icons-material/Chat';
 import MinimizeIcon from '@mui/icons-material/Minimize';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import RuleIcon from '@mui/icons-material/Rule';
 import Badge from '@mui/material/Badge';
 import { useThemeMode } from '@/components/ThemeProvider';
 import { RulesQuickLookup } from '@/components/RulesQuickLookup';
@@ -584,7 +584,7 @@ export function CenterZone({
   const is2hg = gameType === '2hg';
   const activeTeam = is2hg ? currentPlayer?.teamNumber ?? null : null;
   const turnCmdLabel = is2hg && activeTeam != null
-    ? `Team ${activeTeam}`
+    ? (teamNames?.[activeTeam] ?? `Team ${activeTeam}`)
     : (currentPlayer?.commander.name ?? '—');
   const turnPlayerLabel = is2hg && activeTeam != null
     ? players.filter((p) => p.teamNumber === activeTeam).map((p) => p.playerName).join(' & ')
@@ -636,11 +636,11 @@ export function CenterZone({
           {/* Turn tracker */}
           {firstPlayerSet && (
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '80%', px: 1 }}>
-              <Box sx={{ transform: 'rotate(90deg)', maxWidth: rotatedBoxMaxWidth, flexShrink: 0, textAlign: 'center' }}>
+              <Box sx={{ transform: is2hg ? 'rotate(180deg)' : 'rotate(90deg)', maxWidth: rotatedBoxMaxWidth, flexShrink: 0, textAlign: 'center' }}>
                 <Typography sx={{ fontWeight: 900, fontSize: fsTurnNum, color: 'primary.main', lineHeight: 1 }}>
                   Turn {turnNumber}
                 </Typography>
-                <Typography sx={{ fontSize: fsCmdName, fontWeight: 600, color: 'text.primary', lineHeight: 1.2 }}>
+                <Typography sx={{ fontSize: fsCmdName, fontWeight: 600, color: 'text.primary', lineHeight: 1.2, ...(is2hg && { textTransform: 'uppercase', letterSpacing: 0.5 }) }}>
                   {turnCmdLabel}
                 </Typography>
                 <Typography sx={{ fontSize: fsPlayerName, color: 'text.secondary', lineHeight: 1.3 }}>
@@ -670,11 +670,11 @@ export function CenterZone({
                 </Button>
               </Tooltip>
 
-              <Box sx={{ transform: 'rotate(-90deg)', maxWidth: rotatedBoxMaxWidth, flexShrink: 0, textAlign: 'center' }}>
+              <Box sx={{ transform: is2hg ? 'rotate(0deg)' : 'rotate(-90deg)', maxWidth: rotatedBoxMaxWidth, flexShrink: 0, textAlign: 'center' }}>
                 <Typography sx={{ fontWeight: 900, fontSize: fsTurnNum, color: 'primary.main', lineHeight: 1 }}>
                   Turn {turnNumber}
                 </Typography>
-                <Typography sx={{ fontSize: fsCmdName, fontWeight: 600, color: 'text.primary', lineHeight: 1.2 }}>
+                <Typography sx={{ fontSize: fsCmdName, fontWeight: 600, color: 'text.primary', lineHeight: 1.2, ...(is2hg && { textTransform: 'uppercase', letterSpacing: 0.5 }) }}>
                   {turnCmdLabel}
                 </Typography>
                 <Typography sx={{ fontSize: fsPlayerName, color: 'text.secondary', lineHeight: 1.3 }}>
@@ -845,9 +845,23 @@ export function CenterZone({
           </IconButton>
 
           {/* Quick rules/pattern/card lookup (no AI; direct MCP fetch) */}
-          <Box sx={{ position: 'absolute', bottom: 6, left: 48 }}>
+          <Box sx={{ position: 'absolute', top: '50%', left: 14, transform: 'translateY(-50%)' }}>
             <RulesQuickLookup />
           </Box>
+
+          {/* 2HG rules reference, in the right column between the gear and dice buttons */}
+          {gameType === '2hg' && (
+            <IconButton
+              component="a"
+              href={TWO_HEADED_GIANT_RULES_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{ position: 'absolute', top: '50%', right: 6, transform: 'translateY(-50%)', color: 'text.secondary' }}
+              title="Two-Headed Giant Rules"
+            >
+              <RuleIcon sx={{ fontSize: 24 }} />
+            </IconButton>
+          )}
         </CardContent>
 
         {/* Settings overlay */}
@@ -955,20 +969,6 @@ export function CenterZone({
               </Button>
             </Stack>
 
-            {gameType === '2hg' && (
-              <Button
-                component="a"
-                href={TWO_HEADED_GIANT_RULES_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                variant="text"
-                size="small"
-                endIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
-                sx={{ fontSize: 11, py: 0.5, mt: 0.5 }}
-              >
-                Two-Headed Giant Rules
-              </Button>
-            )}
           </Box>
         )}
 
