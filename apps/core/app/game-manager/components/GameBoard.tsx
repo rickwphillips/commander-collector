@@ -650,7 +650,16 @@ export function GameBoard({
   const handleTeamNameChange = (teamNumber: number, name: string) => {
     onUpdate((prev) => ({ ...prev, teamNames: { ...prev.teamNames, [teamNumber]: name } }));
   };
-  const renderTeamPanel = (members: TeamMember[], opponents: TeamMember[], teamNumber: number, edge: 'top' | 'bottom') => (
+  const renderTeamPanel = (members: TeamMember[], opponents: TeamMember[], teamNumber: number, edge: 'top' | 'bottom') => {
+    // One phone per team: pair via the primary seat's code, and treat the team
+    // as connected if either teammate's phone has checked in recently.
+    const primaryPos = members[0]?.player.position;
+    const teamSeatCode = primaryPos ? state.sessionSeats?.[primaryPos] ?? undefined : undefined;
+    const teamRemoteConnected = nowMs > 0 && members.some((m) => {
+      const c = state.remoteCheckins?.[m.player.position];
+      return !!c && nowMs - c < 15000;
+    });
+    return (
     <Box
       sx={{
         gridColumn: '1 / -1',
@@ -671,6 +680,11 @@ export function GameBoard({
         commanderDamage={commanderDamage}
         startingLife={startingLife}
         isActiveTeam={firstPlayerSet && activeTeam === teamNumber}
+        elapsedSeconds={firstPlayerSet && activeTeam === teamNumber ? elapsedSeconds : 0}
+        turnTimerSeconds={turnTimerSeconds}
+        highlightMode={highlightMode}
+        seatCode={teamSeatCode}
+        remoteConnected={teamRemoteConnected}
         onLifeChange={handleLifeChange}
         onPoisonChange={handlePoisonChange}
         onCommanderTaxChange={handleCommanderTaxChange}
@@ -680,9 +694,12 @@ export function GameBoard({
         onToggleInitiative={handleToggleInitiative}
         onToggleCitysBlessing={handleToggleCitysBlessing}
         onCommanderDamageChange={handleCommanderDamageChange}
+        onEliminate={handleEliminate}
+        onUndoEliminate={handleUndoEliminate}
       />
     </Box>
-  );
+    );
+  };
 
   return (
     <Box

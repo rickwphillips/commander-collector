@@ -18,14 +18,21 @@
  * both heads in sync. Standard games never use this component.
  */
 import { useState, useEffect, useRef } from 'react';
-import { Box, Stack, Typography, IconButton, SvgIcon, CircularProgress, TextField } from '@mui/material';
+import { Box, Stack, Typography, IconButton, SvgIcon, CircularProgress, TextField, Menu, MenuItem } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import CloseIcon from '@mui/icons-material/Close';
 import InitiativeIcon from '@mui/icons-material/Castle';
 import CityIcon from '@mui/icons-material/LocationCity';
+import ElimIcon from '@mui/icons-material/PersonOff';
+import ReplayIcon from '@mui/icons-material/Replay';
+import SettingsIcon from '@mui/icons-material/Settings';
+import SmartphoneIcon from '@mui/icons-material/Smartphone';
+import { QRCodeSVG } from 'qrcode.react';
+import { ASSET_BASE } from '@/lib/api';
 import { getCardImageByName } from '@commander/shared/lib/cardImageCache';
 import { LifeTotal } from './LifeTotal';
+import { useTimerTokens, TIMER_EXPIRED_BORDER_BLINK, TIMER_EXPIRED_HEADER_BLINK } from '@/game-manager/hooks/useTimerTokens';
 import type { PlayerState, CommanderDamageMap } from '@/lib/types';
 
 // Small crown glyph mirrored from PlayerCard so the Monarch toggle reads the
@@ -50,6 +57,19 @@ interface TeamPanelProps {
   commanderDamage: CommanderDamageMap;
   startingLife: number;
   isActiveTeam: boolean;
+  // Turn-timer + Highlight parity with standard games: the active team's panel
+  // reflects the countdown color (border/shadow with Highlight off, app-bar
+  // gradient with Highlight on) via the shared useTimerTokens hook.
+  elapsedSeconds: number;
+  turnTimerSeconds: number;
+  highlightMode: boolean;
+  // Remote phone (per team): the primary seat's code drives one QR / connection
+  // indicator for the whole team; a phone scanning it renders this same panel.
+  seatCode?: string;
+  remoteConnected?: boolean;
+  // On the phone the panel fills the viewport, so it scales up (dvmax clamps)
+  // and reflows its three sections into a vertical stack. Table stays as-is.
+  remoteMode?: boolean;
   onLifeChange: (idx: number, delta: number) => void;
   onPoisonChange: (idx: number, delta: number) => void;
   onCommanderTaxChange: (idx: number, delta: number) => void;
@@ -62,9 +82,77 @@ interface TeamPanelProps {
   onToggleInitiative: (idx: number) => void;
   onToggleCitysBlessing: (idx: number) => void;
   onCommanderDamageChange: (targetIdx: number, sourceIdx: number, isPartner: boolean, delta: number) => void;
+  // Concede is a team action: eliminating either head concedes the whole team
+  // (reconcileTeams marks both eliminated together). Routed through the primary seat.
+  onEliminate: (idx: number) => void;
+  onUndoEliminate: (idx: number) => void;
 }
 
-function StatButton({ onClick, size = 18, children }: { onClick: () => void; size?: number; children: React.ReactNode }) {
+// Responsive size tokens. Table (!remoteMode) keeps the original fixed px so the
+// on-table strip is pixel-identical; phone (remoteMode) uses viewport-relative
+// clamp(dvmax) so the panel scales with the device, mirroring PlayerCard.
+interface Sz {
+  art: number | string;
+  briefName: number | string;
+  briefSub: number | string;
+  miniGlyph: number | string;
+  xsLabel: number | string;
+  val: number | string;
+  btnSm: number | string;
+  btnCmd: number | string;
+  btnPoison: number | string;
+  btnLife: number | string;
+  ability: number | string;
+  sectionLabel: number | string;
+  poisonVal: number | string;
+  cmdLabel: number | string;
+  cmdVal: number | string;
+  life: string;
+  big: boolean;
+}
+
+// Table: dvh-based clamps whose mins equal the original fixed px, so the strip
+// never shrinks below its shipped look but grows on taller displays.
+const SZ_TABLE: Sz = {
+  art: 'clamp(36px, 4dvh, 46px)',
+  briefName: 'clamp(12px, 1.4dvh, 15px)',
+  briefSub: 'clamp(10px, 1.2dvh, 13px)',
+  miniGlyph: 'clamp(11px, 1.3dvh, 14px)',
+  xsLabel: 'clamp(9px, 1.1dvh, 12px)',
+  val: 'clamp(12px, 1.4dvh, 15px)',
+  btnSm: 'clamp(12px, 1.4dvh, 15px)',
+  btnCmd: 'clamp(14px, 1.6dvh, 17px)',
+  btnPoison: 'clamp(16px, 1.8dvh, 20px)',
+  btnLife: 'clamp(30px, 3.6dvh, 40px)',
+  ability: 'clamp(14px, 1.6dvh, 17px)',
+  sectionLabel: 'clamp(10px, 1.2dvh, 13px)',
+  poisonVal: 'clamp(20px, 2.3dvh, 26px)',
+  cmdLabel: 'clamp(12px, 1.4dvh, 15px)',
+  cmdVal: 'clamp(14px, 1.6dvh, 17px)',
+  life: 'clamp(52px, 9dvh, 96px)', big: false,
+};
+
+const SZ_PHONE: Sz = {
+  art: 'clamp(52px, 7dvmax, 74px)',
+  briefName: 'clamp(14px, 1.7dvmax, 21px)',
+  briefSub: 'clamp(11px, 1.4dvmax, 16px)',
+  miniGlyph: 'clamp(14px, 1.7dvmax, 19px)',
+  xsLabel: 'clamp(11px, 1.4dvmax, 16px)',
+  val: 'clamp(17px, 2.1dvmax, 24px)',
+  btnSm: 'clamp(17px, 2.1dvmax, 24px)',
+  btnCmd: 'clamp(19px, 2.3dvmax, 26px)',
+  btnPoison: 'clamp(22px, 2.6dvmax, 30px)',
+  btnLife: 'clamp(40px, 5.5dvmax, 58px)',
+  ability: 'clamp(19px, 2.4dvmax, 27px)',
+  sectionLabel: 'clamp(12px, 1.5dvmax, 18px)',
+  poisonVal: 'clamp(26px, 3.3dvmax, 38px)',
+  cmdLabel: 'clamp(15px, 1.8dvmax, 21px)',
+  cmdVal: 'clamp(19px, 2.3dvmax, 26px)',
+  life: 'clamp(80px, 14dvmax, 170px)',
+  big: true,
+};
+
+function StatButton({ onClick, big = false, children }: { onClick: () => void; big?: boolean; children: React.ReactNode }) {
   return (
     <IconButton
       onClick={onClick}
@@ -72,7 +160,7 @@ function StatButton({ onClick, size = 18, children }: { onClick: () => void; siz
         color: 'primary.main',
         border: (theme) => `1px solid ${theme.palette.divider}`,
         borderRadius: 1,
-        p: 0.25,
+        p: big ? 0.5 : 0.25,
       }}
     >
       {children}
@@ -89,6 +177,7 @@ function MiniCounter({
   active,
   onDec,
   onInc,
+  sz,
 }: {
   glyph: React.ReactNode;
   glyphColor: string;
@@ -97,16 +186,17 @@ function MiniCounter({
   active: boolean;
   onDec: () => void;
   onInc: () => void;
+  sz: Sz;
 }) {
   return (
     <Stack direction="row" alignItems="center" spacing={0.25}>
-      <Box component="span" sx={{ fontSize: 11, lineHeight: 1, color: glyphColor }}>{glyph}</Box>
-      <Typography sx={{ fontSize: 9, color: 'text.secondary' }}>{label}</Typography>
-      <StatButton onClick={onDec}><RemoveIcon sx={{ fontSize: 12 }} /></StatButton>
-      <Typography sx={{ fontSize: 12, fontWeight: 700, minWidth: 14, textAlign: 'center', color: active ? glyphColor : 'text.primary' }}>
+      <Box component="span" sx={{ fontSize: sz.miniGlyph, lineHeight: 1, color: glyphColor }}>{glyph}</Box>
+      <Typography sx={{ fontSize: sz.xsLabel, color: 'text.secondary' }}>{label}</Typography>
+      <StatButton onClick={onDec} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnSm }} /></StatButton>
+      <Typography sx={{ fontSize: sz.val, fontWeight: 700, minWidth: 14, textAlign: 'center', color: active ? glyphColor : 'text.primary' }}>
         {value}
       </Typography>
-      <StatButton onClick={onInc}><AddIcon sx={{ fontSize: 12 }} /></StatButton>
+      <StatButton onClick={onInc} big={sz.big}><AddIcon sx={{ fontSize: sz.btnSm }} /></StatButton>
     </Stack>
   );
 }
@@ -117,12 +207,14 @@ function AbilityToggle({
   color,
   title,
   onToggle,
+  big = false,
   children,
 }: {
   active: boolean;
   color: string;
   title: string;
   onToggle: () => void;
+  big?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -130,7 +222,7 @@ function AbilityToggle({
       onClick={onToggle}
       title={title}
       sx={{
-        p: 0.25,
+        p: big ? 0.5 : 0.25,
         borderRadius: 1,
         border: (theme) => `1px solid ${active ? color : theme.palette.divider}`,
         bgcolor: active ? `${color}22` : 'transparent',
@@ -143,7 +235,7 @@ function AbilityToggle({
 }
 
 /** Compact commander identity shown in the team app bar, one per pilot. */
-function CommanderBrief({ member, align, onView }: { member?: TeamMember; align: 'left' | 'right'; onView: (name: string) => void }) {
+function CommanderBrief({ member, align, onView, sz }: { member?: TeamMember; align: 'left' | 'right'; onView: (name: string) => void; sz: Sz }) {
   if (!member) return <Box sx={{ flex: 1, minWidth: 0 }} />;
   const { player } = member;
   return (
@@ -152,11 +244,11 @@ function CommanderBrief({ member, align, onView }: { member?: TeamMember; align:
         noWrap
         onClick={() => onView(player.commander.name)}
         title={player.commander.name}
-        sx={{ fontSize: 12, fontWeight: 700, lineHeight: 1.15, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+        sx={{ fontSize: sz.briefName, fontWeight: 700, lineHeight: 1.15, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
       >
         {player.playerName}
       </Typography>
-      <Typography noWrap sx={{ fontSize: 10, color: 'text.secondary', lineHeight: 1.15 }}>
+      <Typography noWrap sx={{ fontSize: sz.briefSub, color: 'text.secondary', lineHeight: 1.15 }}>
         {player.commander.name}{player.partner ? ` / ${player.partner.name}` : ''}
       </Typography>
     </Box>
@@ -172,6 +264,12 @@ export function TeamPanel({
   commanderDamage,
   startingLife,
   isActiveTeam,
+  elapsedSeconds,
+  turnTimerSeconds,
+  highlightMode,
+  seatCode,
+  remoteConnected = false,
+  remoteMode = false,
   onLifeChange,
   onPoisonChange,
   onCommanderTaxChange,
@@ -181,6 +279,8 @@ export function TeamPanel({
   onToggleInitiative,
   onToggleCitysBlessing,
   onCommanderDamageChange,
+  onEliminate,
+  onUndoEliminate,
 }: TeamPanelProps) {
   // Commander card preview — card-local view state, copied verbatim from
   // PlayerCard so any commander (own team or opposing) can be tapped to enlarge.
@@ -223,9 +323,23 @@ export function TeamPanel({
   const life = primary?.player.life ?? startingLife;
   const poison = primary?.player.poison ?? 0;
   const eliminated = primary?.player.isEliminated ?? false;
+  // A team is "conceded" if either head was manually conceded (vs eliminated by
+  // damage). reconcileTeams only stamps isConceded on the head that received the
+  // eliminate event, so check both.
+  const conceded = members.some((m) => m.player.isConceded);
+  const [showConcedeConfirm, setShowConcedeConfirm] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  const closeMenu = () => { setMenuAnchor(null); setShowConcedeConfirm(false); };
+
+  const sz = remoteMode ? SZ_PHONE : SZ_TABLE;
+
 
   const lifeColor =
     life <= 0 ? '#B71C1C' : life <= 10 ? '#E65100' : life <= 20 ? '#F9A825' : 'primary.main';
+
+  // Turn timer, shared with standard games. The active team plays the role of
+  // the current player: its panel carries the countdown color.
+  const timer = useTimerTokens(elapsedSeconds, turnTimerSeconds, isActiveTeam);
 
   // The shared life number's reactions (damage flash, energy pulse, poison boil)
   // are rendered by the shared <LifeTotal>. Per-player counters react to the
@@ -258,9 +372,17 @@ export function TeamPanel({
         display: 'flex',
         flexDirection: 'column',
         borderRadius: 2,
-        border: (theme) => `2px solid ${isActiveTeam ? theme.palette.primary.main : theme.palette.divider}`,
+        // Highlight OFF: the active team's border/shadow carry the timer color.
+        // Highlight ON: the border stays neutral and the color rides the app bar
+        // gradient instead (see the header Stack below). Matches PlayerCard.
+        border: !highlightMode && timer.currentPlayerBorder
+          ? timer.currentPlayerBorder
+          : (theme) => `2px solid ${isActiveTeam ? theme.palette.primary.main : theme.palette.divider}`,
         bgcolor: (theme) => (theme.palette.mode === 'dark' ? '#221913' : '#FFFDFA'),
-        boxShadow: isActiveTeam ? (theme) => `0 0 14px 2px ${theme.palette.primary.main}55` : 'none',
+        boxShadow: !highlightMode && timer.currentPlayerShadow
+          ? timer.currentPlayerShadow
+          : isActiveTeam ? (theme) => `0 0 14px 2px ${theme.palette.primary.main}55` : 'none',
+        ...(!highlightMode && timer.isTimerExpired && TIMER_EXPIRED_BORDER_BLINK),
         opacity: eliminated ? 0.5 : 1,
         overflow: 'hidden',
       }}
@@ -272,9 +394,18 @@ export function TeamPanel({
         direction="row"
         alignItems="center"
         spacing={1}
-        sx={{ flexShrink: 0, px: 1.25, py: 0.5, borderBottom: (theme) => `1px solid ${theme.palette.divider}` }}
+        sx={{
+          flexShrink: 0, px: 1.25, py: 0.5,
+          borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+          transition: 'background 0.3s ease',
+          // Highlight ON: the active team's app bar carries the timer gradient.
+          background: isActiveTeam && highlightMode
+            ? `linear-gradient(90deg, ${timer.timerColorRgba(0.3)} 0%, ${timer.timerColorRgba(0.7)} 50%, ${timer.timerColorRgba(0.3)} 100%)`
+            : undefined,
+          ...(isActiveTeam && highlightMode && timer.isTimerExpired && TIMER_EXPIRED_HEADER_BLINK),
+        }}
       >
-        <CommanderBrief member={members[0]} align="left" onView={setCmdPreviewName} />
+        <CommanderBrief member={members[0]} align="left" onView={setCmdPreviewName} sz={sz} />
 
         {/* Center: color badge + editable team name + active flag. */}
         <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0 }}>
@@ -300,17 +431,92 @@ export function TeamPanel({
               {teamName}
             </Typography>
           )}
-          {isActiveTeam && (
+          {isActiveTeam && !eliminated && (
             <Typography sx={{ fontSize: 10, fontWeight: 700, color: 'primary.main', textTransform: 'uppercase', letterSpacing: 0.5, whiteSpace: 'nowrap' }}>
               Active
             </Typography>
           )}
+          {/* Green dot when a teammate's phone is connected (glanceable). The QR
+              to pair one lives in the gear menu below. */}
+          {remoteConnected && (
+            <SmartphoneIcon sx={{ fontSize: 16, color: 'success.main', animation: 'remotePulse 2s ease-in-out infinite', '@keyframes remotePulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.4 } }, flexShrink: 0 }} />
+          )}
+          {/* Team options gear — QR pairing + concede live here to stay unobtrusive. */}
+          <IconButton size="small" title="Team options" onClick={(e) => setMenuAnchor(e.currentTarget)} sx={{ p: 0.25, color: 'text.disabled' }}>
+            <SettingsIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+          <Menu
+            anchorEl={menuAnchor}
+            open={Boolean(menuAnchor)}
+            onClose={closeMenu}
+            slotProps={{ paper: { sx: { maxHeight: 'min(80dvh, 480px)', overflowY: 'auto' } } }}
+          >
+            {seatCode && !remoteConnected && (
+              <Box
+                key="qr"
+                onClick={() => { navigator.clipboard?.writeText(seatCode).catch(() => {}); }}
+                sx={{ px: 2, py: 0.75, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, cursor: 'pointer' }}
+              >
+                <Typography sx={{ fontSize: 10, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>Pair a phone</Typography>
+                <Box sx={{ p: 0.75, bgcolor: '#fff', borderRadius: 1 }}>
+                  <QRCodeSVG value={`${typeof window !== 'undefined' ? window.location.origin : ''}${ASSET_BASE}/game-manager/remote/?code=${seatCode}`} size={92} />
+                </Box>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: 13, letterSpacing: 2, fontWeight: 700 }}>{seatCode}</Typography>
+                <Typography sx={{ fontSize: 10, color: 'text.secondary' }}>tap to copy code</Typography>
+              </Box>
+            )}
+            {remoteConnected && (
+              <MenuItem key="connected" disabled sx={{ fontSize: 13, opacity: '1 !important' }}>
+                <SmartphoneIcon sx={{ fontSize: 16, mr: 1, color: 'success.main' }} /> Phone connected
+              </MenuItem>
+            )}
+            {eliminated
+              ? [
+                  <MenuItem key="undo" onClick={() => { onUndoEliminate(primary.idx); closeMenu(); }} sx={{ fontSize: 13, fontWeight: 700, color: 'error.main' }}>
+                    <ReplayIcon sx={{ fontSize: 16, mr: 1 }} /> Undo concede
+                  </MenuItem>,
+                ]
+              : showConcedeConfirm
+              ? [
+                  <MenuItem key="confirm" onClick={() => { onEliminate(primary.idx); closeMenu(); }} sx={{ fontSize: 13, fontWeight: 700, color: '#DAA520' }}>
+                    <ElimIcon sx={{ fontSize: 16, mr: 1 }} /> Confirm concede
+                  </MenuItem>,
+                  <MenuItem key="cancel" onClick={() => setShowConcedeConfirm(false)} sx={{ fontSize: 13, color: 'text.secondary' }}>
+                    Cancel
+                  </MenuItem>,
+                ]
+              : [
+                  <MenuItem key="concede" onClick={() => setShowConcedeConfirm(true)} sx={{ fontSize: 13, color: 'text.secondary' }}>
+                    <ElimIcon sx={{ fontSize: 16, mr: 1 }} /> Concede
+                  </MenuItem>,
+                ]}
+          </Menu>
         </Stack>
 
-        <CommanderBrief member={members[1]} align="right" onView={setCmdPreviewName} />
+        <CommanderBrief member={members[1]} align="right" onView={setCmdPreviewName} sz={sz} />
       </Stack>
 
-      {/* Body: landscape stat row (pilots | shared life | commander damage). */}
+      {/* Concede confirm + conceded/eliminated overlays (mirrors PlayerCard). */}
+      {showConcedeConfirm && !eliminated && (
+        <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5, pointerEvents: 'none', bgcolor: 'rgba(218,165,32,0.12)' }}>
+          <Typography sx={{ fontWeight: 900, color: '#DAA520', fontSize: 22, letterSpacing: 2, textShadow: '0 2px 8px rgba(0,0,0,0.5)', transform: 'rotate(-10deg)' }}>
+            CONCEDE?
+          </Typography>
+        </Box>
+      )}
+      {eliminated && (
+        <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 11, pointerEvents: 'none', bgcolor: conceded ? 'rgba(218,165,32,0.12)' : 'transparent' }}>
+          <Typography
+            sx={{ fontWeight: 900, letterSpacing: 4, fontSize: 40, transform: 'rotate(-12deg)', color: conceded ? '#DAA520' : 'error.main' }}
+            style={conceded ? { WebkitTextStroke: '2px black' } : undefined}
+          >
+            {conceded ? 'CONCEDED' : 'ELIMINATED'}
+          </Typography>
+        </Box>
+      )}
+
+      {/* Body: landscape stat row (pilots | shared life | commander damage).
+          Same layout on table and phone; only the sizes scale (see sz). */}
       <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', alignItems: 'stretch', gap: 1.5, p: 1.5 }}>
       {/* Section A: pilots + per-commander tax */}
       <Stack spacing={0.75} sx={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
@@ -324,22 +530,28 @@ export function TeamPanel({
                   alt=""
                   onClick={(e) => { e.stopPropagation(); setCmdPreviewName(m.player.commander.name); }}
                   title={m.player.commander.name}
-                  sx={{ height: 36, width: 'auto', borderRadius: 0.5, flexShrink: 0, cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
+                  sx={{ height: sz.art, width: 'auto', borderRadius: 0.5, flexShrink: 0, cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
                 />
               )}
-              {/* Identity (pilot + commander) lives in the app bar; this column
-                  keeps the per-player controls beside the commander's art. */}
+              {/* Per-player controls, labeled with the pilot they apply to so the
+                  two teammates' counters aren't ambiguous. */}
               <Stack spacing={0.25} sx={{ flex: 1, minWidth: 0 }}>
-                {/* Per-player counters: commander tax + (individual) energy + XP.
-                    Tax stays per-commander; energy and experience are per-player
-                    and route to this teammate's real seat idx, not the primary. */}
-                <Stack direction="row" alignItems="center" useFlexGap flexWrap="wrap" spacing={1}>
-                  <Stack direction="row" alignItems="center" spacing={0.25}>
-                    <Typography sx={{ fontSize: 9, color: 'text.secondary' }}>Tax</Typography>
-                    <StatButton onClick={() => onCommanderTaxChange(m.idx, -1)}><RemoveIcon sx={{ fontSize: 12 }} /></StatButton>
-                    <Typography sx={{ fontSize: 12, fontWeight: 700, minWidth: 14, textAlign: 'center' }}>{m.player.commanderTax}</Typography>
-                    <StatButton onClick={() => onCommanderTaxChange(m.idx, 1)}><AddIcon sx={{ fontSize: 12 }} /></StatButton>
+                {/* Name + commander tax share the top row: tax is the most-used
+                    control, so it sits by the pilot name and reads slightly larger
+                    (cmd-tier tokens) than the energy/XP counters below. */}
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
+                  <Typography noWrap sx={{ fontSize: sz.briefName, fontWeight: 700, lineHeight: 1.1, color: teamNumber === 1 ? 'primary.main' : 'secondary.main', minWidth: 0, flexShrink: 1 }}>
+                    {m.player.playerName}
+                  </Typography>
+                  <Stack direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
+                    <Typography sx={{ fontSize: sz.cmdLabel, color: 'text.secondary' }}>Tax</Typography>
+                    <StatButton onClick={() => onCommanderTaxChange(m.idx, -1)} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
+                    <Typography sx={{ fontSize: sz.cmdVal, fontWeight: 700, minWidth: 16, textAlign: 'center' }}>{m.player.commanderTax}</Typography>
+                    <StatButton onClick={() => onCommanderTaxChange(m.idx, 1)} big={sz.big}><AddIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
                   </Stack>
+                </Stack>
+                {/* Individual per-player counters (energy + XP). */}
+                <Stack direction="row" alignItems="center" useFlexGap flexWrap="wrap" spacing={1}>
                   <MiniCounter
                     glyph="⚡"
                     glyphColor="#4FC8FF"
@@ -348,6 +560,7 @@ export function TeamPanel({
                     active={m.player.energy > 0}
                     onDec={() => onEnergyChange(m.idx, -1)}
                     onInc={() => onEnergyChange(m.idx, 1)}
+                    sz={sz}
                   />
                   <MiniCounter
                     glyph="✦"
@@ -357,18 +570,19 @@ export function TeamPanel({
                     active={m.player.experience > 0}
                     onDec={() => onExperienceChange(m.idx, -1)}
                     onInc={() => onExperienceChange(m.idx, 1)}
+                    sz={sz}
                   />
                 </Stack>
                 {/* Per-player ability toggles (individual, not shared). */}
                 <Stack direction="row" alignItems="center" spacing={0.5}>
-                  <AbilityToggle active={m.player.isMonarch} color="#DAA520" title="Monarch" onToggle={() => onToggleMonarch(m.idx)}>
-                    <CrownIcon sx={{ fontSize: 14 }} />
+                  <AbilityToggle active={m.player.isMonarch} color="#DAA520" title="Monarch" onToggle={() => onToggleMonarch(m.idx)} big={sz.big}>
+                    <CrownIcon sx={{ fontSize: sz.ability }} />
                   </AbilityToggle>
-                  <AbilityToggle active={m.player.hasInitiative} color="#4FC3F7" title="Initiative" onToggle={() => onToggleInitiative(m.idx)}>
-                    <InitiativeIcon sx={{ fontSize: 14 }} />
+                  <AbilityToggle active={m.player.hasInitiative} color="#4FC3F7" title="Initiative" onToggle={() => onToggleInitiative(m.idx)} big={sz.big}>
+                    <InitiativeIcon sx={{ fontSize: sz.ability }} />
                   </AbilityToggle>
-                  <AbilityToggle active={m.player.hasCitysBlessing} color="#7851A9" title="City's Blessing" onToggle={() => onToggleCitysBlessing(m.idx)}>
-                    <CityIcon sx={{ fontSize: 14 }} />
+                  <AbilityToggle active={m.player.hasCitysBlessing} color="#7851A9" title="City's Blessing" onToggle={() => onToggleCitysBlessing(m.idx)} big={sz.big}>
+                    <CityIcon sx={{ fontSize: sz.ability }} />
                   </AbilityToggle>
                 </Stack>
               </Stack>
@@ -380,10 +594,10 @@ export function TeamPanel({
       {/* Section B: shared life (centered + prominent) and poison */}
       <Stack sx={{ flex: 1.2, minWidth: 0, alignItems: 'center', justifyContent: 'center' }} spacing={0.5}>
         <Stack direction="row" alignItems="center" justifyContent="center" spacing={1.5}>
-          <StatButton onClick={() => onLifeChange(primary.idx, -1)}><RemoveIcon sx={{ fontSize: 30 }} /></StatButton>
+          <StatButton onClick={() => onLifeChange(primary.idx, -1)} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnLife }} /></StatButton>
           <LifeTotal
             value={life}
-            fontSize="clamp(52px, 11dvh, 120px)"
+            fontSize={sz.life}
             color={lifeColor}
             damageFlash={damageFlash}
             energy={teamEnergy}
@@ -391,19 +605,19 @@ export function TeamPanel({
             reactions={{ swipes: false }}
             sx={{ minWidth: 96, textAlign: 'center' }}
           />
-          <StatButton onClick={() => onLifeChange(primary.idx, 1)}><AddIcon sx={{ fontSize: 30 }} /></StatButton>
+          <StatButton onClick={() => onLifeChange(primary.idx, 1)} big={sz.big}><AddIcon sx={{ fontSize: sz.btnLife }} /></StatButton>
         </Stack>
-        <Typography sx={{ fontSize: 10, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
+        <Typography sx={{ fontSize: sz.sectionLabel, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
           Shared Life
         </Typography>
         <Stack direction="row" alignItems="center" justifyContent="center" spacing={1} sx={{ mt: 0.5 }}>
-          <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>Poison</Typography>
-          <StatButton onClick={() => onPoisonChange(primary.idx, -1)}><RemoveIcon sx={{ fontSize: 16 }} /></StatButton>
-          <Typography sx={{ fontWeight: 800, fontSize: 20, minWidth: 26, textAlign: 'center', color: poison >= 15 ? '#2E7D32' : 'text.primary' }}>
+          <Typography sx={{ fontSize: sz.sectionLabel, color: 'text.secondary' }}>Poison</Typography>
+          <StatButton onClick={() => onPoisonChange(primary.idx, -1)} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnPoison }} /></StatButton>
+          <Typography sx={{ fontWeight: 800, fontSize: sz.poisonVal, minWidth: 26, textAlign: 'center', color: poison >= 15 ? '#2E7D32' : 'text.primary' }}>
             {poison}
           </Typography>
-          <StatButton onClick={() => onPoisonChange(primary.idx, 1)}><AddIcon sx={{ fontSize: 16 }} /></StatButton>
-          <Typography sx={{ fontSize: 10, color: 'text.secondary' }}>/ 15</Typography>
+          <StatButton onClick={() => onPoisonChange(primary.idx, 1)} big={sz.big}><AddIcon sx={{ fontSize: sz.btnPoison }} /></StatButton>
+          <Typography sx={{ fontSize: sz.sectionLabel, color: 'text.secondary' }}>/ 15</Typography>
         </Stack>
       </Stack>
 
@@ -411,7 +625,7 @@ export function TeamPanel({
           All damage is tracked against the team's primary seat so reconcileTeams
           sums it for the 21-damage elimination check. */}
       <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
-        <Typography sx={{ fontSize: 10, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        <Typography sx={{ fontSize: sz.sectionLabel, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
           Cmd Damage
         </Typography>
         {opponents.flatMap((opp) => {
@@ -423,6 +637,7 @@ export function TeamPanel({
               value={dmg[0]}
               onChange={(delta) => onCommanderDamageChange(primary.idx, opp.idx, false, delta)}
               onView={() => setCmdPreviewName(opp.player.commander.name)}
+              sz={sz}
             />,
           ];
           if (opp.player.partner) {
@@ -433,6 +648,7 @@ export function TeamPanel({
                 value={dmg[1]}
                 onChange={(delta) => onCommanderDamageChange(primary.idx, opp.idx, true, delta)}
                 onView={() => setCmdPreviewName(opp.player.partner!.name)}
+                sz={sz}
               />,
             );
           }
@@ -493,20 +709,20 @@ export function TeamPanel({
   );
 }
 
-function CmdDamageRow({ label, value, onChange, onView }: { label: string; value: number; onChange: (delta: number) => void; onView: () => void }) {
+function CmdDamageRow({ label, value, onChange, onView, sz }: { label: string; value: number; onChange: (delta: number) => void; onView: () => void; sz: Sz }) {
   return (
     <Stack direction="row" alignItems="center" spacing={0.75}>
       <Typography
         noWrap
         onClick={(e) => { e.stopPropagation(); onView(); }}
-        sx={{ flex: 1, minWidth: 0, fontSize: 12, color: value >= 21 ? '#B71C1C' : 'text.primary', fontWeight: value >= 21 ? 700 : 400, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+        sx={{ flex: 1, minWidth: 0, fontSize: sz.cmdLabel, color: value >= 21 ? '#B71C1C' : 'text.primary', fontWeight: value >= 21 ? 700 : 400, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
       >
         {label}
       </Typography>
-      <StatButton onClick={() => onChange(-1)}><RemoveIcon sx={{ fontSize: 14 }} /></StatButton>
-      <Typography sx={{ fontSize: 14, fontWeight: 700, minWidth: 22, textAlign: 'center' }}>{value}</Typography>
-      <StatButton onClick={() => onChange(1)}><AddIcon sx={{ fontSize: 14 }} /></StatButton>
-      <Typography sx={{ fontSize: 9, color: 'text.secondary' }}>/21</Typography>
+      <StatButton onClick={() => onChange(-1)} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
+      <Typography sx={{ fontSize: sz.cmdVal, fontWeight: 700, minWidth: 22, textAlign: 'center' }}>{value}</Typography>
+      <StatButton onClick={() => onChange(1)} big={sz.big}><AddIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
+      <Typography sx={{ fontSize: sz.xsLabel, color: 'text.secondary' }}>/21</Typography>
     </Stack>
   );
 }
