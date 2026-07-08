@@ -17,8 +17,8 @@
  * normal handlers, targeting the team's primary seat so reconcileTeams keeps
  * both heads in sync. Standard games never use this component.
  */
-import { useState, useEffect, useRef } from 'react';
-import { Box, Stack, Typography, IconButton, SvgIcon, CircularProgress, TextField, Menu, MenuItem } from '@mui/material';
+import { useState, useEffect, useRef, type MouseEvent } from 'react';
+import { Box, Stack, Typography, IconButton, SvgIcon, CircularProgress, TextField, Menu, MenuItem, type SxProps, type Theme } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import CloseIcon from '@mui/icons-material/Close';
@@ -29,7 +29,7 @@ import ReplayIcon from '@mui/icons-material/Replay';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SmartphoneIcon from '@mui/icons-material/Smartphone';
 import { QRCodeSVG } from 'qrcode.react';
-import { ASSET_BASE } from '@/lib/api';
+import { ASSET_BASE, remoteQrOrigin } from '@/lib/api';
 import { getCardImageByName } from '@commander/shared/lib/cardImageCache';
 import { LifeTotal } from './LifeTotal';
 import { useTimerTokens, TIMER_EXPIRED_BORDER_BLINK, TIMER_EXPIRED_HEADER_BLINK } from '@/game-manager/hooks/useTimerTokens';
@@ -105,6 +105,8 @@ interface TeamPanelProps {
   // (reconcileTeams marks both eliminated together). Routed through the primary seat.
   onEliminate: (idx: number) => void;
   onUndoEliminate: (idx: number) => void;
+  // Present only when it is this team's turn (remote sends a pass_turn event).
+  onPassTurn?: () => void;
 }
 
 // Responsive size tokens. Table (!remoteMode) keeps the original fixed px so the
@@ -209,6 +211,34 @@ function StatButton({ onClick, onLongPress, lpKey, lp, big = false, children }: 
       {children}
     </IconButton>
   );
+}
+
+/**
+ * Commander art resolved through the proxied, phone-safe path (getCardImageByName
+ * → scryfall-cache.php + card-image.php → base64 data URI served by the host).
+ * The stored artCropUrl is a raw cards.scryfall.io URL, which a phone with
+ * LAN-only connectivity can't load; the proxy is reachable via the host. On the
+ * remote the proxy is authorized by the session code (see setRemoteSessionCode).
+ * Resolving by name also fills in art that was never persisted at setup. Renders
+ * nothing until an image resolves.
+ */
+function CommanderArt({ name, fallback, sx, onClick, title }: {
+  name: string;
+  fallback?: string;
+  sx?: SxProps<Theme>;
+  onClick?: (e: MouseEvent) => void;
+  title?: string;
+}) {
+  const [src, setSrc] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    getCardImageByName(name)
+      .then((u) => { if (alive) setSrc(u ?? fallback); })
+      .catch(() => { if (alive) setSrc(fallback); });
+    return () => { alive = false; };
+  }, [name, fallback]);
+  if (!src) return null;
+  return <Box component="img" src={src} alt="" onClick={onClick} title={title} sx={sx} />;
 }
 
 /** Compact per-player counter (energy / experience) used inside a teammate block. */
@@ -333,6 +363,7 @@ export function TeamPanel({
   onCommanderDamageChange,
   onEliminate,
   onUndoEliminate,
+  onPassTurn,
 }: TeamPanelProps) {
   // Commander card preview — card-local view state, copied verbatim from
   // PlayerCard so any commander (own team or opposing) can be tapped to enlarge.
@@ -536,7 +567,7 @@ export function TeamPanel({
               >
                 <Typography sx={{ fontSize: 10, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>Pair a phone</Typography>
                 <Box sx={{ p: 0.75, bgcolor: '#fff', borderRadius: 1 }}>
-                  <QRCodeSVG value={`${typeof window !== 'undefined' ? window.location.origin : ''}${ASSET_BASE}/game-manager/remote/?code=${seatCode}`} size={92} />
+                  <QRCodeSVG value={`${remoteQrOrigin()}${ASSET_BASE}/game-manager/remote/?code=${seatCode}`} size={92} />
                 </Box>
                 <Typography sx={{ fontFamily: 'monospace', fontSize: 13, letterSpacing: 2, fontWeight: 700 }}>{seatCode}</Typography>
                 <Typography sx={{ fontSize: 10, color: 'text.secondary' }}>tap to copy code</Typography>
@@ -597,23 +628,28 @@ export function TeamPanel({
           stacks the three sections into a column (scrollable). */}
       <Box sx={{
         flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', alignItems: 'stretch', gap: 1.5, p: 1.5,
-        ...(remoteMode && { '@media (orientation: portrait)': { flexDirection: 'column', overflowY: 'auto', gap: 2 } }),
+        // On a phone held landscape the body is tall, so centering each column
+        // leaves a dead band under the header and misaligns the three columns
+        // (they have different heights). Top-align them instead so content sits
+        // under the header and the columns share a baseline. The on-table strip
+        // (!remoteMode) and portrait stack keep their centered/stretch layout.
+        ...(remoteMode && {
+          alignItems: 'flex-start',
+          '@media (orientation: portrait)': { flexDirection: 'column', overflowY: 'auto', gap: 2, alignItems: 'stretch' },
+        }),
       }}>
       {/* Section A: pilots + per-commander tax. Ordered to the RIGHT (order 3). */}
       <Stack spacing={0.75} sx={{ flex: 1, minWidth: 0, justifyContent: 'center', order: 3 }}>
         {members.map((m) => (
           <Box key={m.idx}>
             <Stack direction="row" alignItems="center" spacing={1}>
-              {m.player.commander.artCropUrl && (
-                <Box
-                  component="img"
-                  src={m.player.commander.artCropUrl}
-                  alt=""
-                  onClick={(e) => { e.stopPropagation(); setCmdPreviewName(m.player.commander.name); }}
-                  title={m.player.commander.name}
-                  sx={{ height: sz.art, width: 'auto', borderRadius: 0.5, flexShrink: 0, cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
-                />
-              )}
+              <CommanderArt
+                name={m.player.commander.name}
+                fallback={m.player.commander.artCropUrl}
+                onClick={(e) => { e.stopPropagation(); setCmdPreviewName(m.player.commander.name); }}
+                title={m.player.commander.name}
+                sx={{ height: sz.art, width: 'auto', borderRadius: 0.5, flexShrink: 0, cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
+              />
               {/* Per-player controls, labeled with the pilot they apply to so the
                   two teammates' counters aren't ambiguous. */}
               <Stack spacing={0.25} sx={{ flex: 1, minWidth: 0 }}>
@@ -722,6 +758,18 @@ export function TeamPanel({
           <StatButton onClick={() => onPoisonChange(primary.idx, 1)} onLongPress={() => onPoisonChange(primary.idx, 5)} lpKey="poison-inc" lp={longPress} big={sz.big}><AddIcon sx={{ fontSize: sz.btnPoison }} /></StatButton>
           <Typography sx={{ fontSize: sz.sectionLabel, color: 'text.secondary' }}>/ 15</Typography>
         </Stack>
+        {/* Pass Turn — only on the active team's panel (the remote sends a
+            pass_turn event; the host advances the turn). Mirrors PlayerCard. */}
+        {isActiveTeam && onPassTurn && (
+          <Box
+            onClick={onPassTurn}
+            sx={{ mt: 0.5, px: 1.5, py: 0.5, borderRadius: 1.5, border: '2px solid', borderColor: 'primary.main', cursor: 'pointer', userSelect: 'none' }}
+          >
+            <Typography sx={{ fontSize: sz.sectionLabel, fontWeight: 800, color: 'primary.main', textTransform: 'uppercase', letterSpacing: 1, lineHeight: 1.4 }}>
+              Pass Turn
+            </Typography>
+          </Box>
+        )}
       </Stack>
 
       {/* Section C: opposing-team stats + commander damage taken from each of

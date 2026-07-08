@@ -7,6 +7,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { PlayerPanel } from '../components/PlayerPanel';
 import { TeamPanel } from '../components/TeamPanel';
 import { api } from '@/lib/api';
+import { setRemoteSessionCode } from '@commander/shared/lib/api';
 import type { GameManagerState, PlayerState, LiveGameEvent, DistributiveOmit } from '@/lib/types';
 import { applyEvent } from '../remoteTransforms';
 import { otherTeam, teamName } from '@/lib/teams';
@@ -123,6 +124,8 @@ function RemotePageInner() {
         return;
       }
       setCode(trimmed);
+      // Authorize the card-image proxy by this session code (no JWT on the remote).
+      setRemoteSessionCode(trimmed);
       setSeat(res.seat);
       setState(res.state);
       // Send checkin event so host sees us immediately
@@ -507,6 +510,7 @@ function RemotePageInner() {
           onCommanderDamageChange={handleCommanderDamageChange}
           onEliminate={handleEliminate}
           onUndoEliminate={handleUndoEliminate}
+          onPassTurn={teamActive ? handlePassTurn : undefined}
         />
       ) : (
       <PlayerPanel

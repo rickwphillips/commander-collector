@@ -13,6 +13,11 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  // Fill the screen edge-to-edge on notched iPhones instead of letterboxing the
+  // page inside the safe area (which shows a black band above/around the panel).
+  // Pages that need to keep content clear of the notch/home indicator pad with
+  // env(safe-area-inset-*), which only returns real values under 'cover'.
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({

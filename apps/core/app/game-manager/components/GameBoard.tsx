@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect, useLayoutEffect, useCallback } from 'react';
-import { Box, Button, Typography, IconButton, Stack } from '@mui/material';
+import { Box, Button, Typography, IconButton, Stack, useMediaQuery } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -483,6 +483,50 @@ export function GameBoard({
     ? '1fr minmax(300px, 520px) 1fr'
     : `${leftColumnWidth} 1fr ${rightColumnWidth}`;
 
+  // Whole-board-on-one-phone: the 2HG board is a shared-table layout (top team
+  // flipped 180deg) sized to fill the viewport with two 1fr rows. On a phone
+  // those rows are far shorter than a team panel needs, so overflow:hidden clips
+  // the content. On compact viewports we instead let the rows size to content
+  // and scale the entire board down with a transform so nothing clips while the
+  // flip-for-opponent ergonomics survive. Tablet layout and the per-team remote
+  // view are unaffected (they never hit compact2hg).
+  const isCompactViewport = useMediaQuery('(max-height: 500px), (max-width: 500px)');
+  const compact2hg = is2hg && isCompactViewport;
+  const boardRef = useRef<HTMLDivElement>(null);
+  const [boardScale, setBoardScale] = useState(1);
+  useLayoutEffect(() => {
+    // boardScale is only read when compact2hg is applied to the grid, so there's
+    // nothing to reset when it's off — bail without touching state.
+    if (!compact2hg) return;
+    const el = boardRef.current;
+    if (!el) return;
+    // offsetWidth/offsetHeight report the UNSCALED layout box (transform does not
+    // affect them), so measuring the element we also scale can't feed back into a
+    // loop. width is pinned to 100vw, so the width ratio is ~1 and the scale is
+    // driven by height.
+    const recompute = () => {
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      if (!w || !h) return;
+      const s = Math.min(1, window.innerWidth / w, window.innerHeight / h);
+      setBoardScale(s > 0 ? s : 1);
+    };
+    recompute();
+    const ro = new ResizeObserver(recompute);
+    ro.observe(el);
+    window.addEventListener('resize', recompute);
+    window.addEventListener('orientationchange', recompute);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', recompute);
+      window.removeEventListener('orientationchange', recompute);
+    };
+    // state.phase is a dep so the effect re-runs when the board actually mounts
+    // (seating -> playing): compact2hg alone doesn't change across that flip, so
+    // without it the ref would still be null from the seating render and never
+    // get measured.
+  }, [compact2hg, state.phase, players.length]);
+
   // -------- Seating phase early-return --------
   if (state.phase === 'seating') {
     const filledCount = players.filter(isSeatFilled).length;
@@ -707,14 +751,34 @@ export function GameBoard({
       sx={{
         position: 'fixed',
         inset: 0,
-        display: 'grid',
-        gridTemplateColumns,
-        gridTemplateRows: '1fr clamp(120px, 18dvh, 220px) 1fr',
+        overflow: 'hidden',
         bgcolor: (theme) =>
           theme.palette.mode === 'dark' ? '#1A1410' : '#FFF8F0',
+      }}
+    >
+    <Box
+      ref={boardRef}
+      sx={{
+        display: 'grid',
+        gridTemplateColumns,
+        // Compact 2HG: content-sized team rows (never clip) + transform scale to
+        // fit. Otherwise the original viewport-filling 1fr rows.
+        gridTemplateRows: compact2hg
+          ? 'auto clamp(120px, 18dvh, 220px) auto'
+          : '1fr clamp(120px, 18dvh, 220px) 1fr',
         gap: 0.5,
         px: 0.5,
         py: 0,
+        ...(compact2hg
+          ? {
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              width: '100vw',
+              transform: `translate(-50%, -50%) scale(${boardScale})`,
+              transformOrigin: 'center center',
+            }
+          : { position: 'absolute', inset: 0 }),
       }}
     >
       {state.gameType === '2hg' && (
@@ -893,7 +957,7 @@ export function GameBoard({
           commanderDamage={commanderDamage}
         />
       </Box>
-
+    </Box>
 
       {/* Read-only player panel overlay */}
       {viewingPlayerIdx !== null && (() => {

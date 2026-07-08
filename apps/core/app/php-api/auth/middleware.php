@@ -72,6 +72,39 @@ function requireAuth() {
     return $payload;
 }
 
+// Allow either a normal JWT (host board) OR an active, unexpired live-game
+// session code (the unauthenticated remote panel). Used by read-only card-art
+// endpoints so a phone connected by code can load art through the host without a
+// login. The code is ephemeral and destroyed when the game ends.
+function requireAuthOrSessionCode() {
+    $token = getBearerToken();
+    if ($token) {
+        $payload = jwt_decode($token, JWT_SECRET);
+        if ($payload) {
+            $GLOBALS['currentUser'] = $payload;
+            return $payload;
+        }
+    }
+
+    $code = $_GET['code'] ?? '';
+    if ($code !== '') {
+        $pdo = getDB();
+        $stmt = $pdo->prepare('
+            SELECT 1
+            FROM live_game_seats seat
+            JOIN live_game_sessions s ON seat.session_id = s.id
+            WHERE seat.code = ? AND s.is_active = 1 AND s.expires_at > NOW()
+            LIMIT 1
+        ');
+        $stmt->execute([$code]);
+        if ($stmt->fetch()) {
+            return ['session_code' => $code];
+        }
+    }
+
+    sendError('Authentication required', 401);
+}
+
 function generateUUID(): string {
     $data = random_bytes(16);
     $data[6] = chr(ord($data[6]) & 0x0f | 0x40);

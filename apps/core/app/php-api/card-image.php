@@ -1,7 +1,8 @@
 <?php
 require_once 'config.php';
 require_once 'auth/middleware.php';
-requireAuth();
+// JWT (host board) or a valid live-game session code (unauthenticated remote).
+requireAuthOrSessionCode();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     sendError('Method not allowed', 405);
