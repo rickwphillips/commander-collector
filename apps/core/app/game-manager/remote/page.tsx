@@ -9,6 +9,7 @@ import { TeamPanel } from '../components/TeamPanel';
 import { api } from '@/lib/api';
 import type { GameManagerState, PlayerState, LiveGameEvent, DistributiveOmit } from '@/lib/types';
 import { applyEvent } from '../remoteTransforms';
+import { otherTeam, teamName } from '@/lib/teams';
 import { useThemeMode } from '@/components/ThemeProvider';
 
 // After sending an event, suppress incoming SSE state for this long.
@@ -457,8 +458,8 @@ function RemotePageInner() {
   const teamOpponents = state.players.map((p, idx) => ({ player: p, idx })).filter((m) => m.player.teamNumber !== myTeam);
   const teamActive = myTeam != null && state.players[state.currentPlayerIdx]?.teamNumber === myTeam;
   const teamName2hg = (myTeam != null && state.teamNames?.[myTeam]) || `Team ${myTeam ?? ''}`;
-  const oppTeam2hg = myTeam === 1 ? 2 : 1;
-  const oppTeamName2hg = state.teamNames?.[oppTeam2hg] || `Team ${oppTeam2hg}`;
+  const oppTeam2hg = otherTeam(myTeam ?? 1);
+  const oppTeamName2hg = teamName(oppTeam2hg, state.teamNames);
 
   return (
     <Box

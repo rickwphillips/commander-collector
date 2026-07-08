@@ -13,7 +13,7 @@ import { TeamPanel, type TeamMember } from './TeamPanel';
 import { SeatPickerModal } from './SeatPickerModal';
 import { api } from '@/lib/api';
 import { isSeatFilled } from '@/lib/types';
-import { teamLabel, teamName } from '@/lib/teams';
+import { teamLabel, teamName, otherTeam } from '@/lib/teams';
 import { BracketMismatchBanner } from '@/components/BracketMismatchBanner';
 import type { Player, DeckWithPlayer, PlayerSetup, LiveGameEvent, DistributiveOmit } from '@/lib/types';
 import type { GameManagerState, PlayerState } from '../types';
@@ -674,7 +674,7 @@ export function GameBoard({
       <TeamPanel
         teamNumber={teamNumber}
         teamName={teamName(teamNumber, state.teamNames)}
-        opponentTeamName={teamName(teamNumber === 1 ? 2 : 1, state.teamNames)}
+        opponentTeamName={teamName(otherTeam(teamNumber), state.teamNames)}
         onTeamNameChange={(name) => handleTeamNameChange(teamNumber, name)}
         members={members}
         opponents={opponents}

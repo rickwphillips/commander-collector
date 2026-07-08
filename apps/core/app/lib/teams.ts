@@ -14,6 +14,16 @@ export function teamName(
   return (teamNumber != null && teamNames?.[teamNumber]?.trim()) || `Team ${teamNumber}`;
 }
 
+// The team's accent color (MUI palette token). Team 1 = primary, others = secondary.
+export function teamColor(teamNumber: number | null | undefined): string {
+  return teamNumber === 1 ? 'primary.main' : 'secondary.main';
+}
+
+// The opposing team's number in a two-team (2HG) game.
+export function otherTeam(teamNumber: number): number {
+  return teamNumber === 1 ? 2 : 1;
+}
+
 // The team's name plus its members: "Name (A / B)".
 export function teamLabel(
   teamNumber: number | null | undefined,

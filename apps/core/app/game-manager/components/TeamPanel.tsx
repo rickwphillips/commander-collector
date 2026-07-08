@@ -35,6 +35,7 @@ import { LifeTotal } from './LifeTotal';
 import { useTimerTokens, TIMER_EXPIRED_BORDER_BLINK, TIMER_EXPIRED_HEADER_BLINK } from '@/game-manager/hooks/useTimerTokens';
 import { useLongPress } from '@/game-manager/hooks/useLongPress';
 import { lifeColor } from '@/game-manager/lifeColor';
+import { teamColor, otherTeam } from '@/lib/teams';
 import type { PlayerState, CommanderDamageMap } from '@/lib/types';
 
 // Small crown glyph mirrored from PlayerCard so the Monarch toggle reads the
@@ -48,6 +49,21 @@ const CrownIcon = (props: React.ComponentProps<typeof SvgIcon>) => (
 export interface TeamMember {
   player: PlayerState;
   idx: number;
+}
+
+// Highest energy across a team's seats (the shared readout reacts to whichever
+// teammate is highest). One rule for both this team and the opposing team.
+function maxEnergy(list: TeamMember[]): number {
+  return list.reduce((max, m) => Math.max(max, m.player.energy), 0);
+}
+
+// A member's commanders in tuple order: commander → dmg[0], partner → dmg[1].
+// Single source of the partner/damage-index convention shared by the editable
+// cmd-damage rows and the read-only opponent summary.
+function commanderEntries(member: TeamMember): { name: string; isPartner: boolean }[] {
+  const out = [{ name: member.player.commander.name, isPartner: false }];
+  if (member.player.partner) out.push({ name: member.player.partner.name, isPartner: true });
+  return out;
 }
 
 interface TeamPanelProps {
@@ -373,18 +389,20 @@ export function TeamPanel({
   const longPress = useLongPress();
 
   // Shared smooth ramp (greens above starting life, reds out below) — same fn
-  // the standard PlayerPanel uses. '' at exactly starting life → LifeTotal default.
-  const teamLifeColor = lifeColor(life, startingLife);
+  // the standard PlayerPanel uses. lifeColor returns '' at exactly starting life;
+  // LifeTotal's `color ?? primary.main` does NOT treat '' as default, so fall back
+  // explicitly (matches the opponent readout below).
+  const teamLifeColor = lifeColor(life, startingLife) || 'primary.main';
 
   // Opposing team's shared stats (mirrored across their heads, so either head
   // is the team total). Shown in the cmd-damage column so you can track them.
   const oppPrimary = opponents[0];
   const oppLife = oppPrimary?.player.life ?? startingLife;
   const oppPoison = oppPrimary?.player.poison ?? 0;
-  const oppEnergy = opponents.reduce((max, m) => Math.max(max, m.player.energy), 0);
+  const oppEnergy = maxEnergy(opponents);
   const oppEliminated = oppPrimary?.player.isEliminated ?? false;
-  const oppTeamNumber = oppPrimary?.player.teamNumber ?? (teamNumber === 1 ? 2 : 1);
-  const oppColor = oppTeamNumber === 1 ? 'primary.main' : 'secondary.main';
+  const oppTeamNumber = oppPrimary?.player.teamNumber ?? otherTeam(teamNumber);
+  const oppColor = teamColor(oppTeamNumber);
   const oppLifeColor = lifeColor(oppLife, startingLife) || 'text.primary';
 
   // Commander damage THIS team's commanders have dealt to the opposing team,
@@ -392,9 +410,7 @@ export function TeamPanel({
   const oppReceived = oppPrimary
     ? members.flatMap((m) => {
         const dmg = commanderDamage[oppPrimary.idx]?.[m.idx] ?? [0, 0];
-        const out = [{ name: m.player.commander.name, value: dmg[0] }];
-        if (m.player.partner) out.push({ name: m.player.partner.name, value: dmg[1] });
-        return out;
+        return commanderEntries(m).map((e) => ({ name: e.name, value: e.isPartner ? dmg[1] : dmg[0] }));
       })
     : [];
 
@@ -407,7 +423,7 @@ export function TeamPanel({
   // team's HIGHEST value, so a teammate raising energy lights up the shared
   // readout the moment they do. Poison/life are mirrored across heads, so their
   // single value is already the team value.
-  const teamEnergy = members.reduce((max, m) => Math.max(max, m.player.energy), 0);
+  const teamEnergy = maxEnergy(members);
 
   // Drive the damage flash transiently off shared-life decreases, then clear it
   // so it plays once per hit and unmounts when done.
@@ -470,7 +486,7 @@ export function TeamPanel({
 
         {/* Center: color badge + editable team name + active flag. */}
         <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0 }}>
-          <Box sx={{ width: 12, height: 12, borderRadius: 0.5, flexShrink: 0, bgcolor: teamNumber === 1 ? 'primary.main' : 'secondary.main' }} />
+          <Box sx={{ width: 12, height: 12, borderRadius: 0.5, flexShrink: 0, bgcolor: teamColor(teamNumber) }} />
           {editingName ? (
             <TextField
               value={nameDraft}
@@ -609,7 +625,7 @@ export function TeamPanel({
                     noWrap
                     onClick={() => setCmdPreviewName(m.player.commander.name)}
                     title={`View ${m.player.commander.name}`}
-                    sx={{ fontSize: sz.briefName, fontWeight: 700, lineHeight: 1.1, color: teamNumber === 1 ? 'primary.main' : 'secondary.main', minWidth: 0, flexShrink: 1, cursor: 'pointer', '&:hover': { opacity: 0.8 } }}
+                    sx={{ fontSize: sz.briefName, fontWeight: 700, lineHeight: 1.1, color: teamColor(teamNumber), minWidth: 0, flexShrink: 1, cursor: 'pointer', '&:hover': { opacity: 0.8 } }}
                   >
                     {m.player.playerName}
                   </Typography>
@@ -725,9 +741,9 @@ export function TeamPanel({
                 life (read-only; edited from their own panel). Only shows once > 0. */}
             {oppReceived.some((r) => r.value > 0) && (
               <Stack spacing={0} sx={{ minWidth: 0, maxWidth: '16ch' }}>
-                {oppReceived.filter((r) => r.value > 0).map((r, i) => (
+                {oppReceived.filter((r) => r.value > 0).map((r) => (
                   <Stack
-                    key={i}
+                    key={r.name}
                     direction="row"
                     alignItems="baseline"
                     spacing={0.5}
@@ -755,33 +771,19 @@ export function TeamPanel({
         </Typography>
         {opponents.flatMap((opp) => {
           const dmg = commanderDamage[primary.idx]?.[opp.idx] ?? [0, 0];
-          const rows: React.ReactNode[] = [
+          // Same commander → dmg[0] / partner → dmg[1] convention as oppReceived.
+          return commanderEntries(opp).map((e) => (
             <CmdDamageRow
-              key={`${opp.idx}-own`}
-              label={opp.player.commander.name}
-              value={dmg[0]}
-              onChange={(delta) => onCommanderDamageChange(primary.idx, opp.idx, false, delta)}
-              onView={() => setCmdPreviewName(opp.player.commander.name)}
+              key={`${opp.idx}-${e.isPartner ? 'partner' : 'own'}`}
+              label={e.name}
+              value={e.isPartner ? dmg[1] : dmg[0]}
+              onChange={(delta) => onCommanderDamageChange(primary.idx, opp.idx, e.isPartner, delta)}
+              onView={() => setCmdPreviewName(e.name)}
               lp={longPress}
-              lpKey={`cmd-${opp.idx}-own`}
+              lpKey={`cmd-${opp.idx}-${e.isPartner ? 'partner' : 'own'}`}
               sz={sz}
-            />,
-          ];
-          if (opp.player.partner) {
-            rows.push(
-              <CmdDamageRow
-                key={`${opp.idx}-partner`}
-                label={opp.player.partner.name}
-                value={dmg[1]}
-                onChange={(delta) => onCommanderDamageChange(primary.idx, opp.idx, true, delta)}
-                onView={() => setCmdPreviewName(opp.player.partner!.name)}
-                lp={longPress}
-                lpKey={`cmd-${opp.idx}-partner`}
-                sz={sz}
-              />,
-            );
-          }
-          return rows;
+            />
+          ));
         })}
       </Stack>
       </Box>
