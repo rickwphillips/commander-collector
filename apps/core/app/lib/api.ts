@@ -19,7 +19,11 @@ export const ASSET_BASE = isDev ? '' : '/app/projects/commander';
 // (dual-stack), but a manually-launched PHP on macOS will bind IPv6-only;
 // "localhost" works in both cases, "127.0.0.1" only works for the
 // dual-stack/IPv4-bound case.
-const SSE_BASE = isDev ? 'http://localhost:8081/php-api/' : '/php-api/';
+// Use the host the page was actually loaded from (localhost on the Mac, the LAN
+// IP on a phone) so the SSE stream is reachable from whichever device opened the
+// page — the remote player view runs on a phone and must reach the Mac's PHP.
+const DEV_HOST = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+const SSE_BASE = isDev ? `http://${DEV_HOST}:8081/php-api/` : '/php-api/';
 
 // Auth token key (shared with portfolio login page)
 const AUTH_TOKEN_KEY = 'auth_token';
@@ -27,6 +31,20 @@ const AUTH_TOKEN_KEY = 'auth_token';
 // Login page URL (lives in the portfolio site)
 const LOGIN_URL =
   process.env.NODE_ENV === 'development' ? 'http://localhost:3000/app/login/' : '/app/login/';
+
+// Origin for the in-game "pair a phone" QR. In dev the host views the board on
+// the Mac at localhost, which a phone can't reach, so swap in the LAN host that
+// next.config detected (NEXT_PUBLIC_DEV_LAN_HOST). If the board is already open
+// on the LAN IP, or in prod, the page's own origin is already reachable.
+export function remoteQrOrigin(): string {
+  if (typeof window === 'undefined') return '';
+  const { protocol, hostname, port, origin } = window.location;
+  const lanHost = process.env.NEXT_PUBLIC_DEV_LAN_HOST;
+  if (isDev && lanHost && (hostname === 'localhost' || hostname === '127.0.0.1')) {
+    return `${protocol}//${lanHost}${port ? `:${port}` : ''}`;
+  }
+  return origin;
+}
 
 function getAuthHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return {};

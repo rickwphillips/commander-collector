@@ -20,7 +20,7 @@ import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import { QRCodeSVG } from 'qrcode.react';
 import { getCardImageByName } from '@commander/shared/lib/cardImageCache';
-import { ASSET_BASE } from '@/lib/api';
+import { ASSET_BASE, remoteQrOrigin } from '@/lib/api';
 import { ControlFocusModal } from './ControlFocusModal';
 import { LifeTotal } from './LifeTotal';
 import { useXpKeyframes } from './PlayerCard.keyframes';
@@ -1081,11 +1081,16 @@ function PlayerCardImpl(props: PlayerCardProps) {
       </Box>
 
       {/* ── Main: Commander Damage (left) + Life (right) ── */}
-      <Box sx={{ display: 'flex', flex: 1, minHeight: 0, borderTop: (theme) => `1px solid ${theme.palette.divider}`, filter: 'none', position: 'relative', zIndex: 3 }}>
+      <Box sx={{ display: 'flex', flex: 1, minHeight: 0, borderTop: (theme) => `1px solid ${theme.palette.divider}`, filter: 'none', position: 'relative', zIndex: 3,
+        // Phone held portrait: the three columns (cmd damage | life | counters)
+        // are sized in dvw but the fonts scale to dvmax (the tall dimension), so
+        // they overflow the narrow columns. Stack them full-width and scroll,
+        // mirroring TeamPanel. Landscape and the on-table board are unaffected.
+        ...(remoteMode ? { '@media (orientation: portrait)': { flexDirection: 'column', overflowY: 'auto' } } : {}) }}>
 
         {/* Commander Damage box */}
         <Box sx={{
-          ...(remoteMode ? { width: '33dvw', flexShrink: 0 } : { flex: 1, minWidth: 0 }),
+          ...(remoteMode ? { width: '33dvw', flexShrink: 0, '@media (orientation: portrait)': { width: '100%' } } : { flex: 1, minWidth: 0 }),
           borderRight: (theme) => `1px solid ${theme.palette.divider}`,
           px: remoteMode ? 1 : 0.5,
           py: remoteMode ? 1 : 0.25,
@@ -1302,7 +1307,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
         </Box>
 
         {/* Life total + controls */}
-        <Box sx={{ ...(remoteMode ? { width: '33dvw', flexShrink: 0 } : { flex: 1, minWidth: 0 }), display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5, alignSelf: 'stretch', pt: remoteMode ? 2 : 0 }}>
+        <Box sx={{ ...(remoteMode ? { width: '33dvw', flexShrink: 0, '@media (orientation: portrait)': { width: '100%' } } : { flex: 1, minWidth: 0 }), display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5, alignSelf: 'stretch', pt: remoteMode ? 2 : 0 }}>
           <Box sx={{ position: 'relative', lineHeight: 1, overflow: 'visible', width: '100%', flex: remoteMode ? undefined : 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             {showCrown && (
               <CrownIcon sx={{
@@ -1409,6 +1414,8 @@ function PlayerCardImpl(props: PlayerCardProps) {
           minWidth: 0,
           overflow: 'hidden',
           borderLeft: (theme) => `1px solid ${theme.palette.divider}`,
+          // Portrait stack: take full width like the other two sections.
+          ...(remoteMode ? { '@media (orientation: portrait)': { width: '100%', flex: 'none' } } : {}),
         }}>
           <Box
             onClick={() => setCountersOpen(o => !o)}
@@ -2408,7 +2415,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
         >
           <Box sx={{ p: 1, bgcolor: '#fff', borderRadius: 1 }}>
             <QRCodeSVG
-              value={`${typeof window !== 'undefined' ? window.location.origin : ''}${ASSET_BASE}/game-manager/remote/?code=${seatCode}`}
+              value={`${remoteQrOrigin()}${ASSET_BASE}/game-manager/remote/?code=${seatCode}`}
               size={140}
             />
           </Box>

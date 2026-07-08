@@ -19,6 +19,19 @@ function getAuthHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// The live-game remote page is unauthenticated (it connects by an ephemeral,
+// per-panel session code, not a login). It still needs the card-image proxy so
+// commander art can be served through the host on a LAN with no direct Scryfall
+// access. The remote sets its code here; the image-proxy calls append it so the
+// server can authorize by session code instead of a JWT.
+let remoteSessionCode: string | null = null;
+export function setRemoteSessionCode(code: string | null): void {
+  remoteSessionCode = code;
+}
+function sessionCodeParam(): string {
+  return remoteSessionCode ? `&code=${encodeURIComponent(remoteSessionCode)}` : '';
+}
+
 function redirectToLogin() {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(AUTH_TOKEN_KEY);
@@ -193,7 +206,7 @@ export const api = {
   // Scryfall card cache
   lookupCard: (name: string) =>
     apiFetch<import('./types').ScryfallCachedCard | null>(
-      `/scryfall-cache?name=${encodeURIComponent(name)}`
+      `/scryfall-cache?name=${encodeURIComponent(name)}${sessionCodeParam()}`
     ),
   bulkLookupCards: (names: string[]) =>
     apiFetch<{ results: (import('./types').ScryfallCachedCard & { error?: string })[] }>(
@@ -211,7 +224,7 @@ export const api = {
   // Card image caching (on-demand fetch + store as base64)
   getCardImage: (scryfallId: string, url?: string) =>
     apiFetch<{ data_uri: string; cached: boolean }>(
-      `/card-image?scryfall_id=${encodeURIComponent(scryfallId)}${url ? `&url=${encodeURIComponent(url)}` : ''}`
+      `/card-image?scryfall_id=${encodeURIComponent(scryfallId)}${url ? `&url=${encodeURIComponent(url)}` : ''}${sessionCodeParam()}`
     ),
 
   // All printings of a card from Scryfall
