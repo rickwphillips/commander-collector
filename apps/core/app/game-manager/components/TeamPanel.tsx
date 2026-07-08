@@ -635,6 +635,7 @@ export function TeamPanel({
         // (!remoteMode) and portrait stack keep their centered/stretch layout.
         ...(remoteMode && {
           alignItems: 'flex-start',
+          gap: 4, // wider separation between the three columns on a phone landscape
           '@media (orientation: portrait)': { flexDirection: 'column', overflowY: 'auto', gap: 2, alignItems: 'stretch' },
         }),
       }}>
@@ -731,7 +732,7 @@ export function TeamPanel({
       </Stack>
 
       {/* Section B: shared life (centered + prominent) and poison. Order 2 (center). */}
-      <Stack sx={{ flex: 1.2, minWidth: 0, alignItems: 'center', justifyContent: 'center', order: 2 }} spacing={0.5}>
+      <Stack sx={{ flex: 1.2, minWidth: 0, alignItems: 'center', justifyContent: 'center', order: 2, ...(remoteMode && { alignSelf: 'stretch' }) }} spacing={0.5}>
         <Stack direction="row" alignItems="center" justifyContent="center" spacing={1.5}>
           <StatButton onClick={() => onLifeChange(primary.idx, -1)} onLongPress={() => onLifeChange(primary.idx, -5)} lpKey="life-dec" lp={longPress} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnLife }} /></StatButton>
           <LifeTotal
@@ -759,16 +760,21 @@ export function TeamPanel({
           <Typography sx={{ fontSize: sz.sectionLabel, color: 'text.secondary' }}>/ 15</Typography>
         </Stack>
         {/* Pass Turn — only on the active team's panel (the remote sends a
-            pass_turn event; the host advances the turn). Mirrors PlayerCard. */}
+            pass_turn event; the host advances the turn). The flex spacer pushes
+            it to the bottom of the (stretched) center column in landscape; in the
+            portrait stack there's no free space so it sits after poison. */}
         {isActiveTeam && onPassTurn && (
+          <>
+          <Box sx={{ flexGrow: 1, minHeight: 0, width: '100%' }} />
           <Box
             onClick={onPassTurn}
-            sx={{ mt: 0.5, px: 1.5, py: 0.5, borderRadius: 1.5, border: '2px solid', borderColor: 'primary.main', cursor: 'pointer', userSelect: 'none' }}
+            sx={{ px: 1.5, py: 0.5, borderRadius: 1.5, border: '2px solid', borderColor: 'primary.main', cursor: 'pointer', userSelect: 'none' }}
           >
             <Typography sx={{ fontSize: sz.sectionLabel, fontWeight: 800, color: 'primary.main', textTransform: 'uppercase', letterSpacing: 1, lineHeight: 1.4 }}>
               Pass Turn
             </Typography>
           </Box>
+          </>
         )}
       </Stack>
 
