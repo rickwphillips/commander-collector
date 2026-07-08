@@ -33,6 +33,8 @@ import { ASSET_BASE } from '@/lib/api';
 import { getCardImageByName } from '@commander/shared/lib/cardImageCache';
 import { LifeTotal } from './LifeTotal';
 import { useTimerTokens, TIMER_EXPIRED_BORDER_BLINK, TIMER_EXPIRED_HEADER_BLINK } from '@/game-manager/hooks/useTimerTokens';
+import { useLongPress } from '@/game-manager/hooks/useLongPress';
+import { lifeColor } from '@/game-manager/lifeColor';
 import type { PlayerState, CommanderDamageMap } from '@/lib/types';
 
 // Small crown glyph mirrored from PlayerCard so the Monarch toggle reads the
@@ -51,6 +53,7 @@ export interface TeamMember {
 interface TeamPanelProps {
   teamNumber: number;
   teamName: string;
+  opponentTeamName?: string;
   onTeamNameChange: (name: string) => void;
   members: TeamMember[];
   opponents: TeamMember[];
@@ -108,6 +111,7 @@ interface Sz {
   cmdLabel: number | string;
   cmdVal: number | string;
   life: string;
+  oppLife: string;
   big: boolean;
 }
 
@@ -129,7 +133,8 @@ const SZ_TABLE: Sz = {
   poisonVal: 'clamp(20px, 2.3dvh, 26px)',
   cmdLabel: 'clamp(12px, 1.4dvh, 15px)',
   cmdVal: 'clamp(14px, 1.6dvh, 17px)',
-  life: 'clamp(52px, 9dvh, 96px)', big: false,
+  life: 'clamp(52px, 9dvh, 96px)',
+  oppLife: 'clamp(30px, 4.5dvh, 48px)', big: false,
 };
 
 // Phone: scale to dvmin (the panel's SHORT/constraining dimension), not dvmax —
@@ -152,13 +157,32 @@ const SZ_PHONE: Sz = {
   cmdLabel: 'clamp(13px, 3.7dvmin, 18px)',
   cmdVal: 'clamp(15px, 4.2dvmin, 20px)',
   life: 'clamp(52px, 20dvmin, 100px)',
+  oppLife: 'clamp(32px, 11dvmin, 54px)',
   big: true,
 };
 
-function StatButton({ onClick, big = false, children }: { onClick: () => void; big?: boolean; children: React.ReactNode }) {
+type LongPress = ReturnType<typeof useLongPress>;
+
+// Reuses the standard panel's long-press: tap = ±1 (onClick), hold ~500ms = ±5
+// (onLongPress). guardClick stops the release from also firing the ±1.
+function StatButton({ onClick, onLongPress, lpKey, lp, big = false, children }: {
+  onClick: () => void;
+  onLongPress?: () => void;
+  lpKey?: string;
+  lp?: LongPress;
+  big?: boolean;
+  children: React.ReactNode;
+}) {
+  const wired = !!(onLongPress && lp && lpKey);
   return (
     <IconButton
-      onClick={onClick}
+      onClick={wired ? lp!.guardClick(onClick) : onClick}
+      {...(wired && {
+        onPointerDown: (e: React.PointerEvent) => { e.stopPropagation(); lp!.startLongPress(lpKey!, onLongPress!); },
+        onPointerUp: lp!.cancelLongPress,
+        onPointerLeave: lp!.cancelLongPress,
+        onPointerCancel: lp!.cancelLongPress,
+      })}
       sx={{
         color: 'primary.main',
         border: (theme) => `1px solid ${theme.palette.divider}`,
@@ -180,6 +204,10 @@ function MiniCounter({
   active,
   onDec,
   onInc,
+  onDec5,
+  onInc5,
+  lp,
+  lpKey,
   sz,
 }: {
   glyph: React.ReactNode;
@@ -189,17 +217,21 @@ function MiniCounter({
   active: boolean;
   onDec: () => void;
   onInc: () => void;
+  onDec5: () => void;
+  onInc5: () => void;
+  lp: LongPress;
+  lpKey: string;
   sz: Sz;
 }) {
   return (
     <Stack direction="row" alignItems="center" spacing={0.25}>
       <Box component="span" sx={{ fontSize: sz.miniGlyph, lineHeight: 1, color: glyphColor }}>{glyph}</Box>
       <Typography sx={{ fontSize: sz.xsLabel, color: 'text.secondary' }}>{label}</Typography>
-      <StatButton onClick={onDec} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnSm }} /></StatButton>
+      <StatButton onClick={onDec} onLongPress={onDec5} lpKey={`${lpKey}-dec`} lp={lp} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnSm }} /></StatButton>
       <Typography sx={{ fontSize: sz.val, fontWeight: 700, minWidth: 14, textAlign: 'center', color: active ? glyphColor : 'text.primary' }}>
         {value}
       </Typography>
-      <StatButton onClick={onInc} big={sz.big}><AddIcon sx={{ fontSize: sz.btnSm }} /></StatButton>
+      <StatButton onClick={onInc} onLongPress={onInc5} lpKey={`${lpKey}-inc`} lp={lp} big={sz.big}><AddIcon sx={{ fontSize: sz.btnSm }} /></StatButton>
     </Stack>
   );
 }
@@ -261,6 +293,7 @@ function CommanderBrief({ member, align, onView, sz }: { member?: TeamMember; al
 export function TeamPanel({
   teamNumber,
   teamName,
+  opponentTeamName,
   onTeamNameChange,
   members,
   opponents,
@@ -336,9 +369,34 @@ export function TeamPanel({
 
   const sz = remoteMode ? SZ_PHONE : SZ_TABLE;
 
+  // Long-press ±5 on every +/- control, reused from the standard panel's hook.
+  const longPress = useLongPress();
 
-  const lifeColor =
-    life <= 0 ? '#B71C1C' : life <= 10 ? '#E65100' : life <= 20 ? '#F9A825' : 'primary.main';
+  // Shared smooth ramp (greens above starting life, reds out below) — same fn
+  // the standard PlayerPanel uses. '' at exactly starting life → LifeTotal default.
+  const teamLifeColor = lifeColor(life, startingLife);
+
+  // Opposing team's shared stats (mirrored across their heads, so either head
+  // is the team total). Shown in the cmd-damage column so you can track them.
+  const oppPrimary = opponents[0];
+  const oppLife = oppPrimary?.player.life ?? startingLife;
+  const oppPoison = oppPrimary?.player.poison ?? 0;
+  const oppEnergy = opponents.reduce((max, m) => Math.max(max, m.player.energy), 0);
+  const oppEliminated = oppPrimary?.player.isEliminated ?? false;
+  const oppTeamNumber = oppPrimary?.player.teamNumber ?? (teamNumber === 1 ? 2 : 1);
+  const oppColor = oppTeamNumber === 1 ? 'primary.main' : 'secondary.main';
+  const oppLifeColor = lifeColor(oppLife, startingLife) || 'text.primary';
+
+  // Commander damage THIS team's commanders have dealt to the opposing team,
+  // read off the opponent primary seat as target (mirror of their own panel).
+  const oppReceived = oppPrimary
+    ? members.flatMap((m) => {
+        const dmg = commanderDamage[oppPrimary.idx]?.[m.idx] ?? [0, 0];
+        const out = [{ name: m.player.commander.name, value: dmg[0] }];
+        if (m.player.partner) out.push({ name: m.player.partner.name, value: dmg[1] });
+        return out;
+      })
+    : [];
 
   // Turn timer, shared with standard games. The active team plays the role of
   // the current player: its panel carries the countdown color.
@@ -525,8 +583,8 @@ export function TeamPanel({
         flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', alignItems: 'stretch', gap: 1.5, p: 1.5,
         ...(remoteMode && { '@media (orientation: portrait)': { flexDirection: 'column', overflowY: 'auto', gap: 2 } }),
       }}>
-      {/* Section A: pilots + per-commander tax */}
-      <Stack spacing={0.75} sx={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+      {/* Section A: pilots + per-commander tax. Ordered to the RIGHT (order 3). */}
+      <Stack spacing={0.75} sx={{ flex: 1, minWidth: 0, justifyContent: 'center', order: 3 }}>
         {members.map((m) => (
           <Box key={m.idx}>
             <Stack direction="row" alignItems="center" spacing={1}>
@@ -547,14 +605,19 @@ export function TeamPanel({
                     control, so it sits by the pilot name and reads slightly larger
                     (cmd-tier tokens) than the energy/XP counters below. */}
                 <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
-                  <Typography noWrap sx={{ fontSize: sz.briefName, fontWeight: 700, lineHeight: 1.1, color: teamNumber === 1 ? 'primary.main' : 'secondary.main', minWidth: 0, flexShrink: 1 }}>
+                  <Typography
+                    noWrap
+                    onClick={() => setCmdPreviewName(m.player.commander.name)}
+                    title={`View ${m.player.commander.name}`}
+                    sx={{ fontSize: sz.briefName, fontWeight: 700, lineHeight: 1.1, color: teamNumber === 1 ? 'primary.main' : 'secondary.main', minWidth: 0, flexShrink: 1, cursor: 'pointer', '&:hover': { opacity: 0.8 } }}
+                  >
                     {m.player.playerName}
                   </Typography>
                   <Stack direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
                     <Typography sx={{ fontSize: sz.cmdLabel, color: 'text.secondary' }}>Tax</Typography>
-                    <StatButton onClick={() => onCommanderTaxChange(m.idx, -1)} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
+                    <StatButton onClick={() => onCommanderTaxChange(m.idx, -1)} onLongPress={() => onCommanderTaxChange(m.idx, -5)} lpKey={`tax-${m.idx}-dec`} lp={longPress} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
                     <Typography sx={{ fontSize: sz.cmdVal, fontWeight: 700, minWidth: 16, textAlign: 'center' }}>{m.player.commanderTax}</Typography>
-                    <StatButton onClick={() => onCommanderTaxChange(m.idx, 1)} big={sz.big}><AddIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
+                    <StatButton onClick={() => onCommanderTaxChange(m.idx, 1)} onLongPress={() => onCommanderTaxChange(m.idx, 5)} lpKey={`tax-${m.idx}-inc`} lp={longPress} big={sz.big}><AddIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
                   </Stack>
                 </Stack>
                 {/* Individual per-player counters (energy + XP). */}
@@ -567,6 +630,10 @@ export function TeamPanel({
                     active={m.player.energy > 0}
                     onDec={() => onEnergyChange(m.idx, -1)}
                     onInc={() => onEnergyChange(m.idx, 1)}
+                    onDec5={() => onEnergyChange(m.idx, -5)}
+                    onInc5={() => onEnergyChange(m.idx, 5)}
+                    lp={longPress}
+                    lpKey={`energy-${m.idx}`}
                     sz={sz}
                   />
                   <MiniCounter
@@ -577,6 +644,10 @@ export function TeamPanel({
                     active={m.player.experience > 0}
                     onDec={() => onExperienceChange(m.idx, -1)}
                     onInc={() => onExperienceChange(m.idx, 1)}
+                    onDec5={() => onExperienceChange(m.idx, -5)}
+                    onInc5={() => onExperienceChange(m.idx, 5)}
+                    lp={longPress}
+                    lpKey={`xp-${m.idx}`}
                     sz={sz}
                   />
                 </Stack>
@@ -598,41 +669,88 @@ export function TeamPanel({
         ))}
       </Stack>
 
-      {/* Section B: shared life (centered + prominent) and poison */}
-      <Stack sx={{ flex: 1.2, minWidth: 0, alignItems: 'center', justifyContent: 'center' }} spacing={0.5}>
+      {/* Section B: shared life (centered + prominent) and poison. Order 2 (center). */}
+      <Stack sx={{ flex: 1.2, minWidth: 0, alignItems: 'center', justifyContent: 'center', order: 2 }} spacing={0.5}>
         <Stack direction="row" alignItems="center" justifyContent="center" spacing={1.5}>
-          <StatButton onClick={() => onLifeChange(primary.idx, -1)} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnLife }} /></StatButton>
+          <StatButton onClick={() => onLifeChange(primary.idx, -1)} onLongPress={() => onLifeChange(primary.idx, -5)} lpKey="life-dec" lp={longPress} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnLife }} /></StatButton>
           <LifeTotal
             value={life}
             fontSize={sz.life}
-            color={lifeColor}
+            color={teamLifeColor}
             damageFlash={damageFlash}
             energy={teamEnergy}
             poison={poison}
             reactions={{ swipes: false }}
             sx={{ minWidth: 96, textAlign: 'center' }}
           />
-          <StatButton onClick={() => onLifeChange(primary.idx, 1)} big={sz.big}><AddIcon sx={{ fontSize: sz.btnLife }} /></StatButton>
+          <StatButton onClick={() => onLifeChange(primary.idx, 1)} onLongPress={() => onLifeChange(primary.idx, 5)} lpKey="life-inc" lp={longPress} big={sz.big}><AddIcon sx={{ fontSize: sz.btnLife }} /></StatButton>
         </Stack>
         <Typography sx={{ fontSize: sz.sectionLabel, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
           Shared Life
         </Typography>
         <Stack direction="row" alignItems="center" justifyContent="center" spacing={1} sx={{ mt: 0.5 }}>
           <Typography sx={{ fontSize: sz.sectionLabel, color: 'text.secondary' }}>Poison</Typography>
-          <StatButton onClick={() => onPoisonChange(primary.idx, -1)} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnPoison }} /></StatButton>
+          <StatButton onClick={() => onPoisonChange(primary.idx, -1)} onLongPress={() => onPoisonChange(primary.idx, -5)} lpKey="poison-dec" lp={longPress} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnPoison }} /></StatButton>
           <Typography sx={{ fontWeight: 800, fontSize: sz.poisonVal, minWidth: 26, textAlign: 'center', color: poison >= 15 ? '#2E7D32' : 'text.primary' }}>
             {poison}
           </Typography>
-          <StatButton onClick={() => onPoisonChange(primary.idx, 1)} big={sz.big}><AddIcon sx={{ fontSize: sz.btnPoison }} /></StatButton>
+          <StatButton onClick={() => onPoisonChange(primary.idx, 1)} onLongPress={() => onPoisonChange(primary.idx, 5)} lpKey="poison-inc" lp={longPress} big={sz.big}><AddIcon sx={{ fontSize: sz.btnPoison }} /></StatButton>
           <Typography sx={{ fontSize: sz.sectionLabel, color: 'text.secondary' }}>/ 15</Typography>
         </Stack>
       </Stack>
 
-      {/* Section C: commander damage taken from each opposing commander.
-          All damage is tracked against the team's primary seat so reconcileTeams
-          sums it for the 21-damage elimination check. */}
-      <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
-        <Typography sx={{ fontSize: sz.sectionLabel, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+      {/* Section C: opposing-team stats + commander damage taken from each of
+          their commanders. Ordered to the LEFT (order 1). All damage is tracked
+          against this team's primary seat so reconcileTeams sums it for the
+          21-damage check. */}
+      <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0, justifyContent: 'center', order: 1 }}>
+        {/* Opposing team's shared life/poison, so you can see how they're doing. */}
+        <Box sx={{ opacity: oppEliminated ? 0.5 : 1 }}>
+          <Typography noWrap sx={{ fontSize: sz.briefName, fontWeight: 700, color: oppColor, lineHeight: 1.1, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            {opponentTeamName ?? `Team ${oppTeamNumber}`}
+          </Typography>
+          <Stack direction="row" alignItems="center" spacing={1.25}>
+            {/* Reuse the shared LifeTotal so the opponent number carries the same
+                color ramp + poison boil / energy pulse (read-only, no buttons). */}
+            <LifeTotal
+              value={oppLife}
+              fontSize={sz.oppLife}
+              color={oppLifeColor}
+              energy={oppEnergy}
+              poison={oppPoison}
+              reactions={{ swipes: false }}
+              sx={{ minWidth: 0, lineHeight: 1 }}
+            />
+            {/* Commander damage this team has dealt to them, stacked beside the
+                life (read-only; edited from their own panel). Only shows once > 0. */}
+            {oppReceived.some((r) => r.value > 0) && (
+              <Stack spacing={0} sx={{ minWidth: 0, maxWidth: '16ch' }}>
+                {oppReceived.filter((r) => r.value > 0).map((r, i) => (
+                  <Stack
+                    key={i}
+                    direction="row"
+                    alignItems="baseline"
+                    spacing={0.5}
+                    onClick={() => setCmdPreviewName(r.name)}
+                    title={`View ${r.name}`}
+                    sx={{ minWidth: 0, cursor: 'pointer', '&:hover': { opacity: 0.8 } }}
+                  >
+                    <Typography noWrap sx={{ fontSize: sz.xsLabel, color: 'text.secondary', lineHeight: 1.3, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</Typography>
+                    <Typography sx={{ fontSize: sz.xsLabel, color: 'text.secondary', lineHeight: 1.3, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                      <Box component="span" sx={{ fontWeight: 800, color: r.value >= 21 ? '#B71C1C' : 'text.primary' }}>{r.value}</Box>/21
+                    </Typography>
+                  </Stack>
+                ))}
+              </Stack>
+            )}
+            {oppPoison > 0 && (
+              <Typography sx={{ fontSize: sz.cmdLabel, color: 'text.secondary', ml: 0.5 }}>
+                Poison <Box component="span" sx={{ fontWeight: 800, color: oppPoison >= 15 ? '#2E7D32' : 'text.primary' }}>{oppPoison}</Box><Box component="span" sx={{ color: 'text.disabled' }}> / 15</Box>
+              </Typography>
+            )}
+          </Stack>
+        </Box>
+        <Typography sx={{ fontSize: sz.sectionLabel, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5, mt: 0.5 }}>
           Cmd Damage
         </Typography>
         {opponents.flatMap((opp) => {
@@ -644,6 +762,8 @@ export function TeamPanel({
               value={dmg[0]}
               onChange={(delta) => onCommanderDamageChange(primary.idx, opp.idx, false, delta)}
               onView={() => setCmdPreviewName(opp.player.commander.name)}
+              lp={longPress}
+              lpKey={`cmd-${opp.idx}-own`}
               sz={sz}
             />,
           ];
@@ -655,6 +775,8 @@ export function TeamPanel({
                 value={dmg[1]}
                 onChange={(delta) => onCommanderDamageChange(primary.idx, opp.idx, true, delta)}
                 onView={() => setCmdPreviewName(opp.player.partner!.name)}
+                lp={longPress}
+                lpKey={`cmd-${opp.idx}-partner`}
                 sz={sz}
               />,
             );
@@ -716,7 +838,7 @@ export function TeamPanel({
   );
 }
 
-function CmdDamageRow({ label, value, onChange, onView, sz }: { label: string; value: number; onChange: (delta: number) => void; onView: () => void; sz: Sz }) {
+function CmdDamageRow({ label, value, onChange, onView, lp, lpKey, sz }: { label: string; value: number; onChange: (delta: number) => void; onView: () => void; lp: LongPress; lpKey: string; sz: Sz }) {
   return (
     <Stack direction="row" alignItems="center" spacing={0.75}>
       <Typography
@@ -726,9 +848,9 @@ function CmdDamageRow({ label, value, onChange, onView, sz }: { label: string; v
       >
         {label}
       </Typography>
-      <StatButton onClick={() => onChange(-1)} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
-      <Typography sx={{ fontSize: sz.cmdVal, fontWeight: 700, minWidth: 22, textAlign: 'center' }}>{value}</Typography>
-      <StatButton onClick={() => onChange(1)} big={sz.big}><AddIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
+      <StatButton onClick={() => onChange(-1)} onLongPress={() => onChange(-5)} lpKey={`${lpKey}-dec`} lp={lp} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
+      <Typography onClick={(e) => { e.stopPropagation(); onView(); }} title="View commander" sx={{ fontSize: sz.cmdVal, fontWeight: 700, minWidth: 22, textAlign: 'center', cursor: 'pointer', '&:hover': { color: 'primary.main' } }}>{value}</Typography>
+      <StatButton onClick={() => onChange(1)} onLongPress={() => onChange(5)} lpKey={`${lpKey}-inc`} lp={lp} big={sz.big}><AddIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
       <Typography sx={{ fontSize: sz.xsLabel, color: 'text.secondary' }}>/21</Typography>
     </Stack>
   );

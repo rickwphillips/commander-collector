@@ -674,6 +674,7 @@ export function GameBoard({
       <TeamPanel
         teamNumber={teamNumber}
         teamName={teamName(teamNumber, state.teamNames)}
+        opponentTeamName={teamName(teamNumber === 1 ? 2 : 1, state.teamNames)}
         onTeamNameChange={(name) => handleTeamNameChange(teamNumber, name)}
         members={members}
         opponents={opponents}
