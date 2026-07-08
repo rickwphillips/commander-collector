@@ -9,6 +9,7 @@ import { useMonarchTransition } from '@/game-manager/hooks/useMonarchTransition'
 import { useCitysBlessingExit } from '@/game-manager/hooks/useCitysBlessingExit';
 import { useLongPress } from '@/game-manager/hooks/useLongPress';
 import { useTimerTokens } from '@/game-manager/hooks/useTimerTokens';
+import { lifeColor } from '@/game-manager/lifeColor';
 import InitiativeIcon from '@mui/icons-material/Castle';
 import type { PlayerState, CommanderDamageMap } from '../types';
 import { PlayerCard, type PlayerCardProps, type KillOpponent } from './PlayerCard';
@@ -196,23 +197,7 @@ export function PlayerPanel({
   const timer = useTimerTokens(elapsedSeconds, turnTimerSeconds, isCurrentPlayer);
 
   // ─── Derived: life / poison / warning ────────────────────────────────────
-  function lifeColor(life: number): string {
-    if (life <= 0) return '#6B0000';
-    if (life > startingLife) {
-      const gain = Math.min((life - startingLife) / startingLife, 1);
-      const r = Math.round(180 - 140 * gain);
-      const g = Math.round(120 + 102 * gain);
-      const b = Math.round(60 - 36 * gain);
-      return `rgb(${r},${g},${b})`;
-    }
-    const ratio = Math.max(0, Math.min((startingLife - life) / startingLife, 1));
-    if (ratio <= 0) return '';
-    const r = Math.round(180 + 71 * ratio);
-    const g = Math.round(120 - 120 * ratio);
-    const b = Math.round(60 - 60 * ratio);
-    return `rgb(${r},${g},${b})`;
-  }
-  const computedLifeColor = lifeColor(player.life);
+  const computedLifeColor = lifeColor(player.life, startingLife);
   const lostRatio = player.life <= 0 ? 1 : Math.max(0, Math.min((startingLife - player.life) / startingLife, 1));
 
   const isLifeLow = player.life <= 0;
@@ -275,7 +260,7 @@ export function PlayerPanel({
       if (d[0] === 0 && d[1] === 0) return [];
       return [{ tgt, d }];
     });
-    const srcLifeColor = lifeColor(src.life);
+    const srcLifeColor = lifeColor(src.life, startingLife);
     return (
       <Box sx={{ width: 190, position: 'relative', overflow: 'hidden' }}>
         {src.commander.artCropUrl && (

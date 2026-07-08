@@ -457,6 +457,8 @@ function RemotePageInner() {
   const teamOpponents = state.players.map((p, idx) => ({ player: p, idx })).filter((m) => m.player.teamNumber !== myTeam);
   const teamActive = myTeam != null && state.players[state.currentPlayerIdx]?.teamNumber === myTeam;
   const teamName2hg = (myTeam != null && state.teamNames?.[myTeam]) || `Team ${myTeam ?? ''}`;
+  const oppTeam2hg = myTeam === 1 ? 2 : 1;
+  const oppTeamName2hg = state.teamNames?.[oppTeam2hg] || `Team ${oppTeam2hg}`;
 
   return (
     <Box
@@ -482,6 +484,7 @@ function RemotePageInner() {
         <TeamPanel
           teamNumber={myTeam ?? 1}
           teamName={teamName2hg}
+          opponentTeamName={oppTeamName2hg}
           onTeamNameChange={() => { /* host owns team names; phone is read-only here */ }}
           members={teamMembers}
           opponents={teamOpponents}
