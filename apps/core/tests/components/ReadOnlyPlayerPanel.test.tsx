@@ -80,6 +80,7 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     life: 28,
     poison: 0,
     commanderTax: 0,
+    partnerCommanderTax: 0,
     isMonarch: false,
     hasInitiative: false,
     hasCitysBlessing: false,

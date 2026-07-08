@@ -32,6 +32,7 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     life: 40,
     poison: 0,
     commanderTax: 0,
+    partnerCommanderTax: 0,
     isMonarch: false,
     hasInitiative: false,
     hasCitysBlessing: false,
@@ -233,6 +234,32 @@ describe('applyCommanderTaxChange', () => {
   it('does not go below 0', () => {
     const state = makeState();
     const result = applyCommanderTaxChange(state, 0, -5);
+    expect(result.players[0].commanderTax).toBe(0);
+  });
+
+  it('isPartner targets partnerCommanderTax and leaves commanderTax untouched', () => {
+    const state = makeState();
+    const result = applyCommanderTaxChange(state, 0, 3, true);
+    expect(result.players[0].partnerCommanderTax).toBe(3);
+    expect(result.players[0].commanderTax).toBe(0);
+  });
+
+  it('the two commander taxes are independent', () => {
+    let state = makeState();
+    state = applyCommanderTaxChange(state, 0, 2, false);
+    state = applyCommanderTaxChange(state, 0, 5, true);
+    expect(state.players[0].commanderTax).toBe(2);
+    expect(state.players[0].partnerCommanderTax).toBe(5);
+  });
+
+  it('partner tax does not go below 0', () => {
+    const result = applyCommanderTaxChange(makeState(), 0, -5, true);
+    expect(result.players[0].partnerCommanderTax).toBe(0);
+  });
+
+  it('applyEvent routes isPartner through', () => {
+    const result = applyEvent(makeState(), { seat: 'bottom', ts: 1, type: 'commander_tax_change', playerIdx: 0, delta: 4, isPartner: true });
+    expect(result.players[0].partnerCommanderTax).toBe(4);
     expect(result.players[0].commanderTax).toBe(0);
   });
 });
@@ -710,6 +737,15 @@ describe('2HG — reconcileTeams shared totals and team elimination', () => {
     const result = applyEvent(state, { seat: 'bottom', ts: 1, type: 'eliminate', playerIdx: 0 });
     expect(result.players[0].isEliminated).toBe(true);
     expect(result.players[1].isEliminated).toBe(true);
+  });
+
+  it('commander tax is per-player, not mirrored across teammates', () => {
+    const state = make2hgState();
+    const result = applyEvent(state, { seat: 'bottom', ts: 1, type: 'commander_tax_change', playerIdx: 0, delta: 2, isPartner: true });
+    expect(result.players[0].partnerCommanderTax).toBe(2);
+    // teammate (seat 1, same team) is untouched — tax never mirrors
+    expect(result.players[1].partnerCommanderTax).toBe(0);
+    expect(result.players[1].commanderTax).toBe(0);
   });
 
   it('reconcileTeams is a no-op for standard games', () => {

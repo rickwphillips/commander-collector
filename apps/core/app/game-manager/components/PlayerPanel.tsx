@@ -55,7 +55,7 @@ interface PlayerPanelProps {
   commanderDamage: CommanderDamageMap;
   onLifeChange: (idx: number, delta: number) => void;
   onPoisonChange: (idx: number, delta: number) => void;
-  onCommanderTaxChange: (idx: number, delta: number) => void;
+  onCommanderTaxChange: (idx: number, delta: number, isPartner?: boolean) => void;
   onEnergyChange: (idx: number, delta: number) => void;
   onExperienceChange: (idx: number, delta: number) => void;
   onToggleMonarch: (idx: number) => void;

@@ -91,7 +91,7 @@ interface TeamPanelProps {
   remoteMode?: boolean;
   onLifeChange: (idx: number, delta: number) => void;
   onPoisonChange: (idx: number, delta: number) => void;
-  onCommanderTaxChange: (idx: number, delta: number) => void;
+  onCommanderTaxChange: (idx: number, delta: number, isPartner?: boolean) => void;
   // Per-player (NOT shared): each teammate keeps their own energy, experience,
   // and monarch / initiative / city's-blessing toggles. These route to the
   // member's real seat idx, never the primary seat.
@@ -620,7 +620,7 @@ export function TeamPanel({
                 {/* Name + commander tax share the top row: tax is the most-used
                     control, so it sits by the pilot name and reads slightly larger
                     (cmd-tier tokens) than the energy/XP counters below. */}
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
+                <Stack direction="row" alignItems="center" useFlexGap flexWrap="wrap" spacing={1} sx={{ minWidth: 0 }}>
                   <Typography
                     noWrap
                     onClick={() => setCmdPreviewName(m.player.commander.name)}
@@ -629,12 +629,21 @@ export function TeamPanel({
                   >
                     {m.player.playerName}
                   </Typography>
-                  <Stack direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
-                    <Typography sx={{ fontSize: sz.cmdLabel, color: 'text.secondary' }}>Tax</Typography>
-                    <StatButton onClick={() => onCommanderTaxChange(m.idx, -1)} onLongPress={() => onCommanderTaxChange(m.idx, -5)} lpKey={`tax-${m.idx}-dec`} lp={longPress} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
-                    <Typography sx={{ fontSize: sz.cmdVal, fontWeight: 700, minWidth: 16, textAlign: 'center' }}>{m.player.commanderTax}</Typography>
-                    <StatButton onClick={() => onCommanderTaxChange(m.idx, 1)} onLongPress={() => onCommanderTaxChange(m.idx, 5)} lpKey={`tax-${m.idx}-inc`} lp={longPress} big={sz.big}><AddIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
-                  </Stack>
+                  {/* One tax counter per commander (each commander taxes
+                      independently). Labeled 'Tax' for a single-commander deck, or
+                      by the commander name when there are two. */}
+                  {commanderEntries(m).map((e) => {
+                    const value = e.isPartner ? m.player.partnerCommanderTax : m.player.commanderTax;
+                    const key = e.isPartner ? 'p' : 'o';
+                    return (
+                      <Stack key={key} direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
+                        <Typography noWrap onClick={() => setCmdPreviewName(e.name)} title={`View ${e.name}`} sx={{ fontSize: sz.cmdLabel, color: 'text.secondary', maxWidth: '9ch', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer', '&:hover': { color: 'primary.main' } }}>{m.player.partner ? e.name : 'Tax'}</Typography>
+                        <StatButton onClick={() => onCommanderTaxChange(m.idx, -1, e.isPartner)} onLongPress={() => onCommanderTaxChange(m.idx, -5, e.isPartner)} lpKey={`tax-${m.idx}-${key}-dec`} lp={longPress} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
+                        <Typography sx={{ fontSize: sz.cmdVal, fontWeight: 700, minWidth: 16, textAlign: 'center' }}>{value}</Typography>
+                        <StatButton onClick={() => onCommanderTaxChange(m.idx, 1, e.isPartner)} onLongPress={() => onCommanderTaxChange(m.idx, 5, e.isPartner)} lpKey={`tax-${m.idx}-${key}-inc`} lp={longPress} big={sz.big}><AddIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
+                      </Stack>
+                    );
+                  })}
                 </Stack>
                 {/* Individual per-player counters (energy + XP). */}
                 <Stack direction="row" alignItems="center" useFlexGap flexWrap="wrap" spacing={1}>
@@ -777,6 +786,7 @@ export function TeamPanel({
               key={`${opp.idx}-${e.isPartner ? 'partner' : 'own'}`}
               label={e.name}
               value={e.isPartner ? dmg[1] : dmg[0]}
+              tax={e.isPartner ? opp.player.partnerCommanderTax : opp.player.commanderTax}
               onChange={(delta) => onCommanderDamageChange(primary.idx, opp.idx, e.isPartner, delta)}
               onView={() => setCmdPreviewName(e.name)}
               lp={longPress}
@@ -840,16 +850,22 @@ export function TeamPanel({
   );
 }
 
-function CmdDamageRow({ label, value, onChange, onView, lp, lpKey, sz }: { label: string; value: number; onChange: (delta: number) => void; onView: () => void; lp: LongPress; lpKey: string; sz: Sz }) {
+function CmdDamageRow({ label, value, tax, onChange, onView, lp, lpKey, sz }: { label: string; value: number; tax: number; onChange: (delta: number) => void; onView: () => void; lp: LongPress; lpKey: string; sz: Sz }) {
   return (
     <Stack direction="row" alignItems="center" spacing={0.75}>
-      <Typography
-        noWrap
-        onClick={(e) => { e.stopPropagation(); onView(); }}
-        sx={{ flex: 1, minWidth: 0, fontSize: sz.cmdLabel, color: value >= 21 ? '#B71C1C' : 'text.primary', fontWeight: value >= 21 ? 700 : 400, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
-      >
-        {label}
-      </Typography>
+      {/* Commander name + its current tax (+{tax*2} generic mana) sit together. */}
+      <Stack direction="row" alignItems="baseline" spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
+        <Typography
+          noWrap
+          onClick={(e) => { e.stopPropagation(); onView(); }}
+          sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: sz.cmdLabel, color: value >= 21 ? '#B71C1C' : 'text.primary', fontWeight: value >= 21 ? 700 : 400, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+        >
+          {label}
+        </Typography>
+        {tax > 0 && (
+          <Typography title={`Tax: cast ${tax}x`} sx={{ fontSize: sz.xsLabel, fontWeight: 700, color: 'warning.main', flexShrink: 0, whiteSpace: 'nowrap' }}>+{tax * 2}</Typography>
+        )}
+      </Stack>
       <StatButton onClick={() => onChange(-1)} onLongPress={() => onChange(-5)} lpKey={`${lpKey}-dec`} lp={lp} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
       <Typography onClick={(e) => { e.stopPropagation(); onView(); }} title="View commander" sx={{ fontSize: sz.cmdVal, fontWeight: 700, minWidth: 22, textAlign: 'center', cursor: 'pointer', '&:hover': { color: 'primary.main' } }}>{value}</Typography>
       <StatButton onClick={() => onChange(1)} onLongPress={() => onChange(5)} lpKey={`${lpKey}-inc`} lp={lp} big={sz.big}><AddIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>

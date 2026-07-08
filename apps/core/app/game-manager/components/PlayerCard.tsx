@@ -534,7 +534,7 @@ export interface PlayerCardProps {
   // Counter / state mutation handlers
   onLifeChange: (idx: number, delta: number) => void;
   onPoisonChange: (idx: number, delta: number) => void;
-  onCommanderTaxChange: (idx: number, delta: number) => void;
+  onCommanderTaxChange: (idx: number, delta: number, isPartner?: boolean) => void;
   onEnergyChange: (idx: number, delta: number) => void;
   onExperienceChange: (idx: number, delta: number) => void;
   onToggleMonarch: (idx: number) => void;
@@ -889,8 +889,12 @@ function PlayerCardImpl(props: PlayerCardProps) {
               onClick={(e) => { e.stopPropagation(); setCmdPreviewName(player.commander.name); }}
               sx={{ height: sizes.artHeight, width: 'auto', borderRadius: 0.5, flexShrink: 0, cursor: 'zoom-in' }} />
           )}
-          {player.commanderTax > 0 && (
-            <Tooltip title={`Tax: cast ${player.commanderTax}× (+${player.commanderTax * 2} generic mana)`} placement="bottom" arrow>
+          {/* One tax medallion per commander with tax > 0 (partner decks show two). */}
+          {[
+            { name: player.commander.name, tax: player.commanderTax },
+            ...(player.partner ? [{ name: player.partner.name, tax: player.partnerCommanderTax }] : []),
+          ].filter((c) => c.tax > 0).map((c, i) => (
+            <Tooltip key={i} title={`${c.name} tax: cast ${c.tax}× (+${c.tax * 2} generic mana)`} placement="bottom" arrow>
               <Stack direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
                 <Typography sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary', lineHeight: 1, userSelect: 'none' }}>+</Typography>
                 <Box sx={{
@@ -901,12 +905,12 @@ function PlayerCardImpl(props: PlayerCardProps) {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   <Typography sx={{ fontSize: 11, fontWeight: 800, color: '#111', lineHeight: 1, userSelect: 'none' }}>
-                    {player.commanderTax * 2}
+                    {c.tax * 2}
                   </Typography>
                 </Box>
               </Stack>
             </Tooltip>
-          )}
+          ))}
           {player.experience > 0 && (
             <Box sx={{
               position: 'relative', flexShrink: 0, width: 34, height: 34,
@@ -1267,7 +1271,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
                     <Typography sx={{ fontSize: sizes.fsSourceName, fontWeight: 700, color: src.poison >= 10 ? 'error.main' : src.poison > 0 ? '#66BB6A' : 'text.disabled' }}>☠ {src.poison}</Typography>
                     <Typography sx={{ fontSize: sizes.fsSourceName, fontWeight: 700, color: src.energy > 0 ? '#4FC8FF' : 'text.disabled' }}>⚡ {src.energy}</Typography>
                     <Typography sx={{ fontSize: sizes.fsSourceName, fontWeight: 700, color: src.experience > 0 ? '#DAA520' : 'text.disabled' }}>XP {src.experience}</Typography>
-                    <Typography sx={{ fontSize: sizes.fsSourceName, fontWeight: 700, color: src.commanderTax > 0 ? 'text.secondary' : 'text.disabled' }}>Tax +{src.commanderTax * 2}</Typography>
+                    <Typography sx={{ fontSize: sizes.fsSourceName, fontWeight: 700, color: (src.commanderTax > 0 || src.partnerCommanderTax > 0) ? 'text.secondary' : 'text.disabled' }}>Tax +{Math.max(src.commanderTax, src.partnerCommanderTax) * 2}</Typography>
                   </Stack>
 
                   <Stack sx={{ flex: 1, minWidth: 0 }} spacing={0.25}>
@@ -1435,14 +1439,14 @@ function PlayerCardImpl(props: PlayerCardProps) {
                   <Typography sx={{ fontSize: 11, color: '#DAA520', fontWeight: 700, lineHeight: 1 }}>{player.experience}</Typography>
                 </Box>
               )}
-              {player.commanderTax > 0 && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
+              {[player.commanderTax, ...(player.partner ? [player.partnerCommanderTax] : [])].filter((t) => t > 0).map((t, i) => (
+                <Box key={i} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
                   <Box sx={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, background: 'radial-gradient(circle at 38% 35%, #d0d0d0, #7a7a7a)', border: '1.5px solid #3a3a3a', boxShadow: '0 1px 3px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Typography sx={{ fontSize: 7, fontWeight: 800, color: '#111', lineHeight: 1, userSelect: 'none' }}>+{player.commanderTax * 2}</Typography>
+                    <Typography sx={{ fontSize: 7, fontWeight: 800, color: '#111', lineHeight: 1, userSelect: 'none' }}>+{t * 2}</Typography>
                   </Box>
-                  <Typography sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 700, lineHeight: 1 }}>{player.commanderTax}</Typography>
+                  <Typography sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 700, lineHeight: 1 }}>{t}</Typography>
                 </Box>
-              )}
+              ))}
             </>}
             <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }}>
               <ChevronRightIcon sx={{ fontSize: 22, color: 'text.secondary', transform: countersOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s ease', display: 'block' }} />
@@ -1463,22 +1467,26 @@ function PlayerCardImpl(props: PlayerCardProps) {
               rowGap: remoteMode ? 0.5 : 0.1,
             }}>
             {([
-              ['Poison', player.poison, () => onPoisonChange(playerIdx, -1), () => onPoisonChange(playerIdx, 1), () => onPoisonChange(playerIdx, -5), () => onPoisonChange(playerIdx, 5), player.poison >= 10 ? 'error.main' : player.poison > 0 ? 'warning.main' : 'text.disabled'],
-              ['Energy', player.energy, () => onEnergyChange(playerIdx, -1), () => onEnergyChange(playerIdx, 1), () => onEnergyChange(playerIdx, -5), () => onEnergyChange(playerIdx, 5), player.energy > 0 ? 'primary.main' : 'text.disabled'],
-              ['XP', player.experience, () => onExperienceChange(playerIdx, -1), () => onExperienceChange(playerIdx, 1), () => onExperienceChange(playerIdx, -5), () => onExperienceChange(playerIdx, 5), player.experience > 0 ? 'primary.main' : 'text.disabled'],
-              ['Tax', player.commanderTax, () => onCommanderTaxChange(playerIdx, -1), () => onCommanderTaxChange(playerIdx, 1), () => onCommanderTaxChange(playerIdx, -5), () => onCommanderTaxChange(playerIdx, 5), player.commanderTax > 0 ? 'warning.main' : 'text.disabled'],
-            ] as [string, number, () => void, () => void, () => void, () => void, string][]).flatMap(([label, value, onDec, onInc, onDec5, onInc5, color]) => [
+              ['Poison', player.poison, () => onPoisonChange(playerIdx, -1), () => onPoisonChange(playerIdx, 1), () => onPoisonChange(playerIdx, -5), () => onPoisonChange(playerIdx, 5), player.poison >= 10 ? 'error.main' : player.poison > 0 ? 'warning.main' : 'text.disabled', null, () => setFocusedControl({ type: 'poison' })],
+              ['Energy', player.energy, () => onEnergyChange(playerIdx, -1), () => onEnergyChange(playerIdx, 1), () => onEnergyChange(playerIdx, -5), () => onEnergyChange(playerIdx, 5), player.energy > 0 ? 'primary.main' : 'text.disabled', null, () => setFocusedControl({ type: 'energy' })],
+              ['XP', player.experience, () => onExperienceChange(playerIdx, -1), () => onExperienceChange(playerIdx, 1), () => onExperienceChange(playerIdx, -5), () => onExperienceChange(playerIdx, 5), player.experience > 0 ? 'primary.main' : 'text.disabled', null, () => setFocusedControl({ type: 'experience' })],
+              // One Tax row per commander (each commander taxes independently).
+              // The medallion value (8th slot) and focus thunk (9th) let a partner
+              // deck render a second Tax row keyed by the partner commander's name.
+              ['Tax', player.commanderTax, () => onCommanderTaxChange(playerIdx, -1), () => onCommanderTaxChange(playerIdx, 1), () => onCommanderTaxChange(playerIdx, -5), () => onCommanderTaxChange(playerIdx, 5), player.commanderTax > 0 ? 'warning.main' : 'text.disabled', player.commanderTax, () => setFocusedControl({ type: 'commanderTax' })],
+              ...(player.partner ? [[player.partner.name, player.partnerCommanderTax, () => onCommanderTaxChange(playerIdx, -1, true), () => onCommanderTaxChange(playerIdx, 1, true), () => onCommanderTaxChange(playerIdx, -5, true), () => onCommanderTaxChange(playerIdx, 5, true), player.partnerCommanderTax > 0 ? 'warning.main' : 'text.disabled', player.partnerCommanderTax, () => setFocusedControl({ type: 'commanderTax', isPartner: true })]] as [string, number, () => void, () => void, () => void, () => void, string, number | null, () => void][] : []),
+            ] as [string, number, () => void, () => void, () => void, () => void, string, number | null, () => void][]).flatMap(([label, value, onDec, onInc, onDec5, onInc5, color, medallionTax, onFocus]) => [
               <Stack key={`${label}-lbl`} direction="row" alignItems="center" spacing={0.4} sx={{ overflow: 'hidden', filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none', minWidth: 0 }}>
                 {label === 'Poison'     && <Typography component="span" sx={{ fontSize: sizes.fsSourceName, color: player.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1, flexShrink: 0 }}>☠</Typography>}
                 {label === 'Energy'     && <Typography component="span" sx={{ fontSize: sizes.fsSourceName, color: '#4FC8FF', lineHeight: 1, flexShrink: 0 }}>⚡</Typography>}
                 {label === 'XP' && <Box sx={{ bgcolor: 'background.paper', display: 'inline-flex', flexShrink: 0 }}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: sizes.fsSourceName, height: sizes.fsSourceName, objectFit: 'contain', mixBlendMode: 'multiply' }} /></Box>}
-                {label === 'Tax'        && <Box sx={{ width: sizes.fsSourceName, height: sizes.fsSourceName, borderRadius: '50%', flexShrink: 0, background: 'radial-gradient(circle at 38% 35%, #d0d0d0, #7a7a7a)', border: '1px solid #3a3a3a', boxShadow: '0 1px 2px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Typography sx={{ fontSize: 7, fontWeight: 800, color: '#111', lineHeight: 1, userSelect: 'none' }}>+{player.commanderTax * 2}</Typography></Box>}
+                {medallionTax !== null   && <Box sx={{ width: sizes.fsSourceName, height: sizes.fsSourceName, borderRadius: '50%', flexShrink: 0, background: 'radial-gradient(circle at 38% 35%, #d0d0d0, #7a7a7a)', border: '1px solid #3a3a3a', boxShadow: '0 1px 2px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Typography sx={{ fontSize: 7, fontWeight: 800, color: '#111', lineHeight: 1, userSelect: 'none' }}>+{medallionTax * 2}</Typography></Box>}
                 <Typography component="span" sx={{ fontSize: sizes.fsSourceName, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</Typography>
               </Stack>,
               <Tooltip key={`${label}-dec`} open={lpKey === `${label}-dec`} title="-5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
                 <IconButton onClick={guardClick(onDec)} onPointerDown={() => startLongPress(`${label}-dec`, onDec5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: sizes.cmdBtnWidth, minHeight: sizes.cmdBtnHeight }}><Typography sx={{ fontSize: sizes.fsCounterBtn, fontWeight: 700 }}>−</Typography></IconButton>
               </Tooltip>,
-              <Typography key={`${label}-val`} onClick={() => { const t = { 'Poison': 'poison', 'Energy': 'energy', 'XP': 'experience', 'Tax': 'commanderTax' }[label] as 'poison' | 'energy' | 'experience' | 'commanderTax' | undefined; if (t) setFocusedControl({ type: t }); }} sx={{ fontSize: sizes.fsCounterValue, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', cursor: 'pointer', color, filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none', ...(label === 'Poison' && value === 9 && { animation: 'poisonPulse 2.5s ease-in-out infinite', '@keyframes poisonPulse': { '0%, 100%': { opacity: 1, transform: 'scale(1)', textShadow: '0 0 8px rgba(0,200,60,0.9), 0 0 20px rgba(0,200,60,0.5)' }, '50%': { opacity: 0.3, transform: 'scale(0.85)', textShadow: '0 0 2px rgba(0,200,60,0.2)' } } }), ...(label === 'XP' && xpGlow && { textShadow: xpGlow, ...(xpShimmerAnim && { animation: `${xpShimmerAnim} 3s ease-in-out infinite` }) }) }}>{value}</Typography>,
+              <Typography key={`${label}-val`} onClick={onFocus} sx={{ fontSize: sizes.fsCounterValue, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', cursor: 'pointer', color, filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none', ...(label === 'Poison' && value === 9 && { animation: 'poisonPulse 2.5s ease-in-out infinite', '@keyframes poisonPulse': { '0%, 100%': { opacity: 1, transform: 'scale(1)', textShadow: '0 0 8px rgba(0,200,60,0.9), 0 0 20px rgba(0,200,60,0.5)' }, '50%': { opacity: 0.3, transform: 'scale(0.85)', textShadow: '0 0 2px rgba(0,200,60,0.2)' } } }), ...(label === 'XP' && xpGlow && { textShadow: xpGlow, ...(xpShimmerAnim && { animation: `${xpShimmerAnim} 3s ease-in-out infinite` }) }) }}>{value}</Typography>,
               <Tooltip key={`${label}-inc`} open={lpKey === `${label}-inc`} title="+5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
                 <IconButton onClick={guardClick(onInc)} onPointerDown={() => startLongPress(`${label}-inc`, onInc5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: sizes.cmdBtnWidth, minHeight: sizes.cmdBtnHeight }}><Typography sx={{ fontSize: sizes.fsCounterBtn, fontWeight: 700 }}>+</Typography></IconButton>
               </Tooltip>,
@@ -2297,13 +2305,14 @@ function PlayerCardImpl(props: PlayerCardProps) {
           onInc5 = () => onExperienceChange(playerIdx, 5);
           valueColor = player.experience > 0 ? 'primary.main' : 'text.disabled';
         } else if (fc.type === 'commanderTax') {
-          label = 'Tax';
-          value = player.commanderTax;
-          onDec = () => onCommanderTaxChange(playerIdx, -1);
-          onInc = () => onCommanderTaxChange(playerIdx, 1);
-          onDec5 = () => onCommanderTaxChange(playerIdx, -5);
-          onInc5 = () => onCommanderTaxChange(playerIdx, 5);
-          valueColor = player.commanderTax > 0 ? 'warning.main' : 'text.disabled';
+          const isP = fc.isPartner ?? false;
+          label = isP ? `${player.partner?.name ?? 'Partner'} Tax` : 'Tax';
+          value = isP ? player.partnerCommanderTax : player.commanderTax;
+          onDec = () => onCommanderTaxChange(playerIdx, -1, isP);
+          onInc = () => onCommanderTaxChange(playerIdx, 1, isP);
+          onDec5 = () => onCommanderTaxChange(playerIdx, -5, isP);
+          onInc5 = () => onCommanderTaxChange(playerIdx, 5, isP);
+          valueColor = value > 0 ? 'warning.main' : 'text.disabled';
         } else if (fc.type === 'commanderDamage' && fc.sourceIdx !== undefined) {
           const src = allPlayers[fc.sourceIdx];
           const dmg = commanderDamage[playerIdx]?.[fc.sourceIdx] ?? [0, 0];

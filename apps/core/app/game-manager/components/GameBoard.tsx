@@ -390,8 +390,8 @@ export function GameBoard({
   const handlePoisonChange = (idx: number, delta: number) =>
     dispatchHostEvent({ type: 'poison_change', playerIdx: idx, delta });
 
-  const handleCommanderTaxChange = (idx: number, delta: number) =>
-    dispatchHostEvent({ type: 'commander_tax_change', playerIdx: idx, delta });
+  const handleCommanderTaxChange = (idx: number, delta: number, isPartner = false) =>
+    dispatchHostEvent({ type: 'commander_tax_change', playerIdx: idx, delta, isPartner });
 
   const handleToggleMonarch = (idx: number) =>
     dispatchHostEvent({ type: 'toggle_monarch', playerIdx: idx });

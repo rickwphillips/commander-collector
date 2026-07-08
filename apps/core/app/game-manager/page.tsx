@@ -67,6 +67,7 @@ function emptySeatAt(position: PlayerState['position']): PlayerState {
     life: 0,
     poison: 0,
     commanderTax: 0,
+    partnerCommanderTax: 0,
     isMonarch: false,
     hasInitiative: false,
     hasCitysBlessing: false,

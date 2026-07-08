@@ -239,8 +239,8 @@ function RemotePageInner() {
     sendEvent({ type: 'poison_change', playerIdx: idx, delta });
   }, [sendEvent, state]);
 
-  const handleCommanderTaxChange = useCallback((idx: number, delta: number) => {
-    sendEvent({ type: 'commander_tax_change', playerIdx: idx, delta });
+  const handleCommanderTaxChange = useCallback((idx: number, delta: number, isPartner = false) => {
+    sendEvent({ type: 'commander_tax_change', playerIdx: idx, delta, isPartner });
   }, [sendEvent]);
 
   const handleEnergyChange = useCallback((idx: number, delta: number) => {
