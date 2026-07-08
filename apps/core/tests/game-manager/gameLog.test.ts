@@ -13,6 +13,7 @@ function player(name: string, overrides: Partial<PlayerState> = {}): PlayerState
     life: 40,
     poison: 0,
     commanderTax: 0,
+    partnerCommanderTax: 0,
     isMonarch: false,
     hasInitiative: false,
     hasCitysBlessing: false,

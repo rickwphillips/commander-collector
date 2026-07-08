@@ -173,10 +173,17 @@ export function applyCommanderTaxChange(
   state: GameManagerState,
   idx: number,
   delta: number,
+  isPartner = false,
 ): GameManagerState {
-  const newPlayers = state.players.map((p, i) =>
-    i === idx ? { ...p, commanderTax: Math.max(0, p.commanderTax + delta) } : p,
-  );
+  // Each commander taxes independently; isPartner targets the second commander's
+  // tax (partner/background decks). Per-player in 2HG — reconcileTeams never
+  // mirrors tax across teammates.
+  const newPlayers = state.players.map((p, i) => {
+    if (i !== idx) return p;
+    return isPartner
+      ? { ...p, partnerCommanderTax: Math.max(0, p.partnerCommanderTax + delta) }
+      : { ...p, commanderTax: Math.max(0, p.commanderTax + delta) };
+  });
   return { ...state, players: newPlayers };
 }
 
@@ -493,7 +500,7 @@ function applyEventInner(state: GameManagerState, event: LiveGameEvent): GameMan
     case 'poison_change':
       return applyPoisonChange(state, event.playerIdx, event.delta);
     case 'commander_tax_change':
-      return applyCommanderTaxChange(state, event.playerIdx, event.delta);
+      return applyCommanderTaxChange(state, event.playerIdx, event.delta, event.isPartner);
     case 'energy_change':
       return applyEnergyChange(state, event.playerIdx, event.delta);
     case 'experience_change':

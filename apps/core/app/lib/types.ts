@@ -506,7 +506,7 @@ interface LiveGameEventBase {
 export type LiveGameEvent =
   | (LiveGameEventBase & { type: 'life_change'; playerIdx: number; delta: number })
   | (LiveGameEventBase & { type: 'poison_change'; playerIdx: number; delta: number })
-  | (LiveGameEventBase & { type: 'commander_tax_change'; playerIdx: number; delta: number })
+  | (LiveGameEventBase & { type: 'commander_tax_change'; playerIdx: number; delta: number; isPartner?: boolean })
   | (LiveGameEventBase & { type: 'energy_change'; playerIdx: number; delta: number })
   | (LiveGameEventBase & { type: 'experience_change'; playerIdx: number; delta: number })
   | (LiveGameEventBase & { type: 'toggle_monarch'; playerIdx: number })
@@ -577,6 +577,9 @@ export interface PlayerState extends PlayerSetup {
   life: number;
   poison: number;
   commanderTax: number;
+  // Second commander's tax for partner/background decks (each commander accrues
+  // its own tax independently). Always present; 0 for single-commander decks.
+  partnerCommanderTax: number;
   isMonarch: boolean;
   hasInitiative: boolean;
   hasCitysBlessing: boolean;

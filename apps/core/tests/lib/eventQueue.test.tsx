@@ -79,7 +79,7 @@ function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
   return {
     playerId: 'player-alice', deckId: 'deck-test-1', playerName: 'Alice', deckName: 'D',
     commander: { name: 'X' }, position: 'bottom',
-    life: 40, poison: 0, commanderTax: 0,
+    life: 40, poison: 0, commanderTax: 0, partnerCommanderTax: 0,
     isMonarch: false, hasInitiative: false, hasCitysBlessing: false,
     energy: 0, experience: 0,
     isEliminated: false, isConceded: false, eliminatedTurn: null,
