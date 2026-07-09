@@ -227,6 +227,14 @@ export const api = {
       `/card-image?scryfall_id=${encodeURIComponent(scryfallId)}${url ? `&url=${encodeURIComponent(url)}` : ''}${sessionCodeParam()}`
     ),
 
+  // Proxy a specific Scryfall art_crop URL through the host (phone-safe). Kept
+  // separate from getCardImage so the full-card image cache isn't polluted with
+  // crops — the panels show the art crop as background art.
+  getCardArtCrop: (artUrl: string) =>
+    apiFetch<{ data_uri: string; cached: boolean }>(
+      `/card-image?art=${encodeURIComponent(artUrl)}${sessionCodeParam()}`
+    ),
+
   // All printings of a card from Scryfall
   getCardPrints: (name: string) =>
     apiFetch<{ prints: import('./types').CardPrint[] }>(

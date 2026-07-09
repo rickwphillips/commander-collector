@@ -17,8 +17,8 @@
  * normal handlers, targeting the team's primary seat so reconcileTeams keeps
  * both heads in sync. Standard games never use this component.
  */
-import { useState, useEffect, useRef, type MouseEvent } from 'react';
-import { Box, Stack, Typography, IconButton, SvgIcon, CircularProgress, TextField, Menu, MenuItem, type SxProps, type Theme } from '@mui/material';
+import { useState, useEffect, useRef } from 'react';
+import { Box, Stack, Typography, IconButton, SvgIcon, CircularProgress, TextField, Menu, MenuItem } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import CloseIcon from '@mui/icons-material/Close';
@@ -31,6 +31,7 @@ import SmartphoneIcon from '@mui/icons-material/Smartphone';
 import { QRCodeSVG } from 'qrcode.react';
 import { ASSET_BASE, remoteQrOrigin } from '@/lib/api';
 import { getCardImageByName } from '@commander/shared/lib/cardImageCache';
+import { CommanderArt } from './CommanderArt';
 import { LifeTotal } from './LifeTotal';
 import { useTimerTokens, TIMER_EXPIRED_BORDER_BLINK, TIMER_EXPIRED_HEADER_BLINK } from '@/game-manager/hooks/useTimerTokens';
 import { useLongPress } from '@/game-manager/hooks/useLongPress';
@@ -211,34 +212,6 @@ function StatButton({ onClick, onLongPress, lpKey, lp, big = false, children }: 
       {children}
     </IconButton>
   );
-}
-
-/**
- * Commander art resolved through the proxied, phone-safe path (getCardImageByName
- * → scryfall-cache.php + card-image.php → base64 data URI served by the host).
- * The stored artCropUrl is a raw cards.scryfall.io URL, which a phone with
- * LAN-only connectivity can't load; the proxy is reachable via the host. On the
- * remote the proxy is authorized by the session code (see setRemoteSessionCode).
- * Resolving by name also fills in art that was never persisted at setup. Renders
- * nothing until an image resolves.
- */
-function CommanderArt({ name, fallback, sx, onClick, title }: {
-  name: string;
-  fallback?: string;
-  sx?: SxProps<Theme>;
-  onClick?: (e: MouseEvent) => void;
-  title?: string;
-}) {
-  const [src, setSrc] = useState<string | undefined>(undefined);
-  useEffect(() => {
-    let alive = true;
-    getCardImageByName(name)
-      .then((u) => { if (alive) setSrc(u ?? fallback); })
-      .catch(() => { if (alive) setSrc(fallback); });
-    return () => { alive = false; };
-  }, [name, fallback]);
-  if (!src) return null;
-  return <Box component="img" src={src} alt="" onClick={onClick} title={title} sx={sx} />;
 }
 
 /** Compact per-player counter (energy / experience) used inside a teammate block. */
@@ -646,7 +619,6 @@ export function TeamPanel({
             <Stack direction="row" alignItems="center" spacing={1}>
               <CommanderArt
                 name={m.player.commander.name}
-                fallback={m.player.commander.artCropUrl}
                 onClick={(e) => { e.stopPropagation(); setCmdPreviewName(m.player.commander.name); }}
                 title={m.player.commander.name}
                 sx={{ height: sz.art, width: 'auto', borderRadius: 0.5, flexShrink: 0, cursor: 'pointer', '&:hover': { opacity: 0.85 } }}

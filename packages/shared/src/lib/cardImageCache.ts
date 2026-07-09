@@ -67,6 +67,75 @@ export async function getCardImageByName(name: string): Promise<string | null> {
   return promise;
 }
 
+// Art crops are cached separately from full-card images (different Scryfall
+// variant, different consumer: panel background art vs. card previews).
+const artCache = new Map<string, string>();
+const artInFlight = new Map<string, Promise<string | null>>();
+
+/**
+ * Resolves a Scryfall art_crop URL to a host-proxied data URI (phone-safe).
+ * Deduped/cached per URL. Returns null on failure so callers can fall back to
+ * the raw CDN URL (which works anywhere the CDN is reachable).
+ */
+export async function getArtCropByUrl(artUrl: string): Promise<string | null> {
+  const cached = artCache.get(artUrl);
+  if (cached !== undefined) return cached;
+  if (artInFlight.has(artUrl)) return artInFlight.get(artUrl)!;
+
+  const promise = enqueue(() => api.getCardArtCrop(artUrl))
+    .then((img) => {
+      const uri = img?.data_uri ?? null;
+      if (uri !== null) artCache.set(artUrl, uri);
+      artInFlight.delete(artUrl);
+      return uri;
+    })
+    .catch(() => {
+      artInFlight.delete(artUrl);
+      return null;
+    });
+
+  artInFlight.set(artUrl, promise);
+  return promise;
+}
+
+const artNameCache = new Map<string, string>();
+const artNameInFlight = new Map<string, Promise<string | null>>();
+
+/**
+ * Resolves a card NAME to a host-proxied art_crop data URI (phone-safe). Works
+ * even when the game state never persisted an artCropUrl (older games store
+ * null): it looks the card up, derives the art_crop URL from the cached 'normal'
+ * image_uri (same Scryfall path — only the size segment differs), and proxies
+ * that crop. Falls back to the raw art_crop URL where the CDN is reachable.
+ * Serves the ART CROP, not the full card.
+ */
+export async function getArtCropByName(name: string): Promise<string | null> {
+  const cached = artNameCache.get(name);
+  if (cached !== undefined) return cached;
+  if (artNameInFlight.has(name)) return artNameInFlight.get(name)!;
+
+  const promise = enqueue(() => api.lookupCard(name))
+    .then(async (meta) => {
+      const normal = meta?.image_uri;
+      if (!normal || !normal.includes('/normal/')) return null;
+      const artUrl = normal.replace('/normal/', '/art_crop/');
+      const proxied = await getArtCropByUrl(artUrl);
+      return proxied ?? artUrl;
+    })
+    .then((uri) => {
+      if (uri) artNameCache.set(name, uri);
+      artNameInFlight.delete(name);
+      return uri;
+    })
+    .catch(() => {
+      artNameInFlight.delete(name);
+      return null;
+    });
+
+  artNameInFlight.set(name, promise);
+  return promise;
+}
+
 /**
  * Returns the back face image URL for a DFC card, or null for single-faced cards.
  * Piggybacks on the same lookupCard call as getCardImageByName — no extra request if front already fetched.
