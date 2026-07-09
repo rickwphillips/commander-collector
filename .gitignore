@@ -6,6 +6,8 @@ node_modules
 # Next.js
 .next
 out
+# Auto-generated per build; dev vs prod configs differ, so it thrashes the tree
+next-env.d.ts
 
 # Turbo cache
 .turbo
@@ -19,6 +21,7 @@ tsconfig.tsbuildinfo
 
 # Vitest coverage reports (generated)
 apps/core/coverage
+apps/rules-guru/coverage
 
 # Playwright auth state (contains JWT tokens) and output
 apps/core/e2e/.auth/
