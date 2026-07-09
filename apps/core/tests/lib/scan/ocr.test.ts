@@ -260,7 +260,7 @@ describe('runTileScan', () => {
   it('processes tiles in batches of 3', async () => {
     // 4 tiles = batch of 3 then batch of 1
     const mockScanDeck = vi.mocked(api.scanDeck);
-    let callOrder: number[] = [];
+    const callOrder: number[] = [];
     mockScanDeck.mockImplementation(async (_b, _m) => {
       callOrder.push(Date.now());
       return { cards: [] };

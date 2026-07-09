@@ -599,4 +599,90 @@ describe('useList', () => {
       expect(result.current.error).toBe('attach boom');
     });
   });
+
+  // ── J) non-Error rejection fallbacks (err instanceof Error === false) ──────
+
+  describe('non-Error rejection fallbacks', () => {
+    it('fetchById uses the fallback message when a non-Error is thrown', async () => {
+      mockApiFetch.mockRejectedValueOnce('bare string');
+      const { result } = renderHook(() => useList({ id: 'list-uuid-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.error).toBe('Failed to load list');
+    });
+
+    it('fetchByDeckId uses the fallback message when the fallback fetch throws a non-Error', async () => {
+      mockApiFetch
+        .mockRejectedValueOnce(new Error('no route'))
+        .mockRejectedValueOnce('bare string');
+      const { result } = renderHook(() => useList({ deckId: 'deck-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.error).toBe('Failed to load list for deck');
+    });
+
+    it('save uses the fallback message when a non-Error is thrown', async () => {
+      mockApiFetch
+        .mockResolvedValueOnce(makeListDetail())
+        .mockRejectedValueOnce('bare string');
+      const { result } = renderHook(() => useList({ id: 'list-uuid-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(() => result.current.save([
+        { id: 'x1', card_name: 'Sol Ring', scryfall_id: 's1', quantity: 1, is_commander: false, is_proxy: false },
+      ] as never));
+      expect(result.current.conflict).toBe(false);
+      expect(result.current.error).toBe('Save failed');
+    });
+
+    it('attachToDeck uses the fallback message when a non-Error is thrown', async () => {
+      mockApiFetch
+        .mockResolvedValueOnce(makeListDetail())
+        .mockRejectedValueOnce('bare string');
+      const { result } = renderHook(() => useList({ id: 'list-uuid-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(() => result.current.attachToDeck('deck-1'));
+      expect(result.current.error).toBe('Failed to attach list to deck');
+    });
+
+    it('detachFromDeck uses the fallback message when a non-Error is thrown', async () => {
+      mockApiFetch
+        .mockResolvedValueOnce(makeListDetail())
+        .mockRejectedValueOnce('bare string');
+      const { result } = renderHook(() => useList({ id: 'list-uuid-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let caught: Error | null = null;
+      await act(async () => {
+        try {
+          await result.current.detachFromDeck();
+        } catch (e) {
+          caught = e as Error;
+        }
+      });
+      expect(caught).not.toBeNull();
+      expect(caught!.message).toBe('Failed to detach list from deck');
+      expect(result.current.error).toBe('Failed to detach list from deck');
+    });
+  });
+
+  // ── K) updateCard leaves non-matching cards untouched (ternary else branch) ─
+
+  describe('updateCard non-matching branch', () => {
+    it('patches only the matching card and leaves the others unchanged', async () => {
+      mockApiFetch
+        .mockResolvedValueOnce(makeListDetail([
+          { id: 'c0', card_name: 'A', quantity: 1 },
+          { id: 'c1', card_name: 'B', quantity: 1 },
+        ]))
+        .mockResolvedValueOnce({ success: true, version: 2 });
+      const { result } = renderHook(() => useList({ id: 'list-uuid-1' }));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(() => result.current.updateCard('c0', { quantity: 7 } as never));
+      const c0 = result.current.cards.find((c) => String(c.id) === 'c0');
+      const c1 = result.current.cards.find((c) => String(c.id) === 'c1');
+      expect(c0!.quantity).toBe(7);
+      expect(c1!.quantity).toBe(1);
+    });
+  });
 });

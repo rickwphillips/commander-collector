@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import type { PlayerState, CommanderDamageMap } from '@/game-manager/types';
+import type { PlayerCardProps } from '@/game-manager/components/PlayerCard';
 
 // ─── Spies on the orchestrator-only hooks ─────────────────────────────────────
 // Phase 5 wires ReadOnlyPlayerPanel straight to PlayerCard, skipping the
@@ -162,7 +163,7 @@ describe('ReadOnlyPlayerPanel', () => {
         startingLife={40}
       />,
     );
-    const props = playerCardSpy.mock.calls[0][0] as Record<string, any>;
+    const props = playerCardSpy.mock.calls[0][0] as unknown as PlayerCardProps;
 
     // Mode flags are hard off in the read-only overlay.
     expect(props.remoteMode).toBe(false);
