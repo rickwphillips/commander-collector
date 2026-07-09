@@ -259,6 +259,7 @@ function AbilityToggle({
   title,
   onToggle,
   big = false,
+  redundant = false,
   children,
 }: {
   active: boolean;
@@ -266,6 +267,8 @@ function AbilityToggle({
   title: string;
   onToggle: () => void;
   big?: boolean;
+  /** Activation would be redundant (a teammate already holds this exclusive ability). */
+  redundant?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -278,6 +281,7 @@ function AbilityToggle({
         border: (theme) => `1px solid ${active ? color : theme.palette.divider}`,
         bgcolor: active ? `${color}22` : 'transparent',
         color: active ? color : 'text.disabled',
+        ...(redundant && { opacity: 0.35, cursor: 'not-allowed' }),
       }}
     >
       {children}
@@ -677,14 +681,28 @@ export function TeamPanel({
                   onEnergyChange={onEnergyChange}
                   onExperienceChange={onExperienceChange}
                 />
-                {/* Per-player ability toggles (individual, not shared). */}
+                {/* Per-player ability toggles (individual, not shared). Monarch and
+                    Initiative are one-per-game: activating one that the OTHER teammate
+                    already holds is redundant, so it's a no-op (and the toggle dims).
+                    Turning your own off, or taking it from the opposing team, still works.
+                    City's Blessing is non-exclusive, so no such guard. */}
                 <Stack direction="row" alignItems="center" spacing={0.5}>
-                  <AbilityToggle active={m.player.isMonarch} color="#DAA520" title="Monarch" onToggle={() => onToggleMonarch(m.idx)} big={sz.big}>
-                    <CrownIcon sx={{ fontSize: sz.ability }} />
-                  </AbilityToggle>
-                  <AbilityToggle active={m.player.hasInitiative} color="#4FC3F7" title="Initiative" onToggle={() => onToggleInitiative(m.idx)} big={sz.big}>
-                    <InitiativeIcon sx={{ fontSize: sz.ability }} />
-                  </AbilityToggle>
+                  {(() => {
+                    const teammateMonarch = members.some((o) => o.idx !== m.idx && o.player.isMonarch);
+                    const teammateInitiative = members.some((o) => o.idx !== m.idx && o.player.hasInitiative);
+                    const monarchRedundant = !m.player.isMonarch && teammateMonarch;
+                    const initiativeRedundant = !m.player.hasInitiative && teammateInitiative;
+                    return (
+                      <>
+                        <AbilityToggle active={m.player.isMonarch} color="#DAA520" title={monarchRedundant ? 'Monarch (your team already has it)' : 'Monarch'} redundant={monarchRedundant} onToggle={() => { if (monarchRedundant) return; onToggleMonarch(m.idx); }} big={sz.big}>
+                          <CrownIcon sx={{ fontSize: sz.ability }} />
+                        </AbilityToggle>
+                        <AbilityToggle active={m.player.hasInitiative} color="#4FC3F7" title={initiativeRedundant ? 'Initiative (your team already has it)' : 'Initiative'} redundant={initiativeRedundant} onToggle={() => { if (initiativeRedundant) return; onToggleInitiative(m.idx); }} big={sz.big}>
+                          <InitiativeIcon sx={{ fontSize: sz.ability }} />
+                        </AbilityToggle>
+                      </>
+                    );
+                  })()}
                   <AbilityToggle active={m.player.hasCitysBlessing} color="#7851A9" title="City's Blessing" onToggle={() => onToggleCitysBlessing(m.idx)} big={sz.big}>
                     <CityIcon sx={{ fontSize: sz.ability }} />
                   </AbilityToggle>
