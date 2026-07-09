@@ -887,6 +887,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
         <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0, zIndex: 1 }}>
           <CommanderArt
             name={player.commander.name}
+            alt={player.commander.name}
             title={player.commander.name}
             onClick={(e) => { e.stopPropagation(); setCmdPreviewName(player.commander.name); }}
             sx={{ height: sizes.artHeight, width: 'auto', borderRadius: 0.5, flexShrink: 0, cursor: 'zoom-in' }}

@@ -120,10 +120,14 @@ export async function getArtCropByName(name: string): Promise<string | null> {
       if (!normal || !normal.includes('/normal/')) return null;
       const artUrl = normal.replace('/normal/', '/art_crop/');
       const proxied = await getArtCropByUrl(artUrl);
+      // Cache ONLY the proxied data URI. A raw-URL fallback (proxy transiently
+      // down) must not be cached — a CDN-blocked phone would otherwise be stuck
+      // with a non-loading URL for the whole session. Returning it uncached lets
+      // the next mount retry the proxy (getArtCropByUrl caches only successes too).
+      if (proxied) artNameCache.set(name, proxied);
       return proxied ?? artUrl;
     })
     .then((uri) => {
-      if (uri) artNameCache.set(name, uri);
       artNameInFlight.delete(name);
       return uri;
     })

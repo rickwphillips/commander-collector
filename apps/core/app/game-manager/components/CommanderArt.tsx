@@ -35,15 +35,16 @@ export function useProxiedArtUrl(name?: string): string | undefined {
 }
 
 /** <img> commander art crop via the phone-safe proxy. Renders nothing until resolved. */
-export function CommanderArt({ name, sx, onClick, title }: {
+export function CommanderArt({ name, alt, sx, onClick, title }: {
   name?: string;
+  alt?: string;
   sx?: SxProps<Theme>;
   onClick?: (e: MouseEvent) => void;
   title?: string;
 }) {
   const src = useProxiedArtUrl(name);
   if (!src) return null;
-  return <Box component="img" src={src} alt="" onClick={onClick} title={title} sx={sx} />;
+  return <Box component="img" src={src} alt={alt ?? ''} onClick={onClick} title={title} sx={sx} />;
 }
 
 /**
