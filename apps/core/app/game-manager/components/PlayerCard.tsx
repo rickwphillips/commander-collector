@@ -1,7 +1,6 @@
 'use client';
 
 import { memo, useEffect, useState } from 'react';
-import { keyframes } from '@emotion/react';
 import { Box, Button, IconButton, Stack, SvgIcon, TextField, Tooltip, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
@@ -32,6 +31,7 @@ import { LifeCracks } from './LifeCracks';
 import { CityBlessing } from './CityBlessing';
 import { InitiativeTorch } from './InitiativeTorch';
 import { CrownIcon, MonarchCrown, monarchCrownAnim } from './MonarchCrown';
+import { EliminatedOverlay } from './EliminatedOverlay';
 
 // Singles poison is lethal at 10; the danger pulse fires one below.
 const POISON_DANGER_SINGLES = 9;
@@ -63,21 +63,6 @@ import type { MonarchAnim } from '@/game-manager/hooks/useMonarchTransition';
 // ─── Local keyframes / constants used by migrated render blocks ────────────
 // Phase 3 will sweep cross-component keyframes into a shared module. For now
 // each block owns whatever it needs.
-const tearFall = keyframes`
-  0%   { transform: translateY(-12px) translateX(0px) scaleY(1);    opacity: 0; }
-  8%   { opacity: 0.85; }
-  40%  { transform: translateY(40%)  translateX(4px)  scaleY(1.1);  opacity: 0.75; }
-  75%  { transform: translateY(80%)  translateX(-3px) scaleY(0.95); opacity: 0.4; }
-  100% { transform: translateY(110%) translateX(1px)  scaleY(1);    opacity: 0; }
-`;
-const TEARS = [
-  { left: '12%', delay: '0s',    dur: '2.9s' },
-  { left: '28%', delay: '1.1s',  dur: '3.2s' },
-  { left: '45%', delay: '0.4s',  dur: '2.6s' },
-  { left: '60%', delay: '1.7s',  dur: '3.4s' },
-  { left: '76%', delay: '0.7s',  dur: '2.8s' },
-  { left: '88%', delay: '2.0s',  dur: '3.1s' },
-];
 
 /**
  * Presentational counterpart of PlayerPanel. All behavior hooks live in the
@@ -1121,27 +1106,8 @@ function PlayerCardImpl(props: PlayerCardProps) {
         </Box>
       )}
 
-      {/* ── Eliminated overlay ── */}
-      {player.isEliminated && (
-        <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 11, pointerEvents: 'none', bgcolor: player.isConceded && !isPoisoned ? 'rgba(218,165,32,0.12)' : 'transparent', overflow: 'hidden' }}>
-          {player.isConceded && !isPoisoned && TEARS.map((t, i) => (
-            <Box key={i} sx={{
-              position: 'absolute', top: 0, left: t.left,
-              width: 7, height: 11,
-              borderRadius: '50% 50% 50% 50% / 70% 70% 30% 30%',
-              bgcolor: 'rgba(120, 190, 255, 0.8)',
-              boxShadow: '0 0 5px rgba(120,190,255,0.5)',
-              animation: `${tearFall} ${t.dur} ${t.delay} ease-in infinite`,
-            }} />
-          ))}
-          <Typography
-            sx={{ fontWeight: 900, letterSpacing: 4, fontSize: 48, transform: 'rotate(-15deg)', color: isPoisoned ? undefined : player.isConceded ? '#DAA520' : 'error.main' }}
-            style={isPoisoned ? { color: '#00c853', WebkitTextFillColor: '#00c853', WebkitTextStroke: '2px black' } : player.isConceded ? { WebkitTextStroke: '2px black' } : undefined}
-          >
-            {isPoisoned ? 'POISONED' : player.isConceded ? 'CONCEDED' : 'ELIMINATED'}
-          </Typography>
-        </Box>
-      )}
+      {/* ── Eliminated overlay (shared with TeamPanel) ── */}
+      <EliminatedOverlay eliminated={player.isEliminated} conceded={player.isConceded} poisoned={isPoisoned} />
 
       {/* ── Life kill attribution overlay ── */}
       {lifeKillOpponents && onLifeKillSelect && (

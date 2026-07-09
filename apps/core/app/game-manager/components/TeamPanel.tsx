@@ -32,6 +32,7 @@ import { useCommanderPreview } from './useCommanderPreview';
 import { usePoisonSound } from '@/game-manager/hooks/usePoisonSound';
 import { useSounds } from '@/game-manager/hooks/useSounds';
 import { PoisonOverlay } from './PoisonOverlay';
+import { EliminatedOverlay } from './EliminatedOverlay';
 import { LifeCracks } from './LifeCracks';
 import { CityBlessing } from './CityBlessing';
 import { InitiativeTorch } from './InitiativeTorch';
@@ -865,6 +866,10 @@ export function TeamPanel({
       {/* Shared Phyrexian poison overlay — washes the whole panel as the team's
           shared poison closes on lethal (15). Same component as PlayerCard. */}
       <PoisonOverlay poison={poison} poisonProgress={poisonProgress} />
+
+      {/* Eliminated / Conceded / Poisoned outcome overlay (shared with PlayerCard),
+          shown per team. Poison is lethal at 15 in 2HG. */}
+      <EliminatedOverlay eliminated={eliminated} conceded={primary?.player.isConceded ?? false} poisoned={poison >= 15} />
 
       {/* Commander card preview overlay — shared with PlayerCard, scoped to this
           panel via the root Box's position:relative + inset:0. */}
