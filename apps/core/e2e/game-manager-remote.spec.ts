@@ -97,6 +97,34 @@ test.describe('Game Manager — Remote Panel', () => {
     await expect(cmdDmg).toBeVisible();
   });
 
+  test('remote panel renders commander art (regression: art must not go blank)', async ({ page }) => {
+    if (!seatCode) {
+      test.skip(true, 'No active game');
+      return;
+    }
+    await goto(page, `/game-manager/remote/?code=${seatCode}`);
+    await page.waitForLoadState('domcontentloaded');
+    // The remote holds an open SSE connection (networkidle never fires) and art
+    // resolves through the host proxy after connect, so give it a fixed settle.
+    await page.waitForTimeout(4000);
+    // Commander art renders as an <img> (thumbnail) and/or a CSS background
+    // (faded panel art). Accept a data: URI (proxied crop) or a scryfall URL
+    // (raw fallback) — either proves art is present, guarding against the
+    // blank-art regression where every commander-art surface rendered nothing.
+    const hasArt = await page.evaluate(() => {
+      const imgOk = [...document.querySelectorAll('img')].some((i) => {
+        const s = (i as HTMLImageElement).src;
+        return s.startsWith('data:image') || s.includes('scryfall.io');
+      });
+      const bgOk = [...document.querySelectorAll('*')].some((el) => {
+        const b = getComputedStyle(el).backgroundImage;
+        return b.includes('data:image') || b.includes('scryfall.io');
+      });
+      return imgOk || bgOk;
+    });
+    expect(hasArt, 'commander art (img or background) must render on the connected remote').toBe(true);
+  });
+
   test('invalid seat code shows error or enter-code state', async ({ page }) => {
     await goto(page, '/game-manager/remote/?code=INVALID_CODE_00000');
     await page.waitForLoadState('domcontentloaded');

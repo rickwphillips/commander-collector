@@ -109,6 +109,16 @@ describe('describeLogEntry', () => {
     expect(describeLogEntry(entry('manual_entry', {}))).toBe('Manual entry by unknown');
   });
 
+  it('handles missing array payloads on turn_order, die_roll and roll_for_first', () => {
+    expect(describeLogEntry(entry('turn_order', {}))).toBe('Turn order: ');
+    expect(describeLogEntry(entry('die_roll', { die: 'd6' }))).toBe('Rolled d6: ');
+    expect(describeLogEntry(entry('roll_for_first', {}))).toBe('Roll for first: ');
+  });
+
+  it('describes concede without a turn', () => {
+    expect(describeLogEntry(entry('concede', { player: 'A' }))).toBe('A conceded');
+  });
+
   it('returns the raw type for an unknown entry and handles a missing payload', () => {
     expect(describeLogEntry(entry('something_new'))).toBe('something_new');
   });

@@ -143,4 +143,13 @@ describe('useHiddenStats', () => {
     expect(result.current.hiddenPanelIds.has('panel-3')).toBe(true);
     expect(result.current.hiddenPanelIds.has('panel-14')).toBe(true);
   });
+
+  it('falls back to an empty set when stored JSON is invalid', async () => {
+    localStorage.setItem(HIDDEN_SECTIONS_KEY, '{not valid json');
+    localStorage.setItem(HIDDEN_PANELS_KEY, '<<garbage>>');
+    const { result } = renderHook(() => useHiddenStats());
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+    expect(result.current.hiddenSections.size).toBe(0);
+    expect(result.current.hiddenPanelIds.size).toBe(0);
+  });
 });

@@ -9,11 +9,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ─── Mock the API module ───────────────────────────────────────────────────────
 const mockLookupCard = vi.fn();
 const mockGetCardImage = vi.fn();
+const mockGetCardArtCrop = vi.fn();
 
 vi.mock('../../../../packages/shared/src/lib/api', () => ({
   api: {
     lookupCard: (...args: unknown[]) => mockLookupCard(...args),
     getCardImage: (...args: unknown[]) => mockGetCardImage(...args),
+    getCardArtCrop: (...args: unknown[]) => mockGetCardArtCrop(...args),
   },
 }));
 
@@ -21,6 +23,8 @@ vi.mock('../../../../packages/shared/src/lib/api', () => ({
 import {
   getCardImageByName,
   getCardBackImageByName,
+  getArtCropByUrl,
+  getArtCropByName,
   prewarmCardImages,
 } from '../../../../packages/shared/src/lib/cardImageCache';
 
@@ -47,6 +51,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockLookupCard.mockReset();
   mockGetCardImage.mockReset();
+  mockGetCardArtCrop.mockReset();
 });
 
 // ─── Unit Tests ────────────────────────────────────────────────────────────────
@@ -120,6 +125,101 @@ describe('getCardImageByName', () => {
     expect(a).toBe('data:image/png;base64,dedup');
     expect(b).toBe('data:image/png;base64,dedup');
     expect(c).toBe('data:image/png;base64,dedup');
+    expect(mockLookupCard).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('getArtCropByUrl', () => {
+  const artUrl = (n: string) => `https://cards.scryfall.io/art_crop/front/a/b/${n}.jpg?1`;
+
+  it('returns the proxied data_uri for a crop URL', async () => {
+    const url = artUrl(uniqueName('sol'));
+    mockGetCardArtCrop.mockResolvedValue({ data_uri: 'data:image/jpeg;base64,crop', cached: false });
+
+    expect(await getArtCropByUrl(url)).toBe('data:image/jpeg;base64,crop');
+    expect(mockGetCardArtCrop).toHaveBeenCalledWith(url);
+  });
+
+  it('returns null when the endpoint yields no data_uri', async () => {
+    const url = artUrl(uniqueName('none'));
+    mockGetCardArtCrop.mockResolvedValue({ data_uri: null, cached: false });
+
+    expect(await getArtCropByUrl(url)).toBeNull();
+  });
+
+  it('returns null on error and does not cache the failure', async () => {
+    const url = artUrl(uniqueName('flaky'));
+    mockGetCardArtCrop.mockRejectedValueOnce(new Error('boom'));
+    expect(await getArtCropByUrl(url)).toBeNull();
+
+    mockGetCardArtCrop.mockResolvedValueOnce({ data_uri: 'data:image/jpeg;base64,ok', cached: false });
+    expect(await getArtCropByUrl(url)).toBe('data:image/jpeg;base64,ok');
+    expect(mockGetCardArtCrop).toHaveBeenCalledTimes(2);
+  });
+
+  it('caches success — a second call does not hit the endpoint', async () => {
+    const url = artUrl(uniqueName('cached'));
+    mockGetCardArtCrop.mockResolvedValue({ data_uri: 'data:image/jpeg;base64,c', cached: false });
+
+    await getArtCropByUrl(url);
+    await getArtCropByUrl(url);
+    expect(mockGetCardArtCrop).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('getArtCropByName', () => {
+  // Scryfall image URLs share one path shape; only the size segment differs, so
+  // the art_crop URL is derived from the cached 'normal' URL.
+  function normalMeta(name: string) {
+    return { scryfall_id: `sf-${name}`, image_uri: `https://cards.scryfall.io/normal/front/a/b/${name}.jpg?9`, back_image_uri: null };
+  }
+
+  it('derives the art_crop URL from the normal image_uri and proxies it', async () => {
+    const name = uniqueName('Baylen');
+    mockLookupCard.mockResolvedValue(normalMeta(name));
+    mockGetCardArtCrop.mockResolvedValue({ data_uri: 'data:image/jpeg;base64,art', cached: false });
+
+    const result = await getArtCropByName(name);
+
+    expect(result).toBe('data:image/jpeg;base64,art');
+    expect(mockGetCardArtCrop).toHaveBeenCalledWith(
+      `https://cards.scryfall.io/art_crop/front/a/b/${name}.jpg?9`
+    );
+  });
+
+  it('falls back to the derived crop URL when the proxy returns null', async () => {
+    const name = uniqueName('Prosper');
+    mockLookupCard.mockResolvedValue(normalMeta(name));
+    mockGetCardArtCrop.mockResolvedValue({ data_uri: null, cached: false });
+
+    const result = await getArtCropByName(name);
+
+    expect(result).toBe(`https://cards.scryfall.io/art_crop/front/a/b/${name}.jpg?9`);
+  });
+
+  it('returns null when the card has no image_uri', async () => {
+    const name = uniqueName('Missing');
+    mockLookupCard.mockResolvedValue({ scryfall_id: null, image_uri: null, back_image_uri: null });
+
+    expect(await getArtCropByName(name)).toBeNull();
+    expect(mockGetCardArtCrop).not.toHaveBeenCalled();
+  });
+
+  it('returns null when the image_uri has no /normal/ segment (cannot derive)', async () => {
+    const name = uniqueName('Weird');
+    mockLookupCard.mockResolvedValue({ scryfall_id: 'x', image_uri: 'https://cards.scryfall.io/large/front/a/b/x.jpg', back_image_uri: null });
+
+    expect(await getArtCropByName(name)).toBeNull();
+    expect(mockGetCardArtCrop).not.toHaveBeenCalled();
+  });
+
+  it('caches by name — a second call does not look the card up again', async () => {
+    const name = uniqueName('Cached Cmd');
+    mockLookupCard.mockResolvedValue(normalMeta(name));
+    mockGetCardArtCrop.mockResolvedValue({ data_uri: 'data:image/jpeg;base64,cc', cached: false });
+
+    await getArtCropByName(name);
+    await getArtCropByName(name);
     expect(mockLookupCard).toHaveBeenCalledTimes(1);
   });
 });

@@ -39,6 +39,21 @@ describe('scryfall search helpers', () => {
     expect(await scryfallAutocomplete('sol')).toEqual([]);
   });
 
+  it('scryfallAutocomplete returns [] when the payload has no data array', async () => {
+    vi.stubGlobal('fetch', okJson({}));
+    expect(await scryfallAutocomplete('sol')).toEqual([]);
+  });
+
+  it('scryfallCommanderSearch returns [] when the payload has no data array', async () => {
+    vi.stubGlobal('fetch', okJson({}));
+    expect(await scryfallCommanderSearch('atr')).toEqual([]);
+  });
+
+  it('scryfallPartnerSearch returns [] on a non-ok response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+    expect(await scryfallPartnerSearch('face', true)).toEqual([]);
+  });
+
   it('scryfallCommanderSearch maps name and mana_cost', async () => {
     vi.stubGlobal('fetch', okJson({ data: [{ name: 'Atraxa', mana_cost: '{G}{W}{U}{B}' }] }));
     expect(await scryfallCommanderSearch('atr')).toEqual([
