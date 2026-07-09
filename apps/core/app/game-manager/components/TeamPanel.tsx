@@ -29,9 +29,16 @@ import { QRCodeSVG } from 'qrcode.react';
 import { ASSET_BASE, remoteQrOrigin } from '@/lib/api';
 import { CommanderArt } from './CommanderArt';
 import { useCommanderPreview } from './useCommanderPreview';
+import { PoisonOverlay } from './PoisonOverlay';
+import { LifeCracks } from './LifeCracks';
 import { LifeTotal } from './LifeTotal';
 import { useTimerTokens, TIMER_EXPIRED_BORDER_BLINK, TIMER_EXPIRED_HEADER_BLINK } from '@/game-manager/hooks/useTimerTokens';
 import { StepperControl, StepperOverlayHost, type StepperSize } from './StepperControl';
+import { useXpKeyframes } from './PlayerCard.keyframes';
+import { xpGlowFor, energyGlowFor, counterValueSx } from './counterEffects';
+
+// Shared poison total is lethal at 15 in 2HG; the danger pulse fires one below.
+const POISON_DANGER_2HG = 14;
 import { lifeColor } from '@/game-manager/lifeColor';
 import { teamColor, otherTeam } from '@/lib/teams';
 import type { PlayerState, CommanderDamageMap } from '@/lib/types';
@@ -186,6 +193,63 @@ function taxStepSize(sz: Sz): Partial<StepperSize> {
   return { btnFont: sz.btnCmd, valueFont: sz.cmdVal, btnMinWidth: sz.big ? 36 : 30, btnMinHeight: sz.big ? 36 : 30, valueMinWidth: 16 };
 }
 
+/**
+ * One pilot's energy + XP counters. A component (not inline) so it can call the
+ * XP shimmer hook once per pilot — hooks can't run inside members.map(). Ports
+ * PlayerCard's value effects: XP gold glow + shimmer, energy cyan glow, and the
+ * poison "closing in" blur that ramps as the team nears lethal poison.
+ */
+function TeammateCounters({ member, sz, poisonProgress, onEnergyChange, onExperienceChange }: {
+  member: TeamMember;
+  sz: Sz;
+  poisonProgress: number;
+  onEnergyChange: (idx: number, delta: number) => void;
+  onExperienceChange: (idx: number, delta: number) => void;
+}) {
+  const { energy, experience } = member.player;
+  const idx = member.idx;
+
+  const { intensity: xpIntensity, glow: xpGlow } = xpGlowFor(experience);
+  const { xpShimmerAnim } = useXpKeyframes(experience, xpGlow, xpIntensity);
+  const energyGlow = energyGlowFor(energy);
+  const glow = { xpGlow, xpShimmerAnim, energyGlow };
+
+  return (
+    <Stack direction="row" alignItems="center" useFlexGap flexWrap="wrap" spacing={1}>
+      <StepperControl
+        label="Energy"
+        glyph="⚡"
+        glyphColor="#4FC8FF"
+        value={energy}
+        color={energy > 0 ? '#4FC8FF' : 'text.primary'}
+        // Energy has no card-wide glow surface in 2HG (unlike PlayerCard), so its
+        // cyan glow rides directly on the value here.
+        valueSx={{ ...counterValueSx('energy', energy, poisonProgress, glow, POISON_DANGER_2HG), ...(energyGlow ? { textShadow: energyGlow } : {}) }}
+        onDec={() => onEnergyChange(idx, -1)}
+        onInc={() => onEnergyChange(idx, 1)}
+        onDec5={() => onEnergyChange(idx, -5)}
+        onInc5={() => onEnergyChange(idx, 5)}
+        size={miniStepSize(sz)}
+        lpKeyPrefix={`energy-${idx}`}
+      />
+      <StepperControl
+        label="XP"
+        glyph="✦"
+        glyphColor="#DAA520"
+        value={experience}
+        color={experience > 0 ? '#DAA520' : 'text.primary'}
+        valueSx={counterValueSx('xp', experience, poisonProgress, glow, POISON_DANGER_2HG)}
+        onDec={() => onExperienceChange(idx, -1)}
+        onInc={() => onExperienceChange(idx, 1)}
+        onDec5={() => onExperienceChange(idx, -5)}
+        onInc5={() => onExperienceChange(idx, 5)}
+        size={miniStepSize(sz)}
+        lpKeyPrefix={`xp-${idx}`}
+      />
+    </Stack>
+  );
+}
+
 /** Compact per-player ability toggle (monarch / initiative / city's blessing). */
 function AbilityToggle({
   active,
@@ -288,6 +352,12 @@ export function TeamPanel({
   const primary = members[0];
   const life = primary?.player.life ?? startingLife;
   const poison = primary?.player.poison ?? 0;
+  // Poison "closing in" ramp: counters blur as shared poison approaches the 2HG
+  // lethal threshold of 15 (PlayerCard uses 10 for singles). Mirrors PlayerCard.
+  const poisonProgress = Math.min(poison / 15, 1);
+  // Life-lost ratio drives the shared crack overlay (same closure as PlayerCard).
+  const lostRatio = startingLife > 0 ? Math.min(Math.max((startingLife - life) / startingLife, 0), 1) : 0;
+  const crackAlpha = (from: number) => Math.min(Math.max((lostRatio - from) / 0.15, 0), 1);
   const eliminated = primary?.player.isEliminated ?? false;
   // A team is "conceded" if either head was manually conceded (vs eliminated by
   // damage). reconcileTeams only stamps isConceded on the head that received the
@@ -581,35 +651,16 @@ export function TeamPanel({
                   })}
                 </Stack>
                 {/* Individual per-player counters (energy + XP). No text label —
-                    the ⚡ / ✦ glyph identifies each; buttons run a touch larger. */}
-                <Stack direction="row" alignItems="center" useFlexGap flexWrap="wrap" spacing={1}>
-                  <StepperControl
-                    label="Energy"
-                    glyph="⚡"
-                    glyphColor="#4FC8FF"
-                    value={m.player.energy}
-                    color={m.player.energy > 0 ? '#4FC8FF' : 'text.primary'}
-                    onDec={() => onEnergyChange(m.idx, -1)}
-                    onInc={() => onEnergyChange(m.idx, 1)}
-                    onDec5={() => onEnergyChange(m.idx, -5)}
-                    onInc5={() => onEnergyChange(m.idx, 5)}
-                    size={miniStepSize(sz)}
-                    lpKeyPrefix={`energy-${m.idx}`}
-                  />
-                  <StepperControl
-                    label="XP"
-                    glyph="✦"
-                    glyphColor="#DAA520"
-                    value={m.player.experience}
-                    color={m.player.experience > 0 ? '#DAA520' : 'text.primary'}
-                    onDec={() => onExperienceChange(m.idx, -1)}
-                    onInc={() => onExperienceChange(m.idx, 1)}
-                    onDec5={() => onExperienceChange(m.idx, -5)}
-                    onInc5={() => onExperienceChange(m.idx, 5)}
-                    size={miniStepSize(sz)}
-                    lpKeyPrefix={`xp-${m.idx}`}
-                  />
-                </Stack>
+                    the ⚡ / ✦ glyph identifies each; buttons run a touch larger.
+                    Value effects (XP glow/shimmer, energy glow, poison blur) live
+                    in TeammateCounters so the shimmer hook runs once per pilot. */}
+                <TeammateCounters
+                  member={m}
+                  sz={sz}
+                  poisonProgress={poisonProgress}
+                  onEnergyChange={onEnergyChange}
+                  onExperienceChange={onExperienceChange}
+                />
                 {/* Per-player ability toggles (individual, not shared). */}
                 <Stack direction="row" alignItems="center" spacing={0.5}>
                   <AbilityToggle active={m.player.isMonarch} color="#DAA520" title="Monarch" onToggle={() => onToggleMonarch(m.idx)} big={sz.big}>
@@ -630,6 +681,9 @@ export function TeamPanel({
 
       {/* Section B: shared life (centered + prominent) and poison. Order 2 (center). */}
       <Stack sx={{ flex: 1.2, minWidth: 0, alignItems: 'center', justifyContent: 'center', order: 2, ...(remoteMode && { alignSelf: 'stretch' }) }} spacing={0.5}>
+        {/* Shared crack overlay behind the life number (same component as PlayerCard). */}
+        <Box sx={{ position: 'relative', overflow: 'hidden', display: 'flex', justifyContent: 'center' }}>
+        <LifeCracks fingerprint={teamNumber} crackAlpha={crackAlpha} />
         <StepperControl
           label="Life Total"
           value={life}
@@ -654,6 +708,7 @@ export function TeamPanel({
             />
           }
         />
+        </Box>
         <Typography sx={{ fontSize: sz.sectionLabel, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
           Shared Life
         </Typography>
@@ -663,7 +718,7 @@ export function TeamPanel({
             label="Poison"
             value={poison}
             color={poison >= 15 ? '#2E7D32' : 'text.primary'}
-            valueSx={{ fontWeight: 800 }}
+            valueSx={{ fontWeight: 800, ...counterValueSx('poison', poison, poisonProgress, {}, POISON_DANGER_2HG) }}
             onDec={() => onPoisonChange(primary.idx, -1)}
             onInc={() => onPoisonChange(primary.idx, 1)}
             onDec5={() => onPoisonChange(primary.idx, -5)}
@@ -764,6 +819,10 @@ export function TeamPanel({
         })}
       </Stack>
       </Box>
+
+      {/* Shared Phyrexian poison overlay — washes the whole panel as the team's
+          shared poison closes on lethal (15). Same component as PlayerCard. */}
+      <PoisonOverlay poison={poison} poisonProgress={poisonProgress} />
 
       {/* Commander card preview overlay — shared with PlayerCard, scoped to this
           panel via the root Box's position:relative + inset:0. */}

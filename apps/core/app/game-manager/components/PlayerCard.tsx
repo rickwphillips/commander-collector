@@ -26,6 +26,12 @@ import { ControlFocusModal } from './ControlFocusModal';
 import { StepperControl, StepperOverlayHost } from './StepperControl';
 import { LifeTotal } from './LifeTotal';
 import { useXpKeyframes } from './PlayerCard.keyframes';
+import { xpGlowFor, energyGlowFor, counterValueSx, poisonBlur } from './counterEffects';
+import { PoisonOverlay } from './PoisonOverlay';
+import { LifeCracks } from './LifeCracks';
+
+// Singles poison is lethal at 10; the danger pulse fires one below.
+const POISON_DANGER_SINGLES = 9;
 import { useLocalStorageBool } from '@/game-manager/hooks/useLocalStorageBool';
 import { TIMER_EXPIRED_BORDER_BLINK, TIMER_EXPIRED_HEADER_BLINK } from '@/game-manager/hooks/useTimerTokens';
 import type { TimerTokens } from '@/game-manager/hooks/useTimerTokens';
@@ -693,10 +699,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
   // These are derived from player.experience only — calling the shared hook
   // locally keeps invalidation tight and avoids threading 7 keyframe objects
   // through props.
-  const xpGlowIntensity = player.experience > 0 ? Math.min(player.experience / 10, 1) : 0;
-  const xpGlow = xpGlowIntensity > 0
-    ? `0 0 ${4 + xpGlowIntensity * 12}px rgba(218,165,32,${(0.5 + xpGlowIntensity * 0.5).toFixed(2)}), 0 0 ${10 + xpGlowIntensity * 24}px rgba(218,165,32,${(0.2 + xpGlowIntensity * 0.3).toFixed(2)})`
-    : undefined;
+  const { intensity: xpGlowIntensity, glow: xpGlow } = xpGlowFor(player.experience);
   const {
     xpShimmerAnim,
     xpFlashAnim,
@@ -708,10 +711,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
   } = useXpKeyframes(player.experience, xpGlow, xpGlowIntensity);
 
   // ─── Energy / damage / poison keyframes ─────────────────────────────────
-  const energyGlowIntensity = player.energy > 0 ? Math.min(player.energy / 8, 1) : 0;
-  const energyGlow = energyGlowIntensity > 0
-    ? `0 0 ${4 + energyGlowIntensity * 18}px rgba(80,200,255,${(0.5 + energyGlowIntensity * 0.45).toFixed(2)}), 0 0 ${10 + energyGlowIntensity * 36}px rgba(80,200,255,${(0.2 + energyGlowIntensity * 0.3).toFixed(2)})`
-    : undefined;
+  const energyGlow = energyGlowFor(player.energy);
   // energyGlow is used in the outer container; reserved here for Phase 4 wiring.
   void energyGlow;
   // The life-number reaction stack (damage flash + swipes, energy pulse/sizzle,
@@ -751,65 +751,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
     return `rgb(${r},${g},${b})`;
   }
 
-  // ─── Crack layers (per-player fingerprint, fixed in render lifetime) ───
-  const ox = 38 + (playerIdx % 7);
-  const oy = 32 + (playerIdx % 5);
-  const cp = (d: string, w: number, op: number) =>
-    `<path d="${d}" stroke="rgba(10,0,0,${op})" stroke-width="${w}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
-  const crackSvg = (paths: string) =>
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${paths}</svg>`;
-  const crackLayers: Array<{ from: number; svg: string }> = [
-    { from: 0.2, svg: crackSvg(
-      cp(`M${ox},${oy} L${ox-14},${oy-18} L${ox-22},${oy-32}`, 1.6, 0.95) +
-      cp(`M${ox},${oy} L${ox+8},${oy-22} L${ox+5},0`, 1.5, 0.92) +
-      cp(`M${ox},${oy} L${ox+28},${oy-14} L${ox+48},${oy-26} L100,${oy-18}`, 1.4, 0.9) +
-      cp(`M${ox},${oy} L${ox+22},${oy+18} L${ox+38},${oy+42} L100,${oy+60}`, 1.3, 0.88) +
-      cp(`M${ox},${oy} L${ox+4},${oy+28} L${ox-2},${oy+52} L${ox+6},100`, 1.3, 0.87) +
-      cp(`M${ox},${oy} L${ox-18},${oy+22} L${ox-34},${oy+48} L0,${oy+62}`, 1.2, 0.85) +
-      cp(`M${ox},${oy} L${ox-28},${oy+6} L0,${oy+14}`, 1.2, 0.84)
-    )},
-    { from: 0.35, svg: crackSvg(
-      cp(`M${ox-14},${oy-18} L${ox-30},${oy-12} L0,${oy-8}`, 1.0, 0.88) +
-      cp(`M${ox-14},${oy-18} L${ox-8},${oy-34} L0,${oy-48}`, 0.9, 0.85) +
-      cp(`M${ox+8},${oy-22} L${ox+22},${oy-14} L${ox+40},${oy-20} L100,${oy-30}`, 0.9, 0.85) +
-      cp(`M${ox+28},${oy-14} L${ox+22},${oy+6} L${ox+36},${oy+18}`, 0.85, 0.82) +
-      cp(`M${ox+22},${oy+18} L${ox+10},${oy+32} L${ox+16},${oy+50}`, 0.85, 0.82) +
-      cp(`M${ox+4},${oy+28} L${ox+18},${oy+36} L${ox+28},${oy+58} L${ox+18},100`, 0.8, 0.8) +
-      cp(`M${ox-18},${oy+22} L${ox-6},${oy+34} L${ox-12},${oy+52}`, 0.8, 0.8) +
-      cp(`M${ox-28},${oy+6} L${ox-18},${oy-6} L${ox-10},${oy-20}`, 0.8, 0.8)
-    )},
-    { from: 0.5, svg: crackSvg(
-      cp(`M${ox-30},${oy-12} L${ox-42},${oy-24} L${ox-36},${oy-40} L0,${oy-52}`, 0.75, 0.82) +
-      cp(`M${ox-8},${oy-34} L${ox+4},${oy-48} L${ox-2},${oy-62} L${ox+10},${oy-80}`, 0.72, 0.8) +
-      cp(`M${ox+40},${oy-20} L${ox+50},${oy-8} L${ox+62},${oy-16}`, 0.7, 0.78) +
-      cp(`M${ox+36},${oy+18} L${ox+52},${oy+28} L${ox+68},${oy+20} L100,${oy+32}`, 0.7, 0.78) +
-      cp(`M${ox+16},${oy+50} L${ox+30},${oy+62} L${ox+22},${oy+78} L${ox+36},100`, 0.68, 0.76) +
-      cp(`M${ox-12},${oy+52} L${ox-24},${oy+64} L${ox-14},${oy+80} L0,${oy+90}`, 0.68, 0.76) +
-      cp(`M${ox-42},${oy-24} L${ox-52},${oy-10} L0,${oy-4}`, 0.65, 0.74) +
-      cp(`M${ox+10},${oy-80} L${ox+22},${oy-72} L${ox+36},${oy-82}`, 0.62, 0.72)
-    )},
-    { from: 0.7, svg: crackSvg(
-      cp(`M${ox-22},${oy-32} L${ox-6},${oy-22} L${ox+4},${oy-38}`, 0.6, 0.8) +
-      cp(`M${ox+5},0 L${ox-10},${oy-44} L${ox-20},${oy-58}`, 0.55, 0.78) +
-      cp(`M${ox+48},${oy-26} L${ox+58},${oy-14} L${ox+72},${oy-22}`, 0.55, 0.76) +
-      cp(`M${ox+62},${oy-16} L${ox+76},${oy-6} L${ox+84},${oy+8}`, 0.52, 0.74) +
-      cp(`M${ox+28},${oy+58} L${ox+44},${oy+68} L${ox+38},${oy+84}`, 0.52, 0.74) +
-      cp(`M${ox-24},${oy+64} L${ox-38},${oy+72} L${ox-28},${oy+86}`, 0.5, 0.72) +
-      cp(`M${ox-52},${oy-10} L${ox-62},${oy+4} L${ox-50},${oy+18}`, 0.5, 0.72) +
-      cp(`M${ox+22},${oy+6} L${ox+14},${oy+18} L${ox+24},${oy+30}`, 0.48, 0.7)
-    )},
-    { from: 0.85, svg: crackSvg(
-      cp(`M${ox-6},${oy+8} L${ox+4},${oy+14} L${ox-2},${oy+22}`, 0.45, 0.8) +
-      cp(`M${ox+10},${oy+4} L${ox+18},${oy+12} L${ox+12},${oy+22}`, 0.42, 0.78) +
-      cp(`M${ox+6},${oy-10} L${ox+14},${oy-4} L${ox+8},${oy+6}`, 0.42, 0.76) +
-      cp(`M${ox-10},${oy-6} L${ox-4},${oy+4} L${ox-12},${oy+12}`, 0.4, 0.74) +
-      cp(`M${ox-36},${oy-40} L${ox-28},${oy-30} L${ox-38},${oy-22}`, 0.4, 0.72) +
-      cp(`M${ox+36},${oy-82} L${ox+48},${oy-76} L${ox+42},${oy-64}`, 0.38, 0.7) +
-      cp(`M${ox+84},${oy+8} L${ox+90},${oy+22} L${ox+80},${oy+34}`, 0.38, 0.7) +
-      cp(`M${ox+44},${oy+68} L${ox+54},${oy+80} L${ox+44},${oy+92}`, 0.36, 0.68) +
-      cp(`M${ox-62},${oy+4} L${ox-72},${oy+16} L${ox-62},${oy+28}`, 0.36, 0.68)
-    )},
-  ];
+  // Crack layers now live in the shared <LifeCracks> component.
   // monarchAnimStr is intentionally not derived here yet — it depends on the
   // crown keyframes which are migrated in Phase 3. The render block that needs
   // it will compute it locally when it lands.
@@ -1307,18 +1249,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
               }} />
             )}
             <Box sx={{ position: 'relative', overflow: 'hidden', lineHeight: 1, width: '100%', flex: remoteMode ? undefined : 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              {crackLayers.map(({ from, svg }) => (
-                <Box key={from} sx={{
-                  position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                  backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(svg)}")`,
-                  backgroundSize: '100% 100%',
-                  mixBlendMode: 'multiply',
-                  pointerEvents: 'none',
-                  userSelect: 'none',
-                  opacity: crackAlpha(from),
-                  transition: 'opacity 0.5s ease',
-                }} />
-              ))}
+              <LifeCracks fingerprint={playerIdx} crackAlpha={crackAlpha} />
               {threatSource?.cmdName && threatSource.intensity > 0 && (
                 [
                   { top: '10%',  left: '6%',  rotate: -18 },
@@ -1469,14 +1400,11 @@ function PlayerCardImpl(props: PlayerCardProps) {
               ['Tax', player.commanderTax, () => onCommanderTaxChange(playerIdx, -1), () => onCommanderTaxChange(playerIdx, 1), () => onCommanderTaxChange(playerIdx, -5), () => onCommanderTaxChange(playerIdx, 5), player.commanderTax > 0 ? 'warning.main' : 'text.disabled', player.commanderTax],
               ...(player.partner ? [[player.partner.name, player.partnerCommanderTax, () => onCommanderTaxChange(playerIdx, -1, true), () => onCommanderTaxChange(playerIdx, 1, true), () => onCommanderTaxChange(playerIdx, -5, true), () => onCommanderTaxChange(playerIdx, 5, true), player.partnerCommanderTax > 0 ? 'warning.main' : 'text.disabled', player.partnerCommanderTax]] as [string, number, () => void, () => void, () => void, () => void, string, number | null][] : []),
             ] as [string, number, () => void, () => void, () => void, () => void, string, number | null][]).flatMap(([label, value, onDec, onInc, onDec5, onInc5, color, medallionTax]) => {
-              const blurSx = poisonProgress > 0 ? { filter: `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` } : {};
-              // Per-row value effects preserved from the bespoke grid: poison blur,
-              // the poison "9" danger pulse, and the XP glow/shimmer.
-              const valueSx = {
-                ...blurSx,
-                ...(label === 'Poison' && value === 9 && { animation: 'poisonPulse 2.5s ease-in-out infinite', '@keyframes poisonPulse': { '0%, 100%': { opacity: 1, transform: 'scale(1)', textShadow: '0 0 8px rgba(0,200,60,0.9), 0 0 20px rgba(0,200,60,0.5)' }, '50%': { opacity: 0.3, transform: 'scale(0.85)', textShadow: '0 0 2px rgba(0,200,60,0.2)' } } }),
-                ...(label === 'XP' && xpGlow && { textShadow: xpGlow, ...(xpShimmerAnim && { animation: `${xpShimmerAnim} 3s ease-in-out infinite` }) }),
-              };
+              const blurSx = poisonBlur(poisonProgress);
+              // Per-value effects are shared with TeamPanel via counterValueSx:
+              // poison blur, the poison danger pulse (9 for singles), XP glow/shimmer.
+              const kind = label === 'Poison' ? 'poison' : label === 'Energy' ? 'energy' : label === 'XP' ? 'xp' : 'other';
+              const valueSx = counterValueSx(kind, value, poisonProgress, { xpGlow, xpShimmerAnim }, POISON_DANGER_SINGLES);
               return [
               <Stack key={`${label}-lbl`} direction="row" alignItems="center" spacing={0.4} sx={{ overflow: 'hidden', ...blurSx, minWidth: 0 }}>
                 {label === 'Poison'     && <Typography component="span" sx={{ fontSize: sizes.fsSourceName, color: player.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1, flexShrink: 0 }}>☠</Typography>}
@@ -2010,248 +1938,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
       )}
 
       {/* ── Phyrexian poison overlay ── */}
-      {poisonProgress > 0 && (
-        <>
-          {/* Green tint wash */}
-          <Box sx={{ position: 'absolute', inset: 0, zIndex: 2, pointerEvents: 'none', bgcolor: `rgba(0,${Math.round(80 + poisonProgress * 60)},0,${Math.pow(poisonProgress, 2) * 0.45})` }} />
-
-          {/* Poison drips — SVG curvy */}
-          <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 3, pointerEvents: 'none', overflow: 'visible' }} viewBox="0 0 600 220" preserveAspectRatio="none">
-            <defs>
-              {[
-                { id: 'tg0', g: 'black', t: '#00c853' }, { id: 'tg1', g: '#003300', t: '#00ff44' },
-                { id: 'tg2', g: 'black',  t: '#004d00' }, { id: 'tg3', g: '#001a00', t: '#00e040' },
-                { id: 'tg4', g: '#002200', t: 'black'  }, { id: 'tg5', g: '#00c853', t: 'black'  },
-                { id: 'bg0', g: 'black', t: '#00c853' }, { id: 'bg1', g: '#003300', t: '#00ff44' },
-                { id: 'bg2', g: 'black',  t: '#004d00' }, { id: 'bg3', g: '#001a00', t: '#00e040' },
-                { id: 'bg4', g: '#002200', t: 'black'  }, { id: 'bg5', g: '#00c853', t: 'black'  },
-              ].map(({ id, g, t }) => (
-                <linearGradient key={id} id={id} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={g} stopOpacity={poisonProgress * 0.9} />
-                  <stop offset="100%" stopColor={t} stopOpacity={poisonProgress * 0.4} />
-                </linearGradient>
-              ))}
-            </defs>
-
-            {/* Top drips */}
-            <g style={{ transformOrigin: '0 0', transform: `scaleY(${poisonProgress})`, transition: 'transform 4s ease' }}>
-              {[
-                { x: 18,  len: 140, w: 8,  cx1: 22,  grad: 'tg0' },
-                { x: 55,  len: 60,  w: 3,  cx1: -5,  grad: 'tg1' },
-                { x: 95,  len: 190, w: 10, cx1: -18, grad: 'tg2' },
-                { x: 148, len: 75,  w: 4,  cx1: 28,  grad: 'tg3' },
-                { x: 190, len: 160, w: 7,  cx1: 8,   grad: 'tg4' },
-                { x: 235, len: 45,  w: 2,  cx1: -24, grad: 'tg5' },
-                { x: 272, len: 175, w: 9,  cx1: 14,  grad: 'tg0' },
-                { x: 318, len: 85,  w: 4,  cx1: 30,  grad: 'tg2' },
-                { x: 360, len: 200, w: 11, cx1: -6,  grad: 'tg3' },
-                { x: 410, len: 55,  w: 3,  cx1: -26, grad: 'tg1' },
-                { x: 448, len: 150, w: 7,  cx1: 18,  grad: 'tg4' },
-                { x: 490, len: 70,  w: 4,  cx1: -32, grad: 'tg5' },
-                { x: 535, len: 120, w: 6,  cx1: 10,  grad: 'tg2' },
-              ].map((d, i) => {
-                const h = d.len; const hw = d.w / 2; const tipX = d.x + d.cx1 * 0.3;
-                return <path key={`td-${i}`} d={`M ${d.x-hw} 0 C ${d.x-hw+d.cx1*0.9} ${h*0.45} ${tipX-1} ${h*0.88} ${tipX} ${h} C ${tipX+1} ${h*0.88} ${d.x+hw+d.cx1*0.9} ${h*0.45} ${d.x+hw} 0 Z`} fill={`url(#${d.grad})`} />;
-              })}
-            </g>
-
-            {/* Bottom drips */}
-            <g style={{ transformOrigin: '0 220px', transform: `scaleY(${poisonProgress})`, transition: 'transform 4s ease' }}>
-              {[
-                { x: 38,  len: 110, w: 7,  cx1: 20,  grad: 'bg0' },
-                { x: 80,  len: 50,  w: 3,  cx1: -28, grad: 'bg1' },
-                { x: 128, len: 170, w: 9,  cx1: 10,  grad: 'bg2' },
-                { x: 175, len: 65,  w: 4,  cx1: -8,  grad: 'bg3' },
-                { x: 220, len: 130, w: 6,  cx1: 26,  grad: 'bg4' },
-                { x: 260, len: 40,  w: 2,  cx1: -14, grad: 'bg5' },
-                { x: 290, len: 155, w: 8,  cx1: -30, grad: 'bg0' },
-                { x: 335, len: 90,  w: 5,  cx1: 6,   grad: 'bg2' },
-                { x: 378, len: 185, w: 10, cx1: 24,  grad: 'bg3' },
-                { x: 425, len: 60,  w: 3,  cx1: -18, grad: 'bg1' },
-                { x: 462, len: 140, w: 7,  cx1: 32,  grad: 'bg4' },
-                { x: 505, len: 75,  w: 4,  cx1: -10, grad: 'bg5' },
-              ].map((d, i) => {
-                const h = d.len; const hw = d.w / 2; const tipX = d.x + d.cx1 * 0.3; const tipY = 220 - h;
-                return <path key={`bd-${i}`} d={`M ${d.x-hw} 220 C ${d.x-hw+d.cx1*0.9} ${220-h*0.45} ${tipX-1} ${220-h*0.88} ${tipX} ${tipY} C ${tipX+1} ${220-h*0.88} ${d.x+hw+d.cx1*0.9} ${220-h*0.45} ${d.x+hw} 220 Z`} fill={`url(#${d.grad})`} />;
-              })}
-            </g>
-          </svg>
-
-          {/* Poison bubbles — only above 5 counters */}
-          {player.poison >= 5 && [
-            { left: '12%', size: 8,  delay: '0s',    dur: '3.2s', dark: false },
-            { left: '28%', size: 5,  delay: '0.7s',  dur: '2.6s', dark: true  },
-            { left: '42%', size: 10, delay: '1.4s',  dur: '3.8s', dark: false },
-            { left: '55%', size: 6,  delay: '0.3s',  dur: '2.9s', dark: true  },
-            { left: '68%', size: 9,  delay: '1.1s',  dur: '3.4s', dark: false },
-            { left: '80%', size: 5,  delay: '0.5s',  dur: '2.4s', dark: true  },
-            { left: '20%', size: 7,  delay: '2.0s',  dur: '3.1s', dark: true  },
-            { left: '90%', size: 6,  delay: '1.8s',  dur: '2.7s', dark: false },
-          ].map((b, i) => {
-            const intensity = Math.max(0, (player.poison - 4) / 6) * (player.poison >= 9 ? 1.0 : 0.6);
-            const durBase = parseFloat(b.dur);
-            const dur = player.poison >= 9 ? `${(durBase * 0.15).toFixed(2)}s` : player.poison >= 8 ? `${(durBase * 0.3).toFixed(1)}s` : b.dur;
-            const delay = player.poison >= 9 ? '0s' : b.delay;
-            return (
-            <Box key={i} sx={{
-              position: 'absolute',
-              bottom: '-12px',
-              left: b.left,
-              width: b.size,
-              height: b.size,
-              borderRadius: '50%',
-              bgcolor: b.dark ? `rgba(0, 0, 0, ${intensity})` : `rgba(0, ${Math.round(180 + poisonProgress * 75)}, 0, ${intensity})`,
-              border: b.dark ? `1px solid rgba(0, 200, 60, ${intensity * 0.6})` : `1px solid rgba(0, 255, 80, ${intensity * 0.8})`,
-              zIndex: 4,
-              pointerEvents: 'none',
-              animation: `poisonBubble ${dur} ${delay} ease-in infinite`,
-              '@keyframes poisonBubble': {
-                '0%':   { transform: 'translateY(0) scale(1)',    opacity: player.poison >= 9 ? 1 : 0.8 },
-                '60%':  { transform: 'translateY(-60px) scale(1.1)', opacity: player.poison >= 9 ? 0.85 : 0.6 },
-                '100%': { transform: 'translateY(-110px) scale(0.6)', opacity: 0 },
-              },
-            }} />
-          );})}
-
-          {/* Extra boiling bubbles at 9+ */}
-          {player.poison >= 9 && [
-            { left: '5%',  size: 22, delay: '0s',    dur: '0.45s' },
-            { left: '15%', size: 8,  delay: '0.05s', dur: '0.38s' },
-            { left: '24%', size: 30, delay: '0.1s',  dur: '0.52s' },
-            { left: '33%', size: 12, delay: '0.02s', dur: '0.41s' },
-            { left: '40%', size: 5,  delay: '0.08s', dur: '0.35s' },
-            { left: '48%', size: 26, delay: '0.15s', dur: '0.48s' },
-            { left: '57%', size: 9,  delay: '0.03s', dur: '0.39s' },
-            { left: '63%', size: 18, delay: '0.12s', dur: '0.44s' },
-            { left: '72%', size: 35, delay: '0s',    dur: '0.55s' },
-            { left: '79%', size: 7,  delay: '0.07s', dur: '0.36s' },
-            { left: '86%', size: 14, delay: '0.09s', dur: '0.42s' },
-            { left: '94%', size: 28, delay: '0.04s', dur: '0.50s' },
-          ].map((b, i) => (
-            <Box key={`boil-${i}`} sx={{
-              position: 'absolute',
-              bottom: '-12px',
-              left: b.left,
-              width: b.size,
-              height: b.size,
-              borderRadius: '50%',
-              bgcolor: i % 3 === 0 ? `rgba(0,0,0,0.85)` : `rgba(0,200,60,0.75)`,
-              border: `1px solid rgba(0,255,80,0.6)`,
-              zIndex: 4,
-              pointerEvents: 'none',
-              animation: `poisonBubbleFast ${b.dur} ${b.delay} ease-in infinite`,
-              '@keyframes poisonBubbleFast': {
-                '0%':   { transform: 'translateY(0) scale(1)',     opacity: 1   },
-                '50%':  { transform: 'translateY(-50px) scale(1.05)', opacity: 0.8 },
-                '100%': { transform: 'translateY(-120px) scale(0.5)', opacity: 0   },
-              },
-            }} />
-          ))}
-
-          {/* Phyrexian symbol — left side */}
-          <Box sx={{
-            position: 'absolute',
-            left: `-${Math.round(30 + poisonProgress * 20)}px`,
-            top: '30%',
-            transform: `translateY(-50%) rotate(-${poisonProgress * 12}deg)`,
-            zIndex: 3,
-            pointerEvents: 'none',
-            transition: 'all 0.8s ease',
-            ...(player.poison >= 9 && {
-              animation: 'phyrexianOrbitL 20s linear infinite',
-              '@keyframes phyrexianOrbitL': {
-                '0%':   { transform: 'translateY(-50%) rotate(-12deg) scale(1)'    },
-                '25%':  { transform: 'translateY(-60%) rotate(8deg)   scale(1.35)' },
-                '50%':  { transform: 'translateY(-40%) rotate(-20deg) scale(0.75)' },
-                '75%':  { transform: 'translateY(-58%) rotate(4deg)   scale(1.2)'  },
-                '100%': { transform: 'translateY(-50%) rotate(-12deg) scale(1)'    },
-              },
-            }),
-          }}>
-            <Box
-              component="img"
-              src="https://cdn.jsdelivr.net/gh/Investigamer/mtg-vectors@main/svg/watermark/phyrexian.svg"
-              alt=""
-              sx={{
-                width: `${140 + poisonProgress * 200}px`,
-                height: `${140 + poisonProgress * 200}px`,
-                opacity: poisonProgress * 0.7,
-                transition: 'all 0.8s ease',
-                userSelect: 'none',
-                display: 'block',
-                filter: 'brightness(0)',
-              }}
-            />
-          </Box>
-
-          {/* Phyrexian symbol — right side */}
-          <Box sx={{
-            position: 'absolute',
-            right: `-${Math.round(30 + poisonProgress * 20)}px`,
-            top: '65%',
-            transform: `translateY(-50%) rotate(${poisonProgress * 12}deg)`,
-            zIndex: 3,
-            pointerEvents: 'none',
-            transition: 'all 0.8s ease',
-            ...(player.poison >= 9 && {
-              animation: 'phyrexianOrbitR 27s linear infinite',
-              '@keyframes phyrexianOrbitR': {
-                '0%':   { transform: 'translateY(-50%) rotate(12deg)  scale(1)'    },
-                '30%':  { transform: 'translateY(-42%) rotate(-6deg)  scale(0.7)'  },
-                '60%':  { transform: 'translateY(-62%) rotate(22deg)  scale(1.4)'  },
-                '80%':  { transform: 'translateY(-44%) rotate(-2deg)  scale(0.85)' },
-                '100%': { transform: 'translateY(-50%) rotate(12deg)  scale(1)'    },
-              },
-            }),
-          }}>
-            <Box
-              component="img"
-              src="https://cdn.jsdelivr.net/gh/Investigamer/mtg-vectors@main/svg/watermark/phyrexian.svg"
-              alt=""
-              sx={{
-                width: `${140 + poisonProgress * 200}px`,
-                height: `${140 + poisonProgress * 200}px`,
-                opacity: poisonProgress * 0.7,
-                transition: 'all 0.8s ease',
-                userSelect: 'none',
-                display: 'block',
-                filter: 'brightness(0)',
-              }}
-            />
-          </Box>
-
-          {/* Floating rising symbols at 9+ */}
-          {player.poison >= 9 && [
-            { left: '42%', size: 120, dur: '18s', delay: '0s',   rotate: -15 },
-            { left: '54%', size: 90,  dur: '22s', delay: '9s',   rotate: 20  },
-            { left: '35%', size: 140, dur: '25s', delay: '14s',  rotate: -8  },
-          ].map((s, i) => (
-            <Box key={`rise-${i}`} sx={{
-              position: 'absolute',
-              left: s.left,
-              bottom: 0,
-              zIndex: 3,
-              pointerEvents: 'none',
-              animation: `phyrexianRise${i} ${s.dur} ${s.delay} ease-in-out infinite both`,
-              [`@keyframes phyrexianRise${i}`]: {
-                '0%':   { transform: `translate(0px,           ${s.size + 40}px) rotate(${s.rotate}deg)     scale(0.7)`, opacity: 0    },
-                '10%':  { transform: `translate(${i%2?8:-6}px, ${s.size}px)      rotate(${s.rotate - 3}deg) scale(0.9)`, opacity: 0.4  },
-                '45%':  { transform: `translate(${i%2?-10:12}px, -100px)  rotate(${s.rotate + 8}deg)  scale(1.1)`,  opacity: 0.65 },
-                '75%':  { transform: `translate(${i%2?6:-8}px,  -260px)   rotate(${s.rotate - 5}deg)  scale(0.9)`,  opacity: 0.3  },
-                '88%':  { transform: `translate(${i%2?-4:10}px, -400px)   rotate(${s.rotate + 12}deg) scale(0.6)`,  opacity: 0    },
-                '100%': { transform: `translate(0px,           ${s.size + 40}px) rotate(${s.rotate}deg)     scale(0.7)`, opacity: 0    },
-              },
-            }}>
-              <Box
-                component="img"
-                src="https://cdn.jsdelivr.net/gh/Investigamer/mtg-vectors@main/svg/watermark/phyrexian.svg"
-                alt=""
-                sx={{ width: s.size, height: s.size, display: 'block', filter: 'brightness(0)', userSelect: 'none' }}
-              />
-            </Box>
-          ))}
-        </>
-      )}
+      <PoisonOverlay poison={player.poison} poisonProgress={poisonProgress} />
 
       {/* ── Viewer notification banner ── */}
       <Box sx={{
