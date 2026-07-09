@@ -29,6 +29,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import { ASSET_BASE, remoteQrOrigin } from '@/lib/api';
 import { CommanderArt } from './CommanderArt';
 import { useCommanderPreview } from './useCommanderPreview';
+import { usePoisonSound } from '@/game-manager/hooks/usePoisonSound';
+import { useSounds } from '@/game-manager/hooks/useSounds';
 import { PoisonOverlay } from './PoisonOverlay';
 import { LifeCracks } from './LifeCracks';
 import { CityBlessing } from './CityBlessing';
@@ -89,6 +91,8 @@ interface TeamPanelProps {
   // On the phone the panel fills the viewport, so it scales up (dvmax clamps)
   // and reflows its three sections into a vertical stack. Table stays as-is.
   remoteMode?: boolean;
+  // Gates the poison ambience + City's Blessing sting (same hooks PlayerPanel uses).
+  soundEnabled?: boolean;
   onLifeChange: (idx: number, delta: number) => void;
   onPoisonChange: (idx: number, delta: number) => void;
   onCommanderTaxChange: (idx: number, delta: number, isPartner?: boolean) => void;
@@ -319,6 +323,7 @@ export function TeamPanel({
   seatCode,
   remoteConnected = false,
   remoteMode = false,
+  soundEnabled = false,
   onLifeChange,
   onPoisonChange,
   onCommanderTaxChange,
@@ -358,6 +363,12 @@ export function TeamPanel({
   const lostRatio = startingLife > 0 ? Math.min(Math.max((startingLife - life) / startingLife, 0), 1) : 0;
   const crackAlpha = (from: number) => Math.min(Math.max((lostRatio - from) / 0.15, 0), 1);
   const eliminated = primary?.player.isEliminated ?? false;
+
+  // Sound parity with PlayerPanel: the shared poison ambience and the City's
+  // Blessing sting (keyed off the team's shared poison / either teammate holding
+  // the blessing). Both no-op when soundEnabled is false.
+  usePoisonSound(poison, eliminated, soundEnabled);
+  useSounds(soundEnabled, members.some((m) => m.player.hasCitysBlessing));
   // A team is "conceded" if either head was manually conceded (vs eliminated by
   // damage). reconcileTeams only stamps isConceded on the head that received the
   // eliminate event, so check both.
