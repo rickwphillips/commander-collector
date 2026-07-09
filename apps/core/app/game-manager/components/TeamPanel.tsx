@@ -18,7 +18,7 @@
  * both heads in sync. Standard games never use this component.
  */
 import { useState, useEffect, useRef } from 'react';
-import { Box, Stack, Typography, IconButton, SvgIcon, TextField, Menu, MenuItem } from '@mui/material';
+import { Box, Stack, Typography, IconButton, TextField, Menu, MenuItem } from '@mui/material';
 import InitiativeIcon from '@mui/icons-material/Castle';
 import CityIcon from '@mui/icons-material/LocationCity';
 import ElimIcon from '@mui/icons-material/PersonOff';
@@ -33,6 +33,7 @@ import { PoisonOverlay } from './PoisonOverlay';
 import { LifeCracks } from './LifeCracks';
 import { CityBlessing } from './CityBlessing';
 import { InitiativeTorch } from './InitiativeTorch';
+import { CrownIcon, MonarchCrown, monarchCrownAnim } from './MonarchCrown';
 import { LifeTotal } from './LifeTotal';
 import { useTimerTokens, TIMER_EXPIRED_BORDER_BLINK, TIMER_EXPIRED_HEADER_BLINK } from '@/game-manager/hooks/useTimerTokens';
 import { StepperControl, StepperOverlayHost, type StepperSize } from './StepperControl';
@@ -44,14 +45,6 @@ const POISON_DANGER_2HG = 14;
 import { lifeColor } from '@/game-manager/lifeColor';
 import { teamColor, otherTeam } from '@/lib/teams';
 import type { PlayerState, CommanderDamageMap } from '@/lib/types';
-
-// Small crown glyph mirrored from PlayerCard so the Monarch toggle reads the
-// same in both surfaces without forking the whole card component.
-const CrownIcon = (props: React.ComponentProps<typeof SvgIcon>) => (
-  <SvgIcon {...props} viewBox="0 0 24 24">
-    <path d="M5 16l-3-10 5.5 4L12 2l4.5 8L22 6l-3 10H5zm0 2h14v2H5v-2z" />
-  </SvgIcon>
-);
 
 export interface TeamMember {
   player: PlayerState;
@@ -715,9 +708,13 @@ export function TeamPanel({
 
       {/* Section B: shared life (centered + prominent) and poison. Order 2 (center). */}
       <Stack sx={{ flex: 1.2, minWidth: 0, alignItems: 'center', justifyContent: 'center', order: 2, ...(remoteMode && { alignSelf: 'stretch' }) }} spacing={0.5}>
-        {/* Shared crack overlay behind the life number (same component as PlayerCard). */}
-        <Box sx={{ position: 'relative', overflow: 'hidden', display: 'flex', justifyContent: 'center' }}>
+        {/* Shared crack overlay behind the life number + floating Monarch crown
+            (same components as PlayerCard). overflow:visible so the crown can rise
+            above the life row; the crack layers are inset:0 so they don't spill. */}
+        <Box sx={{ position: 'relative', overflow: 'visible', display: 'flex', justifyContent: 'center' }}>
         <LifeCracks fingerprint={teamNumber} crackAlpha={crackAlpha} />
+        {/* Monarch is one-per-game; show the crown when either teammate holds it. */}
+        <MonarchCrown show={members.some((m) => m.player.isMonarch)} animStr={monarchCrownAnim('steady', false)} />
         <StepperControl
           label="Life Total"
           value={life}
