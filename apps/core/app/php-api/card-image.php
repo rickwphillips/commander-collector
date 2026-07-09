@@ -20,6 +20,24 @@ if ($artUrl !== '') {
     if (parse_url($artUrl, PHP_URL_HOST) !== 'cards.scryfall.io') {
         sendError('Unsupported art host', 400);
     }
+    // Cache the crop server-side keyed by the scryfall_id embedded in the
+    // art_crop URL filename (.../art_crop/front/a/b/<uuid>.jpg). Stored in its
+    // own art_b64 column so it never collides with the full-card image_b64 that
+    // card previews use — and so the board/remote fetch each crop once instead
+    // of re-downloading it from Scryfall on every view.
+    $artId = '';
+    if (preg_match('#/([0-9a-fA-F-]{36})\.[a-z]+#', $artUrl, $m)) {
+        $artId = $m[1];
+    }
+    $db = getDB();
+    if ($artId !== '') {
+        $stmt = $db->prepare('SELECT art_b64 FROM scryfall_card_cache WHERE scryfall_id = ? LIMIT 1');
+        $stmt->execute([$artId]);
+        $cachedRow = $stmt->fetch();
+        if ($cachedRow && !empty($cachedRow['art_b64'])) {
+            sendJSON(['data_uri' => 'data:image/jpeg;base64,' . $cachedRow['art_b64'], 'cached' => true]);
+        }
+    }
     $ch = curl_init($artUrl);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
@@ -33,7 +51,14 @@ if ($artUrl !== '') {
     if ($curlError || $httpCode !== 200 || !$imageData) {
         sendError('Failed to fetch art image', 502);
     }
-    sendJSON(['data_uri' => 'data:image/jpeg;base64,' . base64_encode($imageData), 'cached' => false]);
+    $artB64 = base64_encode($imageData);
+    if ($artId !== '') {
+        // The row usually already exists (a lookupCard populated it); only fill
+        // in art_b64. If the row is somehow missing the crop still returns.
+        $upd = $db->prepare('UPDATE scryfall_card_cache SET art_b64 = ? WHERE scryfall_id = ?');
+        $upd->execute([$artB64, $artId]);
+    }
+    sendJSON(['data_uri' => 'data:image/jpeg;base64,' . $artB64, 'cached' => false]);
 }
 
 if (!$scryfallId) {

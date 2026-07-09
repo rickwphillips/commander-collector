@@ -1,5 +1,15 @@
 # Changelog
 
+## [5.15.0] - 2026-07-09
+
+### Fixed
+
+- Commander art now shows on the live-game remote and the board even when a phone can't reach the image CDN directly. Art is served through the host as an art crop, resolved by commander name so it fills in even for older games whose saved state never stored an art URL (`artCropUrl: null`)
+
+### Performance
+
+- Commander art crops fetched through the host (`card-image.php?art=`) are cached server-side in a new `art_b64` column, so the board and remote load each crop once instead of re-downloading it from Scryfall on every view. Kept separate from the full-card `image_b64` cache that card previews use
+
 ## [5.9.0] - 2026-06-19
 
 ### Fixed
