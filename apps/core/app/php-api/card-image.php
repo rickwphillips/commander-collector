@@ -10,35 +10,36 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 $scryfallId = trim($_GET['scryfall_id'] ?? '');
 $url        = trim($_GET['url'] ?? '');
-$artUrl     = trim($_GET['art'] ?? '');
+$artFlag    = ($_GET['art'] ?? '') !== '';
 
-// Art-crop pass-through: proxy a specific Scryfall art_crop URL for the phone
-// remote (which can't reach the CDN directly). Kept OUT of the full-card image
-// cache (image_b64) on purpose — the panels want the art crop as background,
-// while card previews want the whole card, so the two must not share a slot.
-if ($artUrl !== '') {
-    if (parse_url($artUrl, PHP_URL_HOST) !== 'cards.scryfall.io') {
-        sendError('Unsupported art host', 400);
-    }
-    // Cache the crop server-side keyed by the scryfall_id embedded in the
-    // art_crop URL filename (.../art_crop/front/a/b/<uuid>.jpg). Stored in its
-    // own art_b64 column so it never collides with the full-card image_b64 that
-    // card previews use — and so the board/remote fetch each crop once instead
-    // of re-downloading it from Scryfall on every view.
-    $artId = '';
-    if (preg_match('#/([0-9a-fA-F-]{36})\.[a-z]+#', $artUrl, $m)) {
-        $artId = $m[1];
+// Art-crop endpoint: serve the commander art crop as a base64 data URI for the
+// phone remote (which can't reach the CDN directly). The crop URL is NEVER taken
+// from the query — prod mod_security blocks URL-valued query params (?art=<url>
+// returns 406) — it is derived here from the card's own cached 'normal' image_uri
+// (same Scryfall path, only the size segment differs), keyed by scryfall_id.
+// Cached in its own art_b64 column so it never collides with the full-card
+// image_b64 that card previews use, and so the board/remote fetch each crop once
+// instead of re-downloading it from Scryfall on every view.
+if ($artFlag) {
+    if (!$scryfallId) {
+        sendError('scryfall_id is required');
     }
     $db = getDB();
-    if ($artId !== '') {
-        $stmt = $db->prepare('SELECT art_b64 FROM scryfall_card_cache WHERE scryfall_id = ? LIMIT 1');
-        $stmt->execute([$artId]);
-        $cachedRow = $stmt->fetch();
-        if ($cachedRow && !empty($cachedRow['art_b64'])) {
-            sendJSON(['data_uri' => 'data:image/jpeg;base64,' . $cachedRow['art_b64'], 'cached' => true]);
-        }
+    $stmt = $db->prepare('SELECT image_uri, art_b64 FROM scryfall_card_cache WHERE scryfall_id = ? LIMIT 1');
+    $stmt->execute([$scryfallId]);
+    $row = $stmt->fetch();
+    if ($row && !empty($row['art_b64'])) {
+        sendJSON(['data_uri' => 'data:image/jpeg;base64,' . $row['art_b64'], 'cached' => true]);
     }
-    $ch = curl_init($artUrl);
+    $normal = $row['image_uri'] ?? '';
+    if ($normal === '' || strpos($normal, '/normal/') === false) {
+        sendError('No art crop available for this card', 404);
+    }
+    $artSrc = str_replace('/normal/', '/art_crop/', $normal);
+    if (parse_url($artSrc, PHP_URL_HOST) !== 'cards.scryfall.io') {
+        sendError('Unsupported art host', 400);
+    }
+    $ch = curl_init($artSrc);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 30,
@@ -52,12 +53,9 @@ if ($artUrl !== '') {
         sendError('Failed to fetch art image', 502);
     }
     $artB64 = base64_encode($imageData);
-    if ($artId !== '') {
-        // The row usually already exists (a lookupCard populated it); only fill
-        // in art_b64. If the row is somehow missing the crop still returns.
-        $upd = $db->prepare('UPDATE scryfall_card_cache SET art_b64 = ? WHERE scryfall_id = ?');
-        $upd->execute([$artB64, $artId]);
-    }
+    // The row exists (we just read image_uri from it); fill in art_b64.
+    $upd = $db->prepare('UPDATE scryfall_card_cache SET art_b64 = ? WHERE scryfall_id = ?');
+    $upd->execute([$artB64, $scryfallId]);
     sendJSON(['data_uri' => 'data:image/jpeg;base64,' . $artB64, 'cached' => false]);
 }
 
