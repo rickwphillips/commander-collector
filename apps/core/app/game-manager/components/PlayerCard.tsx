@@ -1,8 +1,8 @@
 'use client';
 
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { keyframes } from '@emotion/react';
-import { Box, Button, CircularProgress, IconButton, Stack, SvgIcon, TextField, Tooltip, Typography } from '@mui/material';
+import { Box, Button, IconButton, Stack, SvgIcon, TextField, Tooltip, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
@@ -19,10 +19,11 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import { QRCodeSVG } from 'qrcode.react';
-import { getCardImageByName } from '@commander/shared/lib/cardImageCache';
+import { useCommanderPreview } from './useCommanderPreview';
 import { ASSET_BASE, remoteQrOrigin } from '@/lib/api';
 import { CommanderArt, CommanderArtBg } from './CommanderArt';
 import { ControlFocusModal } from './ControlFocusModal';
+import { StepperControl, StepperOverlayHost } from './StepperControl';
 import { LifeTotal } from './LifeTotal';
 import { useXpKeyframes } from './PlayerCard.keyframes';
 import { useLocalStorageBool } from '@/game-manager/hooks/useLocalStorageBool';
@@ -415,11 +416,9 @@ const TEARS = [
  */
 
 // ─── Discriminated unions used by callbacks ────────────────────────────────
-export type FocusedControl = {
-  type: 'life' | 'poison' | 'energy' | 'experience' | 'commanderTax' | 'commanderDamage';
-  sourceIdx?: number;
-  isPartner?: boolean;
-} | null;
+// The hero life readout is the only control that still routes through the
+// card-level focus modal; compact counters own their modal via StepperControl.
+export type FocusedControl = { type: 'life' } | null;
 
 export interface KillOpponent {
   name: string;
@@ -676,29 +675,8 @@ function PlayerCardImpl(props: PlayerCardProps) {
     `cmdDmgShowPlayer:${player.playerId}`,
   );
   const toggleCmdDmgShowPlayer = () => setCmdDmgShowPlayer();
-  const [cmdPreviewName, setCmdPreviewName] = useState<string | null>(null);
-  const [cmdPreviewUrl, setCmdPreviewUrl] = useState<string | null>(null);
-  const [cmdPreviewZoom, setCmdPreviewZoom] = useState(1);
-  const [cmdPreviewBase, setCmdPreviewBase] = useState<{ w: number; h: number } | null>(null);
-  const cmdScrollRef = useRef<HTMLDivElement>(null);
-
-  // Resolve preview URL when name changes; reset zoom/base.
-  // All inputs/outputs are card-local; no orchestrator hook reads cmdPreviewUrl.
-  useEffect(() => {
-    if (!cmdPreviewName) { setCmdPreviewUrl(null); setCmdPreviewZoom(1); setCmdPreviewBase(null); return; }
-    setCmdPreviewUrl(null);
-    setCmdPreviewZoom(1);
-    setCmdPreviewBase(null);
-    getCardImageByName(cmdPreviewName).then(url => setCmdPreviewUrl(url));
-  }, [cmdPreviewName]);
-
-  // Scroll to bottom when zoom changes so the card bottom (player name / mana cost)
-  // stays in view.
-  useEffect(() => {
-    if (cmdPreviewZoom > 1 && cmdScrollRef.current) {
-      cmdScrollRef.current.scrollTop = cmdScrollRef.current.scrollHeight;
-    }
-  }, [cmdPreviewZoom]);
+  // Commander card preview — shared with TeamPanel via the useCommanderPreview hook.
+  const { openPreview: setCmdPreviewName, overlay: cmdPreviewOverlay } = useCommanderPreview();
 
   // Auto-close QR when remote player connects.
   useEffect(() => { if (remoteConnected && qrOpen) setQrOpen(false); }, [remoteConnected, qrOpen]);
@@ -841,7 +819,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
   // highlight + current-player border/shadow, timer-expired blink, energyGlow
   // text-shadow inheritance, poison saturate filter, eliminated opacity.
   return (
-    <Box
+    <StepperOverlayHost
       sx={{
         width: '100%',
         height: '100%',
@@ -1170,38 +1148,42 @@ function PlayerCardImpl(props: PlayerCardProps) {
                   {source.experience > 0 && <Tooltip title={`XP: ${source.experience}`} placement="top" slotProps={position.ttSlotProps} arrow><Stack direction="row" alignItems="center" spacing={0.25}><Box sx={{ bgcolor: 'background.paper', display: 'inline-flex' }}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: sizes.fsStatBadge, height: sizes.fsStatBadge, objectFit: 'contain', mixBlendMode: 'multiply', transition: 'width 0.2s ease, height 0.2s ease' }} /></Box><Typography sx={{ fontSize: sizes.fsStatBadge, fontWeight: 800, color: '#DAA520', lineHeight: 1 }}>{source.experience}</Typography></Stack></Tooltip>}
                 </Stack>
               </Box>,
-              <Tooltip key={`${sourceIdx}-dec`} open={lpKey === `${sourceIdx}-dec`} title="-5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-                <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, false, -1))} onPointerDown={() => startLongPress(`${sourceIdx}-dec`, () => handleCmdDmgChange(playerIdx, sourceIdx, false, -5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: sizes.cmdBtnWidth, minHeight: sizes.cmdBtnHeight }}>
-                  <Typography sx={{ fontSize: sizes.fsCounterBtn, fontWeight: 700, lineHeight: 1 }}>−</Typography>
-                </IconButton></span>
-              </Tooltip>,
-              <Typography key={`${sourceIdx}-val`} onClick={() => setFocusedControl({ type: 'commanderDamage', sourceIdx, isPartner: false })} sx={{ fontSize: sizes.fsCounterValue, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', cursor: 'pointer', color: dmg[0] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary' }}>
-                {dmg[0]}
-              </Typography>,
-              <Tooltip key={`${sourceIdx}-inc`} open={lpKey === `${sourceIdx}-inc`} title="+5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-                <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, false, 1))} onPointerDown={() => startLongPress(`${sourceIdx}-inc`, () => handleCmdDmgChange(playerIdx, sourceIdx, false, 5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: sizes.cmdBtnWidth, minHeight: sizes.cmdBtnHeight }}>
-                  <Typography sx={{ fontSize: sizes.fsCounterBtn, fontWeight: 700, lineHeight: 1 }}>+</Typography>
-                </IconButton></span>
-              </Tooltip>,
+              <StepperControl
+                key={`${sourceIdx}-step`}
+                layout="cells"
+                label={`CMD Dmg — ${cmdDmgShowPlayer ? source.playerName : source.commander.name}`}
+                value={dmg[0]}
+                color={dmg[0] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary'}
+                disableDec={sourceEliminated}
+                onDec={() => handleCmdDmgChange(playerIdx, sourceIdx, false, -1)}
+                onInc={() => handleCmdDmgChange(playerIdx, sourceIdx, false, 1)}
+                onDec5={() => handleCmdDmgChange(playerIdx, sourceIdx, false, -5)}
+                onInc5={() => handleCmdDmgChange(playerIdx, sourceIdx, false, 5)}
+                size={{ btnFont: sizes.fsCounterBtn, valueFont: sizes.fsCounterValue, btnMinWidth: sizes.cmdBtnWidth, btnMinHeight: sizes.cmdBtnHeight, valueMinWidth: sizes.valColWidth }}
+                tooltipSlotProps={position.ttSlotProps}
+                lpKeyPrefix={`${sourceIdx}`}
+              />,
             ];
             if (source.partner) {
               rows.push(
                 <Typography key={`${sourceIdx}-pname`} onClick={(e) => { e.stopPropagation(); setOpenSnapshotKey(k => k === `${sourceIdx}-psnap` ? null : `${sourceIdx}-psnap`); }} sx={{ fontSize: sizes.fsSourceName, color: sourceEliminated ? 'text.disabled' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', cursor: 'pointer' }}>
                   {source.partner.name}
                 </Typography>,
-                <Tooltip key={`${sourceIdx}-pdec`} open={lpKey === `${sourceIdx}-pdec`} title="-5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-                  <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, true, -1))} onPointerDown={() => startLongPress(`${sourceIdx}-pdec`, () => handleCmdDmgChange(playerIdx, sourceIdx, true, -5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: sizes.cmdBtnWidth, minHeight: sizes.cmdBtnHeight }}>
-                    <Typography sx={{ fontSize: sizes.fsCounterBtn, fontWeight: 700, lineHeight: 1 }}>−</Typography>
-                  </IconButton></span>
-                </Tooltip>,
-                <Typography key={`${sourceIdx}-pval`} onClick={() => setFocusedControl({ type: 'commanderDamage', sourceIdx, isPartner: true })} sx={{ fontSize: sizes.fsCounterValue, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', cursor: 'pointer', color: dmg[1] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary' }}>
-                  {dmg[1]}
-                </Typography>,
-                <Tooltip key={`${sourceIdx}-pinc`} open={lpKey === `${sourceIdx}-pinc`} title="+5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-                  <span><IconButton disabled={sourceEliminated} onClick={guardClick(() => handleCmdDmgChange(playerIdx, sourceIdx, true, 1))} onPointerDown={() => startLongPress(`${sourceIdx}-pinc`, () => handleCmdDmgChange(playerIdx, sourceIdx, true, 5))} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: sizes.cmdBtnWidth, minHeight: sizes.cmdBtnHeight }}>
-                    <Typography sx={{ fontSize: sizes.fsCounterBtn, fontWeight: 700, lineHeight: 1 }}>+</Typography>
-                  </IconButton></span>
-                </Tooltip>,
+                <StepperControl
+                  key={`${sourceIdx}-pstep`}
+                  layout="cells"
+                  label={`CMD Dmg — ${source.partner.name}`}
+                  value={dmg[1]}
+                  color={dmg[1] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary'}
+                  disableDec={sourceEliminated}
+                  onDec={() => handleCmdDmgChange(playerIdx, sourceIdx, true, -1)}
+                  onInc={() => handleCmdDmgChange(playerIdx, sourceIdx, true, 1)}
+                  onDec5={() => handleCmdDmgChange(playerIdx, sourceIdx, true, -5)}
+                  onInc5={() => handleCmdDmgChange(playerIdx, sourceIdx, true, 5)}
+                  size={{ btnFont: sizes.fsCounterBtn, valueFont: sizes.fsCounterValue, btnMinWidth: sizes.cmdBtnWidth, btnMinHeight: sizes.cmdBtnHeight, valueMinWidth: sizes.valColWidth }}
+                  tooltipSlotProps={position.ttSlotProps}
+                  lpKeyPrefix={`${sourceIdx}-p`}
+                />,
               );
             }
             return rows;
@@ -1478,30 +1460,48 @@ function PlayerCardImpl(props: PlayerCardProps) {
               rowGap: remoteMode ? 0.5 : 0.1,
             }}>
             {([
-              ['Poison', player.poison, () => onPoisonChange(playerIdx, -1), () => onPoisonChange(playerIdx, 1), () => onPoisonChange(playerIdx, -5), () => onPoisonChange(playerIdx, 5), player.poison >= 10 ? 'error.main' : player.poison > 0 ? 'warning.main' : 'text.disabled', null, () => setFocusedControl({ type: 'poison' })],
-              ['Energy', player.energy, () => onEnergyChange(playerIdx, -1), () => onEnergyChange(playerIdx, 1), () => onEnergyChange(playerIdx, -5), () => onEnergyChange(playerIdx, 5), player.energy > 0 ? 'primary.main' : 'text.disabled', null, () => setFocusedControl({ type: 'energy' })],
-              ['XP', player.experience, () => onExperienceChange(playerIdx, -1), () => onExperienceChange(playerIdx, 1), () => onExperienceChange(playerIdx, -5), () => onExperienceChange(playerIdx, 5), player.experience > 0 ? 'primary.main' : 'text.disabled', null, () => setFocusedControl({ type: 'experience' })],
+              ['Poison', player.poison, () => onPoisonChange(playerIdx, -1), () => onPoisonChange(playerIdx, 1), () => onPoisonChange(playerIdx, -5), () => onPoisonChange(playerIdx, 5), player.poison >= 10 ? 'error.main' : player.poison > 0 ? 'warning.main' : 'text.disabled', null],
+              ['Energy', player.energy, () => onEnergyChange(playerIdx, -1), () => onEnergyChange(playerIdx, 1), () => onEnergyChange(playerIdx, -5), () => onEnergyChange(playerIdx, 5), player.energy > 0 ? 'primary.main' : 'text.disabled', null],
+              ['XP', player.experience, () => onExperienceChange(playerIdx, -1), () => onExperienceChange(playerIdx, 1), () => onExperienceChange(playerIdx, -5), () => onExperienceChange(playerIdx, 5), player.experience > 0 ? 'primary.main' : 'text.disabled', null],
               // One Tax row per commander (each commander taxes independently).
-              // The medallion value (8th slot) and focus thunk (9th) let a partner
-              // deck render a second Tax row keyed by the partner commander's name.
-              ['Tax', player.commanderTax, () => onCommanderTaxChange(playerIdx, -1), () => onCommanderTaxChange(playerIdx, 1), () => onCommanderTaxChange(playerIdx, -5), () => onCommanderTaxChange(playerIdx, 5), player.commanderTax > 0 ? 'warning.main' : 'text.disabled', player.commanderTax, () => setFocusedControl({ type: 'commanderTax' })],
-              ...(player.partner ? [[player.partner.name, player.partnerCommanderTax, () => onCommanderTaxChange(playerIdx, -1, true), () => onCommanderTaxChange(playerIdx, 1, true), () => onCommanderTaxChange(playerIdx, -5, true), () => onCommanderTaxChange(playerIdx, 5, true), player.partnerCommanderTax > 0 ? 'warning.main' : 'text.disabled', player.partnerCommanderTax, () => setFocusedControl({ type: 'commanderTax', isPartner: true })]] as [string, number, () => void, () => void, () => void, () => void, string, number | null, () => void][] : []),
-            ] as [string, number, () => void, () => void, () => void, () => void, string, number | null, () => void][]).flatMap(([label, value, onDec, onInc, onDec5, onInc5, color, medallionTax, onFocus]) => [
-              <Stack key={`${label}-lbl`} direction="row" alignItems="center" spacing={0.4} sx={{ overflow: 'hidden', filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none', minWidth: 0 }}>
+              // The medallion value (8th slot) lets a partner deck render a second
+              // Tax row keyed by the partner commander's name.
+              ['Tax', player.commanderTax, () => onCommanderTaxChange(playerIdx, -1), () => onCommanderTaxChange(playerIdx, 1), () => onCommanderTaxChange(playerIdx, -5), () => onCommanderTaxChange(playerIdx, 5), player.commanderTax > 0 ? 'warning.main' : 'text.disabled', player.commanderTax],
+              ...(player.partner ? [[player.partner.name, player.partnerCommanderTax, () => onCommanderTaxChange(playerIdx, -1, true), () => onCommanderTaxChange(playerIdx, 1, true), () => onCommanderTaxChange(playerIdx, -5, true), () => onCommanderTaxChange(playerIdx, 5, true), player.partnerCommanderTax > 0 ? 'warning.main' : 'text.disabled', player.partnerCommanderTax]] as [string, number, () => void, () => void, () => void, () => void, string, number | null][] : []),
+            ] as [string, number, () => void, () => void, () => void, () => void, string, number | null][]).flatMap(([label, value, onDec, onInc, onDec5, onInc5, color, medallionTax]) => {
+              const blurSx = poisonProgress > 0 ? { filter: `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` } : {};
+              // Per-row value effects preserved from the bespoke grid: poison blur,
+              // the poison "9" danger pulse, and the XP glow/shimmer.
+              const valueSx = {
+                ...blurSx,
+                ...(label === 'Poison' && value === 9 && { animation: 'poisonPulse 2.5s ease-in-out infinite', '@keyframes poisonPulse': { '0%, 100%': { opacity: 1, transform: 'scale(1)', textShadow: '0 0 8px rgba(0,200,60,0.9), 0 0 20px rgba(0,200,60,0.5)' }, '50%': { opacity: 0.3, transform: 'scale(0.85)', textShadow: '0 0 2px rgba(0,200,60,0.2)' } } }),
+                ...(label === 'XP' && xpGlow && { textShadow: xpGlow, ...(xpShimmerAnim && { animation: `${xpShimmerAnim} 3s ease-in-out infinite` }) }),
+              };
+              return [
+              <Stack key={`${label}-lbl`} direction="row" alignItems="center" spacing={0.4} sx={{ overflow: 'hidden', ...blurSx, minWidth: 0 }}>
                 {label === 'Poison'     && <Typography component="span" sx={{ fontSize: sizes.fsSourceName, color: player.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1, flexShrink: 0 }}>☠</Typography>}
                 {label === 'Energy'     && <Typography component="span" sx={{ fontSize: sizes.fsSourceName, color: '#4FC8FF', lineHeight: 1, flexShrink: 0 }}>⚡</Typography>}
                 {label === 'XP' && <Box sx={{ bgcolor: 'background.paper', display: 'inline-flex', flexShrink: 0 }}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: sizes.fsSourceName, height: sizes.fsSourceName, objectFit: 'contain', mixBlendMode: 'multiply' }} /></Box>}
                 {medallionTax !== null   && <Box sx={{ width: sizes.fsSourceName, height: sizes.fsSourceName, borderRadius: '50%', flexShrink: 0, background: 'radial-gradient(circle at 38% 35%, #d0d0d0, #7a7a7a)', border: '1px solid #3a3a3a', boxShadow: '0 1px 2px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Typography sx={{ fontSize: 7, fontWeight: 800, color: '#111', lineHeight: 1, userSelect: 'none' }}>+{medallionTax * 2}</Typography></Box>}
                 <Typography component="span" sx={{ fontSize: sizes.fsSourceName, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</Typography>
               </Stack>,
-              <Tooltip key={`${label}-dec`} open={lpKey === `${label}-dec`} title="-5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-                <IconButton onClick={guardClick(onDec)} onPointerDown={() => startLongPress(`${label}-dec`, onDec5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: sizes.cmdBtnWidth, minHeight: sizes.cmdBtnHeight }}><Typography sx={{ fontSize: sizes.fsCounterBtn, fontWeight: 700 }}>−</Typography></IconButton>
-              </Tooltip>,
-              <Typography key={`${label}-val`} onClick={onFocus} sx={{ fontSize: sizes.fsCounterValue, fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap', cursor: 'pointer', color, filter: poisonProgress > 0 ? `blur(${Math.pow(poisonProgress, 2.5) * 1.5}px)` : 'none', ...(label === 'Poison' && value === 9 && { animation: 'poisonPulse 2.5s ease-in-out infinite', '@keyframes poisonPulse': { '0%, 100%': { opacity: 1, transform: 'scale(1)', textShadow: '0 0 8px rgba(0,200,60,0.9), 0 0 20px rgba(0,200,60,0.5)' }, '50%': { opacity: 0.3, transform: 'scale(0.85)', textShadow: '0 0 2px rgba(0,200,60,0.2)' } } }), ...(label === 'XP' && xpGlow && { textShadow: xpGlow, ...(xpShimmerAnim && { animation: `${xpShimmerAnim} 3s ease-in-out infinite` }) }) }}>{value}</Typography>,
-              <Tooltip key={`${label}-inc`} open={lpKey === `${label}-inc`} title="+5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
-                <IconButton onClick={guardClick(onInc)} onPointerDown={() => startLongPress(`${label}-inc`, onInc5)} onPointerUp={cancelLongPress} onPointerLeave={cancelLongPress} onPointerCancel={cancelLongPress} sx={{ p: 0, minWidth: sizes.cmdBtnWidth, minHeight: sizes.cmdBtnHeight }}><Typography sx={{ fontSize: sizes.fsCounterBtn, fontWeight: 700 }}>+</Typography></IconButton>
-              </Tooltip>,
-            ])}
+              <StepperControl
+                key={`${label}-step`}
+                layout="cells"
+                label={label}
+                value={value}
+                color={color}
+                valueSx={valueSx}
+                onDec={onDec}
+                onInc={onInc}
+                onDec5={onDec5}
+                onInc5={onInc5}
+                size={{ btnFont: sizes.fsCounterBtn, valueFont: sizes.fsCounterValue, btnMinWidth: sizes.cmdBtnWidth, btnMinHeight: sizes.cmdBtnHeight, valueMinWidth: sizes.valColWidth }}
+                tooltipSlotProps={position.ttSlotProps}
+                lpKeyPrefix={label}
+              />,
+            ];
+            })}
           </Box>
         </Box>
       </Box>
@@ -2268,133 +2268,26 @@ function PlayerCardImpl(props: PlayerCardProps) {
         <Typography sx={{ fontSize: 19, fontWeight: 600, lineHeight: 1.3 }}>{viewer.viewerTooltipText}</Typography>
       </Box>
 
-      {/* ── Focused control modal — enlarged single counter/damage control ── */}
-      {(() => {
-        if (!focusedControl) return null;
-        const fc = focusedControl;
-        let label = '';
-        let value = 0;
-        let onDec: () => void = () => {};
-        let onInc: () => void = () => {};
-        let onDec5: (() => void) | undefined;
-        let onInc5: (() => void) | undefined;
-        let valueColor: string = 'text.primary';
-        if (fc.type === 'life') {
-          label = 'Life Total';
-          value = player.life;
-          onDec = () => onLifeChange(playerIdx, -1);
-          onInc = () => onLifeChange(playerIdx, 1);
-          onDec5 = () => onLifeChange(playerIdx, -5);
-          onInc5 = () => onLifeChange(playerIdx, 5);
-          valueColor = computedLifeColor || 'primary.main';
-        } else if (fc.type === 'poison') {
-          label = 'Poison';
-          value = player.poison;
-          onDec = () => onPoisonChange(playerIdx, -1);
-          onInc = () => onPoisonChange(playerIdx, 1);
-          onDec5 = () => onPoisonChange(playerIdx, -5);
-          onInc5 = () => onPoisonChange(playerIdx, 5);
-          valueColor = player.poison >= 10 ? 'error.main' : player.poison > 0 ? 'warning.main' : 'text.disabled';
-        } else if (fc.type === 'energy') {
-          label = 'Energy';
-          value = player.energy;
-          onDec = () => onEnergyChange(playerIdx, -1);
-          onInc = () => onEnergyChange(playerIdx, 1);
-          onDec5 = () => onEnergyChange(playerIdx, -5);
-          onInc5 = () => onEnergyChange(playerIdx, 5);
-          valueColor = player.energy > 0 ? 'primary.main' : 'text.disabled';
-        } else if (fc.type === 'experience') {
-          label = 'XP';
-          value = player.experience;
-          onDec = () => onExperienceChange(playerIdx, -1);
-          onInc = () => onExperienceChange(playerIdx, 1);
-          onDec5 = () => onExperienceChange(playerIdx, -5);
-          onInc5 = () => onExperienceChange(playerIdx, 5);
-          valueColor = player.experience > 0 ? 'primary.main' : 'text.disabled';
-        } else if (fc.type === 'commanderTax') {
-          const isP = fc.isPartner ?? false;
-          label = isP ? `${player.partner?.name ?? 'Partner'} Tax` : 'Tax';
-          value = isP ? player.partnerCommanderTax : player.commanderTax;
-          onDec = () => onCommanderTaxChange(playerIdx, -1, isP);
-          onInc = () => onCommanderTaxChange(playerIdx, 1, isP);
-          onDec5 = () => onCommanderTaxChange(playerIdx, -5, isP);
-          onInc5 = () => onCommanderTaxChange(playerIdx, 5, isP);
-          valueColor = value > 0 ? 'warning.main' : 'text.disabled';
-        } else if (fc.type === 'commanderDamage' && fc.sourceIdx !== undefined) {
-          const src = allPlayers[fc.sourceIdx];
-          const dmg = commanderDamage[playerIdx]?.[fc.sourceIdx] ?? [0, 0];
-          const isPartner = fc.isPartner ?? false;
-          const srcName = isPartner ? (src?.partner?.name ?? 'Partner') : (src?.commander?.name ?? src?.playerName ?? `Player ${fc.sourceIdx + 1}`);
-          label = `CMD Dmg — ${srcName}`;
-          value = isPartner ? dmg[1] : dmg[0];
-          onDec = () => handleCmdDmgChange(playerIdx, fc.sourceIdx!, isPartner, -1);
-          onInc = () => handleCmdDmgChange(playerIdx, fc.sourceIdx!, isPartner, 1);
-          onDec5 = () => handleCmdDmgChange(playerIdx, fc.sourceIdx!, isPartner, -5);
-          onInc5 = () => handleCmdDmgChange(playerIdx, fc.sourceIdx!, isPartner, 5);
-          valueColor = value >= 21 ? 'error.main' : 'text.primary';
-        }
-        return (
-          <ControlFocusModal
-            open
-            onClose={() => setFocusedControl(null)}
-            label={label}
-            value={value}
-            color={valueColor}
-            onDec={onDec}
-            onInc={onInc}
-            onDec5={onDec5}
-            onInc5={onInc5}
-          />
-        );
-      })()}
-
-      {/* ── Commander card preview overlay ── */}
-      {cmdPreviewName && (
-        <Box
-          onClick={() => { setCmdPreviewName(null); setCmdPreviewZoom(1); setCmdPreviewBase(null); }}
-          sx={{ position: 'absolute', inset: 0, zIndex: 35, bgcolor: 'rgba(0,0,0,0.88)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1.5 }}
-        >
-          <IconButton
-            size="small"
-            onClick={(e) => { e.stopPropagation(); setCmdPreviewName(null); setCmdPreviewZoom(1); setCmdPreviewBase(null); }}
-            sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1, color: 'rgba(255,255,255,0.85)', bgcolor: 'rgba(0,0,0,0.5)', '&:hover': { bgcolor: 'rgba(0,0,0,0.75)' } }}
-          >
-            <CloseIcon sx={{ fontSize: 28 }} />
-          </IconButton>
-          {cmdPreviewUrl ? (
-            cmdPreviewZoom > 1 ? (
-              <Box
-                ref={cmdScrollRef}
-                onClick={() => { setCmdPreviewName(null); setCmdPreviewZoom(1); setCmdPreviewBase(null); }}
-                sx={{ position: 'absolute', inset: 8, overflow: 'auto', cursor: 'zoom-out', background: 'transparent !important' }}
-              >
-                <Box sx={{ minWidth: '100%', minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent !important' }}>
-                  <Box
-                    component="img"
-                    src={cmdPreviewUrl}
-                    alt={cmdPreviewName ?? ''}
-                    draggable={false}
-                    onClick={(e) => { e.stopPropagation(); setCmdPreviewZoom(1); }}
-                    sx={{ display: 'block', width: cmdPreviewBase ? cmdPreviewBase.w * cmdPreviewZoom : 'auto', height: 'auto', borderRadius: '4.7%', userSelect: 'none', flexShrink: 0 }}
-                  />
-                </Box>
-              </Box>
-            ) : (
-              <Box
-                component="img"
-                src={cmdPreviewUrl}
-                alt={cmdPreviewName ?? ''}
-                draggable={false}
-                onLoad={(e: React.SyntheticEvent<HTMLImageElement>) => setCmdPreviewBase({ w: e.currentTarget.clientWidth, h: e.currentTarget.clientHeight })}
-                onClick={(e) => { e.stopPropagation(); setCmdPreviewZoom(2.5); }}
-                sx={{ maxHeight: '88%', maxWidth: '88%', borderRadius: '4.7%', display: 'block', cursor: 'zoom-in', userSelect: 'none' }}
-              />
-            )
-          ) : (
-            <CircularProgress size={36} thickness={4} sx={{ color: 'rgba(255,255,255,0.45)' }} />
-          )}
-        </Box>
+      {/* ── Life focus modal — the hero life readout keeps its distinct layout
+             (big number, buttons beneath), so it uses ControlFocusModal directly.
+             Every compact counter (poison/energy/XP/tax/cmd-damage) now owns its
+             own modal via StepperControl. ── */}
+      {focusedControl?.type === 'life' && (
+        <ControlFocusModal
+          open
+          onClose={() => setFocusedControl(null)}
+          label="Life Total"
+          value={player.life}
+          color={computedLifeColor || 'primary.main'}
+          onDec={() => onLifeChange(playerIdx, -1)}
+          onInc={() => onLifeChange(playerIdx, 1)}
+          onDec5={() => onLifeChange(playerIdx, -5)}
+          onInc5={() => onLifeChange(playerIdx, 5)}
+        />
       )}
+
+      {/* ── Commander card preview overlay — shared with TeamPanel ── */}
+      {cmdPreviewOverlay}
 
       {/* ── QR overlay — in-panel, does not take over the board ── */}
       {seatCode && qrOpen && (
@@ -2413,11 +2306,22 @@ function PlayerCardImpl(props: PlayerCardProps) {
             cursor: 'pointer',
           }}
         >
-          <Box sx={{ p: 1, bgcolor: '#fff', borderRadius: 1 }}>
-            <QRCodeSVG
-              value={`${remoteQrOrigin()}${ASSET_BASE}/game-manager/remote/?code=${seatCode}`}
-              size={140}
-            />
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, justifyContent: 'center' }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{ p: 1, bgcolor: '#fff', borderRadius: 1 }}>
+                <QRCodeSVG
+                  value={`${remoteQrOrigin()}${ASSET_BASE}/game-manager/remote/?code=${seatCode}`}
+                  size={120}
+                />
+              </Box>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>Scan to join</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{ p: 1, bgcolor: '#fff', borderRadius: 1 }}>
+                <QRCodeSVG value={seatCode} size={120} />
+              </Box>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>Scan for code</Typography>
+            </Box>
           </Box>
           <Typography sx={{ fontFamily: 'monospace', fontSize: 15, letterSpacing: 3, fontWeight: 700 }}>
             {seatCode}
@@ -2427,7 +2331,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
           </Typography>
         </Box>
       )}
-    </Box>
+    </StepperOverlayHost>
   );
 }
 

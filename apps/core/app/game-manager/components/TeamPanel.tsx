@@ -18,10 +18,7 @@
  * both heads in sync. Standard games never use this component.
  */
 import { useState, useEffect, useRef } from 'react';
-import { Box, Stack, Typography, IconButton, SvgIcon, CircularProgress, TextField, Menu, MenuItem } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import RemoveIcon from '@mui/icons-material/Remove';
-import CloseIcon from '@mui/icons-material/Close';
+import { Box, Stack, Typography, IconButton, SvgIcon, TextField, Menu, MenuItem } from '@mui/material';
 import InitiativeIcon from '@mui/icons-material/Castle';
 import CityIcon from '@mui/icons-material/LocationCity';
 import ElimIcon from '@mui/icons-material/PersonOff';
@@ -30,11 +27,11 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import SmartphoneIcon from '@mui/icons-material/Smartphone';
 import { QRCodeSVG } from 'qrcode.react';
 import { ASSET_BASE, remoteQrOrigin } from '@/lib/api';
-import { getCardImageByName } from '@commander/shared/lib/cardImageCache';
 import { CommanderArt } from './CommanderArt';
+import { useCommanderPreview } from './useCommanderPreview';
 import { LifeTotal } from './LifeTotal';
 import { useTimerTokens, TIMER_EXPIRED_BORDER_BLINK, TIMER_EXPIRED_HEADER_BLINK } from '@/game-manager/hooks/useTimerTokens';
-import { useLongPress } from '@/game-manager/hooks/useLongPress';
+import { StepperControl, StepperOverlayHost, type StepperSize } from './StepperControl';
 import { lifeColor } from '@/game-manager/lifeColor';
 import { teamColor, otherTeam } from '@/lib/teams';
 import type { PlayerState, CommanderDamageMap } from '@/lib/types';
@@ -180,79 +177,13 @@ const SZ_PHONE: Sz = {
   big: true,
 };
 
-type LongPress = ReturnType<typeof useLongPress>;
-
-// Reuses the standard panel's long-press: tap = ±1 (onClick), hold ~500ms = ±5
-// (onLongPress). guardClick stops the release from also firing the ±1.
-function StatButton({ onClick, onLongPress, lpKey, lp, big = false, children }: {
-  onClick: () => void;
-  onLongPress?: () => void;
-  lpKey?: string;
-  lp?: LongPress;
-  big?: boolean;
-  children: React.ReactNode;
-}) {
-  const wired = !!(onLongPress && lp && lpKey);
-  return (
-    <IconButton
-      onClick={wired ? lp!.guardClick(onClick) : onClick}
-      {...(wired && {
-        onPointerDown: (e: React.PointerEvent) => { e.stopPropagation(); lp!.startLongPress(lpKey!, onLongPress!); },
-        onPointerUp: lp!.cancelLongPress,
-        onPointerLeave: lp!.cancelLongPress,
-        onPointerCancel: lp!.cancelLongPress,
-      })}
-      sx={{
-        color: 'primary.main',
-        border: (theme) => `1px solid ${theme.palette.divider}`,
-        borderRadius: 1,
-        p: big ? 0.5 : 0.25,
-      }}
-    >
-      {children}
-    </IconButton>
-  );
+// Per-counter stepper sizing. The − / + glyphs and tap targets read a touch
+// larger than the old bordered StatButton so the buttons are easy to hit.
+function miniStepSize(sz: Sz): Partial<StepperSize> {
+  return { btnFont: sz.btnPoison, valueFont: sz.val, btnMinWidth: sz.big ? 40 : 34, btnMinHeight: sz.big ? 40 : 34, valueMinWidth: 18 };
 }
-
-/** Compact per-player counter (energy / experience) used inside a teammate block. */
-function MiniCounter({
-  glyph,
-  glyphColor,
-  label,
-  value,
-  active,
-  onDec,
-  onInc,
-  onDec5,
-  onInc5,
-  lp,
-  lpKey,
-  sz,
-}: {
-  glyph: React.ReactNode;
-  glyphColor: string;
-  label: string;
-  value: number;
-  active: boolean;
-  onDec: () => void;
-  onInc: () => void;
-  onDec5: () => void;
-  onInc5: () => void;
-  lp: LongPress;
-  lpKey: string;
-  sz: Sz;
-}) {
-  return (
-    <Stack direction="row" alignItems="center" spacing={0.25}>
-      <Box component="span" sx={{ fontSize: sz.miniGlyph, lineHeight: 1, color: glyphColor }}>{glyph}</Box>
-      <Typography sx={{ fontSize: sz.xsLabel, color: 'text.secondary' }}>{label}</Typography>
-      <StatButton onClick={onDec} onLongPress={onDec5} lpKey={`${lpKey}-dec`} lp={lp} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnSm }} /></StatButton>
-      <Typography sx={{ fontSize: sz.val, fontWeight: 700, minWidth: 14, textAlign: 'center', color: active ? glyphColor : 'text.primary' }}>
-        {value}
-      </Typography>
-      <StatButton onClick={onInc} onLongPress={onInc5} lpKey={`${lpKey}-inc`} lp={lp} big={sz.big}><AddIcon sx={{ fontSize: sz.btnSm }} /></StatButton>
-    </Stack>
-  );
+function taxStepSize(sz: Sz): Partial<StepperSize> {
+  return { btnFont: sz.btnCmd, valueFont: sz.cmdVal, btnMinWidth: sz.big ? 36 : 30, btnMinHeight: sz.big ? 36 : 30, valueMinWidth: 16 };
 }
 
 /** Compact per-player ability toggle (monarch / initiative / city's blessing). */
@@ -338,14 +269,9 @@ export function TeamPanel({
   onUndoEliminate,
   onPassTurn,
 }: TeamPanelProps) {
-  // Commander card preview — card-local view state, copied verbatim from
-  // PlayerCard so any commander (own team or opposing) can be tapped to enlarge.
-  // Nothing here is shared or routed through a handler; it is pure local view.
-  const [cmdPreviewName, setCmdPreviewName] = useState<string | null>(null);
-  const [cmdPreviewUrl, setCmdPreviewUrl] = useState<string | null>(null);
-  const [cmdPreviewZoom, setCmdPreviewZoom] = useState(1);
-  const [cmdPreviewBase, setCmdPreviewBase] = useState<{ w: number; h: number } | null>(null);
-  const cmdScrollRef = useRef<HTMLDivElement>(null);
+  // Commander card preview — shared with PlayerCard. Tap any commander (own team
+  // or opposing) to enlarge; the overlay is scoped to this panel's root.
+  const { openPreview: setCmdPreviewName, overlay: cmdPreviewOverlay } = useCommanderPreview();
 
   // Inline team-name editing in the app bar. Commit on Enter/blur, cancel on Esc.
   const [editingName, setEditingName] = useState(false);
@@ -356,22 +282,6 @@ export function TeamPanel({
     if (trimmed && trimmed !== teamName) onTeamNameChange(trimmed);
     setEditingName(false);
   };
-
-  // Resolve preview URL when name changes; reset zoom/base.
-  useEffect(() => {
-    if (!cmdPreviewName) { setCmdPreviewUrl(null); setCmdPreviewZoom(1); setCmdPreviewBase(null); return; }
-    setCmdPreviewUrl(null);
-    setCmdPreviewZoom(1);
-    setCmdPreviewBase(null);
-    getCardImageByName(cmdPreviewName).then(url => setCmdPreviewUrl(url));
-  }, [cmdPreviewName]);
-
-  // Scroll to bottom when zoom changes so the card bottom stays in view.
-  useEffect(() => {
-    if (cmdPreviewZoom > 1 && cmdScrollRef.current) {
-      cmdScrollRef.current.scrollTop = cmdScrollRef.current.scrollHeight;
-    }
-  }, [cmdPreviewZoom]);
 
   // Life and poison are mirrored across teammates, so either head is the team
   // total. All shared mutations target the primary seat; reconcileTeams mirrors.
@@ -389,8 +299,6 @@ export function TeamPanel({
 
   const sz = remoteMode ? SZ_PHONE : SZ_TABLE;
 
-  // Long-press ±5 on every +/- control, reused from the standard panel's hook.
-  const longPress = useLongPress();
 
   // Shared smooth ramp (greens above starting life, reds out below) — same fn
   // the standard PlayerPanel uses. lifeColor returns '' at exactly starting life;
@@ -445,7 +353,7 @@ export function TeamPanel({
   useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current); }, []);
 
   return (
-    <Box
+    <StepperOverlayHost
       sx={{
         position: 'relative',
         height: '100%',
@@ -539,8 +447,19 @@ export function TeamPanel({
                 sx={{ px: 2, py: 0.75, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, cursor: 'pointer' }}
               >
                 <Typography sx={{ fontSize: 10, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>Pair a phone</Typography>
-                <Box sx={{ p: 0.75, bgcolor: '#fff', borderRadius: 1 }}>
-                  <QRCodeSVG value={`${remoteQrOrigin()}${ASSET_BASE}/game-manager/remote/?code=${seatCode}`} size={92} />
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center' }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
+                    <Box sx={{ p: 0.75, bgcolor: '#fff', borderRadius: 1 }}>
+                      <QRCodeSVG value={`${remoteQrOrigin()}${ASSET_BASE}/game-manager/remote/?code=${seatCode}`} size={92} />
+                    </Box>
+                    <Typography sx={{ fontSize: 9, color: 'text.secondary' }}>Scan to join</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
+                    <Box sx={{ p: 0.75, bgcolor: '#fff', borderRadius: 1 }}>
+                      <QRCodeSVG value={seatCode} size={92} />
+                    </Box>
+                    <Typography sx={{ fontSize: 9, color: 'text.secondary' }}>Scan for code</Typography>
+                  </Box>
                 </Box>
                 <Typography sx={{ fontFamily: 'monospace', fontSize: 13, letterSpacing: 2, fontWeight: 700 }}>{seatCode}</Typography>
                 <Typography sx={{ fontSize: 10, color: 'text.secondary' }}>tap to copy code</Typography>
@@ -647,42 +566,48 @@ export function TeamPanel({
                     return (
                       <Stack key={key} direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
                         <Typography noWrap onClick={() => setCmdPreviewName(e.name)} title={`View ${e.name}`} sx={{ fontSize: sz.cmdLabel, color: 'text.secondary', maxWidth: '9ch', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer', '&:hover': { color: 'primary.main' } }}>{m.player.partner ? e.name : 'Tax'}</Typography>
-                        <StatButton onClick={() => onCommanderTaxChange(m.idx, -1, e.isPartner)} onLongPress={() => onCommanderTaxChange(m.idx, -5, e.isPartner)} lpKey={`tax-${m.idx}-${key}-dec`} lp={longPress} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
-                        <Typography sx={{ fontSize: sz.cmdVal, fontWeight: 700, minWidth: 16, textAlign: 'center' }}>{value}</Typography>
-                        <StatButton onClick={() => onCommanderTaxChange(m.idx, 1, e.isPartner)} onLongPress={() => onCommanderTaxChange(m.idx, 5, e.isPartner)} lpKey={`tax-${m.idx}-${key}-inc`} lp={longPress} big={sz.big}><AddIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
+                        <StepperControl
+                          label={m.player.partner ? `${e.name} Tax` : 'Tax'}
+                          value={value}
+                          onDec={() => onCommanderTaxChange(m.idx, -1, e.isPartner)}
+                          onInc={() => onCommanderTaxChange(m.idx, 1, e.isPartner)}
+                          onDec5={() => onCommanderTaxChange(m.idx, -5, e.isPartner)}
+                          onInc5={() => onCommanderTaxChange(m.idx, 5, e.isPartner)}
+                          size={taxStepSize(sz)}
+                          lpKeyPrefix={`tax-${m.idx}-${key}`}
+                        />
                       </Stack>
                     );
                   })}
                 </Stack>
-                {/* Individual per-player counters (energy + XP). */}
+                {/* Individual per-player counters (energy + XP). No text label —
+                    the ⚡ / ✦ glyph identifies each; buttons run a touch larger. */}
                 <Stack direction="row" alignItems="center" useFlexGap flexWrap="wrap" spacing={1}>
-                  <MiniCounter
+                  <StepperControl
+                    label="Energy"
                     glyph="⚡"
                     glyphColor="#4FC8FF"
-                    label="Energy"
                     value={m.player.energy}
-                    active={m.player.energy > 0}
+                    color={m.player.energy > 0 ? '#4FC8FF' : 'text.primary'}
                     onDec={() => onEnergyChange(m.idx, -1)}
                     onInc={() => onEnergyChange(m.idx, 1)}
                     onDec5={() => onEnergyChange(m.idx, -5)}
                     onInc5={() => onEnergyChange(m.idx, 5)}
-                    lp={longPress}
-                    lpKey={`energy-${m.idx}`}
-                    sz={sz}
+                    size={miniStepSize(sz)}
+                    lpKeyPrefix={`energy-${m.idx}`}
                   />
-                  <MiniCounter
+                  <StepperControl
+                    label="XP"
                     glyph="✦"
                     glyphColor="#DAA520"
-                    label="XP"
                     value={m.player.experience}
-                    active={m.player.experience > 0}
+                    color={m.player.experience > 0 ? '#DAA520' : 'text.primary'}
                     onDec={() => onExperienceChange(m.idx, -1)}
                     onInc={() => onExperienceChange(m.idx, 1)}
                     onDec5={() => onExperienceChange(m.idx, -5)}
                     onInc5={() => onExperienceChange(m.idx, 5)}
-                    lp={longPress}
-                    lpKey={`xp-${m.idx}`}
-                    sz={sz}
+                    size={miniStepSize(sz)}
+                    lpKeyPrefix={`xp-${m.idx}`}
                   />
                 </Stack>
                 {/* Per-player ability toggles (individual, not shared). */}
@@ -705,30 +630,47 @@ export function TeamPanel({
 
       {/* Section B: shared life (centered + prominent) and poison. Order 2 (center). */}
       <Stack sx={{ flex: 1.2, minWidth: 0, alignItems: 'center', justifyContent: 'center', order: 2, ...(remoteMode && { alignSelf: 'stretch' }) }} spacing={0.5}>
-        <Stack direction="row" alignItems="center" justifyContent="center" spacing={1.5}>
-          <StatButton onClick={() => onLifeChange(primary.idx, -1)} onLongPress={() => onLifeChange(primary.idx, -5)} lpKey="life-dec" lp={longPress} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnLife }} /></StatButton>
-          <LifeTotal
-            value={life}
-            fontSize={sz.life}
-            color={teamLifeColor}
-            damageFlash={damageFlash}
-            energy={teamEnergy}
-            poison={poison}
-            reactions={{ swipes: false }}
-            sx={{ minWidth: 96, textAlign: 'center' }}
-          />
-          <StatButton onClick={() => onLifeChange(primary.idx, 1)} onLongPress={() => onLifeChange(primary.idx, 5)} lpKey="life-inc" lp={longPress} big={sz.big}><AddIcon sx={{ fontSize: sz.btnLife }} /></StatButton>
-        </Stack>
+        <StepperControl
+          label="Life Total"
+          value={life}
+          color={teamLifeColor}
+          onDec={() => onLifeChange(primary.idx, -1)}
+          onInc={() => onLifeChange(primary.idx, 1)}
+          onDec5={() => onLifeChange(primary.idx, -5)}
+          onInc5={() => onLifeChange(primary.idx, 5)}
+          size={{ btnFont: sz.btnLife, valueFont: sz.life, btnMinWidth: sz.big ? 52 : 44, btnMinHeight: sz.big ? 52 : 44, valueMinWidth: 96 }}
+          rowSpacing={1.5}
+          lpKeyPrefix="life"
+          valueNode={
+            <LifeTotal
+              value={life}
+              fontSize={sz.life}
+              color={teamLifeColor}
+              damageFlash={damageFlash}
+              energy={teamEnergy}
+              poison={poison}
+              reactions={{ swipes: false }}
+              sx={{ minWidth: 96, textAlign: 'center' }}
+            />
+          }
+        />
         <Typography sx={{ fontSize: sz.sectionLabel, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
           Shared Life
         </Typography>
         <Stack direction="row" alignItems="center" justifyContent="center" spacing={1} sx={{ mt: 0.5 }}>
           <Typography sx={{ fontSize: sz.sectionLabel, color: 'text.secondary' }}>Poison</Typography>
-          <StatButton onClick={() => onPoisonChange(primary.idx, -1)} onLongPress={() => onPoisonChange(primary.idx, -5)} lpKey="poison-dec" lp={longPress} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnPoison }} /></StatButton>
-          <Typography sx={{ fontWeight: 800, fontSize: sz.poisonVal, minWidth: 26, textAlign: 'center', color: poison >= 15 ? '#2E7D32' : 'text.primary' }}>
-            {poison}
-          </Typography>
-          <StatButton onClick={() => onPoisonChange(primary.idx, 1)} onLongPress={() => onPoisonChange(primary.idx, 5)} lpKey="poison-inc" lp={longPress} big={sz.big}><AddIcon sx={{ fontSize: sz.btnPoison }} /></StatButton>
+          <StepperControl
+            label="Poison"
+            value={poison}
+            color={poison >= 15 ? '#2E7D32' : 'text.primary'}
+            valueSx={{ fontWeight: 800 }}
+            onDec={() => onPoisonChange(primary.idx, -1)}
+            onInc={() => onPoisonChange(primary.idx, 1)}
+            onDec5={() => onPoisonChange(primary.idx, -5)}
+            onInc5={() => onPoisonChange(primary.idx, 5)}
+            size={{ btnFont: sz.btnPoison, valueFont: sz.poisonVal, btnMinWidth: sz.big ? 40 : 34, btnMinHeight: sz.big ? 40 : 34, valueMinWidth: 26 }}
+            lpKeyPrefix="poison"
+          />
           <Typography sx={{ fontSize: sz.sectionLabel, color: 'text.secondary' }}>/ 15</Typography>
         </Stack>
         {/* Pass Turn — only on the active team's panel (the remote sends a
@@ -815,7 +757,6 @@ export function TeamPanel({
               tax={e.isPartner ? opp.player.partnerCommanderTax : opp.player.commanderTax}
               onChange={(delta) => onCommanderDamageChange(primary.idx, opp.idx, e.isPartner, delta)}
               onView={() => setCmdPreviewName(e.name)}
-              lp={longPress}
               lpKey={`cmd-${opp.idx}-${e.isPartner ? 'partner' : 'own'}`}
               sz={sz}
             />
@@ -824,59 +765,16 @@ export function TeamPanel({
       </Stack>
       </Box>
 
-      {/* Commander card preview overlay — scoped to this panel via the root
-          Box's position:relative + inset:0, copied from PlayerCard. */}
-      {cmdPreviewName && (
-        <Box
-          onClick={() => { setCmdPreviewName(null); setCmdPreviewZoom(1); setCmdPreviewBase(null); }}
-          sx={{ position: 'absolute', inset: 0, zIndex: 35, bgcolor: 'rgba(0,0,0,0.88)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1.5 }}
-        >
-          <IconButton
-            size="small"
-            onClick={(e) => { e.stopPropagation(); setCmdPreviewName(null); setCmdPreviewZoom(1); setCmdPreviewBase(null); }}
-            sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1, color: 'rgba(255,255,255,0.85)', bgcolor: 'rgba(0,0,0,0.5)', '&:hover': { bgcolor: 'rgba(0,0,0,0.75)' } }}
-          >
-            <CloseIcon sx={{ fontSize: 28 }} />
-          </IconButton>
-          {cmdPreviewUrl ? (
-            cmdPreviewZoom > 1 ? (
-              <Box
-                ref={cmdScrollRef}
-                onClick={() => { setCmdPreviewName(null); setCmdPreviewZoom(1); setCmdPreviewBase(null); }}
-                sx={{ position: 'absolute', inset: 8, overflow: 'auto', cursor: 'zoom-out', background: 'transparent !important' }}
-              >
-                <Box sx={{ minWidth: '100%', minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent !important' }}>
-                  <Box
-                    component="img"
-                    src={cmdPreviewUrl}
-                    alt={cmdPreviewName ?? ''}
-                    draggable={false}
-                    onClick={(e) => { e.stopPropagation(); setCmdPreviewZoom(1); }}
-                    sx={{ display: 'block', width: cmdPreviewBase ? cmdPreviewBase.w * cmdPreviewZoom : 'auto', height: 'auto', borderRadius: '4.7%', userSelect: 'none', flexShrink: 0 }}
-                  />
-                </Box>
-              </Box>
-            ) : (
-              <Box
-                component="img"
-                src={cmdPreviewUrl}
-                alt={cmdPreviewName ?? ''}
-                draggable={false}
-                onLoad={(e: React.SyntheticEvent<HTMLImageElement>) => setCmdPreviewBase({ w: e.currentTarget.clientWidth, h: e.currentTarget.clientHeight })}
-                onClick={(e) => { e.stopPropagation(); setCmdPreviewZoom(2.5); }}
-                sx={{ maxHeight: '88%', maxWidth: '88%', borderRadius: '4.7%', display: 'block', cursor: 'zoom-in', userSelect: 'none' }}
-              />
-            )
-          ) : (
-            <CircularProgress size={36} thickness={4} sx={{ color: 'rgba(255,255,255,0.45)' }} />
-          )}
-        </Box>
-      )}
-    </Box>
+      {/* Commander card preview overlay — shared with PlayerCard, scoped to this
+          panel via the root Box's position:relative + inset:0. */}
+      {cmdPreviewOverlay}
+    </StepperOverlayHost>
   );
 }
 
-function CmdDamageRow({ label, value, tax, onChange, onView, lp, lpKey, sz }: { label: string; value: number; tax: number; onChange: (delta: number) => void; onView: () => void; lp: LongPress; lpKey: string; sz: Sz }) {
+// The commander NAME opens the card preview (onView); the VALUE opens the
+// shared focus modal (±1 big + ±5), same as every other counter.
+function CmdDamageRow({ label, value, tax, onChange, onView, lpKey, sz }: { label: string; value: number; tax: number; onChange: (delta: number) => void; onView: () => void; lpKey: string; sz: Sz }) {
   return (
     <Stack direction="row" alignItems="center" spacing={0.75}>
       {/* Commander name + its current tax (+{tax*2} generic mana) sit together. */}
@@ -892,9 +790,17 @@ function CmdDamageRow({ label, value, tax, onChange, onView, lp, lpKey, sz }: { 
           <Typography title={`Tax: cast ${tax}x`} sx={{ fontSize: sz.xsLabel, fontWeight: 700, color: 'warning.main', flexShrink: 0, whiteSpace: 'nowrap' }}>+{tax * 2}</Typography>
         )}
       </Stack>
-      <StatButton onClick={() => onChange(-1)} onLongPress={() => onChange(-5)} lpKey={`${lpKey}-dec`} lp={lp} big={sz.big}><RemoveIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
-      <Typography onClick={(e) => { e.stopPropagation(); onView(); }} title="View commander" sx={{ fontSize: sz.cmdVal, fontWeight: 700, minWidth: 22, textAlign: 'center', cursor: 'pointer', '&:hover': { color: 'primary.main' } }}>{value}</Typography>
-      <StatButton onClick={() => onChange(1)} onLongPress={() => onChange(5)} lpKey={`${lpKey}-inc`} lp={lp} big={sz.big}><AddIcon sx={{ fontSize: sz.btnCmd }} /></StatButton>
+      <StepperControl
+        label={`CMD Dmg — ${label}`}
+        value={value}
+        color={value >= 21 ? '#B71C1C' : 'text.primary'}
+        onDec={() => onChange(-1)}
+        onInc={() => onChange(1)}
+        onDec5={() => onChange(-5)}
+        onInc5={() => onChange(5)}
+        size={{ btnFont: sz.btnCmd, valueFont: sz.cmdVal, btnMinWidth: sz.big ? 36 : 30, btnMinHeight: sz.big ? 36 : 30, valueMinWidth: 22 }}
+        lpKeyPrefix={lpKey}
+      />
       <Typography sx={{ fontSize: sz.xsLabel, color: 'text.secondary' }}>/21</Typography>
     </Stack>
   );
