@@ -23,7 +23,7 @@ vi.mock('../../../../packages/shared/src/lib/api', () => ({
 import {
   getCardImageByName,
   getCardBackImageByName,
-  getArtCropByUrl,
+  getArtCropByScryfallId,
   getArtCropByName,
   prewarmCardImages,
 } from '../../../../packages/shared/src/lib/cardImageCache';
@@ -129,52 +129,50 @@ describe('getCardImageByName', () => {
   });
 });
 
-describe('getArtCropByUrl', () => {
-  const artUrl = (n: string) => `https://cards.scryfall.io/art_crop/front/a/b/${n}.jpg?1`;
-
-  it('returns the proxied data_uri for a crop URL', async () => {
-    const url = artUrl(uniqueName('sol'));
+describe('getArtCropByScryfallId', () => {
+  it('returns the proxied data_uri for a scryfall_id', async () => {
+    const id = uniqueName('sf-sol');
     mockGetCardArtCrop.mockResolvedValue({ data_uri: 'data:image/jpeg;base64,crop', cached: false });
 
-    expect(await getArtCropByUrl(url)).toBe('data:image/jpeg;base64,crop');
-    expect(mockGetCardArtCrop).toHaveBeenCalledWith(url);
+    expect(await getArtCropByScryfallId(id)).toBe('data:image/jpeg;base64,crop');
+    expect(mockGetCardArtCrop).toHaveBeenCalledWith(id);
   });
 
   it('returns null when the endpoint yields no data_uri', async () => {
-    const url = artUrl(uniqueName('none'));
+    const id = uniqueName('sf-none');
     mockGetCardArtCrop.mockResolvedValue({ data_uri: null, cached: false });
 
-    expect(await getArtCropByUrl(url)).toBeNull();
+    expect(await getArtCropByScryfallId(id)).toBeNull();
   });
 
   it('returns null on error and does not cache the failure', async () => {
-    const url = artUrl(uniqueName('flaky'));
+    const id = uniqueName('sf-flaky');
     mockGetCardArtCrop.mockRejectedValueOnce(new Error('boom'));
-    expect(await getArtCropByUrl(url)).toBeNull();
+    expect(await getArtCropByScryfallId(id)).toBeNull();
 
     mockGetCardArtCrop.mockResolvedValueOnce({ data_uri: 'data:image/jpeg;base64,ok', cached: false });
-    expect(await getArtCropByUrl(url)).toBe('data:image/jpeg;base64,ok');
+    expect(await getArtCropByScryfallId(id)).toBe('data:image/jpeg;base64,ok');
     expect(mockGetCardArtCrop).toHaveBeenCalledTimes(2);
   });
 
   it('caches success — a second call does not hit the endpoint', async () => {
-    const url = artUrl(uniqueName('cached'));
+    const id = uniqueName('sf-cached');
     mockGetCardArtCrop.mockResolvedValue({ data_uri: 'data:image/jpeg;base64,c', cached: false });
 
-    await getArtCropByUrl(url);
-    await getArtCropByUrl(url);
+    await getArtCropByScryfallId(id);
+    await getArtCropByScryfallId(id);
     expect(mockGetCardArtCrop).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('getArtCropByName', () => {
   // Scryfall image URLs share one path shape; only the size segment differs, so
-  // the art_crop URL is derived from the cached 'normal' URL.
+  // the server derives the art_crop URL from the cached 'normal' URL by scryfall_id.
   function normalMeta(name: string) {
     return { scryfall_id: `sf-${name}`, image_uri: `https://cards.scryfall.io/normal/front/a/b/${name}.jpg?9`, back_image_uri: null };
   }
 
-  it('derives the art_crop URL from the normal image_uri and proxies it', async () => {
+  it('proxies the crop by scryfall_id (server derives the URL)', async () => {
     const name = uniqueName('Baylen');
     mockLookupCard.mockResolvedValue(normalMeta(name));
     mockGetCardArtCrop.mockResolvedValue({ data_uri: 'data:image/jpeg;base64,art', cached: false });
@@ -182,9 +180,7 @@ describe('getArtCropByName', () => {
     const result = await getArtCropByName(name);
 
     expect(result).toBe('data:image/jpeg;base64,art');
-    expect(mockGetCardArtCrop).toHaveBeenCalledWith(
-      `https://cards.scryfall.io/art_crop/front/a/b/${name}.jpg?9`
-    );
+    expect(mockGetCardArtCrop).toHaveBeenCalledWith(`sf-${name}`);
   });
 
   it('falls back to the derived crop URL when the proxy returns null', async () => {

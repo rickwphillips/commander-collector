@@ -73,28 +73,29 @@ const artCache = new Map<string, string>();
 const artInFlight = new Map<string, Promise<string | null>>();
 
 /**
- * Resolves a Scryfall art_crop URL to a host-proxied data URI (phone-safe).
- * Deduped/cached per URL. Returns null on failure so callers can fall back to
- * the raw CDN URL (which works anywhere the CDN is reachable).
+ * Resolves a scryfall_id to a host-proxied art_crop data URI (phone-safe). The
+ * host derives the crop URL from the card's cached image_uri (no URL is sent in
+ * the query — prod mod_security 406s URL-valued params). Deduped/cached per id.
+ * Returns null on failure so callers can fall back to the raw CDN URL.
  */
-export async function getArtCropByUrl(artUrl: string): Promise<string | null> {
-  const cached = artCache.get(artUrl);
+export async function getArtCropByScryfallId(scryfallId: string): Promise<string | null> {
+  const cached = artCache.get(scryfallId);
   if (cached !== undefined) return cached;
-  if (artInFlight.has(artUrl)) return artInFlight.get(artUrl)!;
+  if (artInFlight.has(scryfallId)) return artInFlight.get(scryfallId)!;
 
-  const promise = enqueue(() => api.getCardArtCrop(artUrl))
+  const promise = enqueue(() => api.getCardArtCrop(scryfallId))
     .then((img) => {
       const uri = img?.data_uri ?? null;
-      if (uri !== null) artCache.set(artUrl, uri);
-      artInFlight.delete(artUrl);
+      if (uri !== null) artCache.set(scryfallId, uri);
+      artInFlight.delete(scryfallId);
       return uri;
     })
     .catch(() => {
-      artInFlight.delete(artUrl);
+      artInFlight.delete(scryfallId);
       return null;
     });
 
-  artInFlight.set(artUrl, promise);
+  artInFlight.set(scryfallId, promise);
   return promise;
 }
 
@@ -116,16 +117,17 @@ export async function getArtCropByName(name: string): Promise<string | null> {
 
   const promise = enqueue(() => api.lookupCard(name))
     .then(async (meta) => {
+      const id = meta?.scryfall_id;
       const normal = meta?.image_uri;
-      if (!normal || !normal.includes('/normal/')) return null;
-      const artUrl = normal.replace('/normal/', '/art_crop/');
-      const proxied = await getArtCropByUrl(artUrl);
+      if (!id || !normal || !normal.includes('/normal/')) return null;
+      const fallbackUrl = normal.replace('/normal/', '/art_crop/');
+      const proxied = await getArtCropByScryfallId(id);
       // Cache ONLY the proxied data URI. A raw-URL fallback (proxy transiently
       // down) must not be cached — a CDN-blocked phone would otherwise be stuck
       // with a non-loading URL for the whole session. Returning it uncached lets
-      // the next mount retry the proxy (getArtCropByUrl caches only successes too).
+      // the next mount retry the proxy (getArtCropByScryfallId caches only successes).
       if (proxied) artNameCache.set(name, proxied);
-      return proxied ?? artUrl;
+      return proxied ?? fallbackUrl;
     })
     .then((uri) => {
       artNameInFlight.delete(name);
