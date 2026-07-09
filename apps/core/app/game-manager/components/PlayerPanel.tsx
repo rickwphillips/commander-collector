@@ -13,6 +13,7 @@ import { lifeColor } from '@/game-manager/lifeColor';
 import InitiativeIcon from '@mui/icons-material/Castle';
 import type { PlayerState, CommanderDamageMap } from '../types';
 import { PlayerCard, type PlayerCardProps, type KillOpponent } from './PlayerCard';
+import { CommanderArt, CommanderArtBg } from './CommanderArt';
 
 // ─── Local glyphs used only by the orchestrator's renderSourceSnapshot ─────
 // PlayerCard owns its own copies of these for the card render.
@@ -263,13 +264,13 @@ export function PlayerPanel({
     const srcLifeColor = lifeColor(src.life, startingLife);
     return (
       <Box sx={{ width: 190, position: 'relative', overflow: 'hidden' }}>
-        {src.commander.artCropUrl && (
-          <Box sx={{ position: 'absolute', inset: 0, backgroundImage: `url(${src.commander.artCropUrl})`, backgroundSize: 'cover', backgroundPosition: 'center top', opacity: 0.12, pointerEvents: 'none' }} />
-        )}
+        <CommanderArtBg
+          name={src.commander.name}
+          sx={{ position: 'absolute', inset: 0, backgroundSize: 'cover', backgroundPosition: 'center top', opacity: 0.12, pointerEvents: 'none' }}
+        />
         <Stack direction="row" alignItems="flex-start" spacing={0.75} sx={{ position: 'relative', p: 1, pb: 0.5 }}>
-          {src.commander.artCropUrl && (
-            <Box component="img" src={src.commander.artCropUrl} alt="" sx={{ height: 36, width: 'auto', borderRadius: 0.5, flexShrink: 0 }} />
-          )}
+          <CommanderArt name={src.commander.name} sx={{ height: 36, width: 'auto', borderRadius: 0.5, flexShrink: 0 }} />
+
           <Box sx={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
             <Stack direction="row" alignItems="center" spacing={0.5}>
               <Typography sx={{ fontSize: 12, fontWeight: 800, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{src.playerName}</Typography>

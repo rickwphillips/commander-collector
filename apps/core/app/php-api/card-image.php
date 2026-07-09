@@ -10,6 +10,31 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 $scryfallId = trim($_GET['scryfall_id'] ?? '');
 $url        = trim($_GET['url'] ?? '');
+$artUrl     = trim($_GET['art'] ?? '');
+
+// Art-crop pass-through: proxy a specific Scryfall art_crop URL for the phone
+// remote (which can't reach the CDN directly). Kept OUT of the full-card image
+// cache (image_b64) on purpose — the panels want the art crop as background,
+// while card previews want the whole card, so the two must not share a slot.
+if ($artUrl !== '') {
+    if (parse_url($artUrl, PHP_URL_HOST) !== 'cards.scryfall.io') {
+        sendError('Unsupported art host', 400);
+    }
+    $ch = curl_init($artUrl);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_HTTPHEADER     => ['User-Agent: CommanderCollector/2.3.0'],
+    ]);
+    $imageData = curl_exec($ch);
+    $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    if ($curlError || $httpCode !== 200 || !$imageData) {
+        sendError('Failed to fetch art image', 502);
+    }
+    sendJSON(['data_uri' => 'data:image/jpeg;base64,' . base64_encode($imageData), 'cached' => false]);
+}
 
 if (!$scryfallId) {
     sendError('scryfall_id is required');

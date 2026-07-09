@@ -21,6 +21,7 @@ import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import { QRCodeSVG } from 'qrcode.react';
 import { getCardImageByName } from '@commander/shared/lib/cardImageCache';
 import { ASSET_BASE, remoteQrOrigin } from '@/lib/api';
+import { CommanderArt, CommanderArtBg } from './CommanderArt';
 import { ControlFocusModal } from './ControlFocusModal';
 import { LifeTotal } from './LifeTotal';
 import { useXpKeyframes } from './PlayerCard.keyframes';
@@ -884,11 +885,12 @@ function PlayerCardImpl(props: PlayerCardProps) {
       }}>
         {/* Left: commander art + tax */}
         <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0, zIndex: 1 }}>
-          {player.commander.artCropUrl && (
-            <Box component="img" src={player.commander.artCropUrl} alt={player.commander.name}
-              onClick={(e) => { e.stopPropagation(); setCmdPreviewName(player.commander.name); }}
-              sx={{ height: sizes.artHeight, width: 'auto', borderRadius: 0.5, flexShrink: 0, cursor: 'zoom-in' }} />
-          )}
+          <CommanderArt
+            name={player.commander.name}
+            title={player.commander.name}
+            onClick={(e) => { e.stopPropagation(); setCmdPreviewName(player.commander.name); }}
+            sx={{ height: sizes.artHeight, width: 'auto', borderRadius: 0.5, flexShrink: 0, cursor: 'zoom-in' }}
+          />
           {/* One tax medallion per commander with tax > 0 (partner decks show two). */}
           {[
             { name: player.commander.name, tax: player.commanderTax },
@@ -1234,9 +1236,10 @@ function PlayerCardImpl(props: PlayerCardProps) {
                   display: 'flex', flexDirection: 'column',
                 }}
               >
-                {src.commander.artCropUrl && (
-                  <Box sx={{ position: 'absolute', inset: 0, backgroundImage: `url(${src.commander.artCropUrl})`, backgroundSize: 'cover', backgroundPosition: 'center top', opacity: 0.15, pointerEvents: 'none' }} />
-                )}
+                <CommanderArtBg
+                  name={src.commander.name}
+                  sx={{ position: 'absolute', inset: 0, backgroundSize: 'cover', backgroundPosition: 'center top', opacity: 0.15, pointerEvents: 'none' }}
+                />
                 <Box onClick={(e) => e.stopPropagation()} sx={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', p: 1, gap: 0.5, overflowY: 'auto' }}>
                   <Stack direction="row" alignItems="center" spacing={0.75}>
                     <Box sx={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
@@ -1288,8 +1291,8 @@ function PlayerCardImpl(props: PlayerCardProps) {
                           onClick={!isMe ? (e) => { e.stopPropagation(); setOpenSnapshotKey(`${tgtIdx}-snap`); } : undefined}
                           sx={{ cursor: isMe ? 'default' : 'pointer', borderRadius: 0.5, '&:hover': !isMe ? { bgcolor: 'action.hover' } : undefined, px: 0.25 }}
                         >
-                          {tgt.commander?.artCropUrl
-                            ? <Box component="img" src={tgt.commander.artCropUrl} alt="" onClick={(e) => { e.stopPropagation(); setCmdPreviewName(tgt.commander!.name); }} sx={{ height: 'clamp(16px, 2.5dvmax, 28px)', width: 'auto', borderRadius: 0.25, flexShrink: 0, opacity: isMe ? 1 : 0.75, cursor: 'pointer', '&:hover': { opacity: 1 } }} />
+                          {tgt.commander?.name
+                            ? <CommanderArt name={tgt.commander.name} onClick={(e) => { e.stopPropagation(); setCmdPreviewName(tgt.commander!.name); }} sx={{ height: 'clamp(16px, 2.5dvmax, 28px)', width: 'auto', borderRadius: 0.25, flexShrink: 0, opacity: isMe ? 1 : 0.75, cursor: 'pointer', '&:hover': { opacity: 1 } }} />
                             : <Box sx={{ height: 'clamp(16px, 2.5dvmax, 28px)', width: 'clamp(11px, 1.8dvmax, 20px)', borderRadius: 0.25, flexShrink: 0, bgcolor: 'action.hover' }} />
                           }
                           <Typography sx={{ fontSize: sizes.fsSectionLabel, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, color: isMe ? 'primary.main' : 'text.secondary', fontWeight: isMe ? 700 : 400 }}>{tgt.playerName}</Typography>
@@ -1504,19 +1507,15 @@ function PlayerCardImpl(props: PlayerCardProps) {
       </Box>
 
       {/* ── Faded background art ── */}
-      {player.commander.artCropUrl && (
-        <Box
-          component="img"
-          src={player.commander.artCropUrl}
-          alt=""
-          sx={{
-            position: 'absolute', inset: 0,
-            width: '100%', height: '100%',
-            objectFit: 'cover', objectPosition: 'center',
-            opacity: 0.12, zIndex: 0, pointerEvents: 'none',
-          }}
-        />
-      )}
+      <CommanderArt
+        name={player.commander.name}
+        sx={{
+          position: 'absolute', inset: 0,
+          width: '100%', height: '100%',
+          objectFit: 'cover', objectPosition: 'center',
+          opacity: 0.12, zIndex: 0, pointerEvents: 'none',
+        }}
+      />
 
       {/* ── City's Blessing god rays ── */}
       {animations.cityBlessingVisible && (
