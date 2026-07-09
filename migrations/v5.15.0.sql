@@ -4,7 +4,21 @@
 -- the board and remote load each crop once instead of re-downloading it from
 -- Scryfall on every view.
 
-ALTER TABLE scryfall_card_cache ADD COLUMN art_b64 MEDIUMTEXT NULL AFTER image_b64;
+-- Idempotent ADD COLUMN (MySQL has no ADD COLUMN IF NOT EXISTS): skip if the
+-- column already exists so re-runs / pre-applied dev DBs don't error 1060.
+SET @col_exists = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'scryfall_card_cache'
+    AND COLUMN_NAME = 'art_b64'
+);
+SET @ddl = IF(@col_exists = 0,
+  'ALTER TABLE scryfall_card_cache ADD COLUMN art_b64 MEDIUMTEXT NULL AFTER image_b64',
+  'DO 0'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 INSERT INTO changelog_releases (id, version, date, title, sort_order)
 VALUES (UUID(), '5.15.0', '2026-07-09', 'Phone-safe commander art on the live-game remote', 109)
