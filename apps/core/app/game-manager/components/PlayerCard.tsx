@@ -31,6 +31,7 @@ import { PoisonOverlay } from './PoisonOverlay';
 import { LifeCracks } from './LifeCracks';
 import { CityBlessing } from './CityBlessing';
 import { InitiativeTorch } from './InitiativeTorch';
+import { CrownIcon, MonarchCrown, monarchCrownAnim } from './MonarchCrown';
 
 // Singles poison is lethal at 10; the danger pulse fires one below.
 const POISON_DANGER_SINGLES = 9;
@@ -42,11 +43,6 @@ const XP_ICON_SRC = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRPxc2
 
 // Local glyphs duplicated from PlayerPanel. Phase 3 will fold both into a
 // shared icons module along with the keyframes.
-const CrownIcon = (props: React.ComponentProps<typeof SvgIcon>) => (
-  <SvgIcon {...props} viewBox="0 0 24 24">
-    <path d="M5 16l-3-10 5.5 4L12 2l4.5 8L22 6l-3 10H5zm0 2h14v2H5v-2z" />
-  </SvgIcon>
-);
 const CityIcon = ({ active, ...props }: React.ComponentProps<typeof SvgIcon> & { active?: boolean }) => (
   <SvgIcon {...props} viewBox="0 0 1024 1024">
     {active && (
@@ -67,18 +63,6 @@ import type { MonarchAnim } from '@/game-manager/hooks/useMonarchTransition';
 // ─── Local keyframes / constants used by migrated render blocks ────────────
 // Phase 3 will sweep cross-component keyframes into a shared module. For now
 // each block owns whatever it needs.
-const crownShimmerBig = keyframes`
-  0%, 100% { filter: drop-shadow(0 0 3px #DAA520) brightness(1); }
-  50%       { filter: drop-shadow(0 0 10px #FFD700) brightness(1.6); }
-`;
-const crownEnterFromTop = keyframes`
-  from { transform: translateY(-80px) rotate(-25deg); opacity: 0; }
-  to   { transform: translateY(0) rotate(-25deg); opacity: 1; }
-`;
-const crownExitToTop = keyframes`
-  from { transform: translateY(0) rotate(-25deg); opacity: 1; }
-  to   { transform: translateY(-80px) rotate(-25deg); opacity: 0; }
-`;
 const tearFall = keyframes`
   0%   { transform: translateY(-12px) translateX(0px) scaleY(1);    opacity: 0; }
   8%   { opacity: 0.85; }
@@ -412,10 +396,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
 
   // ─── Monarch crown anim string ──────────────────────────────────────────
   const { monarchEnterIsTransfer } = animations;
-  const monarchAnimStr =
-    monarchAnim === 'exiting'  ? `${crownExitToTop} 0.5s ease-in forwards` :
-    monarchAnim === 'entering' ? `${crownEnterFromTop} ${monarchEnterIsTransfer ? '1s' : '0.5s'} ${monarchEnterIsTransfer ? '0.5s' : '0s'} ease-out both, ${crownShimmerBig} 2s ease-in-out infinite` :
-    `${crownShimmerBig} 2s ease-in-out infinite`;
+  const monarchAnimStr = monarchCrownAnim(monarchAnim, monarchEnterIsTransfer);
 
   // ─── Derived helpers used in Block B ────────────────────────────────────
   const { startingLife, activePlayerIdx } = props;
@@ -928,17 +909,8 @@ function PlayerCardImpl(props: PlayerCardProps) {
         {/* Life total + controls */}
         <Box sx={{ ...(remoteMode ? { width: '33dvw', flexShrink: 0, '@media (orientation: portrait)': { width: '100%' } } : { flex: 1, minWidth: 0 }), display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5, alignSelf: 'stretch', pt: remoteMode ? 2 : 0 }}>
           <Box sx={{ position: 'relative', lineHeight: 1, overflow: 'visible', width: '100%', flex: remoteMode ? undefined : 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            {showCrown && (
-              <CrownIcon sx={{
-                fontSize: 'clamp(40px, 9dvh, 72px)',
-                color: '#DAA520',
-                transform: 'rotate(-25deg)',
-                position: 'absolute',
-                top: '-3dvh',
-                left: '-4dvh',
-                animation: monarchAnimStr,
-              }} />
-            )}
+            <MonarchCrown show={showCrown} animStr={monarchAnimStr} />
+
             <Box sx={{ position: 'relative', overflow: 'hidden', lineHeight: 1, width: '100%', flex: remoteMode ? undefined : 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               <LifeCracks fingerprint={playerIdx} crackAlpha={crackAlpha} />
               {threatSource?.cmdName && threatSource.intensity > 0 && (
