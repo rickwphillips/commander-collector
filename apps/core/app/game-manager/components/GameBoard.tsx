@@ -730,6 +730,7 @@ export function GameBoard({
         highlightMode={highlightMode}
         seatCode={teamSeatCode}
         remoteConnected={teamRemoteConnected}
+        soundEnabled={soundEnabled}
         onLifeChange={handleLifeChange}
         onPoisonChange={handlePoisonChange}
         onCommanderTaxChange={handleCommanderTaxChange}

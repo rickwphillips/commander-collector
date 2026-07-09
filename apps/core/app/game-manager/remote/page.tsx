@@ -499,6 +499,7 @@ function RemotePageInner() {
           turnTimerSeconds={state.turnTimerSeconds}
           highlightMode={true}
           remoteMode={true}
+          soundEnabled={soundEnabled}
           onLifeChange={handleLifeChange}
           onPoisonChange={handlePoisonChange}
           onCommanderTaxChange={handleCommanderTaxChange}
