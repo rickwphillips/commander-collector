@@ -31,6 +31,8 @@ import { CommanderArt } from './CommanderArt';
 import { useCommanderPreview } from './useCommanderPreview';
 import { PoisonOverlay } from './PoisonOverlay';
 import { LifeCracks } from './LifeCracks';
+import { CityBlessing } from './CityBlessing';
+import { InitiativeTorch } from './InitiativeTorch';
 import { LifeTotal } from './LifeTotal';
 import { useTimerTokens, TIMER_EXPIRED_BORDER_BLINK, TIMER_EXPIRED_HEADER_BLINK } from '@/game-manager/hooks/useTimerTokens';
 import { StepperControl, StepperOverlayHost, type StepperSize } from './StepperControl';
@@ -446,6 +448,20 @@ export function TeamPanel({
         overflow: 'hidden',
       }}
     >
+      {/* City's Blessing decorations (shared with PlayerCard). Per-player ability,
+          so the team panel shows it when either teammate holds the blessing;
+          the flag banners fly the primary pilot's commander art. */}
+      <CityBlessing
+        visible={members.some((m) => m.player.hasCitysBlessing)}
+        exiting={false}
+        threatSource={null}
+        commander={primary.player.commander}
+      />
+
+      {/* Initiative torch (shared with PlayerCard) — shown when either teammate
+          holds the initiative. */}
+      <InitiativeTorch visible={members.some((m) => m.player.hasInitiative)} />
+
       {/* Custom 2HG app bar: each commander's current details flank a centered,
           editable team name (click to rename — persists with the live game
           state). Mirrors the 4-player card's header, doubled for the two pilots. */}
