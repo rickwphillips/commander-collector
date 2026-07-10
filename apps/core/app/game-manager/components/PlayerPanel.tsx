@@ -2,11 +2,9 @@
 
 import { useMemo, useRef, useEffect, useCallback, useState } from 'react';
 import { Box, Stack, SvgIcon, Typography } from '@mui/material';
-import { usePoisonSound } from '@/game-manager/hooks/usePoisonSound';
-import { useSounds } from '@/game-manager/hooks/useSounds';
+import { useBlessingAndSound } from '@/game-manager/hooks/useBlessingAndSound';
 import { useDamageFlash } from '@/game-manager/hooks/useDamageFlash';
 import { useMonarchTransition } from '@/game-manager/hooks/useMonarchTransition';
-import { useCitysBlessingExit } from '@/game-manager/hooks/useCitysBlessingExit';
 import { useLongPress } from '@/game-manager/hooks/useLongPress';
 import { useTimerTokens } from '@/game-manager/hooks/useTimerTokens';
 import { lifeColor } from '@/game-manager/lifeColor';
@@ -133,18 +131,20 @@ export function PlayerPanel({
   onOpenChat,
 }: PlayerPanelProps) {
   // ─── Side-effect hooks ───────────────────────────────────────────────────
-  usePoisonSound(player.poison, player.isEliminated, soundEnabled);
-  const { playCitysBlessing } = useSounds(soundEnabled, player.hasCitysBlessing);
+  // Poison ambience + City's Blessing sound + blessing show/hide lifecycle,
+  // shared with TeamPanel via one hook.
+  const { cityBlessingVisible, cityBlessingExiting } = useBlessingAndSound(
+    player.hasCitysBlessing,
+    player.poison,
+    player.isEliminated,
+    soundEnabled,
+  );
 
   // ─── Animation lifecycle hooks (drive the animations bundle) ─────────────
   const damageFlash = useDamageFlash(player.life);
   const { monarchAnim, monarchEnterIsTransfer } = useMonarchTransition(
     player.isMonarch,
     monarchTransfer,
-  );
-  const { cityBlessingVisible, cityBlessingExiting } = useCitysBlessingExit(
-    player.hasCitysBlessing,
-    playCitysBlessing,
   );
 
   // ─── XP flash (transient ripple on experience increment) ─────────────────

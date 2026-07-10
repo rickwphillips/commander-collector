@@ -29,8 +29,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { ASSET_BASE, remoteQrOrigin } from '@/lib/api';
 import { CommanderArt } from './CommanderArt';
 import { useCommanderPreview } from './useCommanderPreview';
-import { usePoisonSound } from '@/game-manager/hooks/usePoisonSound';
-import { useSounds } from '@/game-manager/hooks/useSounds';
+import { useBlessingAndSound } from '@/game-manager/hooks/useBlessingAndSound';
 import { PoisonOverlay } from './PoisonOverlay';
 import { EliminatedOverlay } from './EliminatedOverlay';
 import { LifeCracks } from './LifeCracks';
@@ -365,11 +364,10 @@ export function TeamPanel({
   const crackAlpha = (from: number) => Math.min(Math.max((lostRatio - from) / 0.15, 0), 1);
   const eliminated = primary?.player.isEliminated ?? false;
 
-  // Sound parity with PlayerPanel: the shared poison ambience and the City's
-  // Blessing sting (keyed off the team's shared poison / either teammate holding
-  // the blessing). Both no-op when soundEnabled is false.
-  usePoisonSound(poison, eliminated, soundEnabled);
-  useSounds(soundEnabled, members.some((m) => m.player.hasCitysBlessing));
+  // Sound + City's Blessing lifecycle, shared with PlayerPanel via one hook
+  // (poison ambience, intro sting on gain, and the 3.8s fade-out on loss).
+  const teamHasBlessing = members.some((m) => m.player.hasCitysBlessing);
+  const { cityBlessingVisible, cityBlessingExiting } = useBlessingAndSound(teamHasBlessing, poison, eliminated, soundEnabled);
   // A team is "conceded" if either head was manually conceded (vs eliminated by
   // damage). reconcileTeams only stamps isConceded on the head that received the
   // eliminate event, so check both.
@@ -461,8 +459,8 @@ export function TeamPanel({
           so the team panel shows it when either teammate holds the blessing;
           the flag banners fly the primary pilot's commander art. */}
       <CityBlessing
-        visible={members.some((m) => m.player.hasCitysBlessing)}
-        exiting={false}
+        visible={cityBlessingVisible}
+        exiting={cityBlessingExiting}
         threatSource={null}
         commander={primary.player.commander}
       />
