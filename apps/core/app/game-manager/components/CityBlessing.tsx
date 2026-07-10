@@ -307,7 +307,11 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
         <Box component="svg" viewBox="0 0 640 240" preserveAspectRatio="none" sx={{
           position: 'absolute', bottom: -55, left: -80,
           width: 'calc(100% + 80px)', height: 200,
-          fill: 'rgba(0,0,0,0.52)', stroke: 'rgba(0,0,0,0.78)', strokeWidth: 1.2,
+          // Opaque (not translucent) so the rolling hills behind don't bleed
+          // through the buildings; lighter + theme-aware so it stays subtle.
+          fill: (theme) => theme.palette.mode === 'dark' ? '#1a1510' : '#bcb4a9',
+          stroke: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.7)' : 'rgba(95,85,72,0.45)',
+          strokeWidth: 1.2,
           // Foreground: sits above the distant hills + skyline (z 0) below.
           zIndex: 1, pointerEvents: 'none',
           animation: exiting
@@ -392,7 +396,10 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
         <Box component="svg" viewBox="0 0 800 80" preserveAspectRatio="none" sx={{
           position: 'absolute', bottom: 38, left: 0, right: 0,
           width: '100%', height: 55,
-          fill: 'rgba(0,0,0,0.22)', stroke: 'none',
+          // Opaque + lighter (more distant reads hazier) so the hills don't
+          // bleed through the distant skyline either.
+          fill: (theme) => theme.palette.mode === 'dark' ? '#251e15' : '#cbc4b9',
+          stroke: 'none',
           zIndex: 0, pointerEvents: 'none', opacity: 0,
           animation: exiting
             ? `${skylineFadeOut} 0.8s 2s ease-in forwards`
@@ -426,7 +433,10 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
         <Box component="svg" viewBox="0 0 200 220" sx={{
           position: 'absolute', bottom: -35, right: -40,
           width: 200, height: 220,
-          fill: 'rgba(0,0,0,0.52)', stroke: 'rgba(0,0,0,0.78)', strokeWidth: 1.2,
+          // Opaque + lighter + theme-aware, matching the castle/houses layer.
+          fill: (theme) => theme.palette.mode === 'dark' ? '#1a1510' : '#bcb4a9',
+          stroke: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.7)' : 'rgba(95,85,72,0.45)',
+          strokeWidth: 1.2,
           // Foreground: sits above the distant hills + skyline (z 0) below.
           zIndex: 1, pointerEvents: 'none',
           animation: exiting
