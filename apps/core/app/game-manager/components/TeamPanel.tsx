@@ -25,6 +25,9 @@ import ElimIcon from '@mui/icons-material/PersonOff';
 import ReplayIcon from '@mui/icons-material/Replay';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SmartphoneIcon from '@mui/icons-material/Smartphone';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import type { SxProps, Theme } from '@mui/material/styles';
 import { QRCodeSVG } from 'qrcode.react';
 import { ASSET_BASE, remoteQrOrigin } from '@/lib/api';
 import { CommanderArt } from './CommanderArt';
@@ -47,6 +50,7 @@ import { isControlGlassActive } from './controlGlass';
 import { CounterGlyph } from './CounterGlyph';
 import { XpBadge, useXpFlash } from './XpBadge';
 import { TurnNavControl } from './TurnNavControl';
+import { remoteDrawerOuterSx, remoteDrawerContentSx, remoteDrawerRailSx, remoteDrawerChevronSx } from './remoteDrawerSx';
 
 // Shared poison total is lethal at 15 in 2HG; the danger pulse fires one below.
 const POISON_DANGER_2HG = 14;
@@ -119,6 +123,8 @@ interface TeamPanelProps {
   onPassTurn?: () => void;
   // Remote turn control steps the shared turn backwards (prev_turn event).
   onPrevTurn?: () => void;
+  // Remote only: open the shared game-log viewer (far right of the turn control).
+  onOpenLog?: () => void;
 }
 
 // Responsive size tokens. Table (!remoteMode) keeps the original fixed px so the
@@ -323,6 +329,59 @@ function CommanderBrief({ member, align, onView, sz }: { member?: TeamMember; al
   );
 }
 
+/**
+ * One of the two flanking sections (pilots | opposing/cmd-damage) around the
+ * shared-life center. On the HOST board it is the plain centered Stack it always
+ * was (seats are rotated, not media-query-aware). On the REMOTE phone it becomes
+ * an orientation-aware collapsible drawer via the shared `remoteDrawerSx` helpers
+ * — mirroring PlayerCard's two side drawers — collapsing WIDTH in landscape and
+ * HEIGHT in portrait, with the rail on the inner edge toward the shared life.
+ *
+ * `side` is which side of center the section sits on after `order` resolves:
+ * 'left' (opposing/cmd damage, order 1) puts the rail LAST; 'right' (pilots,
+ * order 3) puts it FIRST — the flex order the helper's chevron logic expects.
+ */
+function PanelSection({
+  remoteMode,
+  order,
+  side,
+  open,
+  onToggle,
+  spacing,
+  children,
+}: {
+  remoteMode: boolean;
+  order: number;
+  side: 'left' | 'right';
+  open: boolean;
+  onToggle: () => void;
+  spacing: number;
+  children: React.ReactNode;
+}) {
+  if (!remoteMode) {
+    return (
+      <Stack spacing={spacing} sx={{ flex: 1, minWidth: 0, justifyContent: 'center', order }}>
+        {children}
+      </Stack>
+    );
+  }
+  const rail = (
+    <Box onClick={onToggle} sx={remoteDrawerRailSx}>
+      <ChevronRightIcon sx={remoteDrawerChevronSx(open, side)} />
+    </Box>
+  );
+  const content = (
+    <Box sx={[remoteDrawerContentSx(open), { justifyContent: 'center', gap: spacing }] as SxProps<Theme>}>
+      {children}
+    </Box>
+  );
+  return (
+    <Box sx={[{ order }, remoteDrawerOuterSx(open)] as SxProps<Theme>}>
+      {side === 'right' ? <>{rail}{content}</> : <>{content}{rail}</>}
+    </Box>
+  );
+}
+
 export function TeamPanel({
   teamNumber,
   teamName,
@@ -353,6 +412,7 @@ export function TeamPanel({
   onUndoEliminate,
   onPassTurn,
   onPrevTurn,
+  onOpenLog,
 }: TeamPanelProps) {
   // Commander card preview — shared with PlayerCard. Tap any commander (own team
   // or opposing) to enlarge; the overlay is scoped to this panel's root.
@@ -404,6 +464,10 @@ export function TeamPanel({
   const conceded = members.some((m) => m.player.isConceded);
   const [showConcedeConfirm, setShowConcedeConfirm] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  // Remote-only collapsible side drawers (mirror PlayerCard). Pilots sit right of
+  // the shared life (order 3), opposing/cmd-damage left (order 1); both start open.
+  const [pilotsOpen, setPilotsOpen] = useState(true);
+  const [cmdDmgOpen, setCmdDmgOpen] = useState(true);
   const closeMenu = () => { setMenuAnchor(null); setShowConcedeConfirm(false); };
 
   const sz = remoteMode ? SZ_PHONE : SZ_TABLE;
@@ -659,8 +723,10 @@ export function TeamPanel({
           '@media (orientation: portrait)': { flexDirection: 'column', overflowY: 'auto', gap: 2, alignItems: 'stretch' },
         }),
       }}>
-      {/* Section A: pilots + per-commander tax. Ordered to the RIGHT (order 3). */}
-      <Stack spacing={0.75} sx={{ flex: 1, minWidth: 0, justifyContent: 'center', order: 3 }}>
+      {/* Section A: pilots + per-commander tax. Ordered to the RIGHT (order 3).
+          On the remote phone it is a collapsible drawer with its rail on the inner
+          (life) edge; on the host board it stays the plain centered column. */}
+      <PanelSection remoteMode={remoteMode} order={3} side="right" open={pilotsOpen} onToggle={() => setPilotsOpen((o) => !o)} spacing={0.75}>
         {members.map((m) => (
           <Box key={m.idx}>
             <Stack direction="row" alignItems="center" spacing={1}>
@@ -752,7 +818,7 @@ export function TeamPanel({
             </Stack>
           </Box>
         ))}
-      </Stack>
+      </PanelSection>
 
       {/* Section B: shared life (centered + prominent) and poison. Order 2 (center). */}
       <Stack sx={{ flex: 1.2, minWidth: 0, alignItems: 'center', justifyContent: 'center', order: 2, ...(remoteMode && { alignSelf: 'stretch' }) }} spacing={0.5}>
@@ -835,12 +901,24 @@ export function TeamPanel({
             reading "Your Turn" when it is this team's turn. Host board keeps the
             original active-team-only Pass Turn tap. */}
         {remoteMode && onPassTurn && onPrevTurn ? (
-          <TurnNavControl
-            isYourTurn={isActiveTeam}
-            onNext={onPassTurn}
-            onPrev={onPrevTurn}
-            sx={{ px: 2.5, py: 0.75, fontSize: sz.sectionLabel, boxShadow: 3 }}
-          />
+          <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+            <TurnNavControl
+              isYourTurn={isActiveTeam}
+              onNext={onPassTurn}
+              onPrev={onPrevTurn}
+              sx={{ px: 2.5, py: 0.75, fontSize: sz.sectionLabel, boxShadow: 3 }}
+            />
+            {/* Game log link, pinned far right so the turn control stays centered. */}
+            {onOpenLog && (
+              <IconButton
+                onClick={onOpenLog}
+                title="Game log"
+                sx={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', color: 'text.secondary' }}
+              >
+                <FormatListBulletedIcon sx={{ fontSize: sz.ability }} />
+              </IconButton>
+            )}
+          </Box>
         ) : (!remoteMode && isActiveTeam && onPassTurn) ? (
           <Box
             onClick={onPassTurn}
@@ -856,8 +934,8 @@ export function TeamPanel({
       {/* Section C: opposing-team stats + commander damage taken from each of
           their commanders. Ordered to the LEFT (order 1). All damage is tracked
           against this team's primary seat so reconcileTeams sums it for the
-          21-damage check. */}
-      <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0, justifyContent: 'center', order: 1 }}>
+          21-damage check. Remote: a collapsible drawer, rail on the inner edge. */}
+      <PanelSection remoteMode={remoteMode} order={1} side="left" open={cmdDmgOpen} onToggle={() => setCmdDmgOpen((o) => !o)} spacing={0.5}>
         {/* Opposing team's shared life/poison, so you can see how they're doing. */}
         <Box sx={{ opacity: oppEliminated ? 0.5 : 1 }}>
           <Typography noWrap sx={{ fontSize: sz.briefName, fontWeight: 700, color: oppColor, lineHeight: 1.1, textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -924,7 +1002,7 @@ export function TeamPanel({
             />
           ));
         })}
-      </Stack>
+      </PanelSection>
       </Box>
 
       {/* Shared Phyrexian poison overlay — washes the whole panel as the team's

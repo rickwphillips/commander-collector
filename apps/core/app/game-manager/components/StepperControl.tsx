@@ -137,6 +137,9 @@ export interface StepperControlProps {
   maxFont?: number | string;
   /** css override for the `max` denominator text (color, spacing, etc.). */
   maxSx?: SxProps<Theme>;
+  /** Reserve blank space the width of a `/ NN` denominator when this row has no
+   *  `max`, so sibling rows WITH one keep their − value + columns aligned. */
+  reserveMax?: boolean;
   /** Gap between the buttons and the value in 'row' layout (MUI spacing units). */
   rowSpacing?: number;
   /** slotProps for the ±5 long-press tooltip (per-seat rotation on the board). */
@@ -174,6 +177,7 @@ export function StepperControl({
   max,
   maxFont,
   maxSx,
+  reserveMax = false,
   rowSpacing = 0.25,
   tooltipSlotProps,
   lpKeyPrefix,
@@ -244,7 +248,12 @@ export function StepperControl({
             onPointerUp={cancelLongPress}
             onPointerLeave={cancelLongPress}
             onPointerCancel={cancelLongPress}
-            sx={{ p: 0, minWidth: sz.btnMinWidth, minHeight: sz.btnMinHeight }}
+            // Keep the full tap target but pull the glyph to the value side (dec
+            // hugs the value's left, inc its right). The wide button's dead space
+            // then falls on the OUTER edge (toward the label / row end) instead of
+            // between the glyph and the number, which is the "wasted space" a wide
+            // remote tap target otherwise opens up around a small − / + glyph.
+            sx={{ p: 0, minWidth: sz.btnMinWidth, minHeight: sz.btnMinHeight, justifyContent: dir === 'dec' ? 'flex-end' : 'flex-start' }}
           >
             <Typography sx={{ fontSize: sz.btnFont, fontWeight: 700, lineHeight: 1 }}>{glyph}</Typography>
           </IconButton>
@@ -292,7 +301,17 @@ export function StepperControl({
       key={`${keyBase}-max`}
       sx={{ fontSize: maxFont ?? sz.valueFont, color: 'text.secondary', whiteSpace: 'nowrap', lineHeight: 1, flexShrink: 0, ...maxSx }}
     >
-      / {max}
+      /{max}
+    </Typography>
+  ) : reserveMax ? (
+    // Invisible placeholder the width of a "/NN" denominator so rows WITHOUT a max
+    // keep their − value + columns aligned with sibling rows that carry one.
+    <Typography
+      key={`${keyBase}-maxph`}
+      aria-hidden
+      sx={{ fontSize: maxFont ?? sz.valueFont, whiteSpace: 'nowrap', lineHeight: 1, flexShrink: 0, visibility: 'hidden', ...maxSx }}
+    >
+      /00
     </Typography>
   ) : null;
 
