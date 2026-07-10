@@ -32,6 +32,7 @@ import { CityBlessing } from './CityBlessing';
 import { InitiativeTorch } from './InitiativeTorch';
 import { CrownIcon, MonarchCrown, monarchCrownAnim } from './MonarchCrown';
 import { EliminatedOverlay } from './EliminatedOverlay';
+import type { ThreatSource } from '@/game-manager/threatSource';
 
 // Singles poison is lethal at 10; the danger pulse fires one below.
 const POISON_DANGER_SINGLES = 9;
@@ -166,12 +167,8 @@ export interface LongPressHandlers {
 }
 
 // ─── Threat-source derivation (computed in orchestrator from cmd damage) ───
-export interface ThreatSource {
-  artUrl: string | undefined;
-  cmdName: string;
-  intensity: number;
-  dmg: number;
-}
+// Threat type lives in the shared threatSource module; re-export for prop consumers.
+export type { ThreatSource };
 
 // ─── Full prop surface ─────────────────────────────────────────────────────
 export interface PlayerCardProps {

@@ -3,6 +3,7 @@
 import { useMemo, useRef, useEffect, useCallback, useState } from 'react';
 import { Box, Stack, SvgIcon, Typography } from '@mui/material';
 import { useBlessingAndSound } from '@/game-manager/hooks/useBlessingAndSound';
+import { computeThreatSource } from '@/game-manager/threatSource';
 import { useDamageFlash } from '@/game-manager/hooks/useDamageFlash';
 import { useMonarchTransition } from '@/game-manager/hooks/useMonarchTransition';
 import { useLongPress } from '@/game-manager/hooks/useLongPress';
@@ -208,35 +209,14 @@ export function PlayerPanel({
   );
   const isWarning = isLifeLow || isPoisoned || isCmdDmgHigh;
 
-  // ─── Derived: threat source (biggest CMD damage threat against this player)
-  const threatSource = useMemo(() => {
-    if (player.isEliminated) return null;
-    const myDmg = commanderDamage[playerIdx] ?? {};
-    type Candidate = { srcIdx: number; isPartner: boolean; dmg: number; hasArt: boolean };
-    const candidates: Candidate[] = [];
-    for (const [sidxStr, dmgTuple] of Object.entries(myDmg)) {
-      const sidx = Number(sidxStr);
-      const srcPlayer = allPlayers[sidx];
-      if (!srcPlayer) continue;
-      const [main, partner] = dmgTuple;
-      if (main > 0) candidates.push({ srcIdx: sidx, isPartner: false, dmg: main, hasArt: !!srcPlayer.commander.artCropUrl });
-      if (partner > 0) candidates.push({ srcIdx: sidx, isPartner: true, dmg: partner, hasArt: !!(srcPlayer.partner?.artCropUrl) });
-    }
-    if (candidates.length === 0) return null;
-    candidates.sort((a, b) => {
-      if (b.dmg !== a.dmg) return b.dmg - a.dmg;
-      if (a.hasArt !== b.hasArt) return a.hasArt ? -1 : 1;
-      if (a.srcIdx === lastCmdDmgSourceIdx) return -1;
-      if (b.srcIdx === lastCmdDmgSourceIdx) return 1;
-      return 0;
-    });
-    const best = candidates[0];
-    const srcPlayer = allPlayers[best.srcIdx];
-    const artUrl = best.isPartner ? srcPlayer.partner?.artCropUrl : srcPlayer.commander.artCropUrl;
-    const cmdName = best.isPartner ? (srcPlayer.partner?.name ?? '') : srcPlayer.commander.name;
-    const intensity = Math.max(0, Math.min((best.dmg - 7) / 14, 1));
-    return { artUrl, cmdName, intensity, dmg: best.dmg };
-  }, [commanderDamage, playerIdx, allPlayers, player.isEliminated, lastCmdDmgSourceIdx]);
+  // ─── Derived: threat source (biggest CMD damage threat against this player) ──
+  // Shared with the 2HG TeamPanel via computeThreatSource.
+  const threatSource = useMemo(
+    () => player.isEliminated
+      ? null
+      : computeThreatSource([commanderDamage[playerIdx]], (i) => allPlayers[i], lastCmdDmgSourceIdx),
+    [commanderDamage, playerIdx, allPlayers, player.isEliminated, lastCmdDmgSourceIdx],
+  );
 
   // ─── Derived: crack alpha closure (depends only on lostRatio) ────────────
   const crackAlpha = useCallback(
