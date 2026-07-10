@@ -3,12 +3,15 @@
 import { Typography } from '@mui/material';
 import type { ThreatSource } from '@/game-manager/threatSource';
 
+// Lefts kept left-weighted (0-45%) so the long, nowrap names fill a wide
+// container (2HG shared life) without leaving a gap on the left, while still
+// covering PlayerCard's taller container (extra length just runs off, clipped).
 const POSITIONS = [
-  { top: '10%', left: '6%',  rotate: -18 },
-  { top: '74%', left: '55%', rotate:  11 },
-  { top: '42%', left: '62%', rotate:  -6 },
-  { top: '84%', left: '8%',  rotate:  20 },
-  { top: '22%', left: '48%', rotate:  -9 },
+  { top: '10%', left: '2%',  rotate: -18 },
+  { top: '74%', left: '20%', rotate:  11 },
+  { top: '42%', left: '44%', rotate:  -6 },
+  { top: '84%', left: '6%',  rotate:  20 },
+  { top: '22%', left: '30%', rotate:  -9 },
 ];
 
 /**
