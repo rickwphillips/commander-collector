@@ -3,6 +3,7 @@
 import { keyframes } from '@emotion/react';
 import { Box, Typography } from '@mui/material';
 import { useProxiedArtUrl } from './CommanderArt';
+import type { ThreatSource } from '@/game-manager/threatSource';
 
 /**
  * City's Blessing decoration suite — lifted verbatim from PlayerCard, shared
@@ -260,12 +261,10 @@ function CityFlag({ left, bottom = -25, riseDelay, wiggleDuration, wiggleOffset,
 }
 
 
-export interface ThreatSourceLike { artUrl?: string | null; cmdName?: string | null; intensity?: number; dmg: number }
-
 export function CityBlessing({ visible, exiting, threatSource, commander }: {
   visible: boolean;
   exiting: boolean;
-  threatSource?: ThreatSourceLike | null;
+  threatSource?: ThreatSource | null;
   commander: { artCropUrl?: string; name: string };
 }) {
   // Resolve the flag art by NAME through the phone-safe proxy (same path as

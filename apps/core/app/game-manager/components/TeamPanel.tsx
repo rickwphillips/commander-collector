@@ -17,7 +17,7 @@
  * normal handlers, targeting the team's primary seat so reconcileTeams keeps
  * both heads in sync. Standard games never use this component.
  */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Box, Stack, Typography, IconButton, TextField, Menu, MenuItem } from '@mui/material';
 import InitiativeIcon from '@mui/icons-material/Castle';
 import CityIcon from '@mui/icons-material/LocationCity';
@@ -30,6 +30,7 @@ import { ASSET_BASE, remoteQrOrigin } from '@/lib/api';
 import { CommanderArt } from './CommanderArt';
 import { useCommanderPreview } from './useCommanderPreview';
 import { useBlessingAndSound } from '@/game-manager/hooks/useBlessingAndSound';
+import { computeThreatSource } from '@/game-manager/threatSource';
 import { PoisonOverlay } from './PoisonOverlay';
 import { EliminatedOverlay } from './EliminatedOverlay';
 import { LifeCracks } from './LifeCracks';
@@ -364,6 +365,15 @@ export function TeamPanel({
   const crackAlpha = (from: number) => Math.min(Math.max((lostRatio - from) / 0.15, 0), 1);
   const eliminated = primary?.player.isEliminated ?? false;
 
+  // Biggest commander-damage threat against the team (over both teammates), same
+  // computation PlayerPanel uses per seat. Drives the flag-steal in <CityBlessing>.
+  const threatSource = useMemo(() => {
+    if (eliminated) return null;
+    const byIdx = new Map<number, PlayerState>();
+    for (const t of [...members, ...opponents]) byIdx.set(t.idx, t.player);
+    return computeThreatSource(members.map((m) => commanderDamage[m.idx]), (i) => byIdx.get(i), null);
+  }, [eliminated, members, opponents, commanderDamage]);
+
   // Sound + City's Blessing lifecycle, shared with PlayerPanel via one hook
   // (poison ambience, intro sting on gain, and the 3.8s fade-out on loss).
   const teamHasBlessing = members.some((m) => m.player.hasCitysBlessing);
@@ -461,7 +471,7 @@ export function TeamPanel({
       <CityBlessing
         visible={cityBlessingVisible}
         exiting={cityBlessingExiting}
-        threatSource={null}
+        threatSource={threatSource}
         commander={primary.player.commander}
       />
 
