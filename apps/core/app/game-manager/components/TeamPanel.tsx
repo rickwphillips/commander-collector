@@ -732,36 +732,47 @@ export function TeamPanel({
         {/* Shared crack overlay behind the life number + floating Monarch crown
             (same components as PlayerCard). overflow:visible so the crown can rise
             above the life row; the crack layers are inset:0 so they don't spill. */}
-        <Box sx={{ position: 'relative', overflow: 'visible', display: 'flex', justifyContent: 'center' }}>
-        <LifeCracks fingerprint={teamNumber} crackAlpha={crackAlpha} />
-        {/* Floating threatening-commander names over the shared life (shared with PlayerCard). */}
-        <ThreatNames threatSource={threatSource} fingerprint={teamNumber} />
-        {/* Monarch is one-per-game; show the crown when either teammate holds it. */}
-        <MonarchCrown show={members.some((m) => m.player.isMonarch)} animStr={monarchCrownAnim('steady', false)} />
-        <StepperControl
-          label="Life Total"
-          value={life}
-          color={teamLifeColor}
-          onDec={() => onLifeChange(primary.idx, -1)}
-          onInc={() => onLifeChange(primary.idx, 1)}
-          onDec5={() => onLifeChange(primary.idx, -5)}
-          onInc5={() => onLifeChange(primary.idx, 5)}
-          size={{ btnFont: sz.btnLife, valueFont: sz.life, btnMinWidth: sz.big ? 52 : 44, btnMinHeight: sz.big ? 52 : 44, valueMinWidth: 96 }}
-          rowSpacing={1.5}
-          lpKeyPrefix="life"
-          valueNode={
-            <LifeTotal
-              value={life}
-              fontSize={sz.life}
-              color={teamLifeColor}
-              damageFlash={damageFlash}
-              energy={teamEnergy}
-              poison={poison}
-              reactions={{ swipes: false }}
-              sx={{ minWidth: 96, textAlign: 'center' }}
-            />
-          }
-        />
+        <Box sx={{
+          position: 'relative',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          // A generous life-total container so the crack + threat layers cover a
+          // real area (not just the digits). overflow:visible lets the crown rise.
+          minWidth: 'clamp(180px, 42dvw, 340px)',
+          minHeight: 'clamp(110px, 24dvh, 220px)',
+          ...(remoteMode && { width: '100%', flex: 1 }),
+        }}>
+          {/* Cracks + threat names fill the whole container and are clipped to it,
+              so long names don't spill onto the pilot columns. */}
+          <Box sx={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
+            <LifeCracks fingerprint={teamNumber} crackAlpha={crackAlpha} />
+            <ThreatNames threatSource={threatSource} fingerprint={teamNumber} />
+          </Box>
+          {/* Monarch is one-per-game; show the crown when either teammate holds it. */}
+          <MonarchCrown show={members.some((m) => m.player.isMonarch)} animStr={monarchCrownAnim('steady', false)} />
+          <StepperControl
+            label="Life Total"
+            value={life}
+            color={teamLifeColor}
+            onDec={() => onLifeChange(primary.idx, -1)}
+            onInc={() => onLifeChange(primary.idx, 1)}
+            onDec5={() => onLifeChange(primary.idx, -5)}
+            onInc5={() => onLifeChange(primary.idx, 5)}
+            size={{ btnFont: sz.btnLife, valueFont: sz.life, btnMinWidth: sz.big ? 52 : 44, btnMinHeight: sz.big ? 52 : 44, valueMinWidth: 96 }}
+            rowSpacing={1.5}
+            lpKeyPrefix="life"
+            valueNode={
+              <LifeTotal
+                value={life}
+                fontSize={sz.life}
+                color={teamLifeColor}
+                damageFlash={damageFlash}
+                energy={teamEnergy}
+                poison={poison}
+                reactions={{ swipes: false }}
+                sx={{ minWidth: 96, textAlign: 'center' }}
+              />
+            }
+          />
         </Box>
         <Typography sx={{ fontSize: sz.sectionLabel, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
           Shared Life
