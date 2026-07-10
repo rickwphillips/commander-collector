@@ -271,6 +271,9 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
   // CommanderArt). The stored artCropUrl is often null (older games / after a
   // name edit), which is why the 2HG flags were falling back to the name text.
   const commanderArtSrc = useProxiedArtUrl(commander.name) ?? commander.artCropUrl;
+  // Resolve the threatening commander's art the same way, so the flag-steal fires
+  // even when its stored crop is null (the common case, which was gating it off).
+  const threatArtSrc = useProxiedArtUrl(threatSource?.cmdName ?? undefined) ?? threatSource?.artUrl ?? null;
   return (
     <>
       {/* ── City's Blessing god rays ── */}
@@ -495,7 +498,7 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
 
       {/* ── City's Blessing: marching flags ── */}
       {visible && !exiting && (() => {
-        const threatArtUrl = (threatSource?.artUrl) ?? null;
+        const threatArtUrl = threatArtSrc;
         const threatCount = !threatArtUrl
           ? 0
           : Math.min(Math.floor(threatSource!.dmg * 12 / 20), 12);
@@ -515,7 +518,7 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
               driftDuration={cfg.driftDuration}
               driftOffset={cfg.driftOffset}
               artCropUrl={isThreat ? threatArtUrl! : commanderArtSrc}
-              commanderName={commander.name}
+              commanderName={isThreat ? (threatSource?.cmdName ?? commander.name) : commander.name}
             />
             );
           })}
