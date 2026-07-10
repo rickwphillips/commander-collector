@@ -308,7 +308,8 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
           position: 'absolute', bottom: -55, left: -80,
           width: 'calc(100% + 80px)', height: 200,
           fill: 'rgba(0,0,0,0.52)', stroke: 'rgba(0,0,0,0.78)', strokeWidth: 1.2,
-          zIndex: 0, pointerEvents: 'none',
+          // Foreground: sits above the distant hills + skyline (z 0) below.
+          zIndex: 1, pointerEvents: 'none',
           animation: exiting
             ? `${castleSlideOut} 1.8s 2s ease-in forwards`
             : `${castleSlideIn} 1.8s ease-out forwards`,
@@ -426,7 +427,8 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
           position: 'absolute', bottom: -35, right: -40,
           width: 200, height: 220,
           fill: 'rgba(0,0,0,0.52)', stroke: 'rgba(0,0,0,0.78)', strokeWidth: 1.2,
-          zIndex: 0, pointerEvents: 'none',
+          // Foreground: sits above the distant hills + skyline (z 0) below.
+          zIndex: 1, pointerEvents: 'none',
           animation: exiting
             ? `${castleSlideOutRight} 1.8s 2s ease-in forwards`
             : `${castleSlideInRight} 1.8s 0.3s ease-out forwards`,
