@@ -24,8 +24,15 @@ export function glassBackingSx(active: boolean) {
     borderRadius: 1.5,
     px: 0.5,
     py: 0.25,
-    // Keep the control content above the backing pseudo-element.
-    '& > *': { position: 'relative', zIndex: 1 },
+    // Keep the control content above the backing pseudo-element, and (when the
+    // glass is active) lift it with a soft drop shadow so the icons / numbers /
+    // buttons pop off the frosted panel.
+    '& > *': {
+      position: 'relative',
+      zIndex: 1,
+      filter: active ? 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.4))' : 'none',
+      transition: 'filter 0.6s ease',
+    },
     // The backing is a pseudo-element whose OPACITY is transitioned. Opacity
     // always animates cleanly (unlike toggling backdrop-filter / box-shadow), so
     // the frosted panel fades both ON and OFF instead of snapping. It carries the
