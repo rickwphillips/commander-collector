@@ -2,6 +2,8 @@
 
 import { memo, useEffect, useState } from 'react';
 import { Box, Button, IconButton, Stack, SvgIcon, TextField, Tooltip, Typography } from '@mui/material';
+import type { SxProps, Theme } from '@mui/material/styles';
+import { remoteDrawerOuterSx, remoteDrawerContentSx, remoteDrawerRailSx, remoteDrawerChevronSx } from './remoteDrawerSx';
 import AddIcon from '@mui/icons-material/Add';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
@@ -20,7 +22,7 @@ import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import { QRCodeSVG } from 'qrcode.react';
 import { useCommanderPreview } from './useCommanderPreview';
 import { ASSET_BASE, remoteQrOrigin } from '@/lib/api';
-import { CommanderArt, CommanderArtBg } from './CommanderArt';
+import { CommanderArt, CommanderArtBg, CommanderBackdrop, BACKDROP_FADE_MS } from './CommanderArt';
 import { ControlFocusModal } from './ControlFocusModal';
 import { StepperControl, StepperOverlayHost } from './StepperControl';
 import { isControlGlassActive } from './controlGlass';
@@ -36,6 +38,7 @@ import { CityBlessing } from './CityBlessing';
 import { InitiativeTorch } from './InitiativeTorch';
 import { CrownIcon, MonarchCrown, monarchCrownAnim } from './MonarchCrown';
 import { EliminatedOverlay } from './EliminatedOverlay';
+import { TurnNavControl } from './TurnNavControl';
 import type { ThreatSource } from '@/game-manager/threatSource';
 import { ThreatNames } from './ThreatNames';
 
@@ -182,6 +185,14 @@ export interface PlayerCardProps {
   commanderDamage: CommanderDamageMap;
   startingLife: number;
   activePlayerIdx?: number;
+  /**
+   * Staggered backdrop reveal: ms to wait before this seat's background art (or
+   * name fallback) pops in. `null` keeps it hidden (no first player yet); a
+   * number reveals it in turn order once the game starts.
+   */
+  bgRevealDelayMs?: number | null;
+  /** Flash at the end of the backdrop reveal (initial intro sequence only). */
+  bgRevealFlash?: boolean;
 
   // Mode flags
   remoteMode: boolean;
@@ -191,6 +202,9 @@ export interface PlayerCardProps {
   highlightMode: boolean;
   isHighlighted: boolean;
   isCurrentPlayer: boolean;
+  /** Gates the active-turn highlight (border / shadow / header gradient). Held
+   *  off during the initial backdrop intro, then enabled once it completes. */
+  turnIndicatorEnabled?: boolean;
   themeMode?: 'light' | 'dark';
 
   // Kill prompts (passed through from orchestrator)
@@ -210,6 +224,8 @@ export interface PlayerCardProps {
   onEliminate: (idx: number) => void;
   onUndoEliminate: (idx: number) => void;
   onPassTurn?: () => void;
+  /** Step the turn backwards (remote turn control). */
+  onPrevTurn?: () => void;
   onLifeKillSelect?: (sourceIdx: number | null) => void;
   onPoisonKillSelect?: (sourceIdx: number | null) => void;
   onSwitchToPlayer?: (targetIdx: number) => void;
@@ -253,6 +269,8 @@ function arePlayerCardPropsEqual(prev: PlayerCardProps, next: PlayerCardProps): 
     prev.playerIdx === next.playerIdx &&
     prev.startingLife === next.startingLife &&
     prev.activePlayerIdx === next.activePlayerIdx &&
+    prev.bgRevealDelayMs === next.bgRevealDelayMs &&
+    prev.bgRevealFlash === next.bgRevealFlash &&
     prev.remoteMode === next.remoteMode &&
     prev.seatCode === next.seatCode &&
     prev.remoteConnected === next.remoteConnected &&
@@ -260,6 +278,7 @@ function arePlayerCardPropsEqual(prev: PlayerCardProps, next: PlayerCardProps): 
     prev.highlightMode === next.highlightMode &&
     prev.isHighlighted === next.isHighlighted &&
     prev.isCurrentPlayer === next.isCurrentPlayer &&
+    prev.turnIndicatorEnabled === next.turnIndicatorEnabled &&
     prev.themeMode === next.themeMode &&
     prev.lifeKillOpponents === next.lifeKillOpponents &&
     prev.poisonKillOpponents === next.poisonKillOpponents &&
@@ -289,6 +308,7 @@ function arePlayerCardPropsEqual(prev: PlayerCardProps, next: PlayerCardProps): 
     prev.onEliminate === next.onEliminate &&
     prev.onUndoEliminate === next.onUndoEliminate &&
     prev.onPassTurn === next.onPassTurn &&
+    prev.onPrevTurn === next.onPrevTurn &&
     prev.onLifeKillSelect === next.onLifeKillSelect &&
     prev.onPoisonKillSelect === next.onPoisonKillSelect &&
     prev.onSwitchToPlayer === next.onSwitchToPlayer &&
@@ -308,7 +328,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
     onLifeChange, onPoisonChange, onEnergyChange, onExperienceChange, onCommanderTaxChange,
     handleCmdDmgChange,
     onToggleMonarch, onToggleInitiative, onToggleCitysBlessing,
-    onEliminate, onUndoEliminate, onPassTurn,
+    onEliminate, onUndoEliminate, onPassTurn, onPrevTurn,
     onSwitchToPlayer,
     onToggleSound, onToggleTheme, onOpenChat,
     threatSource, crackAlpha,
@@ -337,6 +357,9 @@ function PlayerCardImpl(props: PlayerCardProps) {
   const [focusedControl, setFocusedControl] = useState<FocusedControl>(null);
   const [qrOpen, setQrOpen] = useState(false);
   const [countersOpen, setCountersOpen] = useState(true);
+  // Commander Damage column is a collapsible drawer too (host board only), mirror
+  // of the Counters drawer on the opposite (inner) edge.
+  const [cmdDmgOpen, setCmdDmgOpen] = useState(true);
   const [cmdDmgShowPlayer, setCmdDmgShowPlayer] = useLocalStorageBool(
     `cmdDmgShowPlayer:${player.playerId}`,
   );
@@ -386,7 +409,18 @@ function PlayerCardImpl(props: PlayerCardProps) {
   const monarchAnimStr = monarchCrownAnim(monarchAnim, monarchEnterIsTransfer);
 
   // ─── Derived helpers used in Block B ────────────────────────────────────
-  const { startingLife, activePlayerIdx } = props;
+  const { startingLife, activePlayerIdx, bgRevealDelayMs, bgRevealFlash } = props;
+  // Active-turn highlight is suppressed until the intro backdrop reveal finishes.
+  const turnIndicatorEnabled = props.turnIndicatorEnabled ?? true;
+  const showTurnHighlight = isCurrentPlayer && turnIndicatorEnabled;
+  // Header thumbnail stays hidden until this seat's backdrop has revealed, then
+  // fades in (backdrop delay + its fade). undefined/null pass straight through.
+  const thumbRevealMs =
+    bgRevealDelayMs === undefined
+      ? undefined
+      : bgRevealDelayMs === null
+      ? null
+      : bgRevealDelayMs + BACKDROP_FADE_MS;
   const isCmdDmgHigh = Object.values(commanderDamage[playerIdx] ?? {}).some(
     (dmg) => dmg[0] >= 21 || dmg[1] >= 21
   );
@@ -434,14 +468,14 @@ function PlayerCardImpl(props: PlayerCardProps) {
           ? '3px solid #DAA520'
           : isHighlighted
           ? '3px solid #DAA520'
-          : (!highlightMode ? timer.currentPlayerBorder : undefined)
+          : (!highlightMode && turnIndicatorEnabled ? timer.currentPlayerBorder : undefined)
           ?? (isWarning ? '2px solid #e53935' : undefined)
           ?? ((theme: import('@mui/material').Theme) => `1px solid ${theme.palette.divider}`),
         boxShadow: showEliminateConfirm
           ? '0 0 24px 6px rgba(218,165,32,0.6)'
           : isHighlighted
           ? '0 0 24px 6px rgba(218,165,32,0.6)'
-          : (!highlightMode ? timer.currentPlayerShadow : null) ?? 'none',
+          : (!highlightMode && turnIndicatorEnabled ? timer.currentPlayerShadow : null) ?? 'none',
         ...(!highlightMode && timer.isTimerExpired && TIMER_EXPIRED_BORDER_BLINK),
         transition: 'box-shadow 0.1s ease, border 0.1s ease, filter 1s ease',
         '& .MuiTypography-root': { textShadow: energyGlow, transition: 'font-size 0.2s ease, margin 0.2s ease, text-shadow 0.4s ease' },
@@ -456,7 +490,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
       <Box
         sx={{
         px: 1, py: 0.5, flexShrink: 0, filter: 'none', position: 'relative', zIndex: 3, display: 'flex', alignItems: 'center',
-        background: isCurrentPlayer && highlightMode
+        background: showTurnHighlight && highlightMode
           ? `linear-gradient(90deg, ${timer.timerColorRgba(0.3)} 0%, ${timer.timerColorRgba(0.7)} 50%, ${timer.timerColorRgba(0.3)} 100%)`
           : 'rgba(0,0,0,0.08)',
         transition: 'background-color 0.3s ease',
@@ -464,13 +498,18 @@ function PlayerCardImpl(props: PlayerCardProps) {
       }}>
         {/* Left: commander art + tax */}
         <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0, zIndex: 1 }}>
-          <CommanderArt
-            name={player.commander.name}
-            alt={player.commander.name}
-            title={player.commander.name}
-            onClick={(e) => { e.stopPropagation(); setCmdPreviewName(player.commander.name); }}
-            sx={{ height: sizes.artHeight, width: 'auto', borderRadius: 0.5, flexShrink: 0, cursor: 'zoom-in' }}
-          />
+          {/* Fixed slot so the header reserves the thumbnail's space and doesn't
+              grow/jump when the art finishes loading (CommanderArt is null until then). */}
+          <Box sx={{ height: sizes.artHeight, aspectRatio: '626 / 457', flexShrink: 0, borderRadius: 0.5, overflow: 'hidden', cursor: 'zoom-in', ...(remoteMode && { '@media (orientation: portrait)': { display: 'none' } }) }}>
+            <CommanderArt
+              name={player.commander.name}
+              alt={player.commander.name}
+              title={player.commander.name}
+              revealDelayMs={thumbRevealMs}
+              onClick={(e) => { e.stopPropagation(); setCmdPreviewName(player.commander.name); }}
+              sx={{ display: 'block', height: '100%', width: '100%', objectFit: 'cover' }}
+            />
+          </Box>
           {/* One tax medallion per commander with tax > 0 (partner decks show two). */}
           {[
             { name: player.commander.name, tax: player.commanderTax },
@@ -494,8 +533,8 @@ function PlayerCardImpl(props: PlayerCardProps) {
             </Tooltip>
           ))}
           <XpBadge experience={player.experience} flashing={animations.xpFlashing} rippleKey={animations.xpRippleKey} />
-          {/* Pass Turn */}
-          {isCurrentPlayer && onPassTurn && (
+          {/* Pass Turn (host board only; the remote uses the TurnNavControl below). */}
+          {!remoteMode && isCurrentPlayer && onPassTurn && (
             <Box
               onClick={onPassTurn}
               sx={{
@@ -615,21 +654,32 @@ function PlayerCardImpl(props: PlayerCardProps) {
         // mirroring TeamPanel. Landscape and the on-table board are unaffected.
         ...(remoteMode ? { '@media (orientation: portrait)': { flexDirection: 'column', overflowY: 'auto' } } : {}) }}>
 
-        {/* Commander Damage box */}
-        <Box sx={{
-          ...(remoteMode ? { width: '33dvw', flexShrink: 0, '@media (orientation: portrait)': { width: '100%' } } : { flex: 1, minWidth: 0 }),
-          borderRight: (theme) => `1px solid ${theme.palette.divider}`,
-          px: remoteMode ? 1 : 0.5,
-          py: remoteMode ? 1 : 0.25,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: remoteMode ? 'flex-start' : 'center',
-          gap: remoteMode ? 0.5 : 0.1,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          position: 'relative',
-          transition: 'padding 0.2s ease, row-gap 0.2s ease',
-        }}>
+        {/* Commander Damage box — collapsible drawer (host board); the rail sits on
+            the inner (life) edge, mirroring the Counters drawer. The collapse is a
+            flex-width change in panel space, so the whole rotated card maps it to
+            the correct screen direction (left/right on top-bottom seats, up/down on
+            the side seats). */}
+        <Box sx={[
+          { borderRight: (theme) => `1px solid ${theme.palette.divider}` },
+          remoteMode
+            ? remoteDrawerOuterSx(cmdDmgOpen)
+            : { display: 'flex', flexDirection: 'row', minWidth: 0, overflow: 'hidden', ...(cmdDmgOpen ? { flex: 1 } : { flex: 'none', width: 24 }) },
+        ] as SxProps<Theme>}>
+          <Box sx={[
+          remoteMode
+            ? remoteDrawerContentSx(cmdDmgOpen)
+            // Host: collapse content fully when closed so its padding doesn't shove
+            // the rail off-center; open takes normal padding.
+            : ((!cmdDmgOpen)
+                ? { flex: 'none', width: 0, minWidth: 0, px: 0, opacity: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', overflowY: 'auto', overflowX: 'hidden' }
+                : { flex: 1, minWidth: 0, px: 0.5, opacity: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', overflowY: 'auto', overflowX: 'hidden' }),
+          {
+            py: remoteMode ? 1 : 0.25,
+            position: 'relative',
+            transition: 'padding 0.2s ease, row-gap 0.2s ease, opacity 0.15s ease',
+            ...(remoteMode ? { px: 1, justifyContent: 'flex-start', gap: 0.5, overflowY: 'auto', overflowX: 'hidden' } : { gap: 0.1 }),
+          },
+        ] as SxProps<Theme>}>
           {/* Threat vignette — commander art fades in as damage approaches 21 */}
           {threatSource?.artUrl && threatSource.intensity > 0 && (
             <Box sx={{
@@ -678,10 +728,12 @@ function PlayerCardImpl(props: PlayerCardProps) {
                       {activePlayerIdx === sourceIdx && (
                         <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0, boxShadow: '0 0 4px 1px rgba(var(--mui-palette-primary-mainChannel) / 0.7)' }} />
                       )}
-                      <Typography sx={{ fontSize: sizes.fsSourceName, color: sourceEliminated ? 'text.disabled' : activePlayerIdx === sourceIdx ? 'primary.main' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', fontWeight: activePlayerIdx === sourceIdx ? 700 : 400, flex: 1, minWidth: 0 }}>
+                      <Typography sx={{ fontSize: sizes.fsSourceName, color: sourceEliminated ? 'text.disabled' : activePlayerIdx === sourceIdx ? 'primary.main' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', fontWeight: activePlayerIdx === sourceIdx ? 700 : 400, flex: '0 1 auto', minWidth: 0 }}>
                         {cmdDmgShowPlayer ? source.playerName : source.commander.name}
                       </Typography>
                       <Tooltip title={`Dealt ${source.partner ? `${dealt[0]}/${dealt[1]}` : dealtTotal} commander damage to ${source.playerName}`} placement="top" slotProps={position.ttSlotProps} arrow><Typography sx={{ fontSize: sizes.fsSourceName, fontWeight: 900, color: dealtTotal >= 21 ? 'error.main' : dealtTotal > 0 ? '#e67e22' : 'text.disabled', lineHeight: 1, flexShrink: 0 }}>⚔{source.partner ? `${dealt[0]}/${dealt[1]}` : dealtTotal}</Typography></Tooltip>
+                      {/* Spacer keeps name + sword left-aligned instead of the name growing to push the sword to the counter. */}
+                      <Box sx={{ flex: 1, minWidth: 0 }} />
                     </Stack>
                     <Stack direction="row" spacing={0.5} sx={{ mt: 0.15, flexWrap: 'wrap', alignItems: 'center' }}>
                       {source.isMonarch && <Tooltip title="Monarch" placement="top" slotProps={position.ttSlotProps} arrow><CrownIcon sx={{
@@ -704,13 +756,15 @@ function PlayerCardImpl(props: PlayerCardProps) {
                 }
                 glass={glassActive}
                 value={dmg[0]}
+                max={21}
+                maxFont={sizes.fsSourceName}
                 color={dmg[0] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary'}
                 disableDec={sourceEliminated}
                 onDec={() => handleCmdDmgChange(playerIdx, sourceIdx, false, -1)}
                 onInc={() => handleCmdDmgChange(playerIdx, sourceIdx, false, 1)}
                 onDec5={() => handleCmdDmgChange(playerIdx, sourceIdx, false, -5)}
                 onInc5={() => handleCmdDmgChange(playerIdx, sourceIdx, false, 5)}
-                rowSpacing={0.5}
+                rowSpacing={remoteMode ? 0 : 0.5}
                 size={{ btnFont: sizes.fsCounterBtn, valueFont: sizes.fsCounterValue, btnMinWidth: sizes.cmdBtnWidth, btnMinHeight: sizes.cmdBtnHeight, valueMinWidth: sizes.valColWidth }}
                 tooltipSlotProps={position.ttSlotProps}
                 lpKeyPrefix={`${sourceIdx}`}
@@ -728,13 +782,15 @@ function PlayerCardImpl(props: PlayerCardProps) {
                   }
                   glass={glassActive}
                   value={dmg[1]}
+                  max={21}
+                  maxFont={sizes.fsSourceName}
                   color={dmg[1] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary'}
                   disableDec={sourceEliminated}
                   onDec={() => handleCmdDmgChange(playerIdx, sourceIdx, true, -1)}
                   onInc={() => handleCmdDmgChange(playerIdx, sourceIdx, true, 1)}
                   onDec5={() => handleCmdDmgChange(playerIdx, sourceIdx, true, -5)}
                   onInc5={() => handleCmdDmgChange(playerIdx, sourceIdx, true, 5)}
-                  rowSpacing={0.5}
+                  rowSpacing={remoteMode ? 0 : 0.5}
                   size={{ btnFont: sizes.fsCounterBtn, valueFont: sizes.fsCounterValue, btnMinWidth: sizes.cmdBtnWidth, btnMinHeight: sizes.cmdBtnHeight, valueMinWidth: sizes.valColWidth }}
                   tooltipSlotProps={position.ttSlotProps}
                   lpKeyPrefix={`${sourceIdx}-p`}
@@ -845,10 +901,27 @@ function PlayerCardImpl(props: PlayerCardProps) {
               </Box>
             );
           })()}
+          </Box>
+          {/* Collapse rail on the inner edge, toward the life total. Host centers a
+              mirrored chevron; remote uses the orientation-aware chevron. */}
+          <Box
+            onClick={() => setCmdDmgOpen((o) => !o)}
+            sx={remoteMode
+              ? remoteDrawerRailSx
+              : { width: 24, flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          >
+            {remoteMode ? (
+              <ChevronRightIcon sx={remoteDrawerChevronSx(cmdDmgOpen, 'left')} />
+            ) : (
+              <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }}>
+                <ChevronRightIcon sx={{ fontSize: 22, color: 'text.secondary', transform: cmdDmgOpen ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.25s ease', display: 'block' }} />
+              </Box>
+            )}
+          </Box>
         </Box>
 
         {/* Life total + controls */}
-        <Box sx={{ ...(remoteMode ? { width: '33dvw', flexShrink: 0, '@media (orientation: portrait)': { width: '100%' } } : { flex: 1, minWidth: 0 }), display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5, alignSelf: 'stretch', pt: remoteMode ? 2 : 0 }}>
+        <Box sx={{ ...(remoteMode ? { flex: 1, minWidth: 0, '@media (orientation: portrait)': { width: '100%' } } : { flex: 1, minWidth: 0 }), display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5, alignSelf: 'stretch', pt: remoteMode ? { '@media (orientation: landscape)': 2, '@media (orientation: portrait)': 0 } : 0 }}>
           <Box sx={{ position: 'relative', lineHeight: 1, overflow: 'visible', width: '100%', flex: remoteMode ? undefined : 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             <MonarchCrown show={showCrown} animStr={monarchAnimStr} />
 
@@ -861,14 +934,24 @@ function PlayerCardImpl(props: PlayerCardProps) {
               <GlassBacking active={glassActive} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <LifeTotal
                 value={player.life}
-                fontSize={remoteMode ? 'clamp(80px, 22dvmax, 260px)' : (countersOpen ? 'clamp(34px, 10dvh, 112px)' : 'clamp(60px, 20dvh, 240px)')}
+                // Grows as each side drawer collapses: both open (small) →
+                // one closed (medium) → both closed (largest). Applies to both the
+                // remote (dvmax) and host (dvh) size ramps.
+                fontSize={(() => {
+                  const closed = (countersOpen ? 0 : 1) + (cmdDmgOpen ? 0 : 1);
+                  return remoteMode
+                    // dvmin = the tight dimension (height in landscape, width in
+                    // portrait) so the number never exceeds the middle row.
+                    ? (closed === 0 ? 'clamp(72px, 20dvmin, 220px)' : closed === 1 ? 'clamp(88px, 26dvmin, 280px)' : 'clamp(120px, 38dvmin, 400px)')
+                    : (closed === 0 ? 'clamp(34px, 10dvh, 112px)' : closed === 1 ? 'clamp(46px, 15dvh, 176px)' : 'clamp(60px, 20dvh, 240px)');
+                })()}
                 color={computedLifeColor || undefined}
                 onClick={() => setFocusedControl({ type: 'life' })}
                 damageFlash={animations.damageFlash}
                 energy={player.energy}
                 poison={player.poison}
               />
-              <Stack direction="row" alignItems="center" spacing={remoteMode ? 0 : 0.5} sx={{ mt: remoteMode ? 1 : 'clamp(0px, 0.6dvh, 4px)', flexShrink: 0, zIndex: 1, ...(remoteMode && { width: '100%', justifyContent: 'space-evenly' }) }}>
+              <Stack direction="row" alignItems="center" spacing={remoteMode ? 0 : 0.5} sx={{ mt: remoteMode ? { '@media (orientation: landscape)': 0.25, '@media (orientation: portrait)': 1 } : 'clamp(0px, 0.6dvh, 4px)', flexShrink: 0, zIndex: 1, ...(remoteMode && { width: '100%', justifyContent: 'space-evenly' }) }}>
                 <Tooltip open={lpKey === 'life-dec'} title="-5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
                   <IconButton
                     onClick={guardClick(() => onLifeChange(playerIdx, -1))}
@@ -899,30 +982,31 @@ function PlayerCardImpl(props: PlayerCardProps) {
           </Box>
         </Box>
 
-        {/* Counters — right column, collapsible */}
-        <Box sx={{
-          display: 'flex',
-          flexDirection: 'row',
-          ...(countersOpen ? { flex: 1 } : { flex: 'none', width: 24 }),
-          minWidth: 0,
-          overflow: 'hidden',
-          borderLeft: (theme) => `1px solid ${theme.palette.divider}`,
-          // Portrait stack: take full width like the other two sections.
-          ...(remoteMode ? { '@media (orientation: portrait)': { width: '100%', flex: 'none' } } : {}),
-        }}>
+        {/* Counters — collapsible drawer. Host: panel-space width collapse (the seat
+            rotation orients it). Remote: orientation-aware via shared helpers (width
+            in landscape, height in portrait). */}
+        <Box sx={[
+          { borderLeft: (theme) => `1px solid ${theme.palette.divider}` },
+          remoteMode
+            ? remoteDrawerOuterSx(countersOpen)
+            : { display: 'flex', flexDirection: 'row', minWidth: 0, overflow: 'hidden', ...(countersOpen ? { flex: 1 } : { flex: 'none', width: 24 }) },
+        ] as SxProps<Theme>}>
           <Box
             onClick={() => setCountersOpen(o => !o)}
-            sx={{ width: 24, flexShrink: 0, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', pt: 0.5, gap: 0.5, cursor: 'pointer' }}
+            sx={remoteMode
+              ? remoteDrawerRailSx
+              : { width: 24, flexShrink: 0, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', pt: 0.5, gap: 0.5, cursor: 'pointer' }}
           >
-            {!countersOpen && <>
-              {player.poison > 0 && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
-                  <Box sx={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Typography sx={{ fontSize: 14, color: player.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1 }}>☠</Typography>
+            {/* Host shows a collapsed mini-summary on the rail; remote is chevron-only. */}
+            {!remoteMode && !countersOpen && <>
+              {[player.commanderTax, ...(player.partner ? [player.partnerCommanderTax] : [])].filter((t) => t > 0).map((t, i) => (
+                <Box key={i} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
+                  <Box sx={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, background: 'radial-gradient(circle at 38% 35%, #d0d0d0, #7a7a7a)', border: '1.5px solid #3a3a3a', boxShadow: '0 1px 3px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Typography sx={{ fontSize: 7, fontWeight: 800, color: '#111', lineHeight: 1, userSelect: 'none' }}>+{t * 2}</Typography>
                   </Box>
-                  <Typography sx={{ fontSize: 11, color: player.poison >= 10 ? '#e53935' : '#66BB6A', fontWeight: 700, lineHeight: 1 }}>{player.poison}</Typography>
+                  <Typography sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 700, lineHeight: 1 }}>{t}</Typography>
                 </Box>
-              )}
+              ))}
               {player.energy > 0 && (
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
                   <Box sx={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -939,20 +1023,28 @@ function PlayerCardImpl(props: PlayerCardProps) {
                   <Typography sx={{ fontSize: 11, color: '#DAA520', fontWeight: 700, lineHeight: 1 }}>{player.experience}</Typography>
                 </Box>
               )}
-              {[player.commanderTax, ...(player.partner ? [player.partnerCommanderTax] : [])].filter((t) => t > 0).map((t, i) => (
-                <Box key={i} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
-                  <Box sx={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, background: 'radial-gradient(circle at 38% 35%, #d0d0d0, #7a7a7a)', border: '1.5px solid #3a3a3a', boxShadow: '0 1px 3px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Typography sx={{ fontSize: 7, fontWeight: 800, color: '#111', lineHeight: 1, userSelect: 'none' }}>+{t * 2}</Typography>
+              {player.poison > 0 && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
+                  <Box sx={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Typography sx={{ fontSize: 14, color: player.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1 }}>☠</Typography>
                   </Box>
-                  <Typography sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 700, lineHeight: 1 }}>{t}</Typography>
+                  <Typography sx={{ fontSize: 11, color: player.poison >= 10 ? '#e53935' : '#66BB6A', fontWeight: 700, lineHeight: 1 }}>{player.poison}</Typography>
                 </Box>
-              ))}
+              )}
             </>}
-            <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }}>
-              <ChevronRightIcon sx={{ fontSize: 22, color: 'text.secondary', transform: countersOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s ease', display: 'block' }} />
-            </Box>
+            {remoteMode ? (
+              <ChevronRightIcon sx={remoteDrawerChevronSx(countersOpen, 'right')} />
+            ) : (
+              <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }}>
+                <ChevronRightIcon sx={{ fontSize: 22, color: 'text.secondary', transform: countersOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s ease', display: 'block' }} />
+              </Box>
+            )}
           </Box>
-          <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', opacity: countersOpen ? 1 : 0, transition: 'opacity 0.15s ease' }}>
+          <Box sx={[
+            remoteMode
+              ? remoteDrawerContentSx(countersOpen)
+              : { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', opacity: countersOpen ? 1 : 0, transition: 'opacity 0.15s ease' },
+          ] as SxProps<Theme>}>
             <Typography sx={{ fontSize: sizes.fsSectionLabel, fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5, px: 0.75, pt: 0.5, pb: 0.25, flexShrink: 0 }}>Counters</Typography>
             <Box sx={{
               flex: 1,
@@ -966,14 +1058,14 @@ function PlayerCardImpl(props: PlayerCardProps) {
               gap: remoteMode ? 0.5 : 0.1,
             }}>
             {([
-              ['Poison', player.poison, () => onPoisonChange(playerIdx, -1), () => onPoisonChange(playerIdx, 1), () => onPoisonChange(playerIdx, -5), () => onPoisonChange(playerIdx, 5), player.poison >= 10 ? 'error.main' : player.poison > 0 ? 'warning.main' : 'text.disabled', null],
-              ['Energy', player.energy, () => onEnergyChange(playerIdx, -1), () => onEnergyChange(playerIdx, 1), () => onEnergyChange(playerIdx, -5), () => onEnergyChange(playerIdx, 5), player.energy > 0 ? 'primary.main' : 'text.disabled', null],
-              ['Experience', player.experience, () => onExperienceChange(playerIdx, -1), () => onExperienceChange(playerIdx, 1), () => onExperienceChange(playerIdx, -5), () => onExperienceChange(playerIdx, 5), player.experience > 0 ? 'primary.main' : 'text.disabled', null],
-              // One Tax row per commander (each commander taxes independently).
+              // Fixed order: Tax (one row per commander), Energy, Experience, Poison.
               // The medallion value (8th slot) lets a partner deck render a second
               // Tax row keyed by the partner commander's name.
               ['Commander Tax', player.commanderTax, () => onCommanderTaxChange(playerIdx, -1), () => onCommanderTaxChange(playerIdx, 1), () => onCommanderTaxChange(playerIdx, -5), () => onCommanderTaxChange(playerIdx, 5), player.commanderTax > 0 ? 'warning.main' : 'text.disabled', player.commanderTax],
               ...(player.partner ? [[player.partner.name, player.partnerCommanderTax, () => onCommanderTaxChange(playerIdx, -1, true), () => onCommanderTaxChange(playerIdx, 1, true), () => onCommanderTaxChange(playerIdx, -5, true), () => onCommanderTaxChange(playerIdx, 5, true), player.partnerCommanderTax > 0 ? 'warning.main' : 'text.disabled', player.partnerCommanderTax]] as [string, number, () => void, () => void, () => void, () => void, string, number | null][] : []),
+              ['Energy', player.energy, () => onEnergyChange(playerIdx, -1), () => onEnergyChange(playerIdx, 1), () => onEnergyChange(playerIdx, -5), () => onEnergyChange(playerIdx, 5), player.energy > 0 ? 'primary.main' : 'text.disabled', null],
+              ['Experience', player.experience, () => onExperienceChange(playerIdx, -1), () => onExperienceChange(playerIdx, 1), () => onExperienceChange(playerIdx, -5), () => onExperienceChange(playerIdx, 5), player.experience > 0 ? 'primary.main' : 'text.disabled', null],
+              ['Poison', player.poison, () => onPoisonChange(playerIdx, -1), () => onPoisonChange(playerIdx, 1), () => onPoisonChange(playerIdx, -5), () => onPoisonChange(playerIdx, 5), player.poison >= 10 ? 'error.main' : player.poison > 0 ? 'warning.main' : 'text.disabled', null],
             ] as [string, number, () => void, () => void, () => void, () => void, string, number | null][]).map(([label, value, onDec, onInc, onDec5, onInc5, color, medallionTax]) => {
               const blurSx = poisonBlur(poisonProgress);
               // Per-value effects are shared with TeamPanel via counterValueSx:
@@ -996,16 +1088,20 @@ function PlayerCardImpl(props: PlayerCardProps) {
                 label={label}
                 glyph={glyphNode}
                 labelFont={sizes.fsSourceName}
-                labelSx={{ flex: 1, ...blurSx }}
+                // Remote landscape: hide the counter's text label (keep the glyph)
+                // to free horizontal space; the direct-child Typography is the label.
+                labelSx={{ flex: 1, ...blurSx, ...(remoteMode && { '@media (orientation: landscape)': { '& > .MuiTypography-root': { display: 'none' } } }) }}
                 glass={glassActive}
                 value={value}
+                max={label === 'Poison' ? 10 : undefined}
+                maxFont={sizes.fsSourceName}
                 color={color}
                 valueSx={valueSx}
                 onDec={onDec}
                 onInc={onInc}
                 onDec5={onDec5}
                 onInc5={onInc5}
-                rowSpacing={0.5}
+                rowSpacing={remoteMode ? 0 : 0.5}
                 size={{ btnFont: sizes.fsCounterBtn, valueFont: sizes.fsCounterValue, btnMinWidth: sizes.cmdBtnWidth, btnMinHeight: sizes.cmdBtnHeight, valueMinWidth: sizes.valColWidth }}
                 tooltipSlotProps={position.ttSlotProps}
                 lpKeyPrefix={label}
@@ -1017,14 +1113,35 @@ function PlayerCardImpl(props: PlayerCardProps) {
       </Box>
       </Box>
 
-      {/* ── Faded background art ── */}
-      <CommanderArt
+      {/* ── Remote turn control (footer bar) ── */}
+      {/* Remote only: an in-flow footer at the bottom of the panel (never overlaps
+          content), always usable — tap = next turn, long-press = previous. Reads
+          "Your Turn" when it is this seat's turn. */}
+      {remoteMode && onPassTurn && onPrevTurn && (
+        <Box sx={{
+          flexShrink: 0, position: 'relative', zIndex: 3,
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          px: 1, pt: 1.75, pb: 'calc(env(safe-area-inset-bottom) + 8px)',
+          borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+        }}>
+          <TurnNavControl
+            isYourTurn={isCurrentPlayer}
+            onNext={onPassTurn}
+            onPrev={onPrevTurn}
+            sx={{ px: 4, py: 0.75, fontSize: sizes.fsPassBtn, minWidth: 160 }}
+          />
+        </Box>
+      )}
+
+      {/* ── Faded background art (or diagonal name fallback), staggered reveal ── */}
+      <CommanderBackdrop
         name={player.commander.name}
+        revealDelayMs={bgRevealDelayMs}
+        flashOnReveal={bgRevealFlash}
         sx={{
           position: 'absolute', inset: 0,
           width: '100%', height: '100%',
-          objectFit: 'cover', objectPosition: 'center',
-          opacity: 0.12, zIndex: 0, pointerEvents: 'none',
+          zIndex: 0, pointerEvents: 'none',
         }}
       />
 

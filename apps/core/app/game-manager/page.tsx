@@ -401,6 +401,18 @@ export default function GameManagerPage() {
     const closeStream = api.openLiveGameHostStream(
       code,
       (events) => {
+        // A remote prev_turn that actually steps the turn back is logged as a
+        // turn_revert (mirroring the host's own back button): flag it before the
+        // commit so the diff effect labels the turn change correctly. Detect an
+        // actual change against the latest committed state (prevStateRef) so a
+        // no-op prev (e.g. at turn 1) doesn't leave the flag stuck set.
+        if (events.some((e) => e.type === 'prev_turn')) {
+          const before = prevStateRef.current;
+          const after = events.reduce((s, ev) => applyEvent(s, ev), before);
+          if (after.currentPlayerIdx !== before.currentPlayerIdx || after.turnNumber !== before.turnNumber) {
+            turnRevertRef.current = true;
+          }
+        }
         commit((prev) => events.reduce((s, ev) => applyEvent(s, ev), prev));
       },
       () => { /* session inactive — host controls */ },

@@ -126,6 +126,17 @@ export interface StepperControlProps {
    * which renders the numeric `value`. Ignored in 'cells' layout.
    */
   valueNode?: ReactNode;
+  /**
+   * Optional denominator shown after the value (e.g. the poison lethal `15`, the
+   * commander-damage lethal `21`). Rendered INSIDE the control row so it sits
+   * under the shared glass backing — unlike a sibling `/ 15` the caller would
+   * otherwise append outside the frosted panel. 'row' layout only.
+   */
+  max?: number | string;
+  /** Font size for the `max` denominator (defaults to the value font). */
+  maxFont?: number | string;
+  /** css override for the `max` denominator text (color, spacing, etc.). */
+  maxSx?: SxProps<Theme>;
   /** Gap between the buttons and the value in 'row' layout (MUI spacing units). */
   rowSpacing?: number;
   /** slotProps for the ±5 long-press tooltip (per-seat rotation on the board). */
@@ -160,6 +171,9 @@ export function StepperControl({
   valueClassName,
   valueSx,
   valueNode,
+  max,
+  maxFont,
+  maxSx,
   rowSpacing = 0.25,
   tooltipSlotProps,
   lpKeyPrefix,
@@ -271,6 +285,17 @@ export function StepperControl({
 
   const incBtn = stepButton('inc');
 
+  // Optional denominator (e.g. `/ 15`, `/ 21`). Sits inside the row after the inc
+  // button so it's covered by the glass backing, not appended by the caller.
+  const maxEl = max !== undefined ? (
+    <Typography
+      key={`${keyBase}-max`}
+      sx={{ fontSize: maxFont ?? sz.valueFont, color: 'text.secondary', whiteSpace: 'nowrap', lineHeight: 1, flexShrink: 0, ...maxSx }}
+    >
+      / {max}
+    </Typography>
+  ) : null;
+
   // ─── Focus modal (card-scoped overlay, portaled into the host) ──────────────
   // Reuses ControlFocusModal so the enlarged ±1/±5 control is identical to the
   // hero life modal. Portaled into the host so it isn't clipped by the counters'
@@ -337,6 +362,7 @@ export function StepperControl({
       {decBtn}
       {valueEl}
       {incBtn}
+      {maxEl}
       {portal}
     </Stack>
   );

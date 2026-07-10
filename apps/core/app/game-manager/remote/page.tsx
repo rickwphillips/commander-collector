@@ -287,6 +287,10 @@ function RemotePageInner() {
     sendEvent({ type: 'pass_turn' });
   }, [sendEvent]);
 
+  const handlePrevTurn = useCallback(() => {
+    sendEvent({ type: 'prev_turn' });
+  }, [sendEvent]);
+
   const handleOpenChat = useCallback((playerName: string) => {
     if (!state) return;
     const ctx = {
@@ -511,7 +515,8 @@ function RemotePageInner() {
           onCommanderDamageChange={handleCommanderDamageChange}
           onEliminate={handleEliminate}
           onUndoEliminate={handleUndoEliminate}
-          onPassTurn={teamActive ? handlePassTurn : undefined}
+          onPassTurn={handlePassTurn}
+          onPrevTurn={handlePrevTurn}
         />
       ) : (
       <PlayerPanel
@@ -543,7 +548,8 @@ function RemotePageInner() {
         onToggleTheme={toggleTheme}
         themeMode={mode}
         onToggleSound={() => setSoundEnabled(s => { const next = !s; try { localStorage.setItem('remoteSoundEnabled', next ? '1' : '0'); } catch {} return next; })}
-        onPassTurn={isMyTurn ? handlePassTurn : undefined}
+        onPassTurn={handlePassTurn}
+        onPrevTurn={handlePrevTurn}
         onOpenChat={handleOpenChat}
         {...(lifeKillPending && {
           lifeKillOpponents: state.players
