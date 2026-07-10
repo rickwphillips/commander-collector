@@ -8,6 +8,7 @@ import AddIcon from '@mui/icons-material/Add';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import ChatIcon from '@mui/icons-material/Chat';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import InitiativeIcon from '@mui/icons-material/Castle';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CloseIcon from '@mui/icons-material/Close';
@@ -45,6 +46,7 @@ import { ThreatNames } from './ThreatNames';
 // Singles poison is lethal at 10; the danger pulse fires one below.
 const POISON_DANGER_SINGLES = 9;
 import { useLocalStorageBool } from '@/game-manager/hooks/useLocalStorageBool';
+import { remoteLifeFontSize } from '@/game-manager/lifeFontSize';
 import { TIMER_EXPIRED_BORDER_BLINK, TIMER_EXPIRED_HEADER_BLINK } from '@/game-manager/hooks/useTimerTokens';
 import type { TimerTokens } from '@/game-manager/hooks/useTimerTokens';
 
@@ -232,6 +234,8 @@ export interface PlayerCardProps {
   onToggleTheme?: () => void;
   onToggleSound?: () => void;
   onOpenChat?: (playerName: string) => void;
+  /** Remote only: open the game-log viewer (far-right of the turn footer). */
+  onOpenLog?: () => void;
 
   // Derived value bundles
   sizes: SizeTokens;
@@ -314,7 +318,8 @@ function arePlayerCardPropsEqual(prev: PlayerCardProps, next: PlayerCardProps): 
     prev.onSwitchToPlayer === next.onSwitchToPlayer &&
     prev.onToggleTheme === next.onToggleTheme &&
     prev.onToggleSound === next.onToggleSound &&
-    prev.onOpenChat === next.onOpenChat
+    prev.onOpenChat === next.onOpenChat &&
+    prev.onOpenLog === next.onOpenLog
   );
 }
 
@@ -330,7 +335,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
     onToggleMonarch, onToggleInitiative, onToggleCitysBlessing,
     onEliminate, onUndoEliminate, onPassTurn, onPrevTurn,
     onSwitchToPlayer,
-    onToggleSound, onToggleTheme, onOpenChat,
+    onToggleSound, onToggleTheme, onOpenChat, onOpenLog,
     threatSource, crackAlpha,
   } = props;
   const { lpKey, startLongPress, cancelLongPress, guardClick } = longPress;
@@ -677,7 +682,10 @@ function PlayerCardImpl(props: PlayerCardProps) {
             py: remoteMode ? 1 : 0.25,
             position: 'relative',
             transition: 'padding 0.2s ease, row-gap 0.2s ease, opacity 0.15s ease',
-            ...(remoteMode ? { px: 1, justifyContent: 'flex-start', gap: 0.5, overflowY: 'auto', overflowX: 'hidden' } : { gap: 0.1 }),
+            // px must collapse to 0 when closed: with border-box the padding
+            // otherwise keeps the content ~16px wide, shoving the 24px rail past
+            // the 24px outer wrapper so the chevron gets clipped by overflow:hidden.
+            ...(remoteMode ? { px: cmdDmgOpen ? 1 : 0, justifyContent: 'flex-start', gap: 0.5, overflowY: 'auto', overflowX: 'hidden' } : { gap: 0.1 }),
           },
         ] as SxProps<Theme>}>
           {/* Threat vignette — commander art fades in as damage approaches 21 */}
@@ -728,9 +736,30 @@ function PlayerCardImpl(props: PlayerCardProps) {
                       {activePlayerIdx === sourceIdx && (
                         <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0, boxShadow: '0 0 4px 1px rgba(var(--mui-palette-primary-mainChannel) / 0.7)' }} />
                       )}
-                      <Typography sx={{ fontSize: sizes.fsSourceName, color: sourceEliminated ? 'text.disabled' : activePlayerIdx === sourceIdx ? 'primary.main' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', fontWeight: activePlayerIdx === sourceIdx ? 700 : 400, flex: '0 1 auto', minWidth: 0 }}>
-                        {cmdDmgShowPlayer ? source.playerName : source.commander.name}
-                      </Typography>
+                      {remoteMode ? (
+                        <>
+                          {/* Landscape: the cmd-damage column is narrow, so swap the
+                              name text for a compact commander thumbnail (CMD view)
+                              or the player's first initial (Player view). */}
+                          <Box sx={{ display: 'none', flexShrink: 0, '@media (orientation: landscape)': { display: 'inline-flex', alignItems: 'center' } }}>
+                            {cmdDmgShowPlayer ? (
+                              <Typography sx={{ fontSize: 'clamp(22px, 3.8dvmax, 40px)', lineHeight: 1, fontWeight: 800, color: sourceEliminated ? 'text.disabled' : activePlayerIdx === sourceIdx ? 'primary.main' : 'text.secondary', textDecoration: sourceEliminated ? 'line-through' : 'none' }}>
+                                {source.playerName.charAt(0).toUpperCase()}
+                              </Typography>
+                            ) : (
+                              <CommanderArt name={source.commander.name} title={source.commander.name} sx={{ height: 'clamp(18px, 3dvmax, 34px)', width: 'auto', borderRadius: 0.5, flexShrink: 0, opacity: sourceEliminated ? 0.5 : 1 }} />
+                            )}
+                          </Box>
+                          {/* Portrait: full name text. */}
+                          <Typography sx={{ fontSize: sizes.fsSourceName, color: sourceEliminated ? 'text.disabled' : activePlayerIdx === sourceIdx ? 'primary.main' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', fontWeight: activePlayerIdx === sourceIdx ? 700 : 400, flex: '0 1 auto', minWidth: 0, '@media (orientation: landscape)': { display: 'none' } }}>
+                            {cmdDmgShowPlayer ? source.playerName : source.commander.name}
+                          </Typography>
+                        </>
+                      ) : (
+                        <Typography sx={{ fontSize: sizes.fsSourceName, color: sourceEliminated ? 'text.disabled' : activePlayerIdx === sourceIdx ? 'primary.main' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', fontWeight: activePlayerIdx === sourceIdx ? 700 : 400, flex: '0 1 auto', minWidth: 0 }}>
+                          {cmdDmgShowPlayer ? source.playerName : source.commander.name}
+                        </Typography>
+                      )}
                       <Tooltip title={`Dealt ${source.partner ? `${dealt[0]}/${dealt[1]}` : dealtTotal} commander damage to ${source.playerName}`} placement="top" slotProps={position.ttSlotProps} arrow><Typography sx={{ fontSize: sizes.fsSourceName, fontWeight: 900, color: dealtTotal >= 21 ? 'error.main' : dealtTotal > 0 ? '#e67e22' : 'text.disabled', lineHeight: 1, flexShrink: 0 }}>⚔{source.partner ? `${dealt[0]}/${dealt[1]}` : dealtTotal}</Typography></Tooltip>
                       {/* Spacer keeps name + sword left-aligned instead of the name growing to push the sword to the counter. */}
                       <Box sx={{ flex: 1, minWidth: 0 }} />
@@ -920,8 +949,11 @@ function PlayerCardImpl(props: PlayerCardProps) {
           </Box>
         </Box>
 
-        {/* Life total + controls */}
-        <Box sx={{ ...(remoteMode ? { flex: 1, minWidth: 0, '@media (orientation: portrait)': { width: '100%' } } : { flex: 1, minWidth: 0 }), display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5, alignSelf: 'stretch', pt: remoteMode ? { '@media (orientation: landscape)': 2, '@media (orientation: portrait)': 0 } : 0 }}>
+        {/* Life total + controls. On remote this is a size container so the life
+            number can be capped to the row's REAL height (cqh) — the viewport-based
+            dvmin ramp doesn't know the body height (viewport minus header + footer),
+            so a big number would otherwise push the glass past the row. */}
+        <Box sx={{ ...(remoteMode ? { flex: 1, minWidth: 0, containerType: 'size', '@media (orientation: portrait)': { width: '100%' } } : { flex: 1, minWidth: 0 }), display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 0.5, alignSelf: 'stretch', pt: remoteMode ? { '@media (orientation: landscape)': 2, '@media (orientation: portrait)': 0 } : 0 }}>
           <Box sx={{ position: 'relative', lineHeight: 1, overflow: 'visible', width: '100%', flex: remoteMode ? undefined : 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             <MonarchCrown show={showCrown} animStr={monarchAnimStr} />
 
@@ -931,7 +963,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
               {/* Life number + buttons share the glass backing (same abstraction as
                   every counter, via GlassBacking since the hero life is not a
                   StepperControl), so the whole life control reads over a busy board. */}
-              <GlassBacking active={glassActive} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <GlassBacking active={glassActive} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', ...(remoteMode ? { '@media (orientation: portrait)': { width: '100%', mx: -0.5, py: 3 }, '@media (orientation: landscape)': { height: '100cqh', justifyContent: 'center', pt: 2 } } : {}) }}>
               <LifeTotal
                 value={player.life}
                 // Grows as each side drawer collapses: both open (small) →
@@ -939,19 +971,25 @@ function PlayerCardImpl(props: PlayerCardProps) {
                 // remote (dvmax) and host (dvh) size ramps.
                 fontSize={(() => {
                   const closed = (countersOpen ? 0 : 1) + (cmdDmgOpen ? 0 : 1);
-                  return remoteMode
-                    // dvmin = the tight dimension (height in landscape, width in
-                    // portrait) so the number never exceeds the middle row.
-                    ? (closed === 0 ? 'clamp(72px, 20dvmin, 220px)' : closed === 1 ? 'clamp(88px, 26dvmin, 280px)' : 'clamp(120px, 38dvmin, 400px)')
-                    : (closed === 0 ? 'clamp(34px, 10dvh, 112px)' : closed === 1 ? 'clamp(46px, 15dvh, 176px)' : 'clamp(60px, 20dvh, 240px)');
+                  if (!remoteMode) {
+                    return closed === 0 ? 'clamp(34px, 10dvh, 112px)' : closed === 1 ? 'clamp(46px, 15dvh, 176px)' : 'clamp(60px, 20dvh, 240px)';
+                  }
+                  // Remote (every drawer state): fill the life box along the
+                  // dimension the orientation frees (cqh in landscape, cqw in
+                  // portrait), shrinking for extra digits. See remoteLifeFontSize.
+                  return remoteLifeFontSize(player.life);
                 })()}
                 color={computedLifeColor || undefined}
                 onClick={() => setFocusedControl({ type: 'life' })}
                 damageFlash={animations.damageFlash}
                 energy={player.energy}
                 poison={player.poison}
+                // Crop the digit line box (lineHeight < 1; digits have no descender)
+                // so the buttons snug up under the number instead of sitting below a
+                // block of empty line-box space.
+                sx={remoteMode ? { lineHeight: 0.72 } : undefined}
               />
-              <Stack direction="row" alignItems="center" spacing={remoteMode ? 0 : 0.5} sx={{ mt: remoteMode ? { '@media (orientation: landscape)': 0.25, '@media (orientation: portrait)': 1 } : 'clamp(0px, 0.6dvh, 4px)', flexShrink: 0, zIndex: 1, ...(remoteMode && { width: '100%', justifyContent: 'space-evenly' }) }}>
+              <Stack direction="row" alignItems="center" spacing={remoteMode ? 0 : 0.5} sx={{ mt: remoteMode ? { '@media (orientation: landscape)': 'clamp(-52px, -6dvmin, -12px)', '@media (orientation: portrait)': 1 } : 'clamp(0px, 0.6dvh, 4px)', flexShrink: 0, zIndex: 1, ...(remoteMode && { width: '100%', justifyContent: 'center', columnGap: { '@media (orientation: landscape)': 'clamp(8px, 4dvmin, 32px)', '@media (orientation: portrait)': 'clamp(32px, 22dvmin, 180px)' } }) }}>
                 <Tooltip open={lpKey === 'life-dec'} title="-5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
                   <IconButton
                     onClick={guardClick(() => onLifeChange(playerIdx, -1))}
@@ -961,7 +999,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
                     onPointerCancel={cancelLongPress}
                     sx={{ px: remoteMode ? 4 : 0.5, py: 0.5, minWidth: remoteMode ? 100 : 52, minHeight: 52, borderRadius: 2, '& .MuiTouchRipple-root': { borderRadius: 2 } }}
                   >
-                    <Typography sx={{ fontWeight: 700, fontSize: sizes.fsLifeBtn }}>−</Typography>
+                    <Typography sx={{ fontWeight: 700, fontSize: sizes.fsLifeBtn, lineHeight: 1 }}>−</Typography>
                   </IconButton>
                 </Tooltip>
                 <Tooltip open={lpKey === 'life-inc'} title="+5" placement="top" slotProps={position.ttSlotProps} disableFocusListener disableHoverListener disableTouchListener>
@@ -973,7 +1011,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
                     onPointerCancel={cancelLongPress}
                     sx={{ px: remoteMode ? 4 : 0.5, py: 0.5, minWidth: remoteMode ? 100 : 52, minHeight: 52, borderRadius: 2, '& .MuiTouchRipple-root': { borderRadius: 2 } }}
                   >
-                    <Typography sx={{ fontWeight: 700, fontSize: sizes.fsLifeBtn }}>+</Typography>
+                    <Typography sx={{ fontWeight: 700, fontSize: sizes.fsLifeBtn, lineHeight: 1 }}>+</Typography>
                   </IconButton>
                 </Tooltip>
               </Stack>
@@ -1095,6 +1133,9 @@ function PlayerCardImpl(props: PlayerCardProps) {
                 value={value}
                 max={label === 'Poison' ? 10 : undefined}
                 maxFont={sizes.fsSourceName}
+                // Poison carries a "/10"; the other counters reserve the same
+                // trailing width so every row's − value + column stays aligned.
+                reserveMax
                 color={color}
                 valueSx={valueSx}
                 onDec={onDec}
@@ -1130,6 +1171,17 @@ function PlayerCardImpl(props: PlayerCardProps) {
             onPrev={onPrevTurn}
             sx={{ px: 4, py: 0.75, fontSize: sizes.fsPassBtn, minWidth: 160 }}
           />
+          {/* Game log link, pinned to the far right so the turn control stays
+              centered. Opens the shared log viewer owned by the remote page. */}
+          {onOpenLog && (
+            <IconButton
+              onClick={onOpenLog}
+              title="Game log"
+              sx={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: 'text.secondary' }}
+            >
+              <FormatListBulletedIcon sx={{ fontSize: sizes.fsPassBtn }} />
+            </IconButton>
+          )}
         </Box>
       )}
 

@@ -97,6 +97,7 @@ interface PlayerPanelProps {
   themeMode?: 'light' | 'dark';
   onToggleSound?: () => void;
   onOpenChat?: (playerName: string) => void;
+  onOpenLog?: () => void;
 }
 
 export function PlayerPanel({
@@ -143,6 +144,7 @@ export function PlayerPanel({
   themeMode,
   onToggleSound,
   onOpenChat,
+  onOpenLog,
 }: PlayerPanelProps) {
   // ─── Side-effect hooks ───────────────────────────────────────────────────
   // Poison ambience + City's Blessing sound + blessing show/hide lifecycle,
@@ -320,9 +322,9 @@ export function PlayerPanel({
     fsLifeBtn:      remoteMode ? 'clamp(40px, 8.5dvmax, 90px)'  : 'clamp(28px, 7.0dvh, 56px)',
     fsKillPrompt:   remoteMode ? 'clamp(15px, 2.4dvmax, 28px)'  : 'clamp(11px, 2.0dvh, 15px)',
     artHeight:      remoteMode ? 'clamp(40px, 7.5dvmax, 80px)'  : 'clamp(24px, 4.5dvh, 42px)',
-    cmdBtnWidth:    remoteMode ? 'clamp(44px, 6.0dvmax, 70px)'  : 'clamp(28px, 5.0dvh, 38px)',
+    cmdBtnWidth:    remoteMode ? 'clamp(34px, 4.4dvmax, 50px)'  : 'clamp(28px, 5.0dvh, 38px)',
     cmdBtnHeight:   remoteMode ? 'clamp(40px, 5.5dvmax, 64px)'  : 'clamp(26px, 4.5dvh, 36px)',
-    valColWidth:    remoteMode ? 'clamp(32px, 6.0dvmax, 58px)'  : 'clamp(24px, 4.5dvh, 36px)',
+    valColWidth:    remoteMode ? 'clamp(24px, 3.4dvmax, 40px)'  : 'clamp(24px, 4.5dvh, 36px)',
   }), [remoteMode]);
 
   const position = useMemo<PlayerCardProps['position']>(() => {
@@ -409,6 +411,7 @@ export function PlayerPanel({
       onToggleTheme={onToggleTheme}
       onToggleSound={onToggleSound}
       onOpenChat={onOpenChat}
+      onOpenLog={onOpenLog}
       sizes={sizes}
       position={position}
       timer={timer}

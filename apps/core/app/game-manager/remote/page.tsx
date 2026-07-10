@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Box, Typography, TextField, Button, Stack, CircularProgress, IconButton, Chip, Fab } from '@mui/material';
+import { Box, Typography, TextField, Button, Stack, CircularProgress, IconButton, Chip, Fab, Dialog, DialogTitle, DialogContent } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { PlayerPanel } from '../components/PlayerPanel';
 import { TeamPanel } from '../components/TeamPanel';
+import { GameLogList } from '@/components/GameLogList';
 import { api } from '@/lib/api';
 import { setRemoteSessionCode } from '@commander/shared/lib/api';
-import type { GameManagerState, PlayerState, LiveGameEvent, DistributiveOmit } from '@/lib/types';
+import type { GameManagerState, PlayerState, LiveGameEvent, DistributiveOmit, GameLogEntry } from '@/lib/types';
 import { applyEvent } from '../remoteTransforms';
 import { otherTeam, teamName } from '@/lib/teams';
 import { useThemeMode } from '@/components/ThemeProvider';
@@ -291,6 +292,21 @@ function RemotePageInner() {
     sendEvent({ type: 'prev_turn' });
   }, [sendEvent]);
 
+  // Game log viewer, opened from the far-right link in the turn footer. Reads the
+  // same buffered log the host writes, keyed by this session code (no JWT needed).
+  const [logOpen, setLogOpen] = useState(false);
+  const [logEntries, setLogEntries] = useState<GameLogEntry[]>([]);
+  const [logLoading, setLogLoading] = useState(false);
+  const openLog = useCallback(() => {
+    if (!code) return;
+    setLogOpen(true);
+    setLogLoading(true);
+    api.gameLog.read(code)
+      .then((res) => setLogEntries(res.events ?? []))
+      .catch(() => setLogEntries([]))
+      .finally(() => setLogLoading(false));
+  }, [code]);
+
   const handleOpenChat = useCallback((playerName: string) => {
     if (!state) return;
     const ctx = {
@@ -517,6 +533,7 @@ function RemotePageInner() {
           onUndoEliminate={handleUndoEliminate}
           onPassTurn={handlePassTurn}
           onPrevTurn={handlePrevTurn}
+          onOpenLog={openLog}
         />
       ) : (
       <PlayerPanel
@@ -551,6 +568,7 @@ function RemotePageInner() {
         onPassTurn={handlePassTurn}
         onPrevTurn={handlePrevTurn}
         onOpenChat={handleOpenChat}
+        onOpenLog={openLog}
         {...(lifeKillPending && {
           lifeKillOpponents: state.players
             .map((p, i) => ({ name: p.playerName, idx: i }))
@@ -613,6 +631,30 @@ function RemotePageInner() {
           </Box>
         );
       })()}
+
+      {/* Game log viewer (opened from the turn footer's far-right link). Mirrors
+          the host board's log dialog, reading the same buffered session log. */}
+      <Dialog open={logOpen} onClose={() => setLogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1.5, fontWeight: 600, fontSize: '1rem' }}>
+          Game Log
+          <IconButton size="small" onClick={() => setLogOpen(false)} sx={{ p: 0.25 }}>
+            <CloseIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 0 }}>
+          {logLoading ? (
+            <Typography sx={{ p: 2, color: 'text.secondary', fontSize: 13 }}>Loading...</Typography>
+          ) : (
+            <GameLogList
+              entries={logEntries}
+              emptyText="No events logged yet."
+              timeFontSize={11}
+              textFontSize={13}
+              timeMinWidth={60}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
     </Box>
   );
