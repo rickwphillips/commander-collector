@@ -23,6 +23,8 @@ import { ASSET_BASE, remoteQrOrigin } from '@/lib/api';
 import { CommanderArt, CommanderArtBg } from './CommanderArt';
 import { ControlFocusModal } from './ControlFocusModal';
 import { StepperControl, StepperOverlayHost } from './StepperControl';
+import { isControlGlassActive } from './controlGlass';
+import { GlassBacking } from './GlassBacking';
 import { LifeTotal } from './LifeTotal';
 import { useXpKeyframes } from './PlayerCard.keyframes';
 import { xpGlowFor, energyGlowFor, counterValueSx, poisonBlur } from './counterEffects';
@@ -376,6 +378,14 @@ function PlayerCardImpl(props: PlayerCardProps) {
   // poison boil) now lives in the shared <LifeTotal>; it derives those from the
   // raw energy / poison / damageFlash values passed below.
   const poisonProgress = Math.min(player.poison / 10, 1);
+  // Glass backing for the control clusters when a busy board animation is active
+  // (City's Blessing, Initiative, or late-stage poison). Same shared trigger the
+  // 2HG panel uses; flows into each StepperControl via its `glass` prop.
+  const glassActive = isControlGlassActive({
+    cityBlessingVisible: animations.cityBlessingVisible,
+    hasInitiative: player.hasInitiative,
+    poisonProgress,
+  });
 
   // ─── Monarch crown anim string ──────────────────────────────────────────
   const { monarchEnterIsTransfer } = animations;
@@ -672,11 +682,10 @@ function PlayerCardImpl(props: PlayerCardProps) {
           borderRight: (theme) => `1px solid ${theme.palette.divider}`,
           px: remoteMode ? 1 : 0.5,
           py: remoteMode ? 1 : 0.25,
-          display: 'grid',
-          gridTemplateColumns: `1fr ${sizes.cmdBtnWidth} ${sizes.valColWidth} ${sizes.cmdBtnWidth}`,
-          alignContent: remoteMode ? 'start' : 'center',
-          alignItems: 'center',
-          rowGap: remoteMode ? 0.5 : 0.1,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: remoteMode ? 'flex-start' : 'center',
+          gap: remoteMode ? 0.5 : 0.1,
           overflowY: 'auto',
           overflowX: 'hidden',
           position: 'relative',
@@ -716,39 +725,45 @@ function PlayerCardImpl(props: PlayerCardProps) {
             const dealt = commanderDamage[sourceIdx]?.[playerIdx] ?? [0, 0];
             const dealtTotal = dealt[0] + dealt[1];
             const sourceEliminated = source.isEliminated;
+            // Same abstraction as the counters / 2HG: one row-layout StepperControl
+            // per source. The component owns the label (name + stat-badge row moved
+            // into labelNode, flex:1 so − value + line up across rows) and the glass
+            // backing. Snapshot onClick + all stepper interaction are unchanged.
             const rows = [
-              <Box key={`${sourceIdx}-name`} sx={{ minWidth: 0, pt: 0 }}>
-                <Stack direction="row" alignItems="center" spacing={0.5} sx={{ cursor: 'pointer', minWidth: 0 }} onClick={(e) => { e.stopPropagation(); setOpenSnapshotKey(k => k === `${sourceIdx}-snap` ? null : `${sourceIdx}-snap`); }}>
-                  {activePlayerIdx === sourceIdx && (
-                    <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0, boxShadow: '0 0 4px 1px rgba(var(--mui-palette-primary-mainChannel) / 0.7)' }} />
-                  )}
-                  <Typography sx={{ fontSize: sizes.fsSourceName, color: sourceEliminated ? 'text.disabled' : activePlayerIdx === sourceIdx ? 'primary.main' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', fontWeight: activePlayerIdx === sourceIdx ? 700 : 400, flex: 1, minWidth: 0 }}>
-                    {cmdDmgShowPlayer ? source.playerName : source.commander.name}
-                  </Typography>
-                  <Tooltip title={`Dealt ${source.partner ? `${dealt[0]}/${dealt[1]}` : dealtTotal} commander damage to ${source.playerName}`} placement="top" slotProps={position.ttSlotProps} arrow><Typography sx={{ fontSize: sizes.fsSourceName, fontWeight: 900, color: dealtTotal >= 21 ? 'error.main' : dealtTotal > 0 ? '#e67e22' : 'text.disabled', lineHeight: 1, flexShrink: 0 }}>⚔{source.partner ? `${dealt[0]}/${dealt[1]}` : dealtTotal}</Typography></Tooltip>
-                </Stack>
-                <Stack direction="row" spacing={0.5} sx={{ mt: 0.15, flexWrap: 'wrap', alignItems: 'center' }}>
-                  {source.isMonarch && <Tooltip title="Monarch" placement="top" slotProps={position.ttSlotProps} arrow><CrownIcon sx={{
-                    fontSize: sizes.fsStatBadge,
-                    color: '#DAA520',
-                    animation: 'crownShimmer 2s ease-in-out infinite',
-                    '@keyframes crownShimmer': {
-                      '0%, 100%': { filter: 'drop-shadow(0 0 2px #DAA520) brightness(1)' },
-                      '50%': { filter: 'drop-shadow(0 0 7px #FFD700) brightness(1.5)' },
-                    },
-                  }} /></Tooltip>}
-                  {source.hasCitysBlessing && <Tooltip title="City's Blessing" placement="top" slotProps={position.ttSlotProps} arrow><span><CityIcon active sx={{ fontSize: sizes.fsStatBadge }} /></span></Tooltip>}
-                  {source.hasInitiative && <Tooltip title="Initiative" placement="top" slotProps={position.ttSlotProps} arrow><InitiativeIcon sx={{ fontSize: sizes.fsStatBadge, color: '#4FC3F7' }} /></Tooltip>}
-                  <Tooltip title={`Life: ${source.life}`} placement="top" slotProps={position.ttSlotProps} arrow><Typography sx={{ fontSize: sizes.fsStatBadge, fontWeight: 800, color: lifeColor(source.life) || 'primary.main', lineHeight: 1 }}>♥{source.life}</Typography></Tooltip>
-                  {source.poison > 0 && <Tooltip title={`Poison: ${source.poison}`} placement="top" slotProps={position.ttSlotProps} arrow><Typography sx={{ fontSize: sizes.fsStatBadge, fontWeight: 800, color: source.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1 }}>☠{source.poison}</Typography></Tooltip>}
-                  {source.energy > 0 && <Tooltip title={`Energy: ${source.energy}`} placement="top" slotProps={position.ttSlotProps} arrow><Typography sx={{ fontSize: sizes.fsStatBadge, fontWeight: 800, color: '#4FC8FF', lineHeight: 1 }}>⚡{source.energy}</Typography></Tooltip>}
-                  {source.experience > 0 && <Tooltip title={`XP: ${source.experience}`} placement="top" slotProps={position.ttSlotProps} arrow><Stack direction="row" alignItems="center" spacing={0.25}><Box sx={{ bgcolor: 'background.paper', display: 'inline-flex' }}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: sizes.fsStatBadge, height: sizes.fsStatBadge, objectFit: 'contain', mixBlendMode: 'multiply', transition: 'width 0.2s ease, height 0.2s ease' }} /></Box><Typography sx={{ fontSize: sizes.fsStatBadge, fontWeight: 800, color: '#DAA520', lineHeight: 1 }}>{source.experience}</Typography></Stack></Tooltip>}
-                </Stack>
-              </Box>,
               <StepperControl
                 key={`${sourceIdx}-step`}
-                layout="cells"
                 label={`CMD Dmg — ${cmdDmgShowPlayer ? source.playerName : source.commander.name}`}
+                labelNode={
+                  <Box sx={{ flex: 1, minWidth: 0, pt: 0 }}>
+                    <Stack direction="row" alignItems="center" spacing={0.5} sx={{ cursor: 'pointer', minWidth: 0 }} onClick={(e) => { e.stopPropagation(); setOpenSnapshotKey(k => k === `${sourceIdx}-snap` ? null : `${sourceIdx}-snap`); }}>
+                      {activePlayerIdx === sourceIdx && (
+                        <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0, boxShadow: '0 0 4px 1px rgba(var(--mui-palette-primary-mainChannel) / 0.7)' }} />
+                      )}
+                      <Typography sx={{ fontSize: sizes.fsSourceName, color: sourceEliminated ? 'text.disabled' : activePlayerIdx === sourceIdx ? 'primary.main' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', fontWeight: activePlayerIdx === sourceIdx ? 700 : 400, flex: 1, minWidth: 0 }}>
+                        {cmdDmgShowPlayer ? source.playerName : source.commander.name}
+                      </Typography>
+                      <Tooltip title={`Dealt ${source.partner ? `${dealt[0]}/${dealt[1]}` : dealtTotal} commander damage to ${source.playerName}`} placement="top" slotProps={position.ttSlotProps} arrow><Typography sx={{ fontSize: sizes.fsSourceName, fontWeight: 900, color: dealtTotal >= 21 ? 'error.main' : dealtTotal > 0 ? '#e67e22' : 'text.disabled', lineHeight: 1, flexShrink: 0 }}>⚔{source.partner ? `${dealt[0]}/${dealt[1]}` : dealtTotal}</Typography></Tooltip>
+                    </Stack>
+                    <Stack direction="row" spacing={0.5} sx={{ mt: 0.15, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {source.isMonarch && <Tooltip title="Monarch" placement="top" slotProps={position.ttSlotProps} arrow><CrownIcon sx={{
+                        fontSize: sizes.fsStatBadge,
+                        color: '#DAA520',
+                        animation: 'crownShimmer 2s ease-in-out infinite',
+                        '@keyframes crownShimmer': {
+                          '0%, 100%': { filter: 'drop-shadow(0 0 2px #DAA520) brightness(1)' },
+                          '50%': { filter: 'drop-shadow(0 0 7px #FFD700) brightness(1.5)' },
+                        },
+                      }} /></Tooltip>}
+                      {source.hasCitysBlessing && <Tooltip title="City's Blessing" placement="top" slotProps={position.ttSlotProps} arrow><span><CityIcon active sx={{ fontSize: sizes.fsStatBadge }} /></span></Tooltip>}
+                      {source.hasInitiative && <Tooltip title="Initiative" placement="top" slotProps={position.ttSlotProps} arrow><InitiativeIcon sx={{ fontSize: sizes.fsStatBadge, color: '#4FC3F7' }} /></Tooltip>}
+                      <Tooltip title={`Life: ${source.life}`} placement="top" slotProps={position.ttSlotProps} arrow><Typography sx={{ fontSize: sizes.fsStatBadge, fontWeight: 800, color: lifeColor(source.life) || 'primary.main', lineHeight: 1 }}>♥{source.life}</Typography></Tooltip>
+                      {source.poison > 0 && <Tooltip title={`Poison: ${source.poison}`} placement="top" slotProps={position.ttSlotProps} arrow><Typography sx={{ fontSize: sizes.fsStatBadge, fontWeight: 800, color: source.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1 }}>☠{source.poison}</Typography></Tooltip>}
+                      {source.energy > 0 && <Tooltip title={`Energy: ${source.energy}`} placement="top" slotProps={position.ttSlotProps} arrow><Typography sx={{ fontSize: sizes.fsStatBadge, fontWeight: 800, color: '#4FC8FF', lineHeight: 1 }}>⚡{source.energy}</Typography></Tooltip>}
+                      {source.experience > 0 && <Tooltip title={`XP: ${source.experience}`} placement="top" slotProps={position.ttSlotProps} arrow><Stack direction="row" alignItems="center" spacing={0.25}><Box sx={{ bgcolor: 'background.paper', display: 'inline-flex' }}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: sizes.fsStatBadge, height: sizes.fsStatBadge, objectFit: 'contain', mixBlendMode: 'multiply', transition: 'width 0.2s ease, height 0.2s ease' }} /></Box><Typography sx={{ fontSize: sizes.fsStatBadge, fontWeight: 800, color: '#DAA520', lineHeight: 1 }}>{source.experience}</Typography></Stack></Tooltip>}
+                    </Stack>
+                  </Box>
+                }
+                glass={glassActive}
                 value={dmg[0]}
                 color={dmg[0] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary'}
                 disableDec={sourceEliminated}
@@ -756,6 +771,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
                 onInc={() => handleCmdDmgChange(playerIdx, sourceIdx, false, 1)}
                 onDec5={() => handleCmdDmgChange(playerIdx, sourceIdx, false, -5)}
                 onInc5={() => handleCmdDmgChange(playerIdx, sourceIdx, false, 5)}
+                rowSpacing={0.5}
                 size={{ btnFont: sizes.fsCounterBtn, valueFont: sizes.fsCounterValue, btnMinWidth: sizes.cmdBtnWidth, btnMinHeight: sizes.cmdBtnHeight, valueMinWidth: sizes.valColWidth }}
                 tooltipSlotProps={position.ttSlotProps}
                 lpKeyPrefix={`${sourceIdx}`}
@@ -763,13 +779,15 @@ function PlayerCardImpl(props: PlayerCardProps) {
             ];
             if (source.partner) {
               rows.push(
-                <Typography key={`${sourceIdx}-pname`} onClick={(e) => { e.stopPropagation(); setOpenSnapshotKey(k => k === `${sourceIdx}-psnap` ? null : `${sourceIdx}-psnap`); }} sx={{ fontSize: sizes.fsSourceName, color: sourceEliminated ? 'text.disabled' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', cursor: 'pointer' }}>
-                  {source.partner.name}
-                </Typography>,
                 <StepperControl
                   key={`${sourceIdx}-pstep`}
-                  layout="cells"
                   label={`CMD Dmg — ${source.partner.name}`}
+                  labelNode={
+                    <Typography onClick={(e) => { e.stopPropagation(); setOpenSnapshotKey(k => k === `${sourceIdx}-psnap` ? null : `${sourceIdx}-psnap`); }} sx={{ flex: 1, minWidth: 0, fontSize: sizes.fsSourceName, color: sourceEliminated ? 'text.disabled' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', cursor: 'pointer' }}>
+                      {source.partner.name}
+                    </Typography>
+                  }
+                  glass={glassActive}
                   value={dmg[1]}
                   color={dmg[1] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary'}
                   disableDec={sourceEliminated}
@@ -777,6 +795,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
                   onInc={() => handleCmdDmgChange(playerIdx, sourceIdx, true, 1)}
                   onDec5={() => handleCmdDmgChange(playerIdx, sourceIdx, true, -5)}
                   onInc5={() => handleCmdDmgChange(playerIdx, sourceIdx, true, 5)}
+                  rowSpacing={0.5}
                   size={{ btnFont: sizes.fsCounterBtn, valueFont: sizes.fsCounterValue, btnMinWidth: sizes.cmdBtnWidth, btnMinHeight: sizes.cmdBtnHeight, valueMinWidth: sizes.valColWidth }}
                   tooltipSlotProps={position.ttSlotProps}
                   lpKeyPrefix={`${sourceIdx}-p`}
@@ -897,6 +916,10 @@ function PlayerCardImpl(props: PlayerCardProps) {
             <Box sx={{ position: 'relative', overflow: 'hidden', lineHeight: 1, width: '100%', flex: remoteMode ? undefined : 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               <LifeCracks fingerprint={playerIdx} crackAlpha={crackAlpha} />
               <ThreatNames threatSource={threatSource} fingerprint={playerIdx} />
+              {/* Life number + buttons share the glass backing (same abstraction as
+                  every counter, via GlassBacking since the hero life is not a
+                  StepperControl), so the whole life control reads over a busy board. */}
+              <GlassBacking active={glassActive} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <LifeTotal
                 value={player.life}
                 fontSize={remoteMode ? 'clamp(80px, 22dvmax, 260px)' : (countersOpen ? 'clamp(34px, 10dvh, 112px)' : 'clamp(60px, 20dvh, 240px)')}
@@ -932,6 +955,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
                   </IconButton>
                 </Tooltip>
               </Stack>
+              </GlassBacking>
             </Box>
           </Box>
         </Box>
@@ -997,11 +1021,10 @@ function PlayerCardImpl(props: PlayerCardProps) {
               px: remoteMode ? 0.75 : 0.25,
               pb: remoteMode ? 1 : 0.25,
               overflowY: 'auto',
-              display: 'grid',
-              gridTemplateColumns: `1fr ${sizes.cmdBtnWidth} ${sizes.valColWidth} ${sizes.cmdBtnWidth}`,
-              alignContent: remoteMode ? 'start' : 'safe center',
-              alignItems: 'center',
-              rowGap: remoteMode ? 0.5 : 0.1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: remoteMode ? 'flex-start' : 'safe center',
+              gap: remoteMode ? 0.5 : 0.1,
             }}>
             {([
               ['Poison', player.poison, () => onPoisonChange(playerIdx, -1), () => onPoisonChange(playerIdx, 1), () => onPoisonChange(playerIdx, -5), () => onPoisonChange(playerIdx, 5), player.poison >= 10 ? 'error.main' : player.poison > 0 ? 'warning.main' : 'text.disabled', null],
@@ -1012,24 +1035,30 @@ function PlayerCardImpl(props: PlayerCardProps) {
               // Tax row keyed by the partner commander's name.
               ['Tax', player.commanderTax, () => onCommanderTaxChange(playerIdx, -1), () => onCommanderTaxChange(playerIdx, 1), () => onCommanderTaxChange(playerIdx, -5), () => onCommanderTaxChange(playerIdx, 5), player.commanderTax > 0 ? 'warning.main' : 'text.disabled', player.commanderTax],
               ...(player.partner ? [[player.partner.name, player.partnerCommanderTax, () => onCommanderTaxChange(playerIdx, -1, true), () => onCommanderTaxChange(playerIdx, 1, true), () => onCommanderTaxChange(playerIdx, -5, true), () => onCommanderTaxChange(playerIdx, 5, true), player.partnerCommanderTax > 0 ? 'warning.main' : 'text.disabled', player.partnerCommanderTax]] as [string, number, () => void, () => void, () => void, () => void, string, number | null][] : []),
-            ] as [string, number, () => void, () => void, () => void, () => void, string, number | null][]).flatMap(([label, value, onDec, onInc, onDec5, onInc5, color, medallionTax]) => {
+            ] as [string, number, () => void, () => void, () => void, () => void, string, number | null][]).map(([label, value, onDec, onInc, onDec5, onInc5, color, medallionTax]) => {
               const blurSx = poisonBlur(poisonProgress);
               // Per-value effects are shared with TeamPanel via counterValueSx:
               // poison blur, the poison danger pulse (9 for singles), XP glow/shimmer.
               const kind = label === 'Poison' ? 'poison' : label === 'Energy' ? 'energy' : label === 'XP' ? 'xp' : 'other';
               const valueSx = counterValueSx(kind, value, poisonProgress, { xpGlow, xpShimmerAnim }, POISON_DANGER_SINGLES);
-              return [
-              <Stack key={`${label}-lbl`} direction="row" alignItems="center" spacing={0.4} sx={{ overflow: 'hidden', ...blurSx, minWidth: 0 }}>
-                {label === 'Poison'     && <Typography component="span" sx={{ fontSize: sizes.fsSourceName, color: player.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1, flexShrink: 0 }}>☠</Typography>}
-                {label === 'Energy'     && <Typography component="span" sx={{ fontSize: sizes.fsSourceName, color: '#4FC8FF', lineHeight: 1, flexShrink: 0 }}>⚡</Typography>}
-                {label === 'XP' && <Box sx={{ bgcolor: 'background.paper', display: 'inline-flex', flexShrink: 0 }}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: sizes.fsSourceName, height: sizes.fsSourceName, objectFit: 'contain', mixBlendMode: 'multiply' }} /></Box>}
-                {medallionTax !== null   && <Box sx={{ width: sizes.fsSourceName, height: sizes.fsSourceName, borderRadius: '50%', flexShrink: 0, background: 'radial-gradient(circle at 38% 35%, #d0d0d0, #7a7a7a)', border: '1px solid #3a3a3a', boxShadow: '0 1px 2px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Typography sx={{ fontSize: 7, fontWeight: 800, color: '#111', lineHeight: 1, userSelect: 'none' }}>+{medallionTax * 2}</Typography></Box>}
-                <Typography component="span" sx={{ fontSize: sizes.fsSourceName, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</Typography>
-              </Stack>,
+              // Structured label: the component composes the icon + text itself, so
+              // the caller only supplies the icon node (glyph) and the text (label).
+              // labelSx flexes the label so the − value + line up across rows and
+              // carries the poison blur. Same abstraction as the 2HG panel.
+              const glyphNode =
+                label === 'Poison' ? <Typography component="span" sx={{ fontSize: sizes.fsSourceName, color: player.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1 }}>☠</Typography>
+                : label === 'Energy' ? <Typography component="span" sx={{ fontSize: sizes.fsSourceName, color: '#4FC8FF', lineHeight: 1 }}>⚡</Typography>
+                : label === 'XP' ? <Box sx={{ bgcolor: 'background.paper', display: 'inline-flex' }}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: sizes.fsSourceName, height: sizes.fsSourceName, objectFit: 'contain', mixBlendMode: 'multiply' }} /></Box>
+                : medallionTax !== null ? <Box sx={{ width: sizes.fsSourceName, height: sizes.fsSourceName, borderRadius: '50%', background: 'radial-gradient(circle at 38% 35%, #d0d0d0, #7a7a7a)', border: '1px solid #3a3a3a', boxShadow: '0 1px 2px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Typography sx={{ fontSize: 7, fontWeight: 800, color: '#111', lineHeight: 1, userSelect: 'none' }}>+{medallionTax * 2}</Typography></Box>
+                : undefined;
+              return (
               <StepperControl
-                key={`${label}-step`}
-                layout="cells"
+                key={label}
                 label={label}
+                glyph={glyphNode}
+                labelFont={sizes.fsSourceName}
+                labelSx={{ flex: 1, ...blurSx }}
+                glass={glassActive}
                 value={value}
                 color={color}
                 valueSx={valueSx}
@@ -1037,11 +1066,12 @@ function PlayerCardImpl(props: PlayerCardProps) {
                 onInc={onInc}
                 onDec5={onDec5}
                 onInc5={onInc5}
+                rowSpacing={0.5}
                 size={{ btnFont: sizes.fsCounterBtn, valueFont: sizes.fsCounterValue, btnMinWidth: sizes.cmdBtnWidth, btnMinHeight: sizes.cmdBtnHeight, valueMinWidth: sizes.valColWidth }}
                 tooltipSlotProps={position.ttSlotProps}
                 lpKeyPrefix={label}
-              />,
-            ];
+              />
+              );
             })}
           </Box>
         </Box>

@@ -280,6 +280,9 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
       {visible && (
         <Box component="svg" preserveAspectRatio="none" viewBox="0 0 100 100"
           sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none', overflow: 'hidden', opacity: 0,
+            // Blur so the ray edges blend softly instead of reading as
+            // hard-edged polygons.
+            filter: 'blur(4px)',
             animation: exiting
               ? `${godRaysFadeOut} 1.5s ease-in forwards`
               : `${godRaysFadeIn} 2s 2s ease-out forwards, ${godRaysPulse} 6s 4s ease-in-out infinite`,
@@ -291,11 +294,11 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
               <stop offset="100%" stopColor="#FFE050" stopOpacity="0"/>
             </linearGradient>
           </defs>
-          <polygon points="0,0  4,0   14,100" fill="url(#rayFade)" opacity="0.7"/>
-          <polygon points="0,0  20,0  30,100" fill="url(#rayFade)" opacity="0.5"/>
-          <polygon points="0,0  38,0  46,100" fill="url(#rayFade)" opacity="0.6"/>
-          <polygon points="0,0  58,0  65,100" fill="url(#rayFade)" opacity="0.4"/>
-          <polygon points="0,0  78,0  83,100" fill="url(#rayFade)" opacity="0.55"/>
+          <polygon points="0,0  4,100  22,100"  fill="url(#rayFade)" opacity="0.7"/>
+          <polygon points="0,0  26,100 44,100"  fill="url(#rayFade)" opacity="0.5"/>
+          <polygon points="0,0  48,100 66,100"  fill="url(#rayFade)" opacity="0.6"/>
+          <polygon points="0,0  70,100 88,100"  fill="url(#rayFade)" opacity="0.4"/>
+          <polygon points="0,0  92,100 100,84"  fill="url(#rayFade)" opacity="0.55"/>
           <polygon points="0,0  100,8 100,16"  fill="url(#rayFade)" opacity="0.45"/>
           <polygon points="0,0  100,38 100,46" fill="url(#rayFade)" opacity="0.35"/>
           <polygon points="0,0  100,65 100,73" fill="url(#rayFade)" opacity="0.45"/>
@@ -306,9 +309,11 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
       {visible && (
         <Box component="svg" viewBox="0 0 640 240" preserveAspectRatio="none" sx={{
           position: 'absolute', bottom: -55, left: -80,
-          width: 'calc(100% + 80px)', height: 200,
+          width: 'calc(100% + 80px)', height: 150,
           // Opaque (not translucent) so the rolling hills behind don't bleed
           // through the buildings; lighter + theme-aware so it stays subtle.
+          // Height 150 (was 200): shorter foreground so the distant skyline
+          // behind it is no longer fully hidden.
           fill: (theme) => theme.palette.mode === 'dark' ? '#1a1510' : '#bcb4a9',
           stroke: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.7)' : 'rgba(95,85,72,0.45)',
           strokeWidth: 1.2,
@@ -320,13 +325,13 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
         }}>
           <path d="
             M0,240
-            L0,62 L40,0 L80,62
+            L0,62 L40,26 L80,62
             L80,92 L86,92 L86,80 L94,80 L94,92 L102,92 L102,80 L110,80 L110,92
             L118,92 L118,80 L126,80 L126,92
             L126,68 L150,42 L174,68
             L174,92 L182,92 L182,80 L190,80 L190,92 L198,92 L198,80 L206,80 L206,92
             L214,92 L214,80 L222,80 L222,92
-            L220,62 L260,0 L300,62
+            L220,62 L260,30 L300,62
             L300,148
             L320,118 L340,148
             L360,130 L380,148
@@ -380,26 +385,70 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
         <Box component="svg" viewBox="0 0 600 100" preserveAspectRatio="none" sx={{
           position: 'absolute', bottom: 55, left: 0, right: 0,
           width: '100%', height: 80,
+          // Distinct cool blue-gray (atmospheric distance) so the mountains read
+          // as their own layer instead of blending with the warm tan buildings.
+          fill: (theme) => theme.palette.mode === 'dark' ? '#3b4a63' : '#8f9bb3',
+          // Fade the bottom so the SVG box's straight lower edge doesn't show a
+          // hard horizontal seam behind the buildings.
+          maskImage: 'linear-gradient(to bottom, black 55%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, black 55%, transparent 100%)',
           zIndex: 0, pointerEvents: 'none', opacity: 0,
           animation: exiting
             ? `${skylineFadeOut} 0.8s 2s ease-in forwards`
             : `${skylineFadeIn} 4s 0.5s ease-out forwards`,
         }}>
-          <path d="M0,100 C90,10 200,55 310,22 C430,-5 510,42 600,16 L600,100 Z" fill="rgba(0,0,0,0.09)"/>
-          <path d="M0,100 C75,25 175,60 295,38 C405,16 505,55 600,36 L600,100 Z" fill="rgba(0,0,0,0.11)"/>
-          <path d="M0,100 C60,45 160,70 275,54 C382,38 480,66 600,50 L600,100 Z" fill="rgba(0,0,0,0.14)"/>
+          <path d="M0,100 C90,10 200,55 310,22 C430,-5 510,42 600,16 L600,100 Z" fillOpacity="0.35"/>
+          <path d="M0,100 C75,25 175,60 295,38 C405,16 505,55 600,36 L600,100 Z" fillOpacity="0.5"/>
+          <path d="M0,100 C60,45 160,70 275,54 C382,38 480,66 600,50 L600,100 Z" fillOpacity="0.68"/>
+        </Box>
+      )}
+
+      {/* ── City's Blessing: distant castle on a mountain (left) ── */}
+      {visible && (
+        <Box component="svg" viewBox="0 0 160 200" sx={{
+          position: 'absolute', bottom: 48, left: '3%',
+          width: 112, height: 128,
+          // Distant castle silhouette perched on a mountain, a touch darker than
+          // the hills so the three pointed spires read as an obvious castle.
+          // Behind the skyline (z0, drawn before it) so its base tucks behind the
+          // buildings and only the spires rise above. Kept narrow so it doesn't
+          // dominate the scene.
+          fill: (theme) => theme.palette.mode === 'dark' ? '#2c3750' : '#79849e',
+          zIndex: 0, pointerEvents: 'none', overflow: 'visible', opacity: 0,
+          animation: exiting
+            ? `${skylineFadeOut} 0.8s 2s ease-in forwards`
+            : `${skylineFadeIn} 3.5s 0.9s ease-out forwards`,
+        }}>
+          {/* Mountain + castle silhouette: left tower, tall central keep spire,
+              right tower, all with pointed spires, connected by crenellated walls. */}
+          <path d="
+            M0,200
+            L46,110 L46,80 L41,80 L56,46 L71,80 L66,80 L66,98
+            L82,98 L82,62 L76,62 L92,26 L108,62 L102,62 L102,98
+            L118,98 L118,80 L113,80 L128,46 L143,80 L138,80 L138,110
+            L160,200 Z
+          " />
+          {/* Pennants on the spire tips (gold) so it reads unmistakably as a castle. */}
+          <path d="M92,26 L104,29 L92,32 Z"  fill="rgba(200,162,60,0.8)"/>
+          <path d="M56,46 L66,48.5 L56,51 Z" fill="rgba(200,162,60,0.8)"/>
+          <path d="M128,46 L138,48.5 L128,51 Z" fill="rgba(200,162,60,0.8)"/>
         </Box>
       )}
 
       {/* ── City's Blessing: distant skyline ── */}
       {visible && (
         <Box component="svg" viewBox="0 0 800 80" preserveAspectRatio="none" sx={{
-          position: 'absolute', bottom: 38, left: 0, right: 0,
-          width: '100%', height: 55,
+          position: 'absolute', bottom: 10, left: 0, right: 0,
+          width: '100%', height: 83,
           // Opaque + lighter (more distant reads hazier) so the hills don't
-          // bleed through the distant skyline either.
+          // bleed through the distant skyline either. Base stretched further
+          // down (bottom 10 / height 83) so it fills behind the foreground row.
           fill: (theme) => theme.palette.mode === 'dark' ? '#251e15' : '#cbc4b9',
           stroke: 'none',
+          // Fade the bottom so the SVG box's straight lower edge doesn't show a
+          // hard horizontal seam (same treatment as the rolling hills).
+          maskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
           zIndex: 0, pointerEvents: 'none', opacity: 0,
           animation: exiting
             ? `${skylineFadeOut} 0.8s 2s ease-in forwards`
@@ -407,9 +456,9 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
         }}>
           <path d="
             M0,80 L0,55 L8,40 L4,40 L14,8 L24,40 L20,40 L22,55
-            L40,55 L40,62 L55,62 L55,50 L65,36 L75,50 L75,62
+            L40,55 L40,62 L55,62 L55,42 L65,14 L75,42 L75,62
             L92,62 L92,55 L102,40 L102,26 L106,6 L110,26 L110,40 L120,55
-            L120,62 L138,62 L138,55 L150,40 L162,55 L162,62 L176,62
+            L120,62 L138,62 L138,55 L150,18 L162,55 L162,62 L176,62
             L176,55 L186,38 L186,24 L190,5 L194,24 L194,38 L204,55
             L204,62 L222,62 L222,55 L235,42 L248,55 L248,62 L262,62
             L262,55 L274,40 L274,26 L278,6 L282,26 L282,40 L294,55

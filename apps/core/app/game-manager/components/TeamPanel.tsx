@@ -43,6 +43,7 @@ import { useTimerTokens, TIMER_EXPIRED_BORDER_BLINK, TIMER_EXPIRED_HEADER_BLINK 
 import { StepperControl, StepperOverlayHost, type StepperSize } from './StepperControl';
 import { useXpKeyframes } from './PlayerCard.keyframes';
 import { xpGlowFor, energyGlowFor, counterValueSx } from './counterEffects';
+import { isControlGlassActive } from './controlGlass';
 
 // Shared poison total is lethal at 15 in 2HG; the danger pulse fires one below.
 const POISON_DANGER_2HG = 14;
@@ -200,10 +201,11 @@ function taxStepSize(sz: Sz): Partial<StepperSize> {
  * PlayerCard's value effects: XP gold glow + shimmer, energy cyan glow, and the
  * poison "closing in" blur that ramps as the team nears lethal poison.
  */
-function TeammateCounters({ member, sz, poisonProgress, onEnergyChange, onExperienceChange }: {
+function TeammateCounters({ member, sz, poisonProgress, glass, onEnergyChange, onExperienceChange }: {
   member: TeamMember;
   sz: Sz;
   poisonProgress: number;
+  glass: boolean;
   onEnergyChange: (idx: number, delta: number) => void;
   onExperienceChange: (idx: number, delta: number) => void;
 }) {
@@ -221,8 +223,10 @@ function TeammateCounters({ member, sz, poisonProgress, onEnergyChange, onExperi
         label="Energy"
         glyph="⚡"
         glyphColor="#4FC8FF"
+        showLabel={false}
         value={energy}
         color={energy > 0 ? '#4FC8FF' : 'text.primary'}
+        glass={glass}
         // Energy has no card-wide glow surface in 2HG (unlike PlayerCard), so its
         // cyan glow rides directly on the value here.
         valueSx={{ ...counterValueSx('energy', energy, poisonProgress, glow, POISON_DANGER_2HG), ...(energyGlow ? { textShadow: energyGlow } : {}) }}
@@ -237,8 +241,10 @@ function TeammateCounters({ member, sz, poisonProgress, onEnergyChange, onExperi
         label="XP"
         glyph="✦"
         glyphColor="#DAA520"
+        showLabel={false}
         value={experience}
         color={experience > 0 ? '#DAA520' : 'text.primary'}
+        glass={glass}
         valueSx={counterValueSx('xp', experience, poisonProgress, glow, POISON_DANGER_2HG)}
         onDec={() => onExperienceChange(idx, -1)}
         onInc={() => onExperienceChange(idx, 1)}
@@ -379,6 +385,10 @@ export function TeamPanel({
   // (poison ambience, intro sting on gain, and the 3.8s fade-out on loss).
   const teamHasBlessing = members.some((m) => m.player.hasCitysBlessing);
   const { cityBlessingVisible, cityBlessingExiting } = useBlessingAndSound(teamHasBlessing, poison, eliminated, soundEnabled);
+  // Glass backing for the control clusters when a busy board animation is
+  // active, so the steppers/toggles stay legible over the decorated background.
+  const teamHasInitiative = members.some((m) => m.player.hasInitiative);
+  const glassActive = isControlGlassActive({ cityBlessingVisible, hasInitiative: teamHasInitiative, poisonProgress });
   // A team is "conceded" if either head was manually conceded (vs eliminated by
   // damage). reconcileTeams only stamps isConceded on the head that received the
   // eliminate event, so check both.
@@ -673,10 +683,13 @@ export function TeamPanel({
                     const value = e.isPartner ? m.player.partnerCommanderTax : m.player.commanderTax;
                     const key = e.isPartner ? 'p' : 'o';
                     return (
-                      <Stack key={key} direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
-                        <Typography noWrap onClick={() => setCmdPreviewName(e.name)} title={`View ${e.name}`} sx={{ fontSize: sz.cmdLabel, color: 'text.secondary', maxWidth: '9ch', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer', '&:hover': { color: 'primary.main' } }}>{m.player.partner ? e.name : 'Tax'}</Typography>
+                      <Box key={key} sx={{ flexShrink: 0 }}>
                         <StepperControl
                           label={m.player.partner ? `${e.name} Tax` : 'Tax'}
+                          labelNode={
+                            <Typography noWrap onClick={() => setCmdPreviewName(e.name)} title={`View ${e.name}`} sx={{ fontSize: sz.cmdLabel, color: 'text.secondary', maxWidth: '9ch', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer', '&:hover': { color: 'primary.main' } }}>{m.player.partner ? e.name : 'Tax'}</Typography>
+                          }
+                          glass={glassActive}
                           value={value}
                           onDec={() => onCommanderTaxChange(m.idx, -1, e.isPartner)}
                           onInc={() => onCommanderTaxChange(m.idx, 1, e.isPartner)}
@@ -685,7 +698,7 @@ export function TeamPanel({
                           size={taxStepSize(sz)}
                           lpKeyPrefix={`tax-${m.idx}-${key}`}
                         />
-                      </Stack>
+                      </Box>
                     );
                   })}
                 </Stack>
@@ -697,6 +710,7 @@ export function TeamPanel({
                   member={m}
                   sz={sz}
                   poisonProgress={poisonProgress}
+                  glass={glassActive}
                   onEnergyChange={onEnergyChange}
                   onExperienceChange={onExperienceChange}
                 />
@@ -756,6 +770,8 @@ export function TeamPanel({
           <MonarchCrown show={members.some((m) => m.player.isMonarch)} animStr={monarchCrownAnim('steady', false)} />
           <StepperControl
             label="Life Total"
+            labelSx={{ display: 'none' }}
+            glass={glassActive}
             value={life}
             color={teamLifeColor}
             onDec={() => onLifeChange(primary.idx, -1)}
@@ -783,9 +799,10 @@ export function TeamPanel({
           Shared Life
         </Typography>
         <Stack direction="row" alignItems="center" justifyContent="center" spacing={1} sx={{ mt: 0.5 }}>
-          <Typography sx={{ fontSize: sz.sectionLabel, color: 'text.secondary' }}>Poison</Typography>
           <StepperControl
             label="Poison"
+            labelFont={sz.sectionLabel}
+            glass={glassActive}
             value={poison}
             color={poison >= 15 ? '#2E7D32' : 'text.primary'}
             valueSx={{ fontWeight: 800, ...counterValueSx('poison', poison, poisonProgress, {}, POISON_DANGER_2HG) }}
@@ -880,6 +897,7 @@ export function TeamPanel({
               label={e.name}
               value={e.isPartner ? dmg[1] : dmg[0]}
               tax={e.isPartner ? opp.player.partnerCommanderTax : opp.player.commanderTax}
+              glass={glassActive}
               onChange={(delta) => onCommanderDamageChange(primary.idx, opp.idx, e.isPartner, delta)}
               onView={() => setCmdPreviewName(e.name)}
               lpKey={`cmd-${opp.idx}-${e.isPartner ? 'partner' : 'own'}`}
@@ -907,24 +925,28 @@ export function TeamPanel({
 
 // The commander NAME opens the card preview (onView); the VALUE opens the
 // shared focus modal (±1 big + ±5), same as every other counter.
-function CmdDamageRow({ label, value, tax, onChange, onView, lpKey, sz }: { label: string; value: number; tax: number; onChange: (delta: number) => void; onView: () => void; lpKey: string; sz: Sz }) {
+function CmdDamageRow({ label, value, tax, glass, onChange, onView, lpKey, sz }: { label: string; value: number; tax: number; glass: boolean; onChange: (delta: number) => void; onView: () => void; lpKey: string; sz: Sz }) {
   return (
     <Stack direction="row" alignItems="center" spacing={0.75}>
-      {/* Commander name + its current tax (+{tax*2} generic mana) sit together. */}
-      <Stack direction="row" alignItems="baseline" spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
-        <Typography
-          noWrap
-          onClick={(e) => { e.stopPropagation(); onView(); }}
-          sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: sz.cmdLabel, color: value >= 21 ? '#B71C1C' : 'text.primary', fontWeight: value >= 21 ? 700 : 400, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
-        >
-          {label}
-        </Typography>
-        {tax > 0 && (
-          <Typography title={`Tax: cast ${tax}x`} sx={{ fontSize: sz.xsLabel, fontWeight: 700, color: 'warning.main', flexShrink: 0, whiteSpace: 'nowrap' }}>+{tax * 2}</Typography>
-        )}
-      </Stack>
       <StepperControl
         label={`CMD Dmg — ${label}`}
+        // The commander name (+ its tax badge) IS this counter's label, owned by
+        // the component's label slot rather than rendered bespoke alongside it.
+        labelNode={
+          <Stack direction="row" alignItems="baseline" spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
+            <Typography
+              noWrap
+              onClick={(e) => { e.stopPropagation(); onView(); }}
+              sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: sz.cmdLabel, color: value >= 21 ? '#B71C1C' : 'text.primary', fontWeight: value >= 21 ? 700 : 400, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+            >
+              {label}
+            </Typography>
+            {tax > 0 && (
+              <Typography title={`Tax: cast ${tax}x`} sx={{ fontSize: sz.xsLabel, fontWeight: 700, color: 'warning.main', flexShrink: 0, whiteSpace: 'nowrap' }}>+{tax * 2}</Typography>
+            )}
+          </Stack>
+        }
+        glass={glass}
         value={value}
         color={value >= 21 ? '#B71C1C' : 'text.primary'}
         onDec={() => onChange(-1)}
@@ -932,6 +954,7 @@ function CmdDamageRow({ label, value, tax, onChange, onView, lpKey, sz }: { labe
         onDec5={() => onChange(-5)}
         onInc5={() => onChange(5)}
         size={{ btnFont: sz.btnCmd, valueFont: sz.cmdVal, btnMinWidth: sz.big ? 36 : 30, btnMinHeight: sz.big ? 36 : 30, valueMinWidth: 22 }}
+        rowSpacing={0.75}
         lpKeyPrefix={lpKey}
       />
       <Typography sx={{ fontSize: sz.xsLabel, color: 'text.secondary' }}>/21</Typography>

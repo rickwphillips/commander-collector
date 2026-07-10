@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom';
 import { Box, IconButton, Stack, Tooltip, Typography } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material/styles';
 import { ControlFocusModal } from './ControlFocusModal';
+import { glassBackingSx } from './controlGlass';
 
 /**
  * StepperControl — the one counter primitive used across the game manager.
@@ -73,7 +74,14 @@ const DEFAULT_SIZE: StepperSize = {
 };
 
 export interface StepperControlProps {
-  /** Modal header + long-press tooltip identity. Not shown inline unless `showLabel`. */
+  /**
+   * The name of what this counter is counting (Energy, Poison, a commander,
+   * etc.). Every counter has one: it is rendered inline as part of the control
+   * (in 'row' layout) AND used as the modal header + long-press tooltip
+   * identity. A leading `glyph` (⚡ / ✦) counts as the label, so the text is
+   * suppressed when a glyph is given; use `labelNode` for a richer label, and
+   * `labelSx` to restyle or hide (`display:'none'`) the text contextually.
+   */
   label: string;
   value: number | string;
   color?: string;
@@ -89,9 +97,27 @@ export interface StepperControlProps {
   /** Optional leading icon (⚡ / ✦ / img) shown before the label in 'row' layout. */
   glyph?: ReactNode;
   glyphColor?: string;
-  /** Show the text label inline (default false — the modal always shows it). */
+  /** Rich inline label content, replacing the default text label (e.g. a
+   *  commander name + tax badge). Rendered by the component in the label slot. */
+  labelNode?: ReactNode;
+  /** Show the text label beside the glyph. Default true; set false for a
+   *  glyph-only label (⚡ / ✦). */
   showLabel?: boolean;
+  /** css override for the inline text label so the implementer decides how it
+   *  displays contextually (size, color, or `display:'none'` to hide it). */
+  labelSx?: SxProps<Theme>;
+  /** Default font size for the inline text label (overridable via labelSx). */
   labelFont?: number | string;
+  /** Frosted-glass backing (shared helper), for legibility over a busy animated
+   *  board. Applied to the row wrapper; the implementer flips it on when a board
+   *  animation is active. */
+  glass?: boolean;
+  /** className hooks so implementers can override presentation from a co-located
+   *  `*.module.scss` instead of passing inline sx. `className` targets the row
+   *  wrapper, `labelClassName` the text label, `valueClassName` the value cell. */
+  className?: string;
+  labelClassName?: string;
+  valueClassName?: string;
   /** Extra sx merged onto the inline value (poison blur, XP shimmer, etc.). */
   valueSx?: SxProps<Theme>;
   /**
@@ -124,8 +150,14 @@ export function StepperControl({
   size,
   glyph,
   glyphColor,
-  showLabel = false,
+  labelNode,
+  showLabel = true,
+  labelSx,
   labelFont,
+  glass = false,
+  className,
+  labelClassName,
+  valueClassName,
   valueSx,
   valueNode,
   rowSpacing = 0.25,
@@ -211,6 +243,7 @@ export function StepperControl({
   const valueEl = valueNode !== undefined ? (
     <Box
       key={`${keyBase}-val`}
+      className={valueClassName}
       onClick={() => setModalOpen(true)}
       sx={{ cursor: 'pointer', display: 'inline-flex', ...valueSx }}
     >
@@ -219,6 +252,7 @@ export function StepperControl({
   ) : (
     <Typography
       key={`${keyBase}-val`}
+      className={valueClassName}
       onClick={() => setModalOpen(true)}
       sx={{
         fontSize: sz.valueFont,
@@ -271,16 +305,35 @@ export function StepperControl({
     );
   }
 
+  // Label slot: the component owns "what am I counting". `labelNode` supplies a
+  // fully custom label (e.g. a rich stat-badge row); otherwise the component
+  // composes an optional leading `glyph` icon + the text `label`. Pass
+  // showLabel={false} for a glyph-only label; `labelSx` styles the whole region
+  // (flex, blur, or display:none to hide), `labelFont` sizes the text.
+  const labelEl =
+    labelNode !== undefined ? (
+      labelNode
+    ) : glyph !== undefined || showLabel ? (
+      <Box
+        className={labelClassName}
+        sx={{ display: 'flex', alignItems: 'center', gap: 0.4, minWidth: 0, overflow: 'hidden', ...labelSx }}
+      >
+        {glyph !== undefined && (
+          <Box component="span" sx={{ fontSize: sz.valueFont, lineHeight: 1, color: glyphColor, display: 'inline-flex', flexShrink: 0 }}>
+            {glyph}
+          </Box>
+        )}
+        {showLabel && (
+          <Typography component="span" noWrap sx={{ fontSize: labelFont ?? sz.valueFont, color: 'text.secondary', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {label}
+          </Typography>
+        )}
+      </Box>
+    ) : null;
+
   return (
-    <Stack direction="row" alignItems="center" spacing={rowSpacing}>
-      {glyph !== undefined && (
-        <Box component="span" sx={{ fontSize: sz.valueFont, lineHeight: 1, color: glyphColor, display: 'inline-flex' }}>
-          {glyph}
-        </Box>
-      )}
-      {showLabel && (
-        <Typography sx={{ fontSize: labelFont ?? sz.btnFont, color: 'text.secondary' }}>{label}</Typography>
-      )}
+    <Stack direction="row" alignItems="center" spacing={rowSpacing} className={className} sx={glassBackingSx(glass)}>
+      {labelEl}
       {decBtn}
       {valueEl}
       {incBtn}
