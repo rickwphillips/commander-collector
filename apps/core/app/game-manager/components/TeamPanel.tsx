@@ -46,6 +46,7 @@ import { xpGlowFor, energyGlowFor, counterValueSx } from './counterEffects';
 import { isControlGlassActive } from './controlGlass';
 import { CounterGlyph } from './CounterGlyph';
 import { XpBadge, useXpFlash } from './XpBadge';
+import { TurnNavControl } from './TurnNavControl';
 
 // Shared poison total is lethal at 15 in 2HG; the danger pulse fires one below.
 const POISON_DANGER_2HG = 14;
@@ -116,6 +117,8 @@ interface TeamPanelProps {
   onUndoEliminate: (idx: number) => void;
   // Present only when it is this team's turn (remote sends a pass_turn event).
   onPassTurn?: () => void;
+  // Remote turn control steps the shared turn backwards (prev_turn event).
+  onPrevTurn?: () => void;
 }
 
 // Responsive size tokens. Table (!remoteMode) keeps the original fixed px so the
@@ -349,6 +352,7 @@ export function TeamPanel({
   onEliminate,
   onUndoEliminate,
   onPassTurn,
+  onPrevTurn,
 }: TeamPanelProps) {
   // Commander card preview — shared with PlayerCard. Tap any commander (own team
   // or opposing) to enlarge; the overlay is scoped to this panel's root.
@@ -664,7 +668,7 @@ export function TeamPanel({
                 name={m.player.commander.name}
                 onClick={(e) => { e.stopPropagation(); setCmdPreviewName(m.player.commander.name); }}
                 title={m.player.commander.name}
-                sx={{ height: sz.art, width: 'auto', borderRadius: 0.5, flexShrink: 0, cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
+                sx={{ height: sz.art, width: 'auto', borderRadius: 0.5, flexShrink: 0, cursor: 'pointer', '&:hover': { opacity: 0.85 }, ...(remoteMode && { '@media (orientation: portrait)': { display: 'none' } }) }}
               />
               {/* Per-player controls, labeled with the pilot they apply to so the
                   two teammates' counters aren't ambiguous. */}
@@ -761,7 +765,7 @@ export function TeamPanel({
           // A generous life-total container so the crack + threat layers cover a
           // real area (not just the digits). overflow:visible lets the crown rise.
           minWidth: 'clamp(180px, 42dvw, 340px)',
-          minHeight: 'clamp(110px, 24dvh, 220px)',
+          minHeight: 'clamp(90px, 18dvh, 200px)',
           ...(remoteMode && { width: '100%', flex: 1 }),
         }}>
           {/* Cracks + threat names fill the whole container and are clipped to it,
@@ -802,13 +806,17 @@ export function TeamPanel({
         <Typography sx={{ fontSize: sz.sectionLabel, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
           Shared Life
         </Typography>
-        <Stack direction="row" alignItems="center" justifyContent="center" spacing={1} sx={{ mt: 0.5 }}>
+        <Stack direction="row" alignItems="center" justifyContent="center" sx={{ mt: 0.5 }}>
           <StepperControl
             label="Poison"
             glyph={<CounterGlyph kind="poison" size={sz.sectionLabel} poison={poison} poisonDanger={15} />}
             labelFont={sz.sectionLabel}
+            // Remote landscape: hide the "Poison" text label (keep the glyph).
+            labelSx={remoteMode ? { '@media (orientation: landscape)': { '& > .MuiTypography-root': { display: 'none' } } } : undefined}
             glass={glassActive}
             value={poison}
+            max={15}
+            maxFont={sz.sectionLabel}
             color={poison >= 15 ? '#2E7D32' : 'text.primary'}
             valueSx={{ fontWeight: 800, ...counterValueSx('poison', poison, poisonProgress, {}, POISON_DANGER_2HG) }}
             onDec={() => onPoisonChange(primary.idx, -1)}
@@ -818,15 +826,22 @@ export function TeamPanel({
             size={{ btnFont: sz.btnPoison, valueFont: sz.poisonVal, btnMinWidth: sz.big ? 40 : 34, btnMinHeight: sz.big ? 40 : 34, valueMinWidth: 26 }}
             lpKeyPrefix="poison"
           />
-          <Typography sx={{ fontSize: sz.sectionLabel, color: 'text.secondary' }}>/ 15</Typography>
         </Stack>
-        {/* Pass Turn — only on the active team's panel (the remote sends a
-            pass_turn event; the host advances the turn). The flex spacer pushes
-            it to the bottom of the (stretched) center column in landscape; in the
-            portrait stack there's no free space so it sits after poison. */}
-        {isActiveTeam && onPassTurn && (
-          <>
-          <Box sx={{ flexGrow: 1, minHeight: 0, width: '100%' }} />
+        {/* Growing spacer pins the shared-life cluster up so the poison control +
+            its glass backing clear the panel bottom, and pushes the turn control
+            (below) to the bottom of the stretched center column. */}
+        <Box sx={{ flexGrow: 1, minHeight: 0, width: '100%' }} />
+        {/* Remote: an always-usable turn control (tap = next, long-press = prev),
+            reading "Your Turn" when it is this team's turn. Host board keeps the
+            original active-team-only Pass Turn tap. */}
+        {remoteMode && onPassTurn && onPrevTurn ? (
+          <TurnNavControl
+            isYourTurn={isActiveTeam}
+            onNext={onPassTurn}
+            onPrev={onPrevTurn}
+            sx={{ px: 2.5, py: 0.75, fontSize: sz.sectionLabel, boxShadow: 3 }}
+          />
+        ) : (!remoteMode && isActiveTeam && onPassTurn) ? (
           <Box
             onClick={onPassTurn}
             sx={{ px: 1.5, py: 0.5, borderRadius: 1.5, border: '2px solid', borderColor: 'primary.main', cursor: 'pointer', userSelect: 'none' }}
@@ -835,8 +850,7 @@ export function TeamPanel({
               Pass Turn
             </Typography>
           </Box>
-          </>
-        )}
+        ) : null}
       </Stack>
 
       {/* Section C: opposing-team stats + commander damage taken from each of
@@ -932,9 +946,10 @@ export function TeamPanel({
 // shared focus modal (±1 big + ±5), same as every other counter.
 function CmdDamageRow({ label, value, tax, glass, onChange, onView, lpKey, sz }: { label: string; value: number; tax: number; glass: boolean; onChange: (delta: number) => void; onView: () => void; lpKey: string; sz: Sz }) {
   return (
-    <Stack direction="row" alignItems="center" spacing={0.75}>
       <StepperControl
         label={`CMD Dmg — ${label}`}
+        max={21}
+        maxFont={sz.xsLabel}
         // The commander name (+ its tax badge) IS this counter's label, owned by
         // the component's label slot rather than rendered bespoke alongside it.
         labelNode={
@@ -962,7 +977,5 @@ function CmdDamageRow({ label, value, tax, glass, onChange, onView, lpKey, sz }:
         rowSpacing={0.75}
         lpKeyPrefix={lpKey}
       />
-      <Typography sx={{ fontSize: sz.xsLabel, color: 'text.secondary' }}>/21</Typography>
-    </Stack>
   );
 }

@@ -23,6 +23,7 @@ import {
   applyPassTurn,
   applyPoisonKillAttr,
   applyPrevTurn,
+  CLOCKWISE,
 } from '../remoteTransforms';
 import { detectSideEffects, type SideEffect } from '../detectSideEffects';
 
@@ -35,6 +36,12 @@ interface RollState {
 }
 
 const IDLE_ROLL_STATE: RollState = { phase: 'idle', highlightIdx: null, finalIdx: null };
+
+// Backdrop intro-reveal timing. STEP is the per-seat stagger; FADE mirrors the
+// CommanderArt cbReveal duration. The active-turn highlight is held off until the
+// last seat's fade completes: (seats - 1) * STEP + FADE.
+const BG_REVEAL_STEP_MS = 900;
+const BG_FADE_MS = 800;
 
 function getActiveOpponents(players: PlayerState[], excludeIdx: number) {
   return players
@@ -117,6 +124,23 @@ export function GameBoard({
 
   const [rollState, setRollState] = useState<RollState>(IDLE_ROLL_STATE);
   const [firstPlayerSet, setFirstPlayerSet] = useState(state.firstPlayerIdx != null);
+  // If the game was ALREADY in progress at mount (a reload/resume), the seat
+  // backdrops fade in together rather than staggering — the staggered turn-order
+  // reveal is reserved for the moment a first player is freshly rolled this session.
+  // useState initializer captures the mount-time value once (stable across renders).
+  const [bgWasPreset] = useState(() => state.firstPlayerIdx != null);
+  // Active-turn highlight is held off during the fresh-roll intro reveal and
+  // switched on once the final seat's backdrop finishes fading in. On a reload
+  // (bgWasPreset) it is on from the start.
+  const [turnIndicatorOn, setTurnIndicatorOn] = useState(bgWasPreset);
+  const introTimerStartedRef = useRef(bgWasPreset);
+  useEffect(() => {
+    if (introTimerStartedRef.current || !firstPlayerSet) return;
+    introTimerStartedRef.current = true;
+    const total = Math.max(0, players.length - 1) * BG_REVEAL_STEP_MS + BG_FADE_MS;
+    const id = setTimeout(() => setTurnIndicatorOn(true), total);
+    return () => clearTimeout(id);
+  }, [firstPlayerSet, players.length]);
   const [winnerCountdown, setWinnerCountdown] = useState<number | null>(null);
   const [prevWinnerKey, setPrevWinnerKey] = useState<string | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
@@ -469,6 +493,29 @@ export function GameBoard({
     state.gameType === '2hg'
       ? players[idx]?.teamNumber != null && players[idx].teamNumber === activeTeamNumber
       : currentPlayerIdx === idx;
+
+  // Staggered backdrop reveal (standard play). Turn order = the first player,
+  // then clockwise through the occupied seats. Each seat's ordinal in that order
+  // sets how long its backdrop waits before popping in.
+  const seatRevealOrdinal = (idx: number): number => {
+    const firstIdx = state.firstPlayerIdx;
+    if (firstIdx == null) return 0;
+    // Player indices in clockwise seating order, rotated to start at the first player.
+    const cwOrder = CLOCKWISE
+      .map((pos) => players.findIndex((p) => p.position === pos))
+      .filter((i) => i !== -1);
+    const startAt = cwOrder.indexOf(firstIdx);
+    const rotated = startAt >= 0 ? [...cwOrder.slice(startAt), ...cwOrder.slice(0, startAt)] : cwOrder;
+    const ord = rotated.indexOf(idx);
+    return ord >= 0 ? ord : 0;
+  };
+  // null → hidden (no first player yet); 0 for every seat → fade all in at once
+  // on a reload; otherwise stagger in turn order for a fresh roll.
+  const bgRevealDelay = (idx: number): number | null => {
+    if (state.gameType === '2hg' || !firstPlayerSet) return null;
+    if (bgWasPreset) return 0;
+    return seatRevealOrdinal(idx) * BG_REVEAL_STEP_MS;
+  };
   const leftPanelCss = playerCount === 3 ? 'clamp(200px, 25dvw, 380px)' : 'clamp(160px, 21dvw, 300px)';
   const rightPanelCss = 'clamp(160px, 21dvw, 300px)';
   const leftColumnWidth = playerCount >= 3 ? leftPanelCss : '0px';
@@ -828,6 +875,9 @@ export function GameBoard({
                 playerIdx={idx}
                 allPlayers={players}
                 commanderDamage={commanderDamage}
+                bgRevealDelayMs={bgRevealDelay(idx)}
+                bgRevealFlash={!bgWasPreset}
+                turnIndicatorEnabled={turnIndicatorOn}
                 isHighlighted={rollState.highlightIdx === idx}
                 isCurrentPlayer={firstPlayerSet && isSeatActive(idx)}
                 elapsedSeconds={firstPlayerSet && isSeatActive(idx) ? elapsedSeconds : 0}

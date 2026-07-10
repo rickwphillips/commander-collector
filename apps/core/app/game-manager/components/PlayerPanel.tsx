@@ -66,12 +66,16 @@ interface PlayerPanelProps {
   onEliminate: (idx: number) => void;
   onUndoEliminate: (idx: number) => void;
   onPassTurn?: () => void;
+  /** Step the turn backwards (remote turn control). */
+  onPrevTurn?: () => void;
   lifeKillOpponents?: KillOpponent[];
   onLifeKillSelect?: (sourceIdx: number | null) => void;
   poisonKillOpponents?: KillOpponent[];
   onPoisonKillSelect?: (sourceIdx: number | null) => void;
   isHighlighted?: boolean;
   isCurrentPlayer?: boolean;
+  /** Gates the active-turn highlight; held off during the intro backdrop reveal. */
+  turnIndicatorEnabled?: boolean;
   elapsedSeconds?: number;
   turnTimerSeconds?: number;
   startingLife?: number;
@@ -80,6 +84,10 @@ interface PlayerPanelProps {
   remoteMode?: boolean;
   seatCode?: string;
   activePlayerIdx?: number;
+  /** Staggered backdrop reveal delay (ms) for this seat; null keeps it hidden. */
+  bgRevealDelayMs?: number | null;
+  /** Flash at the end of the backdrop reveal (initial intro sequence only). */
+  bgRevealFlash?: boolean;
   remoteConnected?: boolean;
   soundEnabled?: boolean;
   onSwitchToPlayer?: (targetIdx: number) => void;
@@ -108,12 +116,14 @@ export function PlayerPanel({
   onEliminate,
   onUndoEliminate,
   onPassTurn,
+  onPrevTurn,
   lifeKillOpponents,
   onLifeKillSelect,
   poisonKillOpponents,
   onPoisonKillSelect,
   isHighlighted = false,
   isCurrentPlayer = false,
+  turnIndicatorEnabled,
   elapsedSeconds = 0,
   turnTimerSeconds = 300,
   startingLife = 40,
@@ -122,6 +132,8 @@ export function PlayerPanel({
   remoteMode = false,
   seatCode,
   activePlayerIdx,
+  bgRevealDelayMs,
+  bgRevealFlash,
   remoteConnected = false,
   soundEnabled = true,
   onSwitchToPlayer,
@@ -365,6 +377,8 @@ export function PlayerPanel({
       commanderDamage={commanderDamage}
       startingLife={startingLife}
       activePlayerIdx={activePlayerIdx}
+      bgRevealDelayMs={bgRevealDelayMs}
+      bgRevealFlash={bgRevealFlash}
       remoteMode={remoteMode}
       seatCode={seatCode}
       remoteConnected={remoteConnected}
@@ -372,6 +386,7 @@ export function PlayerPanel({
       highlightMode={highlightMode}
       isHighlighted={isHighlighted}
       isCurrentPlayer={isCurrentPlayer}
+      turnIndicatorEnabled={turnIndicatorEnabled}
       themeMode={themeMode}
       lifeKillOpponents={lifeKillOpponents}
       poisonKillOpponents={poisonKillOpponents}
@@ -387,6 +402,7 @@ export function PlayerPanel({
       onEliminate={onEliminate}
       onUndoEliminate={onUndoEliminate}
       onPassTurn={onPassTurn}
+      onPrevTurn={onPrevTurn}
       onLifeKillSelect={onLifeKillSelect}
       onPoisonKillSelect={onPoisonKillSelect}
       onSwitchToPlayer={onSwitchToPlayer}

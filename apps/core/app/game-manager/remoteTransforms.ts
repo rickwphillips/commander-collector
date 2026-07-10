@@ -521,6 +521,8 @@ function applyEventInner(state: GameManagerState, event: LiveGameEvent): GameMan
       return applyUndoEliminate(state, event.playerIdx);
     case 'pass_turn':
       return applyPassTurn(state);
+    case 'prev_turn':
+      return applyPrevTurn(state);
     case 'checkin':
       return applyCheckin(state, event.seat, event.ts);
     case 'life_kill_attr':
