@@ -1,6 +1,7 @@
 'use client';
 
 import { Box } from '@mui/material';
+import { PHYREXIAN_SRC } from './CounterGlyph';
 
 /**
  * Phyrexian poison overlay — lifted verbatim from PlayerCard, shared with
@@ -171,7 +172,7 @@ export function PoisonOverlay({ poison, poisonProgress }: { poison: number; pois
           }}>
             <Box
               component="img"
-              src="https://cdn.jsdelivr.net/gh/Investigamer/mtg-vectors@main/svg/watermark/phyrexian.svg"
+              src={PHYREXIAN_SRC}
               alt=""
               sx={{
                 width: `${140 + poisonProgress * 200}px`,
@@ -207,7 +208,7 @@ export function PoisonOverlay({ poison, poisonProgress }: { poison: number; pois
           }}>
             <Box
               component="img"
-              src="https://cdn.jsdelivr.net/gh/Investigamer/mtg-vectors@main/svg/watermark/phyrexian.svg"
+              src={PHYREXIAN_SRC}
               alt=""
               sx={{
                 width: `${140 + poisonProgress * 200}px`,
@@ -245,7 +246,7 @@ export function PoisonOverlay({ poison, poisonProgress }: { poison: number; pois
             }}>
               <Box
                 component="img"
-                src="https://cdn.jsdelivr.net/gh/Investigamer/mtg-vectors@main/svg/watermark/phyrexian.svg"
+                src={PHYREXIAN_SRC}
                 alt=""
                 sx={{ width: s.size, height: s.size, display: 'block', filter: 'brightness(0)', userSelect: 'none' }}
               />

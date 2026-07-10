@@ -25,6 +25,8 @@ import { ControlFocusModal } from './ControlFocusModal';
 import { StepperControl, StepperOverlayHost } from './StepperControl';
 import { isControlGlassActive } from './controlGlass';
 import { GlassBacking } from './GlassBacking';
+import { CounterGlyph, XP_ICON_SRC } from './CounterGlyph';
+import { XpBadge } from './XpBadge';
 import { LifeTotal } from './LifeTotal';
 import { useXpKeyframes } from './PlayerCard.keyframes';
 import { xpGlowFor, energyGlowFor, counterValueSx, poisonBlur } from './counterEffects';
@@ -42,8 +44,6 @@ const POISON_DANGER_SINGLES = 9;
 import { useLocalStorageBool } from '@/game-manager/hooks/useLocalStorageBool';
 import { TIMER_EXPIRED_BORDER_BLINK, TIMER_EXPIRED_HEADER_BLINK } from '@/game-manager/hooks/useTimerTokens';
 import type { TimerTokens } from '@/game-manager/hooks/useTimerTokens';
-
-const XP_ICON_SRC = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRPxc2Yz21vbnc5VP3Muxnx5VtQGAynItuNWg&s';
 
 // Local glyphs duplicated from PlayerPanel. Phase 3 will fold both into a
 // shared icons module along with the keyframes.
@@ -360,15 +360,9 @@ function PlayerCardImpl(props: PlayerCardProps) {
   // locally keeps invalidation tight and avoids threading 7 keyframe objects
   // through props.
   const { intensity: xpGlowIntensity, glow: xpGlow } = xpGlowFor(player.experience);
-  const {
-    xpShimmerAnim,
-    xpFlashAnim,
-    xpRippleAnim,
-    xpLevelUpAnim,
-    xpShimmerSweepAnim,
-    xpEmberAnim,
-    xpRuneGlowAnim,
-  } = useXpKeyframes(player.experience, xpGlow, xpGlowIntensity);
+  // Only the steady counter shimmer is used here now; the transient badge anims
+  // (flash / ripple / ember / rune / levelup) live inside the shared <XpBadge>.
+  const { xpShimmerAnim } = useXpKeyframes(player.experience, xpGlow, xpGlowIntensity);
 
   // ─── Energy / damage / poison keyframes ─────────────────────────────────
   const energyGlow = energyGlowFor(player.energy);
@@ -499,62 +493,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
               </Stack>
             </Tooltip>
           ))}
-          {player.experience > 0 && (
-            <Box sx={{
-              position: 'relative', flexShrink: 0, width: 34, height: 34,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              overflow: 'visible',
-              ...(xpRuneGlowAnim && { animation: `${xpRuneGlowAnim} 2.5s ease-in-out infinite${animations.xpFlashing ? `, ${xpLevelUpAnim} 0.7s ease-out` : ''}` }),
-            }}>
-              {/* Ember particles drifting upward */}
-              {xpEmberAnim && [0, 1, 2, 3].map((i) => (
-                <Box key={i} sx={{
-                  position: 'absolute',
-                  width: i % 2 === 0 ? 3 : 2, height: i % 2 === 0 ? 3 : 2,
-                  borderRadius: '50%',
-                  bgcolor: i % 2 === 0 ? '#FFD700' : '#FFA040',
-                  bottom: '55%',
-                  left: `${15 + i * 20}%`,
-                  pointerEvents: 'none',
-                  animation: `${xpEmberAnim} ${1.1 + i * 0.35}s ease-out ${i * 0.38}s infinite`,
-                }} />
-              ))}
-              {/* Diamond shape with shimmer sweep inside */}
-              <Box sx={{
-                position: 'absolute',
-                width: 26, height: 26,
-                transform: 'rotate(45deg)',
-                background: 'linear-gradient(135deg, #FFD700, #8B6914)',
-                border: '1.5px solid rgba(255,215,0,0.85)',
-                boxShadow: '0 2px 8px rgba(218,165,32,0.55)',
-                overflow: 'hidden',
-                ...(animations.xpFlashing && { animation: `${xpFlashAnim} 0.7s ease-out` }),
-              }}>
-                {xpShimmerSweepAnim && (
-                  <Box sx={{
-                    position: 'absolute', top: '-20%', left: 0,
-                    width: '28%', height: '140%',
-                    background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.72), transparent)',
-                    pointerEvents: 'none',
-                    animation: `${xpShimmerSweepAnim} 7.5s linear infinite`,
-                  }} />
-                )}
-              </Box>
-              {/* Ripple — also diamond */}
-              <Box key={animations.xpRippleKey} sx={{
-                position: 'absolute', top: '50%', left: '50%',
-                width: 26, height: 26,
-                border: '2px solid rgba(255,215,0,0.8)',
-                pointerEvents: 'none',
-                animation: `${xpRippleAnim} 0.7s ease-out forwards`,
-              }} />
-              {/* Text — unrotated, on top */}
-              <Stack direction="column" alignItems="center" spacing={0} sx={{ position: 'relative' }}>
-                <Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: 10, height: 10, objectFit: 'contain', mixBlendMode: 'multiply' }} />
-                <Typography sx={{ fontSize: 9, fontWeight: 900, color: '#111', lineHeight: 1, userSelect: 'none' }}>{player.experience}</Typography>
-              </Stack>
-            </Box>
-          )}
+          <XpBadge experience={player.experience} flashing={animations.xpFlashing} rippleKey={animations.xpRippleKey} />
           {/* Pass Turn */}
           {isCurrentPlayer && onPassTurn && (
             <Box
@@ -1029,27 +968,27 @@ function PlayerCardImpl(props: PlayerCardProps) {
             {([
               ['Poison', player.poison, () => onPoisonChange(playerIdx, -1), () => onPoisonChange(playerIdx, 1), () => onPoisonChange(playerIdx, -5), () => onPoisonChange(playerIdx, 5), player.poison >= 10 ? 'error.main' : player.poison > 0 ? 'warning.main' : 'text.disabled', null],
               ['Energy', player.energy, () => onEnergyChange(playerIdx, -1), () => onEnergyChange(playerIdx, 1), () => onEnergyChange(playerIdx, -5), () => onEnergyChange(playerIdx, 5), player.energy > 0 ? 'primary.main' : 'text.disabled', null],
-              ['XP', player.experience, () => onExperienceChange(playerIdx, -1), () => onExperienceChange(playerIdx, 1), () => onExperienceChange(playerIdx, -5), () => onExperienceChange(playerIdx, 5), player.experience > 0 ? 'primary.main' : 'text.disabled', null],
+              ['Experience', player.experience, () => onExperienceChange(playerIdx, -1), () => onExperienceChange(playerIdx, 1), () => onExperienceChange(playerIdx, -5), () => onExperienceChange(playerIdx, 5), player.experience > 0 ? 'primary.main' : 'text.disabled', null],
               // One Tax row per commander (each commander taxes independently).
               // The medallion value (8th slot) lets a partner deck render a second
               // Tax row keyed by the partner commander's name.
-              ['Tax', player.commanderTax, () => onCommanderTaxChange(playerIdx, -1), () => onCommanderTaxChange(playerIdx, 1), () => onCommanderTaxChange(playerIdx, -5), () => onCommanderTaxChange(playerIdx, 5), player.commanderTax > 0 ? 'warning.main' : 'text.disabled', player.commanderTax],
+              ['Commander Tax', player.commanderTax, () => onCommanderTaxChange(playerIdx, -1), () => onCommanderTaxChange(playerIdx, 1), () => onCommanderTaxChange(playerIdx, -5), () => onCommanderTaxChange(playerIdx, 5), player.commanderTax > 0 ? 'warning.main' : 'text.disabled', player.commanderTax],
               ...(player.partner ? [[player.partner.name, player.partnerCommanderTax, () => onCommanderTaxChange(playerIdx, -1, true), () => onCommanderTaxChange(playerIdx, 1, true), () => onCommanderTaxChange(playerIdx, -5, true), () => onCommanderTaxChange(playerIdx, 5, true), player.partnerCommanderTax > 0 ? 'warning.main' : 'text.disabled', player.partnerCommanderTax]] as [string, number, () => void, () => void, () => void, () => void, string, number | null][] : []),
             ] as [string, number, () => void, () => void, () => void, () => void, string, number | null][]).map(([label, value, onDec, onInc, onDec5, onInc5, color, medallionTax]) => {
               const blurSx = poisonBlur(poisonProgress);
               // Per-value effects are shared with TeamPanel via counterValueSx:
               // poison blur, the poison danger pulse (9 for singles), XP glow/shimmer.
-              const kind = label === 'Poison' ? 'poison' : label === 'Energy' ? 'energy' : label === 'XP' ? 'xp' : 'other';
+              const kind = label === 'Poison' ? 'poison' : label === 'Energy' ? 'energy' : label === 'Experience' ? 'xp' : 'other';
               const valueSx = counterValueSx(kind, value, poisonProgress, { xpGlow, xpShimmerAnim }, POISON_DANGER_SINGLES);
               // Structured label: the component composes the icon + text itself, so
               // the caller only supplies the icon node (glyph) and the text (label).
               // labelSx flexes the label so the − value + line up across rows and
               // carries the poison blur. Same abstraction as the 2HG panel.
               const glyphNode =
-                label === 'Poison' ? <Typography component="span" sx={{ fontSize: sizes.fsSourceName, color: player.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1 }}>☠</Typography>
-                : label === 'Energy' ? <Typography component="span" sx={{ fontSize: sizes.fsSourceName, color: '#4FC8FF', lineHeight: 1 }}>⚡</Typography>
-                : label === 'XP' ? <Box sx={{ bgcolor: 'background.paper', display: 'inline-flex' }}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: sizes.fsSourceName, height: sizes.fsSourceName, objectFit: 'contain', mixBlendMode: 'multiply' }} /></Box>
-                : medallionTax !== null ? <Box sx={{ width: sizes.fsSourceName, height: sizes.fsSourceName, borderRadius: '50%', background: 'radial-gradient(circle at 38% 35%, #d0d0d0, #7a7a7a)', border: '1px solid #3a3a3a', boxShadow: '0 1px 2px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Typography sx={{ fontSize: 7, fontWeight: 800, color: '#111', lineHeight: 1, userSelect: 'none' }}>+{medallionTax * 2}</Typography></Box>
+                label === 'Poison' ? <CounterGlyph kind="poison" size={sizes.fsSourceName} poison={player.poison} />
+                : label === 'Energy' ? <CounterGlyph kind="energy" size={sizes.fsSourceName} />
+                : label === 'Experience' ? <CounterGlyph kind="xp" size={sizes.fsSourceName} />
+                : medallionTax !== null ? <CounterGlyph kind="tax" size={sizes.fsSourceName} taxValue={medallionTax} />
                 : undefined;
               return (
               <StepperControl

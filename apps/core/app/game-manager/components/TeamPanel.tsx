@@ -44,6 +44,8 @@ import { StepperControl, StepperOverlayHost, type StepperSize } from './StepperC
 import { useXpKeyframes } from './PlayerCard.keyframes';
 import { xpGlowFor, energyGlowFor, counterValueSx } from './counterEffects';
 import { isControlGlassActive } from './controlGlass';
+import { CounterGlyph } from './CounterGlyph';
+import { XpBadge, useXpFlash } from './XpBadge';
 
 // Shared poison total is lethal at 15 in 2HG; the danger pulse fires one below.
 const POISON_DANGER_2HG = 14;
@@ -216,13 +218,14 @@ function TeammateCounters({ member, sz, poisonProgress, glass, onEnergyChange, o
   const { xpShimmerAnim } = useXpKeyframes(experience, xpGlow, xpIntensity);
   const energyGlow = energyGlowFor(energy);
   const glow = { xpGlow, xpShimmerAnim, energyGlow };
+  // Per-teammate XP-increase detection drives the shared celebration badge.
+  const { xpFlashing, xpRippleKey } = useXpFlash(experience);
 
   return (
     <Stack direction="row" alignItems="center" useFlexGap flexWrap="wrap" spacing={1}>
       <StepperControl
         label="Energy"
-        glyph="⚡"
-        glyphColor="#4FC8FF"
+        glyph={<CounterGlyph kind="energy" size={sz.val} />}
         showLabel={false}
         value={energy}
         color={energy > 0 ? '#4FC8FF' : 'text.primary'}
@@ -238,14 +241,16 @@ function TeammateCounters({ member, sz, poisonProgress, glass, onEnergyChange, o
         lpKeyPrefix={`energy-${idx}`}
       />
       <StepperControl
-        label="XP"
-        glyph="✦"
-        glyphColor="#DAA520"
+        label="Experience"
+        // Show the XP image icon at rest; once XP is on the board the value becomes
+        // the shared XpBadge (gold diamond containing the same XP icon + number +
+        // burst on increment), so the icon is always visible without doubling.
+        glyph={experience > 0 ? undefined : <CounterGlyph kind="xp" size={sz.val} />}
         showLabel={false}
         value={experience}
         color={experience > 0 ? '#DAA520' : 'text.primary'}
         glass={glass}
-        valueSx={counterValueSx('xp', experience, poisonProgress, glow, POISON_DANGER_2HG)}
+        valueNode={experience > 0 ? <XpBadge experience={experience} flashing={xpFlashing} rippleKey={xpRippleKey} /> : undefined}
         onDec={() => onExperienceChange(idx, -1)}
         onInc={() => onExperienceChange(idx, 1)}
         onDec5={() => onExperienceChange(idx, -5)}
@@ -685,10 +690,9 @@ export function TeamPanel({
                     return (
                       <Box key={key} sx={{ flexShrink: 0 }}>
                         <StepperControl
-                          label={m.player.partner ? `${e.name} Tax` : 'Tax'}
-                          labelNode={
-                            <Typography noWrap onClick={() => setCmdPreviewName(e.name)} title={`View ${e.name}`} sx={{ fontSize: sz.cmdLabel, color: 'text.secondary', maxWidth: '9ch', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer', '&:hover': { color: 'primary.main' } }}>{m.player.partner ? e.name : 'Tax'}</Typography>
-                          }
+                          label={m.player.partner ? `${e.name} Commander Tax` : 'Commander Tax'}
+                          glyph={<CounterGlyph kind="tax" size={sz.cmdLabel} taxValue={value} />}
+                          showLabel={false}
                           glass={glassActive}
                           value={value}
                           onDec={() => onCommanderTaxChange(m.idx, -1, e.isPartner)}
@@ -801,6 +805,7 @@ export function TeamPanel({
         <Stack direction="row" alignItems="center" justifyContent="center" spacing={1} sx={{ mt: 0.5 }}>
           <StepperControl
             label="Poison"
+            glyph={<CounterGlyph kind="poison" size={sz.sectionLabel} poison={poison} poisonDanger={15} />}
             labelFont={sz.sectionLabel}
             glass={glassActive}
             value={poison}
