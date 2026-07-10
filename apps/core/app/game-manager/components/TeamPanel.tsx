@@ -464,21 +464,26 @@ export function TeamPanel({
         ...(!highlightMode && timer.isTimerExpired && TIMER_EXPIRED_BORDER_BLINK),
         opacity: eliminated ? 0.5 : 1,
         overflow: 'hidden',
+        // Own stacking context so the negative-z decoration layer below is scoped
+        // to this panel (sits behind content, above the panel background).
+        isolation: 'isolate',
       }}
     >
-      {/* City's Blessing decorations (shared with PlayerCard). Per-player ability,
-          so the team panel shows it when either teammate holds the blessing;
-          the flag banners fly the primary pilot's commander art. */}
-      <CityBlessing
-        visible={cityBlessingVisible}
-        exiting={cityBlessingExiting}
-        threatSource={threatSource}
-        commander={primary.player.commander}
-      />
-
-      {/* Initiative torch (shared with PlayerCard) — shown when either teammate
-          holds the initiative. */}
-      <InitiativeTorch visible={members.some((m) => m.player.hasInitiative)} />
+      {/* Themed background decorations (City's Blessing skyline/flags, Initiative
+          torch) sit BEHIND all panel content via a negative-z layer, so the flags
+          and skyline don't paint over the counters — especially in light theme. */}
+      <Box sx={{ position: 'absolute', inset: 0, zIndex: -1, pointerEvents: 'none' }}>
+        {/* City's Blessing (shown when either teammate holds the blessing; flags
+            fly the primary pilot's commander art). */}
+        <CityBlessing
+          visible={cityBlessingVisible}
+          exiting={cityBlessingExiting}
+          threatSource={threatSource}
+          commander={primary.player.commander}
+        />
+        {/* Initiative torch (shown when either teammate holds the initiative). */}
+        <InitiativeTorch visible={members.some((m) => m.player.hasInitiative)} />
+      </Box>
 
       {/* Custom 2HG app bar: each commander's current details flank a centered,
           editable team name (click to rename — persists with the live game
