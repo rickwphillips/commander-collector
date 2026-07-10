@@ -33,6 +33,7 @@ import { InitiativeTorch } from './InitiativeTorch';
 import { CrownIcon, MonarchCrown, monarchCrownAnim } from './MonarchCrown';
 import { EliminatedOverlay } from './EliminatedOverlay';
 import type { ThreatSource } from '@/game-manager/threatSource';
+import { ThreatNames } from './ThreatNames';
 
 // Singles poison is lethal at 10; the danger pulse fires one below.
 const POISON_DANGER_SINGLES = 9;
@@ -895,40 +896,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
 
             <Box sx={{ position: 'relative', overflow: 'hidden', lineHeight: 1, width: '100%', flex: remoteMode ? undefined : 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               <LifeCracks fingerprint={playerIdx} crackAlpha={crackAlpha} />
-              {threatSource?.cmdName && threatSource.intensity > 0 && (
-                [
-                  { top: '10%',  left: '6%',  rotate: -18 },
-                  { top: '74%',  left: '55%', rotate:  11 },
-                  { top: '42%',  left: '62%', rotate:  -6 },
-                  { top: '84%',  left: '8%',  rotate:  20 },
-                  { top: '22%',  left: '48%', rotate:  -9 },
-                ].map(({ top, left, rotate }, i) => (
-                  <Typography key={`threat-${i}`} sx={{
-                    position: 'absolute', top, left,
-                    fontSize: 18 + (i % 3) * 4,
-                    fontWeight: 900,
-                    fontFamily: '"Georgia", "Palatino Linotype", serif',
-                    fontStyle: 'italic',
-                    color: 'error.main',
-                    pointerEvents: 'none',
-                    userSelect: 'none',
-                    whiteSpace: 'nowrap',
-                    zIndex: 0,
-                    transition: 'opacity 0.6s ease',
-                    letterSpacing: 1.5,
-                    textTransform: 'uppercase',
-                    lineHeight: 1,
-                    textShadow: `0 0 8px rgba(180,0,0,${(threatSource.intensity * 0.4).toFixed(2)})`,
-                    animation: `threatNamePulse ${1.8 + i * 0.3}s ease-in-out infinite`,
-                    '@keyframes threatNamePulse': {
-                      '0%, 100%': { opacity: threatSource.intensity * (0.09 + i * 0.02), transform: `rotate(${rotate + (playerIdx % 3) * 5}deg) scale(1)` },
-                      '50%': { opacity: threatSource.intensity * (0.18 + i * 0.04), transform: `rotate(${rotate + (playerIdx % 3) * 5}deg) scale(1.06)` },
-                    },
-                  }}>
-                    {threatSource.cmdName}
-                  </Typography>
-                ))
-              )}
+              <ThreatNames threatSource={threatSource} fingerprint={playerIdx} />
               <LifeTotal
                 value={player.life}
                 fontSize={remoteMode ? 'clamp(80px, 22dvmax, 260px)' : (countersOpen ? 'clamp(34px, 10dvh, 112px)' : 'clamp(60px, 20dvh, 240px)')}
