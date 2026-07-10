@@ -2,6 +2,7 @@
 
 import { keyframes } from '@emotion/react';
 import { Box, Typography } from '@mui/material';
+import { useProxiedArtUrl } from './CommanderArt';
 
 /**
  * City's Blessing decoration suite — lifted verbatim from PlayerCard, shared
@@ -267,6 +268,10 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
   threatSource?: ThreatSourceLike | null;
   commander: { artCropUrl?: string; name: string };
 }) {
+  // Resolve the flag art by NAME through the phone-safe proxy (same path as
+  // CommanderArt). The stored artCropUrl is often null (older games / after a
+  // name edit), which is why the 2HG flags were falling back to the name text.
+  const commanderArtSrc = useProxiedArtUrl(commander.name) ?? commander.artCropUrl;
   return (
     <>
       {/* ── City's Blessing god rays ── */}
@@ -510,7 +515,7 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
               wiggleOffset={cfg.wiggleOffset}
               driftDuration={cfg.driftDuration}
               driftOffset={cfg.driftOffset}
-              artCropUrl={isThreat ? threatArtUrl! : commander.artCropUrl}
+              artCropUrl={isThreat ? threatArtUrl! : commanderArtSrc}
               commanderName={commander.name}
             />
             );
