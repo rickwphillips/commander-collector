@@ -31,6 +31,7 @@ import { CommanderArt } from './CommanderArt';
 import { useCommanderPreview } from './useCommanderPreview';
 import { useBlessingAndSound } from '@/game-manager/hooks/useBlessingAndSound';
 import { computeThreatSource } from '@/game-manager/threatSource';
+import { ThreatNames } from './ThreatNames';
 import { PoisonOverlay } from './PoisonOverlay';
 import { EliminatedOverlay } from './EliminatedOverlay';
 import { LifeCracks } from './LifeCracks';
@@ -733,6 +734,8 @@ export function TeamPanel({
             above the life row; the crack layers are inset:0 so they don't spill. */}
         <Box sx={{ position: 'relative', overflow: 'visible', display: 'flex', justifyContent: 'center' }}>
         <LifeCracks fingerprint={teamNumber} crackAlpha={crackAlpha} />
+        {/* Floating threatening-commander names over the shared life (shared with PlayerCard). */}
+        <ThreatNames threatSource={threatSource} fingerprint={teamNumber} />
         {/* Monarch is one-per-game; show the crown when either teammate holds it. */}
         <MonarchCrown show={members.some((m) => m.player.isMonarch)} animStr={monarchCrownAnim('steady', false)} />
         <StepperControl
