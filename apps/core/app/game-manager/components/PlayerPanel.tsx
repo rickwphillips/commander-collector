@@ -98,6 +98,7 @@ interface PlayerPanelProps {
   onToggleSound?: () => void;
   onOpenChat?: (playerName: string) => void;
   onOpenLog?: () => void;
+  onToggleFullscreen?: () => void;
 }
 
 export function PlayerPanel({
@@ -145,6 +146,7 @@ export function PlayerPanel({
   onToggleSound,
   onOpenChat,
   onOpenLog,
+  onToggleFullscreen,
 }: PlayerPanelProps) {
   // ─── Side-effect hooks ───────────────────────────────────────────────────
   // Poison ambience + City's Blessing sound + blessing show/hide lifecycle,
@@ -412,6 +414,7 @@ export function PlayerPanel({
       onToggleSound={onToggleSound}
       onOpenChat={onOpenChat}
       onOpenLog={onOpenLog}
+      onToggleFullscreen={onToggleFullscreen}
       sizes={sizes}
       position={position}
       timer={timer}

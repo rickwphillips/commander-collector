@@ -27,6 +27,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import SmartphoneIcon from '@mui/icons-material/Smartphone';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import type { SxProps, Theme } from '@mui/material/styles';
 import { QRCodeSVG } from 'qrcode.react';
 import { ASSET_BASE, remoteQrOrigin } from '@/lib/api';
@@ -48,6 +49,7 @@ import { useXpKeyframes } from './PlayerCard.keyframes';
 import { xpGlowFor, energyGlowFor, counterValueSx } from './counterEffects';
 import { isControlGlassActive } from './controlGlass';
 import { CounterGlyph } from './CounterGlyph';
+import { CommanderDamageRow } from './CommanderDamageRow';
 import { XpBadge, useXpFlash } from './XpBadge';
 import { TurnNavControl } from './TurnNavControl';
 import { remoteDrawerOuterSx, remoteDrawerContentSx, remoteDrawerRailSx, remoteDrawerChevronSx } from './remoteDrawerSx';
@@ -125,6 +127,8 @@ interface TeamPanelProps {
   onPrevTurn?: () => void;
   // Remote only: open the shared game-log viewer (far right of the turn control).
   onOpenLog?: () => void;
+  // Remote only: toggle fullscreen (far left of the turn control).
+  onToggleFullscreen?: () => void;
 }
 
 // Responsive size tokens. Table (!remoteMode) keeps the original fixed px so the
@@ -413,6 +417,7 @@ export function TeamPanel({
   onPassTurn,
   onPrevTurn,
   onOpenLog,
+  onToggleFullscreen,
 }: TeamPanelProps) {
   // Commander card preview — shared with PlayerCard. Tap any commander (own team
   // or opposing) to enlarge; the overlay is scoped to this panel's root.
@@ -902,6 +907,16 @@ export function TeamPanel({
             original active-team-only Pass Turn tap. */}
         {remoteMode && onPassTurn && onPrevTurn ? (
           <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+            {/* Fullscreen toggle, pinned far left (mirror of the log link). */}
+            {onToggleFullscreen && (
+              <IconButton
+                onClick={onToggleFullscreen}
+                title="Toggle fullscreen"
+                sx={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', color: 'text.secondary' }}
+              >
+                <FullscreenIcon sx={{ fontSize: sz.ability }} />
+              </IconButton>
+            )}
             <TurnNavControl
               isYourTurn={isActiveTeam}
               onNext={onPassTurn}
@@ -975,33 +990,60 @@ export function TeamPanel({
                 ))}
               </Stack>
             )}
-            {oppPoison > 0 && (
-              <Typography sx={{ fontSize: sz.cmdLabel, color: 'text.secondary', ml: 0.5 }}>
-                Poison <Box component="span" sx={{ fontWeight: 800, color: oppPoison >= 15 ? '#2E7D32' : 'text.primary' }}>{oppPoison}</Box><Box component="span" sx={{ color: 'text.disabled' }}> / 15</Box>
-              </Typography>
+            {(remoteMode || oppPoison > 0) && (
+              <Stack direction="row" alignItems="center" spacing={0.25} sx={{ ml: 0.5 }}>
+                <CounterGlyph kind="poison" size={sz.cmdLabel} poison={oppPoison} poisonDanger={15} />
+                <Typography sx={{ fontSize: sz.cmdLabel, fontWeight: 800, color: oppPoison >= 15 ? '#2E7D32' : oppPoison > 0 ? 'text.primary' : 'text.disabled', lineHeight: 1 }}>{oppPoison}</Typography>
+                <Typography sx={{ fontSize: sz.xsLabel, color: 'text.disabled', lineHeight: 1 }}>/15</Typography>
+              </Stack>
             )}
           </Stack>
         </Box>
         <Typography sx={{ fontSize: sz.sectionLabel, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5, mt: 0.5 }}>
           Cmd Damage
         </Typography>
-        {opponents.flatMap((opp) => {
-          const dmg = commanderDamage[primary.idx]?.[opp.idx] ?? [0, 0];
-          // Same commander → dmg[0] / partner → dmg[1] convention as oppReceived.
-          return commanderEntries(opp).map((e) => (
-            <CmdDamageRow
-              key={`${opp.idx}-${e.isPartner ? 'partner' : 'own'}`}
-              label={e.name}
-              value={e.isPartner ? dmg[1] : dmg[0]}
-              tax={e.isPartner ? opp.player.partnerCommanderTax : opp.player.commanderTax}
-              glass={glassActive}
-              onChange={(delta) => onCommanderDamageChange(primary.idx, opp.idx, e.isPartner, delta)}
-              onView={() => setCmdPreviewName(e.name)}
-              lpKey={`cmd-${opp.idx}-${e.isPartner ? 'partner' : 'own'}`}
-              sz={sz}
-            />
-          ));
-        })}
+        {/* Remote: the SAME shared CommanderDamageRow the standard panel uses, one
+            per opposing pilot (it renders the partner row itself). Life/poison are
+            team-shared and shown above, so the row hides its life value and the
+            poison badge. Host keeps the compact on-table strip below. */}
+        {remoteMode
+          ? opponents.map((opp) => (
+              <CommanderDamageRow
+                key={opp.idx}
+                source={opp.player}
+                damage={commanderDamage[primary.idx]?.[opp.idx] ?? [0, 0]}
+                dealt={commanderDamage[opp.idx]?.[primary.idx] ?? [0, 0]}
+                remoteMode
+                startingLife={startingLife}
+                glass={glassActive}
+                fsName={sz.cmdLabel}
+                fsStatBadge={sz.xsLabel}
+                fsValue={sz.cmdVal}
+                stepperSize={{ btnFont: sz.btnCmd, valueFont: sz.cmdVal, btnMinWidth: sz.big ? 36 : 30, btnMinHeight: sz.big ? 36 : 30, valueMinWidth: 22 }}
+                statusShowPoison={false}
+                showLifeInValue={false}
+                keyPrefix={`cmd-${opp.idx}`}
+                onChange={(isPartner, delta) => onCommanderDamageChange(primary.idx, opp.idx, isPartner, delta)}
+                onTapName={(isPartner) => setCmdPreviewName(isPartner ? (opp.player.partner?.name ?? opp.player.commander.name) : opp.player.commander.name)}
+              />
+            ))
+          : opponents.flatMap((opp) => {
+              const dmg = commanderDamage[primary.idx]?.[opp.idx] ?? [0, 0];
+              // Same commander → dmg[0] / partner → dmg[1] convention as oppReceived.
+              return commanderEntries(opp).map((e) => (
+                <CmdDamageRow
+                  key={`${opp.idx}-${e.isPartner ? 'partner' : 'own'}`}
+                  label={e.name}
+                  value={e.isPartner ? dmg[1] : dmg[0]}
+                  tax={e.isPartner ? opp.player.partnerCommanderTax : opp.player.commanderTax}
+                  glass={glassActive}
+                  onChange={(delta) => onCommanderDamageChange(primary.idx, opp.idx, e.isPartner, delta)}
+                  onView={() => setCmdPreviewName(e.name)}
+                  lpKey={`cmd-${opp.idx}-${e.isPartner ? 'partner' : 'own'}`}
+                  sz={sz}
+                />
+              ));
+            })}
       </PanelSection>
       </Box>
 

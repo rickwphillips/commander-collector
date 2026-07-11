@@ -9,6 +9,7 @@ import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import ChatIcon from '@mui/icons-material/Chat';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import InitiativeIcon from '@mui/icons-material/Castle';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CloseIcon from '@mui/icons-material/Close';
@@ -38,6 +39,7 @@ import { LifeCracks } from './LifeCracks';
 import { CityBlessing } from './CityBlessing';
 import { InitiativeTorch } from './InitiativeTorch';
 import { CrownIcon, MonarchCrown, monarchCrownAnim } from './MonarchCrown';
+import { CommanderDamageRow } from './CommanderDamageRow';
 import { EliminatedOverlay } from './EliminatedOverlay';
 import { TurnNavControl } from './TurnNavControl';
 import type { ThreatSource } from '@/game-manager/threatSource';
@@ -236,6 +238,8 @@ export interface PlayerCardProps {
   onOpenChat?: (playerName: string) => void;
   /** Remote only: open the game-log viewer (far-right of the turn footer). */
   onOpenLog?: () => void;
+  /** Remote only: toggle fullscreen (far-left of the turn footer). */
+  onToggleFullscreen?: () => void;
 
   // Derived value bundles
   sizes: SizeTokens;
@@ -319,7 +323,8 @@ function arePlayerCardPropsEqual(prev: PlayerCardProps, next: PlayerCardProps): 
     prev.onToggleTheme === next.onToggleTheme &&
     prev.onToggleSound === next.onToggleSound &&
     prev.onOpenChat === next.onOpenChat &&
-    prev.onOpenLog === next.onOpenLog
+    prev.onOpenLog === next.onOpenLog &&
+    prev.onToggleFullscreen === next.onToggleFullscreen
   );
 }
 
@@ -335,7 +340,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
     onToggleMonarch, onToggleInitiative, onToggleCitysBlessing,
     onEliminate, onUndoEliminate, onPassTurn, onPrevTurn,
     onSwitchToPlayer,
-    onToggleSound, onToggleTheme, onOpenChat, onOpenLog,
+    onToggleSound, onToggleTheme, onOpenChat, onOpenLog, onToggleFullscreen,
     threatSource, crackAlpha,
   } = props;
   const { lpKey, startLongPress, cancelLongPress, guardClick } = longPress;
@@ -717,117 +722,27 @@ function PlayerCardImpl(props: PlayerCardProps) {
               {cmdDmgShowPlayer ? 'Player' : 'CMD'}
             </Button>
           </Stack>
-          {opponents.flatMap(({ player: source, idx: sourceIdx }) => {
-            const dmg = commanderDamage[playerIdx]?.[sourceIdx] ?? [0, 0];
-            const dealt = commanderDamage[sourceIdx]?.[playerIdx] ?? [0, 0];
-            const dealtTotal = dealt[0] + dealt[1];
-            const sourceEliminated = source.isEliminated;
-            // Same abstraction as the counters / 2HG: one row-layout StepperControl
-            // per source. The component owns the label (name + stat-badge row moved
-            // into labelNode, flex:1 so − value + line up across rows) and the glass
-            // backing. Snapshot onClick + all stepper interaction are unchanged.
-            const rows = [
-              <StepperControl
-                key={`${sourceIdx}-step`}
-                label={`CMD Dmg — ${cmdDmgShowPlayer ? source.playerName : source.commander.name}`}
-                labelNode={
-                  <Box sx={{ flex: 1, minWidth: 0, pt: 0 }}>
-                    <Stack direction="row" alignItems="center" spacing={0.5} sx={{ cursor: 'pointer', minWidth: 0 }} onClick={(e) => { e.stopPropagation(); setOpenSnapshotKey(k => k === `${sourceIdx}-snap` ? null : `${sourceIdx}-snap`); }}>
-                      {activePlayerIdx === sourceIdx && (
-                        <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0, boxShadow: '0 0 4px 1px rgba(var(--mui-palette-primary-mainChannel) / 0.7)' }} />
-                      )}
-                      {remoteMode ? (
-                        <>
-                          {/* Landscape: the cmd-damage column is narrow, so swap the
-                              name text for a compact commander thumbnail (CMD view)
-                              or the player's first initial (Player view). */}
-                          <Box sx={{ display: 'none', flexShrink: 0, '@media (orientation: landscape)': { display: 'inline-flex', alignItems: 'center' } }}>
-                            {cmdDmgShowPlayer ? (
-                              <Typography sx={{ fontSize: 'clamp(22px, 3.8dvmax, 40px)', lineHeight: 1, fontWeight: 800, color: sourceEliminated ? 'text.disabled' : activePlayerIdx === sourceIdx ? 'primary.main' : 'text.secondary', textDecoration: sourceEliminated ? 'line-through' : 'none' }}>
-                                {source.playerName.charAt(0).toUpperCase()}
-                              </Typography>
-                            ) : (
-                              <CommanderArt name={source.commander.name} title={source.commander.name} sx={{ height: 'clamp(18px, 3dvmax, 34px)', width: 'auto', borderRadius: 0.5, flexShrink: 0, opacity: sourceEliminated ? 0.5 : 1 }} />
-                            )}
-                          </Box>
-                          {/* Portrait: full name text. */}
-                          <Typography sx={{ fontSize: sizes.fsSourceName, color: sourceEliminated ? 'text.disabled' : activePlayerIdx === sourceIdx ? 'primary.main' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', fontWeight: activePlayerIdx === sourceIdx ? 700 : 400, flex: '0 1 auto', minWidth: 0, '@media (orientation: landscape)': { display: 'none' } }}>
-                            {cmdDmgShowPlayer ? source.playerName : source.commander.name}
-                          </Typography>
-                        </>
-                      ) : (
-                        <Typography sx={{ fontSize: sizes.fsSourceName, color: sourceEliminated ? 'text.disabled' : activePlayerIdx === sourceIdx ? 'primary.main' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', fontWeight: activePlayerIdx === sourceIdx ? 700 : 400, flex: '0 1 auto', minWidth: 0 }}>
-                          {cmdDmgShowPlayer ? source.playerName : source.commander.name}
-                        </Typography>
-                      )}
-                      <Tooltip title={`Dealt ${source.partner ? `${dealt[0]}/${dealt[1]}` : dealtTotal} commander damage to ${source.playerName}`} placement="top" slotProps={position.ttSlotProps} arrow><Typography sx={{ fontSize: sizes.fsSourceName, fontWeight: 900, color: dealtTotal >= 21 ? 'error.main' : dealtTotal > 0 ? '#e67e22' : 'text.disabled', lineHeight: 1, flexShrink: 0 }}>⚔{source.partner ? `${dealt[0]}/${dealt[1]}` : dealtTotal}</Typography></Tooltip>
-                      {/* Spacer keeps name + sword left-aligned instead of the name growing to push the sword to the counter. */}
-                      <Box sx={{ flex: 1, minWidth: 0 }} />
-                    </Stack>
-                    <Stack direction="row" spacing={0.5} sx={{ mt: 0.15, flexWrap: 'wrap', alignItems: 'center' }}>
-                      {source.isMonarch && <Tooltip title="Monarch" placement="top" slotProps={position.ttSlotProps} arrow><CrownIcon sx={{
-                        fontSize: sizes.fsStatBadge,
-                        color: '#DAA520',
-                        animation: 'crownShimmer 2s ease-in-out infinite',
-                        '@keyframes crownShimmer': {
-                          '0%, 100%': { filter: 'drop-shadow(0 0 2px #DAA520) brightness(1)' },
-                          '50%': { filter: 'drop-shadow(0 0 7px #FFD700) brightness(1.5)' },
-                        },
-                      }} /></Tooltip>}
-                      {source.hasCitysBlessing && <Tooltip title="City's Blessing" placement="top" slotProps={position.ttSlotProps} arrow><span><CityIcon active sx={{ fontSize: sizes.fsStatBadge }} /></span></Tooltip>}
-                      {source.hasInitiative && <Tooltip title="Initiative" placement="top" slotProps={position.ttSlotProps} arrow><InitiativeIcon sx={{ fontSize: sizes.fsStatBadge, color: '#4FC3F7' }} /></Tooltip>}
-                      <Tooltip title={`Life: ${source.life}`} placement="top" slotProps={position.ttSlotProps} arrow><Typography sx={{ fontSize: sizes.fsStatBadge, fontWeight: 800, color: lifeColor(source.life) || 'primary.main', lineHeight: 1 }}>♥{source.life}</Typography></Tooltip>
-                      {source.poison > 0 && <Tooltip title={`Poison: ${source.poison}`} placement="top" slotProps={position.ttSlotProps} arrow><Typography sx={{ fontSize: sizes.fsStatBadge, fontWeight: 800, color: source.poison >= 10 ? '#e53935' : '#66BB6A', lineHeight: 1 }}>☠{source.poison}</Typography></Tooltip>}
-                      {source.energy > 0 && <Tooltip title={`Energy: ${source.energy}`} placement="top" slotProps={position.ttSlotProps} arrow><Typography sx={{ fontSize: sizes.fsStatBadge, fontWeight: 800, color: '#4FC8FF', lineHeight: 1 }}>⚡{source.energy}</Typography></Tooltip>}
-                      {source.experience > 0 && <Tooltip title={`XP: ${source.experience}`} placement="top" slotProps={position.ttSlotProps} arrow><Stack direction="row" alignItems="center" spacing={0.25}><Box sx={{ bgcolor: 'background.paper', display: 'inline-flex' }}><Box component="img" src={XP_ICON_SRC} alt="XP" sx={{ width: sizes.fsStatBadge, height: sizes.fsStatBadge, objectFit: 'contain', mixBlendMode: 'multiply', transition: 'width 0.2s ease, height 0.2s ease' }} /></Box><Typography sx={{ fontSize: sizes.fsStatBadge, fontWeight: 800, color: '#DAA520', lineHeight: 1 }}>{source.experience}</Typography></Stack></Tooltip>}
-                    </Stack>
-                  </Box>
-                }
-                glass={glassActive}
-                value={dmg[0]}
-                max={21}
-                maxFont={sizes.fsSourceName}
-                color={dmg[0] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary'}
-                disableDec={sourceEliminated}
-                onDec={() => handleCmdDmgChange(playerIdx, sourceIdx, false, -1)}
-                onInc={() => handleCmdDmgChange(playerIdx, sourceIdx, false, 1)}
-                onDec5={() => handleCmdDmgChange(playerIdx, sourceIdx, false, -5)}
-                onInc5={() => handleCmdDmgChange(playerIdx, sourceIdx, false, 5)}
-                rowSpacing={remoteMode ? 0 : 0.5}
-                size={{ btnFont: sizes.fsCounterBtn, valueFont: sizes.fsCounterValue, btnMinWidth: sizes.cmdBtnWidth, btnMinHeight: sizes.cmdBtnHeight, valueMinWidth: sizes.valColWidth }}
-                tooltipSlotProps={position.ttSlotProps}
-                lpKeyPrefix={`${sourceIdx}`}
-              />,
-            ];
-            if (source.partner) {
-              rows.push(
-                <StepperControl
-                  key={`${sourceIdx}-pstep`}
-                  label={`CMD Dmg — ${source.partner.name}`}
-                  labelNode={
-                    <Typography onClick={(e) => { e.stopPropagation(); setOpenSnapshotKey(k => k === `${sourceIdx}-psnap` ? null : `${sourceIdx}-psnap`); }} sx={{ flex: 1, minWidth: 0, fontSize: sizes.fsSourceName, color: sourceEliminated ? 'text.disabled' : 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: sourceEliminated ? 'line-through' : 'none', cursor: 'pointer' }}>
-                      {source.partner.name}
-                    </Typography>
-                  }
-                  glass={glassActive}
-                  value={dmg[1]}
-                  max={21}
-                  maxFont={sizes.fsSourceName}
-                  color={dmg[1] >= 21 ? 'error.main' : sourceEliminated ? 'text.disabled' : 'text.primary'}
-                  disableDec={sourceEliminated}
-                  onDec={() => handleCmdDmgChange(playerIdx, sourceIdx, true, -1)}
-                  onInc={() => handleCmdDmgChange(playerIdx, sourceIdx, true, 1)}
-                  onDec5={() => handleCmdDmgChange(playerIdx, sourceIdx, true, -5)}
-                  onInc5={() => handleCmdDmgChange(playerIdx, sourceIdx, true, 5)}
-                  rowSpacing={remoteMode ? 0 : 0.5}
-                  size={{ btnFont: sizes.fsCounterBtn, valueFont: sizes.fsCounterValue, btnMinWidth: sizes.cmdBtnWidth, btnMinHeight: sizes.cmdBtnHeight, valueMinWidth: sizes.valColWidth }}
-                  tooltipSlotProps={position.ttSlotProps}
-                  lpKeyPrefix={`${sourceIdx}-p`}
-                />,
-              );
-            }
-            return rows;
-          })}
+          {opponents.map(({ player: source, idx: sourceIdx }) => (
+            <CommanderDamageRow
+              key={sourceIdx}
+              source={source}
+              damage={commanderDamage[playerIdx]?.[sourceIdx] ?? [0, 0]}
+              dealt={commanderDamage[sourceIdx]?.[playerIdx] ?? [0, 0]}
+              remoteMode={remoteMode}
+              showPlayerName={cmdDmgShowPlayer}
+              isActive={activePlayerIdx === sourceIdx}
+              startingLife={startingLife}
+              glass={glassActive}
+              fsName={sizes.fsSourceName}
+              fsStatBadge={sizes.fsStatBadge}
+              fsValue={sizes.fsCounterValue}
+              stepperSize={{ btnFont: sizes.fsCounterBtn, valueFont: sizes.fsCounterValue, btnMinWidth: sizes.cmdBtnWidth, btnMinHeight: sizes.cmdBtnHeight, valueMinWidth: sizes.valColWidth }}
+              tooltipSlotProps={position.ttSlotProps}
+              keyPrefix={`${sourceIdx}`}
+              onChange={(isPartner, delta) => handleCmdDmgChange(playerIdx, sourceIdx, isPartner, delta)}
+              onTapName={(isPartner) => setOpenSnapshotKey(k => { const key = `${sourceIdx}-${isPartner ? 'psnap' : 'snap'}`; return k === key ? null : key; })}
+            />
+          ))}
 
           {/* Commander snapshot overlay */}
           {openSnapshotKey !== null && (() => {
@@ -1165,6 +1080,16 @@ function PlayerCardImpl(props: PlayerCardProps) {
           px: 1, pt: 1.75, pb: 'calc(env(safe-area-inset-bottom) + 8px)',
           borderTop: (theme) => `1px solid ${theme.palette.divider}`,
         }}>
+          {/* Fullscreen toggle, pinned to the far left (mirror of the log link). */}
+          {onToggleFullscreen && (
+            <IconButton
+              onClick={onToggleFullscreen}
+              title="Toggle fullscreen"
+              sx={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'text.secondary' }}
+            >
+              <FullscreenIcon sx={{ fontSize: sizes.fsPassBtn }} />
+            </IconButton>
+          )}
           <TurnNavControl
             isYourTurn={isCurrentPlayer}
             onNext={onPassTurn}
