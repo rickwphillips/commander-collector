@@ -534,6 +534,7 @@ function RemotePageInner() {
           onPassTurn={handlePassTurn}
           onPrevTurn={handlePrevTurn}
           onOpenLog={openLog}
+          onToggleFullscreen={toggleFullscreen}
         />
       ) : (
       <PlayerPanel
@@ -569,6 +570,7 @@ function RemotePageInner() {
         onPrevTurn={handlePrevTurn}
         onOpenChat={handleOpenChat}
         onOpenLog={openLog}
+        onToggleFullscreen={toggleFullscreen}
         {...(lifeKillPending && {
           lifeKillOpponents: state.players
             .map((p, i) => ({ name: p.playerName, idx: i }))

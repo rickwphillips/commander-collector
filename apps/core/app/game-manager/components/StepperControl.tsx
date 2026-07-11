@@ -140,6 +140,11 @@ export interface StepperControlProps {
   /** Reserve blank space the width of a `/ NN` denominator when this row has no
    *  `max`, so sibling rows WITH one keep their − value + columns aligned. */
   reserveMax?: boolean;
+  /** Render only the (tappable) value, hiding the inline − / + buttons. Tapping
+   *  the value still opens the focus modal, so the row becomes a compact readout
+   *  that edits in the modal (e.g. a remote cmd-damage row showing an opponent's
+   *  life, tapped to record the commander damage they dealt). 'row' layout only. */
+  valueOnly?: boolean;
   /** Gap between the buttons and the value in 'row' layout (MUI spacing units). */
   rowSpacing?: number;
   /** slotProps for the ±5 long-press tooltip (per-seat rotation on the board). */
@@ -178,6 +183,7 @@ export function StepperControl({
   maxFont,
   maxSx,
   reserveMax = false,
+  valueOnly = false,
   rowSpacing = 0.25,
   tooltipSlotProps,
   lpKeyPrefix,
@@ -378,9 +384,9 @@ export function StepperControl({
   return (
     <Stack direction="row" alignItems="center" spacing={rowSpacing} className={className} sx={glassBackingSx(glass)}>
       {labelEl}
-      {decBtn}
+      {!valueOnly && decBtn}
       {valueEl}
-      {incBtn}
+      {!valueOnly && incBtn}
       {maxEl}
       {portal}
     </Stack>
