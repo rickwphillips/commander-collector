@@ -175,8 +175,16 @@ function parseManaValue(manaCost: string | null | undefined): number {
   for (const m of manaCost.matchAll(/\{([^}]+)\}/g)) {
     const inner = m[1];
     const n = Number(inner);
-    if (!isNaN(n)) mv += n;
-    else if (inner !== 'X') mv += 1;
+    if (!isNaN(n)) {
+      mv += n;
+    } else if (inner.includes('/')) {
+      // Hybrid symbol: a monocolored hybrid like {2/W} contributes its numeral
+      // (2) to mana value; color/color ({G/W}) and Phyrexian ({W/P}) contribute 1.
+      const numeral = inner.split('/').map(Number).find((x) => !isNaN(x));
+      mv += numeral ?? 1;
+    } else if (inner !== 'X') {
+      mv += 1;
+    }
   }
   return mv;
 }

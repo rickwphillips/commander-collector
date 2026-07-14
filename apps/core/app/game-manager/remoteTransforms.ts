@@ -21,6 +21,28 @@ export const CLOCKWISE: ReadonlyArray<'bottom' | 'left' | 'top' | 'right'> = [
 export const TWOHG_POISON_THRESHOLD = 15;
 
 /**
+ * True if ANY per-player elimination cause still holds: life <= 0, poison >= 10,
+ * or >= 21 commander damage from any single source. Used to gate every
+ * un-eliminate path so undoing one cause (e.g. restoring life) does NOT revive a
+ * player who is still dead by another cause (e.g. 21 commander damage). 2HG team
+ * poison (15) is reconciled separately in reconcileTeams.
+ */
+function stillEliminated(
+  life: number,
+  poison: number,
+  cmdDmgForTarget: Record<number, [number, number]> | undefined,
+): boolean {
+  if (life <= 0) return true;
+  if (poison >= 10) return true;
+  if (cmdDmgForTarget) {
+    for (const dmg of Object.values(cmdDmgForTarget)) {
+      if ((dmg?.[0] ?? 0) >= 21 || (dmg?.[1] ?? 0) >= 21) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * reconcileTeams — the only place 2HG team semantics live.
  *
  * The per-player reducers above are entirely 2HG-agnostic: they apply a life /
@@ -120,12 +142,18 @@ export function applyLifeChange(
   idx: number,
   delta: number,
 ): GameManagerState {
-  const { players, turnNumber, notes } = state;
+  const { players, commanderDamage, turnNumber, notes } = state;
   const target = players[idx];
   const newLife = target.life + delta;
   const isNewLifeKill = target.life > 0 && newLife <= 0;
   const isUndoLifeKill = target.life <= 0 && newLife > 0;
-  const wasEliminatedByLife = target.isEliminated && target.life <= 0 && target.poison < 10;
+  // Only revive if restoring life clears the LAST elimination cause — a player
+  // still on 21 commander damage or 10 poison stays eliminated.
+  const canRevive =
+    isUndoLifeKill &&
+    target.isEliminated &&
+    !target.isConceded &&
+    !stillEliminated(newLife, target.poison, commanderDamage[idx]);
   const lifeNoteTag = `[lifekill:${idx}]`;
   let newNotes = notes;
   if (isUndoLifeKill) {
@@ -137,7 +165,7 @@ export function applyLifeChange(
       ...p,
       life: newLife,
       ...(isNewLifeKill && !p.isEliminated ? { isEliminated: true, eliminatedTurn: turnNumber } : {}),
-      ...(isUndoLifeKill && wasEliminatedByLife ? { isEliminated: false, eliminatedTurn: null } : {}),
+      ...(canRevive ? { isEliminated: false, eliminatedTurn: null } : {}),
     };
   });
   return { ...state, players: newPlayers, notes: newNotes };
@@ -148,13 +176,16 @@ export function applyPoisonChange(
   idx: number,
   delta: number,
 ): GameManagerState {
-  const { players, turnNumber, notes } = state;
+  const { players, commanderDamage, turnNumber, notes } = state;
   const target = players[idx];
   const newPlayers = players.map((p, i) => {
     if (i !== idx) return p;
     const poison = Math.max(0, p.poison + delta);
-    const wasEliminatedByPoison = p.isEliminated && p.poison >= 10;
-    const isEliminated = poison >= 10 ? true : wasEliminatedByPoison ? false : p.isEliminated;
+    // Revive only if lowering poison clears the LAST cause — still dead by life
+    // <= 0 or 21 commander damage means the player stays eliminated.
+    const canRevive =
+      p.isEliminated && !p.isConceded && !stillEliminated(p.life, poison, commanderDamage[idx]);
+    const isEliminated = poison >= 10 ? true : canRevive ? false : p.isEliminated;
     const eliminatedTurn =
       poison >= 10 && !p.isEliminated ? turnNumber : isEliminated ? p.eliminatedTurn : null;
     return { ...p, poison, isEliminated, eliminatedTurn };
@@ -260,9 +291,16 @@ export function applyCommanderDamageChange(
   const isNewCmdKill = !target.isEliminated && (newDmg[0] >= 21 || newDmg[1] >= 21);
   const isNewLifeKill = !target.isEliminated && target.life > 0 && newLife <= 0 && !isNewCmdKill;
   const isNewElimination = isNewCmdKill || isNewLifeKill;
+  // isUndoCmdElim / isUndoLifeElim identify WHICH note tag to strip (this source's
+  // cmd-damage vs a life-to-0), but the actual revive must check EVERY cause:
+  // decrementing one source below 21 must not revive a player still on 21 from a
+  // different commander, or still dead by life <= 0 / poison.
   const isUndoCmdElim = target.isEliminated && (current[0] >= 21 || current[1] >= 21) && newDmg[0] < 21 && newDmg[1] < 21;
   const isUndoLifeElim = !isUndoCmdElim && target.isEliminated && target.life <= 0 && newLife > 0 && target.poison < 10;
-  const isUndoElimination = isUndoCmdElim || isUndoLifeElim;
+  const isUndoElimination =
+    target.isEliminated &&
+    !target.isConceded &&
+    !stillEliminated(newLife, target.poison, newCommanderDamage[targetIdx]);
 
   const cmdLabel = source.partner
     ? `${source.commander.name} / ${source.partner.name}`
