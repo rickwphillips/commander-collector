@@ -1,6 +1,10 @@
 <?php
-// Live game session API — no auth required (seat code IS the credential)
+// Live game session API — remote actions need no auth (the seat code IS the
+// credential). The one exception is creating a session: that is a host action
+// (the host is logged in), so it requires a JWT and takes the owner from the
+// token, never from the request body. See the POST create branch below.
 require_once 'config.php';
+require_once 'auth/middleware.php';
 
 $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
@@ -88,6 +92,13 @@ switch ($method) {
         }
 
         // ── Create session ────────────────────────────────────────────────
+        // Host-only action: require a valid JWT and take the owner from its
+        // 'sub' claim. Never trust a client-supplied user_id — doing so let any
+        // unauthenticated caller deactivate another user's active game by
+        // passing their id below.
+        $user = requireAuth();
+        $userId = $user['sub'] ?? null;
+
         $data = getJSONInput();
 
         if (empty($data['state']) || !is_array($data['state'])) {
@@ -103,9 +114,6 @@ switch ($method) {
                 sendError("Invalid seat: $seat");
             }
         }
-
-        // Extract optional user_id (passed by authenticated client) — keep as string UUID
-        $userId = isset($data['user_id']) ? (string)$data['user_id'] : null;
 
         try {
             $pdo->beginTransaction();
@@ -179,6 +187,12 @@ switch ($method) {
                     $pdo->rollBack();
                     sendError('Session not found or expired', 404);
                 }
+                // Consuming (clearing) the queue is a host-only action; only the
+                // host seat ('bottom') may drain it, not any remote seat code.
+                if ($row['seat'] !== 'bottom') {
+                    $pdo->rollBack();
+                    sendError('Consume requires the host seat', 403);
+                }
 
                 $events = json_decode($row['remote_events'] ?? '[]', true);
                 if (!is_array($events)) $events = [];
@@ -234,6 +248,11 @@ switch ($method) {
         }
         if (!$row['is_active']) {
             sendError('Session is no longer active', 410);
+        }
+        // Overwriting full authoritative state is host-only. Remotes send their
+        // input via POST ?action=event; only the host seat ('bottom') may PUT.
+        if ($row['seat'] !== 'bottom') {
+            sendError('State update requires the host seat', 403);
         }
 
         $stmt = $pdo->prepare('

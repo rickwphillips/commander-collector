@@ -74,6 +74,15 @@ if (!$row || !$row['is_active']) {
     exit;
 }
 
+// Host mode drains (consumes) the remote_events queue, so it must be the host's
+// own seat — not any remote seat that appends role=host to the URL. The host is
+// the 'bottom' seat (see game-manager createLiveGame). A remote seat requesting
+// host mode would otherwise steal events the real host never sees.
+if ($isHost && $row['seat'] !== 'bottom') {
+    sseEmit(['type' => 'error', 'message' => 'host stream requires the host seat']);
+    exit;
+}
+
 if ($isHost) {
     // ── HOST MODE ────────────────────────────────────────────────────────────
     // Watches remote_events. On connect, flush any already-queued events so
