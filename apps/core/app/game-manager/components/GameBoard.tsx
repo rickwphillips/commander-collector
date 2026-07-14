@@ -337,8 +337,16 @@ export function GameBoard({
   const handleChooseFirstPlayer = (idx: number, note?: string) => {
     const player = players[idx];
     const line = note ?? `First player (chosen): ${player?.playerName ?? '?'}`;
-    const newNotes = state.notes ? `${state.notes}\n${line}` : line;
-    onUpdate({ ...state, currentPlayerIdx: idx, firstPlayerIdx: idx, turnStartTime: Date.now(), notes: newNotes });
+    const turnStartTime = Date.now();
+    // Functional form so notes append onto the latest committed state and a
+    // concurrent remote event isn't clobbered.
+    onUpdate((prev) => ({
+      ...prev,
+      currentPlayerIdx: idx,
+      firstPlayerIdx: idx,
+      turnStartTime,
+      notes: prev.notes ? `${prev.notes}\n${line}` : line,
+    }));
     setRollState(IDLE_ROLL_STATE);
     setFirstPlayerSet(true);
   };
@@ -350,7 +358,10 @@ export function GameBoard({
   };
 
   const updateState = (patch: Partial<GameManagerState>) => {
-    onUpdate({ ...state, ...patch });
+    // Functional form: merge onto the latest committed state, not the render
+    // closure's `state`, so an SSE remote event that landed after this render
+    // isn't clobbered by the merge.
+    onUpdate((prev) => ({ ...prev, ...patch }));
   };
 
   // Replaces a useState setter so the read-only overlay choice mirrors to the
@@ -453,17 +464,29 @@ export function GameBoard({
     dispatchHostEvent({ type: 'undo_eliminate', playerIdx: idx });
 
   const handleNextTurn = () => {
-    const next = applyPassTurn(state);
-    if (next === state) return;
-    updateState({ currentPlayerIdx: next.currentPlayerIdx, turnNumber: next.turnNumber, turnStartTime: next.turnStartTime });
+    // Recompute the turn advance from the latest committed state inside the
+    // updater so a remote event landing after this render survives the write.
+    onUpdate((prev) => {
+      const next = applyPassTurn(prev);
+      return next === prev
+        ? prev
+        : { ...prev, currentPlayerIdx: next.currentPlayerIdx, turnNumber: next.turnNumber, turnStartTime: next.turnStartTime };
+    });
   };
 
   const handlePrevTurn = () => {
-    const next = applyPrevTurn(state);
-    if (next === state) return;
+    // Decide whether a revert applies (and fire the log side effect) from the
+    // render-closure state — turn structure isn't affected by remote life/counter
+    // events — but perform the actual merge functionally so those events survive.
+    if (applyPrevTurn(state) === state) return;
     // Flag the reversal so page.tsx logs turn_revert rather than pass_turn.
     onTurnRevert?.();
-    updateState({ currentPlayerIdx: next.currentPlayerIdx, turnNumber: next.turnNumber, turnStartTime: next.turnStartTime });
+    onUpdate((prev) => {
+      const next = applyPrevTurn(prev);
+      return next === prev
+        ? prev
+        : { ...prev, currentPlayerIdx: next.currentPlayerIdx, turnNumber: next.turnNumber, turnStartTime: next.turnStartTime };
+    });
   };
 
   const getRotation = (position: PlayerState['position']) => {
