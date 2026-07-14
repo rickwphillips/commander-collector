@@ -1,5 +1,20 @@
 # Changelog
 
+## [5.18.0] - 2026-07-14
+
+### Fixed
+
+- Live game security: host-only actions (overwriting full state via `PUT /live-game`, draining the queue via `?consume=1`, and the SSE `role=host` stream) now require the resolved seat to be the host seat (`bottom`). A remote seat code can no longer overwrite authoritative state or steal the host's event queue
+- Live game security: `POST /live-game` (session create) now requires a JWT and takes `user_id` from the token `sub`, never a client-supplied value, so a session can no longer be deactivated on another user's behalf by guessing their id
+- Live game: the SSE host drain emits before clearing and clears only on confirmed delivery (matched by `(seat, ts)`), so remote deltas are no longer lost when the host connection drops/reconnects, and a phone append mid-emit is preserved
+- Remote elimination undo now checks every cause: undoing a life/poison/commander-damage change no longer revives a player still eliminated by another cause (via a shared `stillEliminated` helper), and a conceded player is never auto-revived
+- `DeckFilters.parseManaValue`: a monocolored hybrid `{2/W}` contributes its numeral (2) to mana value; color/color (`{G/W}`) and Phyrexian (`{W/P}`) still contribute 1
+- Remote panel: the "connection lost" banner clears via a functional `setState` so it is no longer read from a stale effect closure (it never cleared after recovery)
+
+### Added
+
+- `house_rules` table for the deckbuilder tool (per-user/per-deck house rules and saved reference rulings)
+
 ## [5.15.0] - 2026-07-09
 
 ### Fixed
