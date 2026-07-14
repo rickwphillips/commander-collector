@@ -53,6 +53,47 @@ function sseEmit(array $payload): void {
     flush();
 }
 
+// Emit a batch of queued events, then clear ONLY those events from the queue —
+// and only if the client actually received them. Remote events are deltas the
+// host applies without dedup, so:
+//   - Clearing BEFORE emitting (the old behavior) lost the whole batch whenever
+//     the emit landed on a dying/superseded connection.
+//   - Blindly redelivering would double-apply.
+// So we emit first; if the connection dropped we leave the events queued for
+// redelivery on reconnect (the client never applied them, so no double-apply);
+// if it was delivered we remove exactly those events, matched by seat+ts, which
+// preserves any events a phone appended while we were emitting (NULLing the
+// column or slicing by count would drop them). The read lock is released before
+// the network write so a slow/dead host connection can't stall phone appends.
+// Returns false if the connection dropped (caller should stop).
+function emitAndClearEvents(PDO $pdo, string $sessionId, array $events): bool {
+    if (empty($events)) return true;
+    sseEmit(['type' => 'events', 'events' => $events]);
+    if (connection_aborted()) return false; // not delivered — leave queued
+
+    $deliveredKeys = [];
+    foreach ($events as $e) {
+        $deliveredKeys[($e['seat'] ?? '') . '|' . ($e['ts'] ?? '')] = true;
+    }
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare('SELECT remote_events FROM live_game_sessions WHERE id = ? FOR UPDATE');
+        $stmt->execute([$sessionId]);
+        $rowNow = $stmt->fetch();
+        $queue = json_decode($rowNow['remote_events'] ?? '[]', true);
+        if (!is_array($queue)) $queue = [];
+        $remaining = array_values(array_filter($queue, function ($e) use ($deliveredKeys) {
+            return !isset($deliveredKeys[($e['seat'] ?? '') . '|' . ($e['ts'] ?? '')]);
+        }));
+        $pdo->prepare('UPDATE live_game_sessions SET remote_events = ? WHERE id = ?')
+            ->execute([empty($remaining) ? null : json_encode($remaining), $sessionId]);
+        $pdo->commit();
+    } catch (Exception $e) {
+        $pdo->rollBack();
+    }
+    return true;
+}
+
 $pdo = getDB();
 
 // Resolve seat + initial session row
@@ -91,19 +132,12 @@ if ($isHost) {
     $initialEvents = json_decode($row['remote_events'] ?? '[]', true);
     if (!is_array($initialEvents)) $initialEvents = [];
 
+    // Flush anything already queued (host reconnected mid-game). emitAndClearEvents
+    // clears only on confirmed delivery, so a drop here just leaves them for the
+    // next reconnect instead of losing them.
     if (!empty($initialEvents)) {
-        // Atomically clear the queue before pushing so events aren't double-applied
-        $pdo->beginTransaction();
-        try {
-            $pdo->prepare('UPDATE live_game_sessions SET remote_events = NULL WHERE id = ?')
-                ->execute([$sessionId]);
-            $pdo->commit();
-        } catch (Exception $e) {
-            $pdo->rollBack();
-            $initialEvents = []; // safe fallback — don't push if we couldn't clear
-        }
-        if (!empty($initialEvents)) {
-            sseEmit(['type' => 'events', 'events' => $initialEvents]);
+        if (!emitAndClearEvents($pdo, $sessionId, $initialEvents)) {
+            exit; // connection dropped; events stay queued for redelivery
         }
     }
 
@@ -121,7 +155,9 @@ if ($isHost) {
 
         if (connection_aborted()) break;
 
-        // Atomically read + clear remote_events if any exist
+        // Read the queue under a short lock, then release it BEFORE emitting so
+        // the network write never blocks concurrent phone appends.
+        $events = [];
         $pdo->beginTransaction();
         try {
             $check = $pdo->prepare("
@@ -142,17 +178,15 @@ if ($isHost) {
 
             $events = json_decode($current['remote_events'] ?? '[]', true);
             if (!is_array($events)) $events = [];
-
-            if (!empty($events)) {
-                $pdo->prepare('UPDATE live_game_sessions SET remote_events = NULL WHERE id = ?')
-                    ->execute([$sessionId]);
-                $pdo->commit();
-                sseEmit(['type' => 'events', 'events' => $events]);
-            } else {
-                $pdo->rollBack();
-            }
+            $pdo->commit();
         } catch (Exception $e) {
             $pdo->rollBack();
+            continue;
+        }
+
+        // Emit + clear-on-delivery outside the read lock.
+        if (!empty($events)) {
+            if (!emitAndClearEvents($pdo, $sessionId, $events)) break;
         }
     }
 
