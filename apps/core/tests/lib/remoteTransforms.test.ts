@@ -401,6 +401,79 @@ describe('applyCommanderDamageChange', () => {
   });
 });
 
+// ─── cross-cause elimination undo ──────────────────────────────────────────────
+// Undoing one elimination cause must not revive a player still dead by another.
+
+describe('cross-cause elimination undo', () => {
+  const others = () => [
+    makePlayer({ position: 'left', playerName: 'Bob', playerId: 'player-bob' }),
+    makePlayer({ position: 'top', playerName: 'Carol', playerId: 'player-carol' }),
+    makePlayer({ position: 'right', playerName: 'Dave', playerId: 'player-dave' }),
+  ];
+  const zeroDmg = (): GameManagerState['commanderDamage'] => ({
+    0: { 1: [0, 0], 2: [0, 0], 3: [0, 0] },
+    1: { 0: [0, 0], 2: [0, 0], 3: [0, 0] },
+    2: { 0: [0, 0], 1: [0, 0], 3: [0, 0] },
+    3: { 0: [0, 0], 1: [0, 0], 2: [0, 0] },
+  });
+
+  it('applyLifeChange does not revive a player still on 21 commander damage', () => {
+    const cd = zeroDmg();
+    cd[0][1] = [21, 0];
+    const state = makeState({
+      players: [makePlayer({ life: 0, isEliminated: true, eliminatedTurn: 2 }), ...others()],
+      commanderDamage: cd,
+    });
+    const result = applyLifeChange(state, 0, 5);
+    expect(result.players[0].life).toBe(5);
+    expect(result.players[0].isEliminated).toBe(true);
+  });
+
+  it('applyPoisonChange does not revive a player still at 0 life', () => {
+    const state = makeState({
+      players: [
+        makePlayer({ life: 0, poison: 10, isEliminated: true, eliminatedTurn: 2 }),
+        ...others(),
+      ],
+    });
+    const result = applyPoisonChange(state, 0, -1);
+    expect(result.players[0].poison).toBe(9);
+    expect(result.players[0].isEliminated).toBe(true);
+  });
+
+  it('applyCommanderDamageChange does not revive while another commander still deals 21', () => {
+    const cd = zeroDmg();
+    cd[0][1] = [21, 0];
+    cd[0][2] = [21, 0];
+    const state = makeState({
+      players: [makePlayer({ life: 30, isEliminated: true, eliminatedTurn: 2 }), ...others()],
+      commanderDamage: cd,
+    });
+    const result = applyCommanderDamageChange(state, 0, 1, false, -1);
+    expect(result.commanderDamage[0][1]).toEqual([20, 0]);
+    expect(result.players[0].isEliminated).toBe(true);
+  });
+
+  it('revives when undoing the last remaining cause', () => {
+    const state = makeState({
+      players: [makePlayer({ life: 0, isEliminated: true, eliminatedTurn: 2 }), ...others()],
+    });
+    const result = applyLifeChange(state, 0, 5);
+    expect(result.players[0].isEliminated).toBe(false);
+  });
+
+  it('does not revive a conceded player when a stat is undone', () => {
+    const state = makeState({
+      players: [
+        makePlayer({ life: 0, isConceded: true, isEliminated: true, eliminatedTurn: 2 }),
+        ...others(),
+      ],
+    });
+    const result = applyLifeChange(state, 0, 5);
+    expect(result.players[0].isEliminated).toBe(true);
+  });
+});
+
 // ─── applyPassTurn ────────────────────────────────────────────────────────────
 
 describe('applyPassTurn', () => {
