@@ -163,7 +163,11 @@ function RemotePageInner() {
         lastSuccessfulPollRef.current = Date.now();
         pollFailCountRef.current = 0;
         inactiveCountRef.current = 0;
-        if (showReconnect) setShowReconnect(false);
+        // Functional form: the effect closes over showReconnect at setup (deps
+        // [phase, code, seat]), so reading it directly is stale and the banner
+        // never cleared after a recovery. Returning the same value when already
+        // false lets React bail out without an extra render.
+        setShowReconnect((prev) => (prev ? false : prev));
         // Skip applying server state during the grace period — optimistic
         // update is ahead of the DB until the host processes our last event.
         if (Date.now() - lastEventTimeRef.current < POST_EVENT_GRACE_MS) return;
