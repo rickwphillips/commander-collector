@@ -48,3 +48,8 @@ services/
 
 # deploy script — local-only symlink to the private deploy-scripts dir (infra blueprint)
 deploy.sh
+
+# Stray local artifacts (not part of the app): an accidental mcp sqlite copy and
+# a literal "~" dir created by a tool that didn't expand the home path.
+data/
+/~/
