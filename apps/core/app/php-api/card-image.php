@@ -79,6 +79,13 @@ $imageUrl = $url ?: ($row['image_uri'] ?? '');
 if (!$imageUrl) {
     sendError('No image URL available for this card', 404);
 }
+// Only ever proxy Scryfall's image CDN. The ?url= param is client-supplied, so
+// without this the endpoint would fetch arbitrary URLs and return the body
+// base64-encoded (SSRF). Legitimate callers always pass the card's own
+// cards.scryfall.io image_uri; same host allow-list the art-crop path uses.
+if (parse_url($imageUrl, PHP_URL_HOST) !== 'cards.scryfall.io') {
+    sendError('Unsupported image host', 400);
+}
 
 // Download the image
 $ch = curl_init($imageUrl);
