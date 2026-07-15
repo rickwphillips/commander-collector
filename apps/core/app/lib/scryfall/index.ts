@@ -9,6 +9,11 @@ export type {
   ScryfallCachedCard,
   ScryfallSearchOptions,
   ScryfallSearchResult,
+  CommanderSearchResult,
+  ScryfallSearchOpts,
+  QueryNamesFilter,
+  QueryNamesResult,
+  ScryfallCardDetail,
 } from './client';
 
 export {
@@ -17,4 +22,9 @@ export {
   bulkLookupByName,
   getPrints,
   search,
+  autocomplete,
+  commanderSearch,
+  partnerSearch,
+  queryNames,
+  getCardDetail,
 } from './client';

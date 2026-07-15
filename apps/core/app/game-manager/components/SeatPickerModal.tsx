@@ -28,7 +28,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import StyleIcon from '@mui/icons-material/Style';
 import { BracketChip } from '@/components/BracketChip';
-import { scryfallAutocomplete, scryfallGetCard, getCardArtCrop } from '@/lib/scryfall';
+import { autocomplete, getCardDetail } from '@/lib/scryfall';
 import type { Player, DeckWithPlayer } from '@/lib/types';
 import type { CommanderInfo, PlayerSetup } from '../types';
 
@@ -89,8 +89,8 @@ export function SeatPickerModal({
   }, [open, initial]);
 
   async function fetchArt(field: 'commander' | 'partner', name: string) {
-    const card = await scryfallGetCard(name);
-    const artCropUrl = card ? (getCardArtCrop(card) ?? undefined) : undefined;
+    const card = await getCardDetail(name);
+    const artCropUrl = card?.art_crop ?? undefined;
     if (field === 'commander') setCommander((s) => ({ ...s, artCropUrl }));
     else setPartner((s) => ({ ...s, artCropUrl }));
   }
@@ -104,7 +104,7 @@ export function SeatPickerModal({
       if (value.length < 2) return;
       if (field === 'commander') setCommander((s) => ({ ...s, loading: true }));
       else setPartner((s) => ({ ...s, loading: true }));
-      const options = await scryfallAutocomplete(value);
+      const options = await autocomplete(value);
       if (field === 'commander') setCommander((s) => ({ ...s, options, loading: false }));
       else setPartner((s) => ({ ...s, options, loading: false }));
     }, 300);

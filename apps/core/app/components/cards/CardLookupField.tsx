@@ -6,10 +6,13 @@
  * Every card-name field in the app should use this component.
  *
  * Dual-mode (auto-detected from input content):
- *   Autocomplete mode — prefix match via Scryfall /cards/autocomplete, results
- *     resolved through the PHP cache layer (api.bulkLookupCards).
- *   Query mode — full Scryfall syntax (/cards/search), results resolved through
- *     the PHP cache layer. Activated when input contains: * : = < > ( " or starts with ! or -
+ *   Autocomplete mode — prefix name match, then resolved through the PHP cache
+ *     layer (api.bulkLookupCards).
+ *   Query mode — full Scryfall syntax, resolved through the PHP cache layer.
+ *     Activated when input contains: * : = < > ( " or starts with ! or -
+ *
+ * Name discovery (autocomplete + query) routes through the unified Scryfall
+ * client (@/lib/scryfall), which proxies Scryfall via php-api/scryfall-cache.php.
  *
  * All card data returned via onAdd is built through cardFromScryfall, ensuring
  * a canonical Card shape with correct boolean flags and a fresh tempId.
@@ -42,6 +45,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import { ManaCost } from '@/components/ManaCost';
 import { CardLookupTips } from '@/components/cards/CardLookupTips';
 import { api } from '@/lib/api';
+import { autocomplete, queryNames } from '@/lib/scryfall';
 import { cardFromScryfall } from '@/lib/cards/fromScryfall';
 import type { Card } from '@/lib/cards/types';
 import type { ScryfallCachedCard } from '@/lib/types';
@@ -113,75 +117,6 @@ interface ResolvedResult {
   /** The name we searched for (may differ from cachedCard.name on fuzzy match) */
   searchedName: string;
   qty: number;
-}
-
-// ── Scryfall fetch helpers (names only — data resolved via PHP cache) ──────────
-
-/** Scryfall autocomplete: returns up to 20 name suggestions for a prefix.
- *  Dedupes Scryfall's "X // X" merged-face aliases (which the cache layer doesn't resolve)
- *  and any case-insensitive duplicates. */
-async function fetchAutocompleteName(query: string): Promise<string[]> {
-  if (query.length < 2) return [];
-  try {
-    const url = `https://api.scryfall.com/cards/autocomplete?q=${encodeURIComponent(query)}&include_extras=false`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = (await res.json()) as { data: string[] };
-    const raw = data.data ?? [];
-    const seen = new Set<string>();
-    const cleaned: string[] = [];
-    for (const name of raw) {
-      // Drop "X // X" merged-face aliases — they refer to the same single-face card.
-      const halves = name.split(' // ');
-      if (halves.length === 2 && halves[0].trim().toLowerCase() === halves[1].trim().toLowerCase()) {
-        continue;
-      }
-      const key = name.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      cleaned.push(name);
-    }
-    return cleaned;
-  } catch {
-    return [];
-  }
-}
-
-/** Scryfall full-syntax search: returns card names matching the query. */
-async function fetchQueryNames(
-  query: string,
-  page: number,
-  filter: ResultFilter | undefined
-): Promise<{ names: string[]; hasMore: boolean }> {
-  try {
-    let q = query;
-
-    // Append resultFilter as Scryfall query terms (only when not already specified).
-    // legendaryCreaturesOnly = "valid commander" filter.
-    // A legal commander is a legendary permanent with power/toughness — Scryfall
-    // encodes this rule via `is:commander`. See memory/feedback_commander_legality.md.
-    if (filter?.legendaryCreaturesOnly && !q.includes('is:commander')) {
-      q += ' is:commander';
-    }
-    if (filter?.partnerOnly && !q.includes('kw:partner')) {
-      q += ' kw:partner';
-    }
-    if (filter?.colorIdentity?.length && !q.includes('id:')) {
-      q += ` id<=${filter.colorIdentity.join('')}`;
-    }
-
-    const url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(q)}&unique=names&order=name&page=${page}`;
-    const res = await fetch(url);
-    if (res.status === 404) return { names: [], hasMore: false };
-    if (!res.ok) return { names: [], hasMore: false };
-    const data = (await res.json()) as { data: { name: string }[]; has_more: boolean };
-    return {
-      names: (data.data ?? []).map((c) => c.name),
-      hasMore: data.has_more ?? false,
-    };
-  } catch {
-    return { names: [], hasMore: false };
-  }
 }
 
 // ── Post-fetch client-side filters ────────────────────────────────────────────
@@ -271,7 +206,8 @@ export function CardLookupField({
   const runSearch = useCallback(
     async (query: string, pageNum: number) => {
       if (abortRef.current) abortRef.current.abort();
-      abortRef.current = new AbortController();
+      const controller = new AbortController();
+      abortRef.current = controller;
 
       setLoading(true);
       setFocusIdx(-1);
@@ -299,11 +235,22 @@ export function CardLookupField({
           const q = filterForcesQuery && !isQueryMode(query)
             ? `name:"${query.replace(/"/g, '')}"`
             : query;
-          const res  = await fetchQueryNames(q, pageNum, resultFilter);
+          const res = await queryNames(
+            q,
+            pageNum,
+            {
+              commander: resultFilter?.legendaryCreaturesOnly,
+              partner: resultFilter?.partnerOnly,
+              identity: resultFilter?.colorIdentity?.length
+                ? resultFilter.colorIdentity.join('')
+                : undefined,
+            },
+            { signal: controller.signal }
+          );
           names      = res.names;
           more       = res.hasMore;
         } else {
-          const raw  = await fetchAutocompleteName(query);
+          const raw  = await autocomplete(query, { signal: controller.signal });
           names      = raw.slice(0, 20);
           more       = false;
         }

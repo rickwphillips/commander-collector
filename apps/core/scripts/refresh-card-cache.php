@@ -22,6 +22,7 @@ $scriptDir  = __DIR__;
 $projectRoot = dirname($scriptDir); // apps/core/
 
 require_once $projectRoot . '/app/php-api/config.php';
+require_once $projectRoot . '/app/php-api/lib/scryfall-helpers.php';
 
 // config.php is designed for HTTP requests; suppress any header/CORS side-effects
 // when running under CLI (headers are no-ops in CLI anyway, but be explicit).
@@ -88,48 +89,21 @@ foreach ($rows as $i => $row) {
 
     // ── Fetch from Scryfall ───────────────────────────────────────────────────
 
-    $url = 'https://api.scryfall.com/cards/' . urlencode($row['scryfall_id']);
-
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 15,
-        CURLOPT_HTTPHEADER     => ['User-Agent: CommanderCollector/1.31.0'],
-    ]);
-    $raw  = curl_exec($ch);
-    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlError = curl_error($ch);
+    [$code, $card, $fetchError] = scryfallGet(
+        SCRYFALL_API_BASE . '/cards/' . urlencode($row['scryfall_id'])
+    );
 
     // ── Handle errors ─────────────────────────────────────────────────────────
 
-    if ($curlError) {
-        fwrite(STDERR, "[{$position}/{$total}] cURL error for '{$row['name']}' ({$row['scryfall_id']}): {$curlError}\n");
-        $errors++;
-        usleep(75000);
-        continue;
-    }
-
     if ($code === 404) {
-        // Card removed or UUID changed on Scryfall (reprints, errata, etc.)
-        fwrite(STDERR, "[{$position}/{$total}] 404 Not Found for '{$row['name']}' ({$row['scryfall_id']}) — card may have been removed or UUID rotated on Scryfall.\n");
+        fwrite(STDERR, "[{$position}/{$total}] 404 Not Found for '{$row['name']}' ({$row['scryfall_id']}): card may have been removed or UUID rotated on Scryfall.\n");
         $errors++;
         usleep(75000);
         continue;
     }
 
-    if ($code !== 200) {
-        fwrite(STDERR, "[{$position}/{$total}] HTTP {$code} for '{$row['name']}' ({$row['scryfall_id']})\n");
-        $errors++;
-        usleep(75000);
-        continue;
-    }
-
-    // ── Parse response ────────────────────────────────────────────────────────
-
-    $card = json_decode($raw, true);
-
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        fwrite(STDERR, "[{$position}/{$total}] JSON parse error for '{$row['name']}': " . json_last_error_msg() . "\n");
+    if ($card === null) {
+        fwrite(STDERR, "[{$position}/{$total}] Fetch failed for '{$row['name']}' ({$row['scryfall_id']}): " . ($fetchError ?: "HTTP {$code}") . "\n");
         $errors++;
         usleep(75000);
         continue;

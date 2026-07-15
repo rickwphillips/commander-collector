@@ -1,56 +1,11 @@
 <?php
 require_once 'config.php';
 require_once 'auth/middleware.php';
+require_once 'lib/scryfall-helpers.php';
 // JWT (host board) or a valid live-game session code (unauthenticated remote).
 requireAuthOrSessionCode();
 
 $method = $_SERVER['REQUEST_METHOD'];
-
-// ── Helper: fetch one card from Scryfall by fuzzy name via cURL ──────────────
-function scryfallFetch(string $name): ?array {
-    $url = 'https://api.scryfall.com/cards/named?fuzzy=' . urlencode($name);
-
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 15,
-        CURLOPT_HTTPHEADER     => ['User-Agent: CommanderCollector/1.31.0'],
-    ]);
-    $raw  = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    // curl_close deprecated & no-op in PHP 8+
-
-    if (!$raw || $code !== 200) {
-        return null;
-    }
-
-    $card = json_decode($raw, true);
-    return isset($card['id']) ? $card : null;
-}
-
-// ── Helper: normalise a Scryfall card array into our cache row ────────────────
-function normaliseCard(array $card): array {
-    $imageUri = $card['image_uris']['normal']
-        ?? $card['card_faces'][0]['image_uris']['normal']
-        ?? null;
-
-    // Double-faced cards: grab the back face image
-    $backImageUri = null;
-    if (isset($card['card_faces'][1]['image_uris']['normal'])) {
-        $backImageUri = $card['card_faces'][1]['image_uris']['normal'];
-    }
-
-    return [
-        'scryfall_id'    => $card['id'],
-        'name'           => $card['name'],
-        'image_uri'      => $imageUri,
-        'back_image_uri' => $backImageUri,
-        'colors'         => implode('', $card['colors'] ?? []),
-        'color_identity' => implode('', $card['color_identity'] ?? []),
-        'type_line'      => $card['type_line'] ?? null,
-        'mana_cost'      => $card['mana_cost'] ?? null,
-    ];
-}
 
 // ── Helper: insert/update one row in the cache ────────────────────────────────
 function cacheCard(PDO $db, array $row): void {
@@ -82,6 +37,109 @@ function cacheCard(PDO $db, array $row): void {
     ]);
 }
 
+// ── Helper: build the commander/partner typeahead query ───────────────────────
+// The query syntax lives here on the server, so the browser never constructs
+// Scryfall search strings directly.
+function buildSearchQuery(string $mode, string $q, bool $backgroundEligible): ?string {
+    switch ($mode) {
+        case 'commander':
+            return "name:{$q} (t:legendary pow>=0 OR o:\"can be your commander\")";
+        case 'partner':
+            $bgClause = $backgroundEligible ? ' OR t:background' : '';
+            return "name:{$q} (t:legendary (kw:partner OR kw:friends-forever OR kw:doctor's-companion) OR o:\"can be your commander\"{$bgClause})";
+        default:
+            return null;
+    }
+}
+
+// ── GET ?action=search — Scryfall passthrough (autocomplete/commander/partner/query)
+if ($method === 'GET' && ($_GET['action'] ?? '') === 'search') {
+    $mode = trim($_GET['mode'] ?? 'autocomplete');
+    $q    = trim($_GET['q'] ?? '');
+
+    if (strlen($q) < 2) {
+        if ($mode === 'query') sendJSON(['names' => [], 'hasMore' => false]);
+        sendJSON($mode === 'autocomplete' ? ['names' => []] : ['results' => []]);
+    }
+
+    // Prefix autocomplete via Scryfall's /cards/autocomplete. Drops "X // X"
+    // merged-face aliases and case-insensitive duplicates.
+    if ($mode === 'autocomplete') {
+        $seen = [];
+        $out  = [];
+        foreach (scryfallAutocompleteNames($q) as $name) {
+            $halves = explode(' // ', $name);
+            if (count($halves) === 2 && strtolower(trim($halves[0])) === strtolower(trim($halves[1]))) {
+                continue;
+            }
+            $key = strtolower($name);
+            if (isset($seen[$key])) continue;
+            $seen[$key] = true;
+            $out[] = $name;
+        }
+        sendJSON(['names' => $out]);
+    }
+
+    // Full Scryfall-syntax search with pagination. Optional result filters are
+    // appended here so the browser never assembles Scryfall filter terms.
+    if ($mode === 'query') {
+        $page  = max(1, (int) ($_GET['page'] ?? 1));
+        $query = $q;
+        if (($_GET['commander'] ?? '') === '1' && strpos($query, 'is:commander') === false) {
+            $query .= ' is:commander';
+        }
+        if (($_GET['partner'] ?? '') === '1' && strpos($query, 'kw:partner') === false) {
+            $query .= ' kw:partner';
+        }
+        $identity = trim($_GET['identity'] ?? '');
+        if ($identity !== '' && strpos($query, 'id:') === false && strpos($query, 'id<=') === false) {
+            $query .= ' id<=' . $identity;
+        }
+
+        $data = scryfallSearch($query, ['unique' => 'names', 'order' => 'name', 'page' => $page]);
+        sendJSON([
+            'names'   => array_map(fn($c) => $c['name'], $data['data'] ?? []),
+            'hasMore' => $data['has_more'] ?? false,
+        ]);
+    }
+
+    // Commander / partner typeahead: returns [{name, mana_cost}].
+    $bg    = ($_GET['bg'] ?? '') === '1';
+    $query = buildSearchQuery($mode, $q, $bg);
+    if ($query === null) {
+        sendError("Unknown search mode: {$mode}");
+    }
+
+    $data  = scryfallSearch($query, ['unique' => 'names', 'order' => 'name']);
+    $results = array_map(
+        fn($c) => ['name' => $c['name'], 'mana_cost' => $c['mana_cost'] ?? null],
+        $data['data'] ?? []
+    );
+    sendJSON(['results' => $results]);
+}
+
+// ── GET ?action=card&name= — live card detail (oracle_text + art_crop) ────────
+// Returns fields the cache row does not store. Not persisted.
+if ($method === 'GET' && ($_GET['action'] ?? '') === 'card') {
+    $name = trim($_GET['name'] ?? '');
+    if (!$name) sendError('name parameter is required');
+
+    $card = scryfallFetchNamed($name);
+    if (!$card) sendJSON(null);
+
+    sendJSON([
+        'name'           => $card['name'],
+        'oracle_text'    => $card['oracle_text'] ?? $card['card_faces'][0]['oracle_text'] ?? '',
+        'color_identity' => $card['color_identity'] ?? [],
+        'art_crop'       => $card['image_uris']['art_crop']
+                            ?? $card['card_faces'][0]['image_uris']['art_crop']
+                            ?? null,
+        'image_uri'      => $card['image_uris']['normal']
+                            ?? $card['card_faces'][0]['image_uris']['normal']
+                            ?? null,
+    ]);
+}
+
 // ── GET ?name=<card name> ─────────────────────────────────────────────────────
 if ($method === 'GET') {
     $name = trim($_GET['name'] ?? '');
@@ -101,10 +159,10 @@ if ($method === 'GET') {
         // Fall through to re-fetch from Scryfall
     }
 
-    $card = scryfallFetch($name);
+    $card = scryfallFetchNamed($name);
     if (!$card) sendJSON(null);
 
-    $row = normaliseCard($card);
+    $row = normaliseScryfallCard($card);
     cacheCard($db, $row);
 
     $fetched = $db->prepare('SELECT id, cached_at FROM scryfall_card_cache WHERE scryfall_id = ? LIMIT 1');
@@ -147,52 +205,31 @@ elseif ($method === 'POST') {
         }
     }
 
-    // Batch uncached names using Scryfall /cards/collection (max 75 per request)
-    $chunks = array_chunk($uncached, 75);
-    foreach ($chunks as $chunk) {
-        $identifiers = array_map(fn($n) => ['name' => $n], $chunk);
-        $payload     = json_encode(['identifiers' => $identifiers]);
+    // Batch uncached names through the shared /cards/collection helper.
+    $identifiers = array_map(fn($n) => ['name' => $n], $uncached);
+    [$found, $notFound] = scryfallCollection($identifiers);
 
-        $ch = curl_init('https://api.scryfall.com/cards/collection');
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $payload,
-            CURLOPT_TIMEOUT        => 30,
-            CURLOPT_HTTPHEADER     => [
-                'Content-Type: application/json',
-                'User-Agent: CommanderCollector/1.31.0',
-            ],
-        ]);
-        $raw  = curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    foreach ($found as $card) {
+        $row = normaliseScryfallCard($card);
+        cacheCard($db, $row);
+        $results[$card['name']] = $row;
+    }
 
-        if (!$raw || $code !== 200) {
-            // Fall back to marking all in this chunk as not found
-            foreach ($chunk as $name) {
-                $results[$name] = ['name' => $name, 'error' => 'lookup failed'];
+    // Mark anything Scryfall could not find (skip internal chunk-error markers).
+    foreach ($notFound as $nf) {
+        if (isset($nf['_chunk_error'])) {
+            foreach ($nf['_chunk'] as $ident) {
+                $reqName = $ident['name'] ?? '';
+                if ($reqName && !isset($results[$reqName])) {
+                    $results[$reqName] = ['name' => $reqName, 'error' => 'lookup failed'];
+                }
             }
             continue;
         }
-
-        $data = json_decode($raw, true);
-        foreach ($data['data'] ?? [] as $card) {
-            $row = normaliseCard($card);
-            cacheCard($db, $row);
-            $results[$card['name']] = $row;
-            // Also map the original requested name (fuzzy match may return different canonical name)
+        $reqName = $nf['name'] ?? '';
+        if ($reqName && !isset($results[$reqName])) {
+            $results[$reqName] = ['name' => $reqName, 'error' => 'not found'];
         }
-
-        // Mark anything Scryfall said it couldn't find
-        foreach ($data['not_found'] ?? [] as $nf) {
-            $reqName = $nf['name'] ?? '';
-            if ($reqName && !isset($results[$reqName])) {
-                $results[$reqName] = ['name' => $reqName, 'error' => 'not found'];
-            }
-        }
-
-        // Respect Scryfall rate limit between batch requests
-        if (count($chunks) > 1) usleep(100000);
     }
 
     // Return results in the same order as the input names

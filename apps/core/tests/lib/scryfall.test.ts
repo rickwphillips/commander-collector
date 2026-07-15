@@ -1,134 +1,91 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const apiFetch = vi.fn();
+vi.mock('@/lib/api', () => ({
+  apiFetch: (...args: unknown[]) => apiFetch(...args),
+}));
+
 import {
-  scryfallAutocomplete,
-  scryfallCommanderSearch,
-  scryfallPartnerSearch,
-  scryfallGetCard,
-  getOracleText,
-  getCardArtCrop,
-  type ScryfallCard,
+  autocomplete,
+  commanderSearch,
+  partnerSearch,
+  getCardDetail,
 } from '@/lib/scryfall';
 
-function okJson(body: unknown) {
-  return vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(body) });
-}
+describe('scryfall typeahead search', () => {
+  beforeEach(() => apiFetch.mockReset());
 
-describe('scryfall search helpers', () => {
-  beforeEach(() => vi.clearAllMocks());
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+  it('autocomplete returns [] for short queries without calling the API', async () => {
+    expect(await autocomplete('a')).toEqual([]);
+    expect(apiFetch).not.toHaveBeenCalled();
   });
 
-  it('scryfallAutocomplete returns [] for short queries', async () => {
-    expect(await scryfallAutocomplete('a')).toEqual([]);
+  it('autocomplete returns the names array', async () => {
+    apiFetch.mockResolvedValue({ names: ['Sol Ring', 'Brainstorm'] });
+    expect(await autocomplete('sol')).toEqual(['Sol Ring', 'Brainstorm']);
+    expect(apiFetch.mock.calls[0][0]).toContain('action=search&mode=autocomplete');
   });
 
-  it('scryfallAutocomplete maps result names', async () => {
-    vi.stubGlobal('fetch', okJson({ data: [{ name: 'Sol Ring' }, { name: 'Brainstorm' }] }));
-    expect(await scryfallAutocomplete('sol')).toEqual(['Sol Ring', 'Brainstorm']);
+  it('autocomplete returns [] when the API throws', async () => {
+    apiFetch.mockImplementationOnce(() => { throw new Error('network'); });
+    expect(await autocomplete('sol')).toEqual([]);
   });
 
-  it('scryfallAutocomplete returns [] on non-ok response', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
-    expect(await scryfallAutocomplete('sol')).toEqual([]);
+  it('commanderSearch returns [] for short queries', async () => {
+    expect(await commanderSearch('a')).toEqual([]);
+    expect(apiFetch).not.toHaveBeenCalled();
   });
 
-  it('scryfallAutocomplete returns [] when fetch throws', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')));
-    expect(await scryfallAutocomplete('sol')).toEqual([]);
-  });
-
-  it('scryfallAutocomplete returns [] when the payload has no data array', async () => {
-    vi.stubGlobal('fetch', okJson({}));
-    expect(await scryfallAutocomplete('sol')).toEqual([]);
-  });
-
-  it('scryfallCommanderSearch returns [] when the payload has no data array', async () => {
-    vi.stubGlobal('fetch', okJson({}));
-    expect(await scryfallCommanderSearch('atr')).toEqual([]);
-  });
-
-  it('scryfallPartnerSearch returns [] on a non-ok response', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
-    expect(await scryfallPartnerSearch('face', true)).toEqual([]);
-  });
-
-  it('scryfallCommanderSearch maps name and mana_cost', async () => {
-    vi.stubGlobal('fetch', okJson({ data: [{ name: 'Atraxa', mana_cost: '{G}{W}{U}{B}' }] }));
-    expect(await scryfallCommanderSearch('atr')).toEqual([
+  it('commanderSearch returns the results array and hits the commander mode', async () => {
+    apiFetch.mockResolvedValue({ results: [{ name: 'Atraxa', mana_cost: '{G}{W}{U}{B}' }] });
+    expect(await commanderSearch('atr')).toEqual([
       { name: 'Atraxa', mana_cost: '{G}{W}{U}{B}' },
     ]);
+    expect(apiFetch.mock.calls[0][0]).toContain('mode=commander');
   });
 
-  it('scryfallCommanderSearch short-circuits and handles errors', async () => {
-    expect(await scryfallCommanderSearch('a')).toEqual([]);
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
-    expect(await scryfallCommanderSearch('atr')).toEqual([]);
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')));
-    expect(await scryfallCommanderSearch('atr')).toEqual([]);
+  it('commanderSearch returns [] when the API throws', async () => {
+    apiFetch.mockImplementationOnce(() => { throw new Error('x'); });
+    expect(await commanderSearch('atr')).toEqual([]);
   });
 
-  it('scryfallPartnerSearch adds the background clause when eligible', async () => {
-    const fetchMock = okJson({ data: [{ name: 'Faceless One' }] });
-    vi.stubGlobal('fetch', fetchMock);
-    await scryfallPartnerSearch('face', true);
-    expect(decodeURIComponent(fetchMock.mock.calls[0][0])).toContain('t:background');
+  it('partnerSearch adds bg=1 when eligible, omits it otherwise', async () => {
+    apiFetch.mockResolvedValue({ results: [] });
+    await partnerSearch('face', true);
+    expect(apiFetch.mock.calls[0][0]).toContain('bg=1');
+
+    apiFetch.mockReset();
+    apiFetch.mockResolvedValue({ results: [] });
+    await partnerSearch('face', false);
+    expect(apiFetch.mock.calls[0][0]).not.toContain('bg=1');
   });
 
-  it('scryfallPartnerSearch omits the background clause when not eligible', async () => {
-    const fetchMock = okJson({ data: [] });
-    vi.stubGlobal('fetch', fetchMock);
-    await scryfallPartnerSearch('face', false);
-    expect(decodeURIComponent(fetchMock.mock.calls[0][0])).not.toContain('t:background');
-  });
-
-  it('scryfallPartnerSearch short-circuits and handles errors', async () => {
-    expect(await scryfallPartnerSearch('a', true)).toEqual([]);
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('x')));
-    expect(await scryfallPartnerSearch('face', true)).toEqual([]);
-  });
-
-  it('scryfallGetCard returns the card, or null on failure', async () => {
-    vi.stubGlobal('fetch', okJson({ id: '1', name: 'Sol Ring' }));
-    expect((await scryfallGetCard('Sol Ring'))?.name).toBe('Sol Ring');
-
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
-    expect(await scryfallGetCard('Nope')).toBeNull();
-
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('x')));
-    expect(await scryfallGetCard('Nope')).toBeNull();
+  it('partnerSearch returns [] for short queries and on error', async () => {
+    expect(await partnerSearch('a', true)).toEqual([]);
+    apiFetch.mockImplementationOnce(() => { throw new Error('x'); });
+    expect(await partnerSearch('face', true)).toEqual([]);
   });
 });
 
-describe('scryfall card accessors', () => {
-  it('getOracleText prefers top-level, then the first face', () => {
-    expect(getOracleText({ id: '1', name: 'A', oracle_text: 'top' })).toBe('top');
-    expect(
-      getOracleText({
-        id: '1',
-        name: 'A',
-        card_faces: [{ name: 'front', oracle_text: 'face' }],
-      } as ScryfallCard)
-    ).toBe('face');
-    expect(getOracleText({ id: '1', name: 'A' })).toBe('');
+describe('scryfall card detail', () => {
+  beforeEach(() => apiFetch.mockReset());
+
+  it('getCardDetail returns the detail and hits the card action', async () => {
+    apiFetch.mockResolvedValue({
+      name: 'Sol Ring',
+      oracle_text: '{T}: Add {C}{C}.',
+      color_identity: [],
+      art_crop: 'https://img/art',
+      image_uri: 'https://img/normal',
+    });
+    const card = await getCardDetail('Sol Ring');
+    expect(card?.name).toBe('Sol Ring');
+    expect(card?.art_crop).toBe('https://img/art');
+    expect(apiFetch.mock.calls[0][0]).toContain('action=card');
   });
 
-  it('getCardArtCrop prefers top-level, then first face, else null', () => {
-    expect(
-      getCardArtCrop({
-        id: '1',
-        name: 'A',
-        image_uris: { art_crop: 'top', normal: '', small: '' },
-      })
-    ).toBe('top');
-    expect(
-      getCardArtCrop({
-        id: '1',
-        name: 'A',
-        card_faces: [{ name: 'f', image_uris: { art_crop: 'face', normal: '', small: '' } }],
-      } as ScryfallCard)
-    ).toBe('face');
-    expect(getCardArtCrop({ id: '1', name: 'A' })).toBeNull();
+  it('getCardDetail returns null when the API throws', async () => {
+    apiFetch.mockImplementationOnce(() => { throw new Error('x'); });
+    expect(await getCardDetail('Nope')).toBeNull();
   });
 });

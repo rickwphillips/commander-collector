@@ -36,7 +36,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { EmptyState } from '@/components/EmptyState';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import { api } from '@/lib/api';
-import { scryfallCommanderSearch, scryfallPartnerSearch, scryfallGetCard, getOracleText, type ScryfallSearchResult } from '@/lib/scryfall';
+import { commanderSearch, partnerSearch, getCardDetail, type CommanderSearchResult } from '@/lib/scryfall';
 import { ManaCost } from '@/components/ManaCost';
 import { getOrdinalSuffix, MTG_COLORS_WITH_C } from '@/lib/utils';
 import type { DeckDetail as DeckDetailType, GameWithResults, Card as DeckCardEntry } from '@/lib/types';
@@ -58,10 +58,10 @@ export default function DeckDetailPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editCommander, setEditCommander] = useState('');
-  const [editCmdrOptions, setEditCmdrOptions] = useState<ScryfallSearchResult[]>([]);
+  const [editCmdrOptions, setEditCmdrOptions] = useState<CommanderSearchResult[]>([]);
   const [editHasPartner, setEditHasPartner] = useState(false);
   const [editPartner, setEditPartner] = useState('');
-  const [editPartnerOptions, setEditPartnerOptions] = useState<ScryfallSearchResult[]>([]);
+  const [editPartnerOptions, setEditPartnerOptions] = useState<CommanderSearchResult[]>([]);
   const [editBgEligible, setEditBgEligible] = useState(false);
   const [editColors, setEditColors] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -127,8 +127,8 @@ export default function DeckDetailPage() {
     setEditDialogOpen(true);
     // Check background eligibility for current commander
     if (deck?.commander) {
-      scryfallGetCard(deck.commander).then((card) => {
-        if (card) setEditBgEligible(getOracleText(card).includes('Choose a Background'));
+      getCardDetail(deck.commander).then((card) => {
+        if (card) setEditBgEligible(card.oracle_text.includes('Choose a Background'));
       });
     }
   };
@@ -404,7 +404,7 @@ export default function DeckDetailPage() {
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
             />
-            <Autocomplete<ScryfallSearchResult, false, false, true>
+            <Autocomplete<CommanderSearchResult, false, false, true>
               freeSolo
               options={editCmdrOptions}
               inputValue={editCommander}
@@ -413,18 +413,18 @@ export default function DeckDetailPage() {
                 if (editCmdrDebounce.current) clearTimeout(editCmdrDebounce.current);
                 if (value.length < 2) { setEditCmdrOptions([]); return; }
                 editCmdrDebounce.current = setTimeout(async () => {
-                  setEditCmdrOptions((await scryfallCommanderSearch(value)).slice(0, 8));
+                  setEditCmdrOptions((await commanderSearch(value)).slice(0, 8));
                 }, 300);
               }}
               onChange={async (_, value) => {
                 const name = typeof value === 'string' ? value : value?.name;
                 if (!name) return;
                 setEditCommander(name);
-                const card = await scryfallGetCard(name);
+                const card = await getCardDetail(name);
                 if (card) {
                   const ci = card.color_identity ?? [];
                   setEditColors(ci.length > 0 ? ci : ['C']);
-                  setEditBgEligible(getOracleText(card).includes('Choose a Background'));
+                  setEditBgEligible(card.oracle_text.includes('Choose a Background'));
                 }
               }}
               getOptionLabel={(opt) => typeof opt === 'string' ? opt : opt.name}
@@ -455,7 +455,7 @@ export default function DeckDetailPage() {
               label="Partner Commander?"
             />
             {editHasPartner && (
-              <Autocomplete<ScryfallSearchResult, false, false, true>
+              <Autocomplete<CommanderSearchResult, false, false, true>
                 freeSolo
                 options={editPartnerOptions}
                 inputValue={editPartner}
@@ -464,7 +464,7 @@ export default function DeckDetailPage() {
                   if (editPartnerDebounce.current) clearTimeout(editPartnerDebounce.current);
                   if (value.length < 2) { setEditPartnerOptions([]); return; }
                   editPartnerDebounce.current = setTimeout(async () => {
-                    setEditPartnerOptions((await scryfallPartnerSearch(value, editBgEligible)).slice(0, 8));
+                    setEditPartnerOptions((await partnerSearch(value, editBgEligible)).slice(0, 8));
                   }, 300);
                 }}
                 onChange={(_, value) => {

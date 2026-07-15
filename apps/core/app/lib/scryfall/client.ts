@@ -4,11 +4,11 @@
  * DO NOT call api.scryfall.com directly from the browser. All methods here go through
  * php-api/scryfall-cache.php or php-api/card-prints.php.
  *
- * Cache layer gap notes (see individual methods for details):
- *  - lookupById: scryfall-cache.php has no ?id= param. Surfaces as thrown error.
- *  - search:     scryfall-cache.php has no search action. Surfaces as thrown error.
- *  - getPrints:  card-prints.php accepts ?name= not ?oracle_id=. Method signature
- *                uses cardName for this reason (see JSDoc).
+ * Name-level search (autocomplete, commander/partner typeahead, full-syntax query)
+ * routes through scryfall-cache.php?action=search. Two methods remain unimplemented
+ * stubs with no caller: lookupById (no ?id= branch) and the full-card search (use
+ * queryNames instead). getPrints takes a card name, since card-prints.php keys on
+ * ?name= not ?oracle_id=.
  */
 
 import { apiFetch } from '@/lib/api';
@@ -58,26 +58,14 @@ export async function lookupByName(name: string): Promise<ScryfallCachedCard | n
 
 /**
  * Look up a card by its Scryfall UUID.
+ * Not implemented: the cache is keyed by name, and scryfall-cache.php has no ?id=
+ * branch. No caller needs id lookup today.
  *
- * NOTE: php-api/scryfall-cache.php does NOT currently support a ?id= query parameter.
- * The cache is keyed by card name, not scryfall_id. This method is not implementable
- * without a cache layer change.
- *
- * Phase 6 should add ?id=<scryfall_id> support to scryfall-cache.php, querying
- * `SELECT * FROM scryfall_card_cache WHERE scryfall_id = ?` and fetching from Scryfall
- * via `https://api.scryfall.com/cards/<id>` on cache miss.
- *
- * @throws Always — not yet implemented.
+ * @throws Always — not implemented.
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function lookupById(_scryfallId: string): Promise<ScryfallCachedCard | null> {
-  // TODO: php-api/scryfall-cache.php does not support ?id= lookup.
-  // Add a GET ?id=<scryfall_id> branch to the cache layer, then implement here as:
-  //   return apiFetch<ScryfallCachedCard | null>(`scryfall-cache?id=${encodeURIComponent(_scryfallId)}`);
-  throw new Error(
-    'scryfall.lookupById is not yet implemented — scryfall-cache.php has no ?id= branch. ' +
-    'See Phase 6 for the cache layer addition.'
-  );
+  throw new Error('scryfall.lookupById is not implemented; scryfall-cache.php has no ?id= branch.');
 }
 
 /**
@@ -123,16 +111,11 @@ export async function getPrints(cardName: string): Promise<CardPrint[]> {
 }
 
 /**
- * Search by Scryfall syntax.
+ * Full-card Scryfall search with pagination (resolves whole cards, not just names).
+ * Not implemented: no caller needs it. For name-level search use `queryNames`, which
+ * powers CardLookupField's query mode through scryfall-cache.php.
  *
- * NOTE: php-api/scryfall-cache.php does not support a search action. CardLookupField
- * currently bypasses this client and calls api.scryfall.com/cards/search directly.
- *
- * Phase 6 should add ?action=search&q=<query> support to scryfall-cache.php, proxying
- * Scryfall's /cards/search endpoint with optional server-side result caching, then
- * implement this method.
- *
- * @throws Always — not yet implemented.
+ * @throws Always — not implemented.
  */
 export async function search(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -140,11 +123,150 @@ export async function search(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _opts?: ScryfallSearchOptions
 ): Promise<ScryfallSearchResult> {
-  // TODO: php-api/scryfall-cache.php does not yet support a search action.
-  // CardLookupField currently bypasses this client and calls api.scryfall.com directly.
-  // Phase 6 should add a search action to scryfall-cache.php and migrate callers.
-  throw new Error(
-    'scryfall.search is not yet implemented — use the cache layer search action when it exists. ' +
-    'CardLookupField is a known caller that must be migrated in Phase 6.'
-  );
+  throw new Error('scryfall.search is not implemented; use queryNames for name-level search.');
+}
+
+// ── Typeahead search (commander / partner / autocomplete) ───────────────────────
+
+export interface CommanderSearchResult {
+  name: string;
+  mana_cost?: string | null;
+}
+
+export interface ScryfallSearchOpts {
+  signal?: AbortSignal;
+}
+
+// Aborted requests must propagate so a caller can distinguish a superseded
+// search from a genuine empty result; all other failures degrade to empty.
+function rethrowAbort(err: unknown): void {
+  if (err instanceof DOMException && err.name === 'AbortError') throw err;
+}
+
+/**
+ * Card name prefix autocomplete.
+ * Routes through: GET scryfall-cache.php?action=search&mode=autocomplete&q=<query>
+ * Returns [] for queries under 2 chars or on any non-abort error.
+ */
+export async function autocomplete(query: string, opts?: ScryfallSearchOpts): Promise<string[]> {
+  if (query.length < 2) return [];
+  try {
+    const res = await apiFetch<{ names: string[] }>(
+      `scryfall-cache?action=search&mode=autocomplete&q=${encodeURIComponent(query)}`,
+      { signal: opts?.signal }
+    );
+    return res.names ?? [];
+  } catch (err) {
+    rethrowAbort(err);
+    return [];
+  }
+}
+
+/**
+ * Search for valid commanders (legendary with power/toughness, or "can be your commander").
+ * Routes through: GET scryfall-cache.php?action=search&mode=commander&q=<query>
+ */
+export async function commanderSearch(query: string): Promise<CommanderSearchResult[]> {
+  if (query.length < 2) return [];
+  try {
+    const res = await apiFetch<{ results: CommanderSearchResult[] }>(
+      `scryfall-cache?action=search&mode=commander&q=${encodeURIComponent(query)}`
+    );
+    return res.results ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Search for valid partner commanders. When backgroundEligible is true, also
+ * includes Background enchantments.
+ * Routes through: GET scryfall-cache.php?action=search&mode=partner&q=<query>&bg=<0|1>
+ */
+export async function partnerSearch(
+  query: string,
+  backgroundEligible: boolean
+): Promise<CommanderSearchResult[]> {
+  if (query.length < 2) return [];
+  try {
+    const bg = backgroundEligible ? '&bg=1' : '';
+    const res = await apiFetch<{ results: CommanderSearchResult[] }>(
+      `scryfall-cache?action=search&mode=partner&q=${encodeURIComponent(query)}${bg}`
+    );
+    return res.results ?? [];
+  } catch {
+    return [];
+  }
+}
+
+// ── Full Scryfall-syntax name search (paginated) ────────────────────────────────
+
+export interface QueryNamesFilter {
+  commander?: boolean;
+  partner?: boolean;
+  /** Color-identity letters, e.g. "WUB". Applied as id<= on the server. */
+  identity?: string;
+}
+
+export interface QueryNamesResult {
+  names: string[];
+  hasMore: boolean;
+}
+
+/**
+ * Full Scryfall-syntax search returning matching card names + a hasMore flag.
+ * Result filters are applied server-side (the browser never assembles Scryfall
+ * filter terms).
+ * Routes through: GET scryfall-cache.php?action=search&mode=query&q=<query>&page=<n>
+ */
+export async function queryNames(
+  query: string,
+  page: number,
+  filter?: QueryNamesFilter,
+  opts?: ScryfallSearchOpts
+): Promise<QueryNamesResult> {
+  try {
+    const params = new URLSearchParams({
+      action: 'search',
+      mode: 'query',
+      q: query,
+      page: String(page),
+    });
+    if (filter?.commander) params.set('commander', '1');
+    if (filter?.partner) params.set('partner', '1');
+    if (filter?.identity) params.set('identity', filter.identity);
+
+    const res = await apiFetch<QueryNamesResult>(`scryfall-cache?${params.toString()}`, {
+      signal: opts?.signal,
+    });
+    return { names: res.names ?? [], hasMore: res.hasMore ?? false };
+  } catch (err) {
+    rethrowAbort(err);
+    return { names: [], hasMore: false };
+  }
+}
+
+// ── Single-card live detail (fields the cache row does not store) ───────────────
+
+export interface ScryfallCardDetail {
+  name: string;
+  oracle_text: string;
+  color_identity: string[];
+  art_crop: string | null;
+  image_uri: string | null;
+}
+
+/**
+ * Live card detail carrying oracle_text and art_crop, which the cache row omits.
+ * Routes through: GET scryfall-cache.php?action=card&name=<name>
+ * Returns null if not found or on error.
+ */
+export async function getCardDetail(name: string): Promise<ScryfallCardDetail | null> {
+  try {
+    return await apiFetch<ScryfallCardDetail | null>(
+      `scryfall-cache?action=card&name=${encodeURIComponent(name)}`
+    );
+  } catch {
+    return null;
+  }
 }
