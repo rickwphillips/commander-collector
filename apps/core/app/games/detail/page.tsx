@@ -30,6 +30,7 @@ import { PageContainer } from '@/components/PageContainer';
 import { ColorIdentityChips } from '@/components/ColorIdentityChips';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { EmptyState } from '@/components/EmptyState';
+import { RematchButton } from '@/components/RematchButton';
 import { api } from '@/lib/api';
 import { getOrdinalSuffix } from '@/lib/utils';
 import type { GameWithResults } from '@/lib/types';
@@ -101,7 +102,8 @@ export default function GameDetailPage() {
       backHref="/games"
       backLabel="Back to Games"
       actions={
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <RematchButton gameId={game.id} variant="outlined" />
           {game && game.log && game.log.length > 0 && (
             <Button startIcon={<FormatListBulletedIcon />} onClick={() => setLogDialogOpen(true)}>
               Game Log
