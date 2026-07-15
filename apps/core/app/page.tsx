@@ -32,6 +32,7 @@ import { SettingsTab } from './components/SettingsTab';
 import { StatsCard } from './components/StatsCard';
 import { ColorIdentityChips } from './components/ColorIdentityChips';
 import { LoadingSpinner } from './components/LoadingSpinner';
+import { RematchButton } from './components/RematchButton';
 import { useAuth } from './components/AuthGuard';
 import { api } from './lib/api';
 import { APP_VERSION } from './lib/version';
@@ -159,6 +160,9 @@ export default function Dashboard() {
             <Typography variant="h6" color="text.secondary">
               Track your Magic: The Gathering Commander games
             </Typography>
+            <Box sx={{ mt: 2 }}>
+              <RematchButton size="large" />
+            </Box>
           </Box>
         </Fade>
 

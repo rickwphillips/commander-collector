@@ -158,6 +158,8 @@ export interface GameWithResults extends Game {
 export interface GameResultWithDeck extends GameResult {
   deck_name: string;
   commander: string;
+  /** Partner/background commander name, or null for single-commander decks. */
+  partner?: string | null;
   player_name: string;
   colors: string;
 }

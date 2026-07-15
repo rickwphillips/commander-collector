@@ -193,6 +193,9 @@ export const api = {
   // Games
   getGames: () => apiFetch<import('./types').GameWithResults[]>('/games'),
   getGame: (id: string) => apiFetch<import('./types').GameWithResults>('/games', { params: { id } }),
+  /** The most recently played game with its per-seat results, or null when none exist. */
+  getMostRecentGame: () =>
+    apiFetch<import('./types').GameWithResults | null>('/games', { params: { recent: '1' } }),
   createGame: (data: import('./types').CreateGameInput) =>
     apiFetch<{ id: string }>('/games', {
       method: 'POST',

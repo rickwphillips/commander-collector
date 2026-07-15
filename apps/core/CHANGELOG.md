@@ -1,5 +1,16 @@
 # Changelog
 
+## [5.19.0] - 2026-07-15
+
+### Added
+
+- Rematch: a `RematchButton` on the dashboard, the games list, and each game's detail page starts a new game pre-filled from a prior one. With no `gameId` it targets the most recent game (and hides itself when there is none); on a detail page it targets that game. It navigates to `/game-manager?rematch=<id>`, where `buildRematchPrefill` maps the recorded results to one seat per player (same player, deck, commander/partner), ordered by team then finish, and seeds game type, pod size, and starting life. Everything stays editable before the game starts; nothing is recorded automatically
+- `GET /games?recent=1` returns the most recent game (by `played_at`, then `id`) in the same shape as the by-id branch, or null when none exist
+
+### Changed
+
+- `games.php`: the per-seat results query is now a single shared `$GAME_RESULTS_SQL` used by both the by-id and all-games branches (it also now selects `decks.partner`), so the result shape stays identical in one place
+
 ## [5.18.0] - 2026-07-14
 
 ### Fixed

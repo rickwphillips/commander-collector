@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/AuthGuard';
 import { GameSetup, type GameSetupSubmit } from './components/GameSetup';
 import { GameBoard } from './components/GameBoard';
@@ -12,6 +12,7 @@ import { isSeatFilled } from '@/lib/types';
 import { api } from '@/lib/api';
 import { applyEvent } from './remoteTransforms';
 import { buildGameStartedEvent, diffGameEvents } from './gameLog';
+import { buildRematchPrefill } from '@/lib/rematch';
 
 const POSITIONS_BY_COUNT: Record<number, Array<PlayerState['position']>> = {
   2: ['bottom', 'top'],
@@ -162,11 +163,14 @@ function buildSeatingState(payload: GameSetupSubmit, prefill?: PlayerSetup[]): G
   };
 }
 
-export default function GameManagerPage() {
+function GameManagerInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const [state, setState] = useState<GameManagerState>(DEFAULT_STATE);
   const [restartPrefill, setRestartPrefill] = useState<PlayerSetup[] | null>(null);
+  // Table options carried by a rematch; overrides the restart-derived initial.
+  const [rematchInitial, setRematchInitial] = useState<Partial<GameSetupSubmit> | null>(null);
 
   const [dbCheckComplete, setDbCheckComplete] = useState<boolean>(false);
   const dbCheckRef = useRef<boolean>(false);
@@ -341,6 +345,25 @@ export default function GameManagerPage() {
     dbCheckRef.current = true;
 
     const checkAndLoad = async () => {
+      // Rematch entry point: ?rematch=<gameId>. Strip the param first so a
+      // refresh/back-nav doesn't re-hydrate, then pre-fill and skip resume.
+      const rematchId = searchParams.get('rematch');
+      if (rematchId) {
+        router.replace('/game-manager');
+        try {
+          const game = await api.getGame(rematchId);
+          const { prefill, playerCount, gameType, startingLife } = buildRematchPrefill(game);
+          if (prefill.length > 0) {
+            setRestartPrefill(prefill);
+            setRematchInitial({ playerCount, gameType, startingLife });
+          }
+        } catch {
+          /* game missing or fetch failed: fall through to an empty setup */
+        }
+        setDbCheckComplete(true);
+        return;
+      }
+
       let loadedGame: GameManagerState | null = null;
       let sessionCode: string | null = null;
 
@@ -375,7 +398,7 @@ export default function GameManagerPage() {
     };
 
     checkAndLoad();
-  }, []);
+  }, [searchParams, router]);
 
   // Guard against accidental nav while the game is actually being played.
   // Seating phase intentionally does NOT trigger this since the user may want
@@ -445,6 +468,7 @@ export default function GameManagerPage() {
     // anyway. The first persist happens once the sessionCode arrives below.
     setState(newState);
     setRestartPrefill(null);
+    setRematchInitial(null);
 
     try {
       const seats = newState.players.map((p) => p.position);
@@ -639,11 +663,21 @@ export default function GameManagerPage() {
     <GameSetup
       onStart={handleSetupSubmit}
       initial={
-        restartPrefill
+        rematchInitial ??
+        (restartPrefill
           ? { playerCount: restartPrefill.length, startingLife: state.startingLife }
-          : undefined
+          : undefined)
       }
     />
+  );
+}
+
+export default function GameManagerPage() {
+  // useSearchParams needs a Suspense boundary under static export.
+  return (
+    <Suspense fallback={null}>
+      <GameManagerInner />
+    </Suspense>
   );
 }
 

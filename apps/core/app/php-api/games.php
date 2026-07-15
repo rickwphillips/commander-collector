@@ -10,6 +10,29 @@ $id = isset($_GET['id']) ? (string)$_GET['id'] : null;
 
 switch ($method) {
     case 'GET':
+        // Per-seat results shape, shared by the by-id and all-games branches.
+        $GAME_RESULTS_SQL = '
+            SELECT
+                gr.*,
+                d.name as deck_name,
+                d.commander,
+                d.partner,
+                d.colors,
+                p.name as player_name
+            FROM game_results gr
+            JOIN decks d ON gr.deck_id = d.id
+            JOIN players p ON gr.player_id = p.id
+            WHERE gr.game_id = ?
+            ORDER BY gr.finish_position ASC
+        ';
+        if (isset($_GET['recent'])) {
+            // Most recent game; falls through to the by-id branch, or null if none.
+            $recentId = $pdo->query('SELECT id FROM games ORDER BY played_at DESC, id DESC LIMIT 1')->fetchColumn();
+            if (!$recentId) {
+                sendJSON(null);
+            }
+            $id = (string)$recentId;
+        }
         if ($id) {
             // Get single game with results
             $stmt = $pdo->prepare('SELECT * FROM games WHERE id = ?');
@@ -21,19 +44,7 @@ switch ($method) {
             }
 
             // Get results for this game
-            $resultStmt = $pdo->prepare('
-                SELECT
-                    gr.*,
-                    d.name as deck_name,
-                    d.commander,
-                    d.colors,
-                    p.name as player_name
-                FROM game_results gr
-                JOIN decks d ON gr.deck_id = d.id
-                JOIN players p ON gr.player_id = p.id
-                WHERE gr.game_id = ?
-                ORDER BY gr.finish_position ASC
-            ');
+            $resultStmt = $pdo->prepare($GAME_RESULTS_SQL);
             $resultStmt->execute([$id]);
             $game['results'] = $resultStmt->fetchAll();
 
@@ -71,19 +82,7 @@ switch ($method) {
             $games = $stmt->fetchAll();
 
             // Get results for each game (prepare once, execute per game)
-            $resultStmt = $pdo->prepare('
-                SELECT
-                    gr.*,
-                    d.name as deck_name,
-                    d.commander,
-                    d.colors,
-                    p.name as player_name
-                FROM game_results gr
-                JOIN decks d ON gr.deck_id = d.id
-                JOIN players p ON gr.player_id = p.id
-                WHERE gr.game_id = ?
-                ORDER BY gr.finish_position ASC
-            ');
+            $resultStmt = $pdo->prepare($GAME_RESULTS_SQL);
             foreach ($games as &$game) {
                 $resultStmt->execute([$game['id']]);
                 $game['results'] = $resultStmt->fetchAll();
