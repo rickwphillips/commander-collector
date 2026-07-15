@@ -20,9 +20,13 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
-// Mock global fetch for Scryfall autocomplete and query endpoints
-const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
+// Name discovery routes through the unified Scryfall client.
+const mockAutocomplete = vi.fn();
+const mockQueryNames = vi.fn();
+vi.mock('@/lib/scryfall', () => ({
+  autocomplete: (...args: unknown[]) => mockAutocomplete(...args),
+  queryNames: (...args: unknown[]) => mockQueryNames(...args),
+}));
 
 // ── Import after mocks ─────────────────────────────────────────────────────────
 
@@ -46,13 +50,6 @@ function makeCachedCard(name: string, overrides: Partial<ScryfallCachedCard> = {
   } as ScryfallCachedCard;
 }
 
-function autocompleteResponse(names: string[]) {
-  return Promise.resolve({
-    ok: true,
-    json: () => Promise.resolve({ data: names }),
-  });
-}
-
 function bulkSuccess(names: string[]) {
   mockBulkLookupCards.mockResolvedValue({
     results: names.map((n) => makeCachedCard(n)),
@@ -62,7 +59,8 @@ function bulkSuccess(names: string[]) {
 describe('CardLookupField', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFetch.mockReset();
+    mockAutocomplete.mockResolvedValue([]);
+    mockQueryNames.mockResolvedValue({ names: [], hasMore: false });
   });
 
   it('renders the search input', () => {
@@ -72,7 +70,7 @@ describe('CardLookupField', () => {
 
   it('debounces lookup and shows results after typing', async () => {
     const user = userEvent.setup();
-    mockFetch.mockReturnValue(autocompleteResponse(['Sol Ring']));
+    mockAutocomplete.mockResolvedValue(['Sol Ring']);
     bulkSuccess(['Sol Ring']);
 
     render(<CardLookupField />);
@@ -86,14 +84,8 @@ describe('CardLookupField', () => {
 
   it('activates query mode when input contains ":"', async () => {
     const user = userEvent.setup();
-    // Query mode calls Scryfall /cards/search
-    mockFetch.mockReturnValue(
-      Promise.resolve({
-        ok: true,
-        json: () =>
-          Promise.resolve({ data: [{ name: 'Lightning Bolt' }], has_more: false }),
-      })
-    );
+    // Query mode routes through queryNames.
+    mockQueryNames.mockResolvedValue({ names: ['Lightning Bolt'], hasMore: false });
     bulkSuccess(['Lightning Bolt']);
 
     render(<CardLookupField />);
@@ -106,13 +98,7 @@ describe('CardLookupField', () => {
 
   it('activates query mode when input starts with "!"', async () => {
     const user = userEvent.setup();
-    mockFetch.mockReturnValue(
-      Promise.resolve({
-        ok: true,
-        json: () =>
-          Promise.resolve({ data: [{ name: 'Sol Ring' }], has_more: false }),
-      })
-    );
+    mockQueryNames.mockResolvedValue({ names: ['Sol Ring'], hasMore: false });
     bulkSuccess(['Sol Ring']);
 
     render(<CardLookupField />);
@@ -126,7 +112,7 @@ describe('CardLookupField', () => {
   it('calls onAdd with Card[] when Add button is clicked', async () => {
     const user = userEvent.setup();
     const onAdd = vi.fn();
-    mockFetch.mockReturnValue(autocompleteResponse(['Sol Ring']));
+    mockAutocomplete.mockResolvedValue(['Sol Ring']);
     bulkSuccess(['Sol Ring']);
 
     render(<CardLookupField onAdd={onAdd} />);
@@ -145,7 +131,7 @@ describe('CardLookupField', () => {
 
   it('hides qty stepper in singletonMode', async () => {
     const user = userEvent.setup();
-    mockFetch.mockReturnValue(autocompleteResponse(['Sol Ring']));
+    mockAutocomplete.mockResolvedValue(['Sol Ring']);
     bulkSuccess(['Sol Ring']);
 
     render(<CardLookupField singletonMode />);
@@ -161,7 +147,7 @@ describe('CardLookupField', () => {
 
   it('shows qty stepper in non-singleton mode', async () => {
     const user = userEvent.setup();
-    mockFetch.mockReturnValue(autocompleteResponse(['Sol Ring']));
+    mockAutocomplete.mockResolvedValue(['Sol Ring']);
     bulkSuccess(['Sol Ring']);
 
     render(<CardLookupField singletonMode={false} />);
@@ -174,7 +160,7 @@ describe('CardLookupField', () => {
 
   it('clears results on Escape', async () => {
     const user = userEvent.setup();
-    mockFetch.mockReturnValue(autocompleteResponse(['Sol Ring']));
+    mockAutocomplete.mockResolvedValue(['Sol Ring']);
     bulkSuccess(['Sol Ring']);
 
     render(<CardLookupField />);

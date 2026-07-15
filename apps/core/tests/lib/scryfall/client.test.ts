@@ -42,11 +42,11 @@ describe('scryfall/client', () => {
     expect(prints).toEqual([{ set_code: 'CMR' }]);
   });
 
-  it('lookupById throws — not yet implemented', async () => {
-    await expect(lookupById('abc')).rejects.toThrow('not yet implemented');
+  it('lookupById throws — not implemented', async () => {
+    await expect(lookupById('abc')).rejects.toThrow('not implemented');
   });
 
-  it('search throws — not yet implemented', async () => {
-    await expect(search('t:legendary')).rejects.toThrow('not yet implemented');
+  it('search throws — not implemented', async () => {
+    await expect(search('t:legendary')).rejects.toThrow('not implemented');
   });
 });
