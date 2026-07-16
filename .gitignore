@@ -53,3 +53,7 @@ deploy.sh
 # a literal "~" dir created by a tool that didn't expand the home path.
 data/
 /~/
+
+# Claude Code local config + graphify knowledge graph (local-only)
+.claude/
+graphify-out/
