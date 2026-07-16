@@ -201,6 +201,7 @@ const CITY_FLAG_CONFIGS = [
 interface CityFlagProps {
   left: string;
   bottom?: number;
+  scale?: number;
   riseDelay: number;
   wiggleDuration: number;
   wiggleOffset: number;
@@ -210,7 +211,7 @@ interface CityFlagProps {
   commanderName: string;
 }
 
-function CityFlag({ left, bottom = -25, riseDelay, wiggleDuration, wiggleOffset, driftDuration, driftOffset, artCropUrl, commanderName }: CityFlagProps) {
+function CityFlag({ left, bottom = -25, scale = 1, riseDelay, wiggleDuration, wiggleOffset, driftDuration, driftOffset, artCropUrl, commanderName }: CityFlagProps) {
   const dur = `${wiggleDuration}s`;
   const off = `${wiggleOffset}s`;
   return (
@@ -220,7 +221,7 @@ function CityFlag({ left, bottom = -25, riseDelay, wiggleDuration, wiggleOffset,
       animation: `${flagRise} 1.4s ${riseDelay}s ease-out both`,
     }}>
       <Box sx={{ animation: `${flagDrift} ${driftDuration}s ${driftOffset}s ease-in-out infinite` }}>
-      <Box sx={{ transform: 'scaleX(-1)' }}>
+      <Box sx={{ transform: `scaleX(-1) scale(${scale})`, transformOrigin: 'bottom center' }}>
       <Box sx={{
         position: 'relative',
         transformOrigin: 'bottom left',
@@ -261,16 +262,22 @@ function CityFlag({ left, bottom = -25, riseDelay, wiggleDuration, wiggleOffset,
 }
 
 
-export function CityBlessing({ visible, exiting, threatSource, commander }: {
+export function CityBlessing({ visible, exiting, threatSource, commander, commander2, scale = 1 }: {
   visible: boolean;
   exiting: boolean;
   threatSource?: ThreatSource | null;
   commander: { artCropUrl?: string; name: string };
+  commander2?: { artCropUrl?: string; name: string };
+  scale?: number;
 }) {
   // Resolve the flag art by NAME through the phone-safe proxy (same path as
   // CommanderArt). The stored artCropUrl is often null (older games / after a
   // name edit), which is why the 2HG flags were falling back to the name text.
   const commanderArtSrc = useProxiedArtUrl(commander.name) ?? commander.artCropUrl;
+  const commander2ArtSrc = useProxiedArtUrl(commander2?.name ?? undefined) ?? commander2?.artCropUrl;
+  const homeFlags = commander2
+    ? [{ name: commander.name, art: commanderArtSrc }, { name: commander2.name, art: commander2ArtSrc }]
+    : [{ name: commander.name, art: commanderArtSrc }];
   // Resolve the threatening commander's art the same way, so the flag-steal fires
   // even when its stored crop is null (the common case, which was gating it off).
   const threatArtSrc = useProxiedArtUrl(threatSource?.cmdName ?? undefined) ?? threatSource?.artUrl ?? null;
@@ -284,7 +291,7 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
             // hard-edged polygons.
             filter: 'blur(4px)',
             animation: exiting
-              ? `${godRaysFadeOut} 1.5s ease-in forwards`
+              ? `${godRaysFadeOut} 1.4s 0.3s ease-in forwards`
               : `${godRaysFadeIn} 2s 2s ease-out forwards, ${godRaysPulse} 6s 4s ease-in-out infinite`,
           }}>
           <defs>
@@ -309,18 +316,13 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
       {visible && (
         <Box component="svg" viewBox="0 0 640 240" preserveAspectRatio="none" sx={{
           position: 'absolute', bottom: -55, left: -80,
-          width: 'calc(100% + 80px)', height: 150,
-          // Opaque (not translucent) so the rolling hills behind don't bleed
-          // through the buildings; lighter + theme-aware so it stays subtle.
-          // Height 150 (was 200): shorter foreground so the distant skyline
-          // behind it is no longer fully hidden.
+          width: 'calc(100% + 80px)', height: 150 * scale,
           fill: (theme) => theme.palette.mode === 'dark' ? '#1a1510' : '#bcb4a9',
           stroke: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.7)' : 'rgba(95,85,72,0.45)',
           strokeWidth: 1.2,
-          // Foreground: sits above the distant hills + skyline (z 0) below.
           zIndex: 1, pointerEvents: 'none',
           animation: exiting
-            ? `${castleSlideOut} 1.8s 2s ease-in forwards`
+            ? `${castleSlideOut} 1.6s 1.6s ease-in forwards`
             : `${castleSlideIn} 1.8s ease-out forwards`,
         }}>
           <path d="
@@ -356,11 +358,11 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
           <line x1="2"   y1="200" x2="78"  y2="200" stroke="rgba(0,0,0,0.3)"  strokeWidth="1"/>
           <line x1="222" y1="170" x2="298" y2="170" stroke="rgba(0,0,0,0.3)"  strokeWidth="1"/>
           <line x1="222" y1="200" x2="298" y2="200" stroke="rgba(0,0,0,0.3)"  strokeWidth="1"/>
-          <rect x="326" y="136" width="5" height="22" rx="1"/>
-          <rect x="400" y="102" width="5" height="18" rx="1"/>
-          <rect x="460" y="116" width="5" height="20" rx="1"/>
-          <rect x="556" y="100" width="5" height="18" rx="1"/>
-          <rect x="616" y="124" width="4" height="16" rx="1"/>
+          <rect x="326" y="154" width="5" height="18" rx="1"/>
+          <rect x="400" y="150" width="5" height="18" rx="1"/>
+          <rect x="460" y="150" width="5" height="18" rx="1"/>
+          <rect x="556" y="150" width="5" height="18" rx="1"/>
+          <rect x="616" y="150" width="4" height="16" rx="1"/>
           <rect x="305" y="130" width="8" height="11" rx="1" fill="rgba(0,0,0,0.7)" stroke="none"/>
           <rect x="363" y="138" width="8" height="10" rx="1" fill="rgba(0,0,0,0.7)" stroke="none"/>
           <rect x="416" y="148" width="8" height="11" rx="1" fill="rgba(0,0,0,0.7)" stroke="none"/>
@@ -388,13 +390,11 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
           // Distinct cool blue-gray (atmospheric distance) so the mountains read
           // as their own layer instead of blending with the warm tan buildings.
           fill: (theme) => theme.palette.mode === 'dark' ? '#3b4a63' : '#8f9bb3',
-          // Fade the bottom so the SVG box's straight lower edge doesn't show a
-          // hard horizontal seam behind the buildings.
           maskImage: 'linear-gradient(to bottom, black 55%, transparent 100%)',
           WebkitMaskImage: 'linear-gradient(to bottom, black 55%, transparent 100%)',
           zIndex: 0, pointerEvents: 'none', opacity: 0,
           animation: exiting
-            ? `${skylineFadeOut} 0.8s 2s ease-in forwards`
+            ? `${skylineFadeOut} 0.8s 1.2s ease-in forwards`
             : `${skylineFadeIn} 4s 0.5s ease-out forwards`,
         }}>
           <path d="M0,100 C90,10 200,55 310,22 C430,-5 510,42 600,16 L600,100 Z" fillOpacity="0.35"/>
@@ -407,16 +407,18 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
       {visible && (
         <Box component="svg" viewBox="0 0 160 200" sx={{
           position: 'absolute', bottom: 48, left: '3%',
-          width: 112, height: 128,
+          width: 112 * scale, height: 128 * scale,
           // Distant castle silhouette perched on a mountain, a touch darker than
           // the hills so the three pointed spires read as an obvious castle.
           // Behind the skyline (z0, drawn before it) so its base tucks behind the
           // buildings and only the spires rise above. Kept narrow so it doesn't
           // dominate the scene.
           fill: (theme) => theme.palette.mode === 'dark' ? '#2c3750' : '#79849e',
+          maskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
           zIndex: 0, pointerEvents: 'none', overflow: 'visible', opacity: 0,
           animation: exiting
-            ? `${skylineFadeOut} 0.8s 2s ease-in forwards`
+            ? `${skylineFadeOut} 0.8s 1.4s ease-in forwards`
             : `${skylineFadeIn} 3.5s 0.9s ease-out forwards`,
         }}>
           {/* Mountain + castle silhouette: left tower, tall central keep spire,
@@ -445,13 +447,11 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
           // down (bottom 10 / height 83) so it fills behind the foreground row.
           fill: (theme) => theme.palette.mode === 'dark' ? '#251e15' : '#cbc4b9',
           stroke: 'none',
-          // Fade the bottom so the SVG box's straight lower edge doesn't show a
-          // hard horizontal seam (same treatment as the rolling hills).
           maskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
           WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
           zIndex: 0, pointerEvents: 'none', opacity: 0,
           animation: exiting
-            ? `${skylineFadeOut} 0.8s 2s ease-in forwards`
+            ? `${skylineFadeOut} 0.8s 1.6s ease-in forwards`
             : `${skylineFadeIn} 3s 1.2s ease-out forwards`,
         }}>
           <path d="
@@ -481,15 +481,13 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
       {visible && (
         <Box component="svg" viewBox="0 0 200 220" sx={{
           position: 'absolute', bottom: -35, right: -40,
-          width: 200, height: 220,
-          // Opaque + lighter + theme-aware, matching the castle/houses layer.
+          width: 200 * scale, height: 220 * scale,
           fill: (theme) => theme.palette.mode === 'dark' ? '#1a1510' : '#bcb4a9',
           stroke: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.7)' : 'rgba(95,85,72,0.45)',
           strokeWidth: 1.2,
-          // Foreground: sits above the distant hills + skyline (z 0) below.
           zIndex: 1, pointerEvents: 'none',
           animation: exiting
-            ? `${castleSlideOutRight} 1.8s 2s ease-in forwards`
+            ? `${castleSlideOutRight} 1.6s 1.8s ease-in forwards`
             : `${castleSlideInRight} 1.8s 0.3s ease-out forwards`,
         }}>
           <path d="
@@ -538,51 +536,63 @@ export function CityBlessing({ visible, exiting, threatSource, commander }: {
       )}
 
       {/* ── City's Blessing clouds ── */}
-      {visible && !exiting && ([
-        { top: '4%',  scale: 1.0,  delay: '4.5s',  dur: '28s' },
-        { top: '12%', scale: 0.65, delay: '13.5s', dur: '34s' },
-        { top: '2%',  scale: 1.3,  delay: '23.5s', dur: '22s' },
-      ]).map((c, i) => (
-        <Box key={i} component="svg" viewBox="0 0 100 40" sx={{
-          position: 'absolute', top: c.top, left: 0, zIndex: 2,
-          width: `${100 * c.scale}px`, height: `${40 * c.scale}px`,
-          fill: 'rgba(255,245,220,0.18)', pointerEvents: 'none', overflow: 'visible',
-          opacity: 0,
-          animation: `${cloudDrift} ${c.dur} ${c.delay} linear infinite`,
+      {visible && (
+        <Box sx={{ position: 'absolute', inset: 0, zIndex: 2, pointerEvents: 'none', overflow: 'hidden',
+          ...(exiting && { animation: `${fwFadeOut} 1s ease-out forwards` }),
         }}>
-          <ellipse cx="28" cy="28" rx="22" ry="14"/>
-          <ellipse cx="50" cy="18" rx="20" ry="18"/>
-          <ellipse cx="74" cy="26" rx="18" ry="15"/>
-          <rect x="6" y="28" width="86" height="12"/>
+          {([
+            { top: '4%',  scale: 1.0,  delay: '4.5s',  dur: '28s' },
+            { top: '12%', scale: 0.65, delay: '13.5s', dur: '34s' },
+            { top: '2%',  scale: 1.3,  delay: '23.5s', dur: '22s' },
+          ]).map((c, i) => (
+            <Box key={i} component="svg" viewBox="0 0 100 40" sx={{
+              position: 'absolute', top: c.top, left: 0,
+              width: `${100 * c.scale * scale}px`, height: `${40 * c.scale * scale}px`,
+              fill: 'rgba(255,245,220,0.18)', pointerEvents: 'none', overflow: 'visible',
+              opacity: 0,
+              animation: `${cloudDrift} ${c.dur} ${c.delay} linear infinite`,
+            }}>
+              <ellipse cx="28" cy="28" rx="22" ry="14"/>
+              <ellipse cx="50" cy="18" rx="20" ry="18"/>
+              <ellipse cx="74" cy="26" rx="18" ry="15"/>
+              <rect x="6" y="28" width="86" height="12"/>
+            </Box>
+          ))}
         </Box>
-      ))}
+      )}
 
       {/* ── City's Blessing: marching flags ── */}
-      {visible && !exiting && (() => {
+      {visible && (() => {
         const threatArtUrl = threatArtSrc;
         const threatCount = !threatArtUrl
           ? 0
           : Math.min(Math.floor(threatSource!.dmg * 12 / 20), 12);
         const stolenIndices: ReadonlySet<number> = new Set(THREAT_STEAL_ORDER.slice(0, threatCount));
         return (
+        <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none',
+          ...(exiting && { animation: `${fwFadeOut} 1.1s ease-out forwards` }),
+        }}>
         <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', animation: `${flagMarch} 38s linear infinite` }}>
           {CITY_FLAG_CONFIGS.map((cfg, i) => {
             const isThreat = stolenIndices.has(i);
+            const home = homeFlags[i % homeFlags.length];
             return (
             <CityFlag
               key={i}
               left={cfg.left}
               bottom={cfg.bottom}
+              scale={scale}
               riseDelay={cfg.riseDelay}
               wiggleDuration={cfg.wiggleDuration}
               wiggleOffset={cfg.wiggleOffset}
               driftDuration={cfg.driftDuration}
               driftOffset={cfg.driftOffset}
-              artCropUrl={isThreat ? threatArtUrl! : commanderArtSrc}
-              commanderName={isThreat ? (threatSource?.cmdName ?? commander.name) : commander.name}
+              artCropUrl={isThreat ? threatArtUrl! : home.art}
+              commanderName={isThreat ? (threatSource?.cmdName ?? commander.name) : home.name}
             />
             );
           })}
+        </Box>
         </Box>
         );
       })()}

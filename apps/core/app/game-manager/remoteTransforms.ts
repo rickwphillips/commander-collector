@@ -490,6 +490,12 @@ export function applyPrevTurn(state: GameManagerState): GameManagerState {
   };
 }
 
+function applySetTeamName(state: GameManagerState, team: number, name: string): GameManagerState {
+  const trimmed = name.trim().slice(0, 32);
+  if (!trimmed) return state;
+  return { ...state, teamNames: { ...(state.teamNames ?? {}), [team]: trimmed } };
+}
+
 type ViewEvent = Extract<LiveGameEvent, { type: 'view_open' | 'view_heartbeat' | 'view_close' }>;
 
 function applyViewPlayer(state: GameManagerState, event: ViewEvent): GameManagerState {
@@ -561,6 +567,8 @@ function applyEventInner(state: GameManagerState, event: LiveGameEvent): GameMan
       return applyPassTurn(state);
     case 'prev_turn':
       return applyPrevTurn(state);
+    case 'set_team_name':
+      return applySetTeamName(state, event.team, event.name);
     case 'checkin':
       return applyCheckin(state, event.seat, event.ts);
     case 'life_kill_attr':

@@ -794,6 +794,7 @@ export function GameBoard({
         opponents={opponents}
         commanderDamage={commanderDamage}
         startingLife={startingLife}
+        monarchTransfer={monarchTransfer}
         isActiveTeam={firstPlayerSet && activeTeam === teamNumber}
         elapsedSeconds={firstPlayerSet && activeTeam === teamNumber ? elapsedSeconds : 0}
         turnTimerSeconds={turnTimerSeconds}

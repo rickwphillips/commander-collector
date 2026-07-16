@@ -42,7 +42,8 @@ import { LifeCracks } from './LifeCracks';
 import { CityBlessing } from './CityBlessing';
 import { InitiativeTorch } from './InitiativeTorch';
 import { CrownIcon, MonarchCrown, monarchCrownAnim } from './MonarchCrown';
-import { LifeTotal } from './LifeTotal';
+import { useMonarchTransition } from '@/game-manager/hooks/useMonarchTransition';
+import { LifeTotal, LifeSwipes } from './LifeTotal';
 import { useTimerTokens, TIMER_EXPIRED_BORDER_BLINK, TIMER_EXPIRED_HEADER_BLINK } from '@/game-manager/hooks/useTimerTokens';
 import { StepperControl, StepperOverlayHost, type StepperSize } from './StepperControl';
 import { useXpKeyframes } from './PlayerCard.keyframes';
@@ -89,6 +90,7 @@ interface TeamPanelProps {
   opponents: TeamMember[];
   commanderDamage: CommanderDamageMap;
   startingLife: number;
+  monarchTransfer?: { fromPos: string | null; toPos: string | null };
   isActiveTeam: boolean;
   // Turn-timer + Highlight parity with standard games: the active team's panel
   // reflects the countdown color (border/shadow with Highlight off, app-bar
@@ -375,12 +377,12 @@ function PanelSection({
     </Box>
   );
   const content = (
-    <Box sx={[remoteDrawerContentSx(open), { justifyContent: 'center', gap: spacing }] as SxProps<Theme>}>
+    <Box sx={[remoteDrawerContentSx(open), { justifyContent: 'center', gap: spacing, '@media (orientation: landscape)': { justifyContent: 'flex-start' } }] as SxProps<Theme>}>
       {children}
     </Box>
   );
   return (
-    <Box sx={[{ order }, remoteDrawerOuterSx(open)] as SxProps<Theme>}>
+    <Box sx={[{ order }, remoteDrawerOuterSx(open), { '@media (orientation: landscape)': { alignSelf: 'stretch' } }] as SxProps<Theme>}>
       {side === 'right' ? <>{rail}{content}</> : <>{content}{rail}</>}
     </Box>
   );
@@ -395,6 +397,7 @@ export function TeamPanel({
   opponents,
   commanderDamage,
   startingLife,
+  monarchTransfer = { fromPos: null, toPos: null },
   isActiveTeam,
   elapsedSeconds,
   turnTimerSeconds,
@@ -457,12 +460,16 @@ export function TeamPanel({
 
   // Sound + City's Blessing lifecycle, shared with PlayerPanel via one hook
   // (poison ambience, intro sting on gain, and the 3.8s fade-out on loss).
-  const teamHasBlessing = members.some((m) => m.player.hasCitysBlessing);
+  const blessingHolders = members.filter((m) => m.player.hasCitysBlessing);
+  const teamHasBlessing = blessingHolders.length > 0;
   const { cityBlessingVisible, cityBlessingExiting } = useBlessingAndSound(teamHasBlessing, poison, eliminated, soundEnabled);
   // Glass backing for the control clusters when a busy board animation is
   // active, so the steppers/toggles stay legible over the decorated background.
   const teamHasInitiative = members.some((m) => m.player.hasInitiative);
   const glassActive = isControlGlassActive({ cityBlessingVisible, hasInitiative: teamHasInitiative, poisonProgress });
+  const teamHasMonarch = members.some((m) => m.player.isMonarch);
+  const { monarchAnim, monarchEnterIsTransfer } = useMonarchTransition(teamHasMonarch, monarchTransfer);
+  const showCrown = teamHasMonarch || monarchAnim === 'exiting';
   // A team is "conceded" if either head was manually conceded (vs eliminated by
   // damage). reconcileTeams only stamps isConceded on the head that received the
   // eliminate event, so check both.
@@ -561,13 +568,13 @@ export function TeamPanel({
           torch) sit BEHIND all panel content via a negative-z layer, so the flags
           and skyline don't paint over the counters — especially in light theme. */}
       <Box sx={{ position: 'absolute', inset: 0, zIndex: -1, pointerEvents: 'none' }}>
-        {/* City's Blessing (shown when either teammate holds the blessing; flags
-            fly the primary pilot's commander art). */}
         <CityBlessing
           visible={cityBlessingVisible}
           exiting={cityBlessingExiting}
           threatSource={threatSource}
-          commander={primary.player.commander}
+          scale={remoteMode ? 1 : 1.5}
+          commander={(blessingHolders[0] ?? primary).player.commander}
+          commander2={blessingHolders.length > 1 ? blessingHolders[1].player.commander : undefined}
         />
         {/* Initiative torch (shown when either teammate holds the initiative). */}
         <InitiativeTorch visible={members.some((m) => m.player.hasInitiative)} />
@@ -724,7 +731,7 @@ export function TeamPanel({
         // (!remoteMode) and portrait stack keep their centered/stretch layout.
         ...(remoteMode && {
           alignItems: 'flex-start',
-          gap: 4, // wider separation between the three columns on a phone landscape
+          gap: 2,
           '@media (orientation: portrait)': { flexDirection: 'column', overflowY: 'auto', gap: 2, alignItems: 'stretch' },
         }),
       }}>
@@ -826,7 +833,11 @@ export function TeamPanel({
       </PanelSection>
 
       {/* Section B: shared life (centered + prominent) and poison. Order 2 (center). */}
-      <Stack sx={{ flex: 1.2, minWidth: 0, alignItems: 'center', justifyContent: 'center', order: 2, ...(remoteMode && { alignSelf: 'stretch' }) }} spacing={0.5}>
+      <Stack sx={{ flex: 1.2, minWidth: 0, alignItems: 'center', justifyContent: 'center', order: 2, ...(remoteMode && { alignSelf: 'stretch', '@media (orientation: landscape)': { flex: 1 } }) }} spacing={0.5}>
+        {/* Remote: growing spacer above the life cluster, matching the one below
+            the poison control, so the number + label + poison sit vertically
+            centered in the stretched column instead of pinned to the top. */}
+        {remoteMode && <Box sx={{ flexGrow: 1, minHeight: 0, width: '100%' }} />}
         {/* Shared crack overlay behind the life number + floating Monarch crown
             (same components as PlayerCard). overflow:visible so the crown can rise
             above the life row; the crack layers are inset:0 so they don't spill. */}
@@ -837,7 +848,7 @@ export function TeamPanel({
           // real area (not just the digits). overflow:visible lets the crown rise.
           minWidth: 'clamp(180px, 42dvw, 340px)',
           minHeight: 'clamp(90px, 18dvh, 200px)',
-          ...(remoteMode && { width: '100%', flex: 1 }),
+          ...(remoteMode && { width: '100%' }),
         }}>
           {/* Cracks + threat names fill the whole container and are clipped to it,
               so long names don't spill onto the pilot columns. */}
@@ -845,8 +856,7 @@ export function TeamPanel({
             <LifeCracks fingerprint={teamNumber} crackAlpha={crackAlpha} />
             <ThreatNames threatSource={threatSource} fingerprint={teamNumber} />
           </Box>
-          {/* Monarch is one-per-game; show the crown when either teammate holds it. */}
-          <MonarchCrown show={members.some((m) => m.player.isMonarch)} animStr={monarchCrownAnim('steady', false)} />
+          <MonarchCrown show={showCrown} animStr={monarchCrownAnim(monarchAnim, monarchEnterIsTransfer)} sx={{ zIndex: 3, ...(remoteMode ? { left: 'calc(50% - 18dvmin)' } : {}) }} />
           <StepperControl
             label="Life Total"
             labelSx={{ display: 'none' }}
@@ -873,6 +883,9 @@ export function TeamPanel({
               />
             }
           />
+          <Box sx={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 2 }}>
+            <LifeSwipes damageFlash={damageFlash} />
+          </Box>
         </Box>
         <Typography sx={{ fontSize: sz.sectionLabel, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
           Shared Life
