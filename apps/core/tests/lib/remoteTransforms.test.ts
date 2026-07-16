@@ -889,3 +889,24 @@ describe('2HG — collective team turns', () => {
     expect(next.currentPlayerIdx).toBe(1);
   });
 });
+
+describe('set_team_name (applyEvent)', () => {
+  it('sets a team name, preserving other teams', () => {
+    const s = makeState({ teamNames: { 2: 'Team 2' } });
+    const next = applyEvent(s, { seat: 'bottom', ts: 1, type: 'set_team_name', team: 1, name: 'Goblins' });
+    expect(next.teamNames).toEqual({ 1: 'Goblins', 2: 'Team 2' });
+  });
+
+  it('trims and caps the name at 32 chars', () => {
+    const s = makeState();
+    const long = '  ' + 'x'.repeat(40) + '  ';
+    const next = applyEvent(s, { seat: 'bottom', ts: 1, type: 'set_team_name', team: 1, name: long });
+    expect(next.teamNames?.[1]).toBe('x'.repeat(32));
+  });
+
+  it('ignores a blank name (no state change)', () => {
+    const s = makeState({ teamNames: { 1: 'Keep' } });
+    const next = applyEvent(s, { seat: 'bottom', ts: 1, type: 'set_team_name', team: 1, name: '   ' });
+    expect(next).toBe(s);
+  });
+});

@@ -65,8 +65,9 @@ export const remoteDrawerRailSx: SxProps<Theme> = {
 };
 
 /**
- * Chevron transform that always points toward the panel center (life) when open,
- * outward when closed. `side` is which side of center the column sits on.
+ * Chevron transform that points outward (toward its own edge, "collapse me")
+ * when open, and toward the panel center (life, "open me") when closed. `side`
+ * is which side of center the column sits on.
  */
 export function remoteDrawerChevronSx(open: boolean, side: 'left' | 'right'): SxProps<Theme> {
   return {
@@ -76,13 +77,13 @@ export function remoteDrawerChevronSx(open: boolean, side: 'left' | 'right'): Sx
     transition: 'transform 0.25s ease',
     '@media (orientation: landscape)': {
       transform: side === 'left'
-        ? (open ? 'rotate(0deg)' : 'rotate(180deg)')
-        : (open ? 'rotate(180deg)' : 'rotate(0deg)'),
+        ? (open ? 'rotate(180deg)' : 'rotate(0deg)')
+        : (open ? 'rotate(0deg)' : 'rotate(180deg)'),
     },
     '@media (orientation: portrait)': {
       transform: side === 'left'
-        ? (open ? 'rotate(90deg)' : 'rotate(270deg)')
-        : (open ? 'rotate(270deg)' : 'rotate(90deg)'),
+        ? (open ? 'rotate(270deg)' : 'rotate(90deg)')
+        : (open ? 'rotate(90deg)' : 'rotate(270deg)'),
     },
   };
 }

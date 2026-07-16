@@ -71,6 +71,37 @@ const SWIPES = [
   { name: 'lifeSwipe5', big: true, fade: true, bg: 'linear-gradient(to right, transparent, rgba(180,0,0,0.35) 35%, rgba(220,10,10,0.58) 50%, rgba(180,0,0,0.35) 65%, transparent)', anim: 'lifeSwipe5 0.58s ease-in 0.54s forwards', from: 'translate(-170%, -350%) rotate(38deg)', to: 'translate(370%, 350%) rotate(38deg)' },
 ];
 
+/**
+ * The red "claw" slashes of a damage hit, as siblings with no wrapper. Scopes to
+ * the nearest positioned ancestor, so the CALLER must supply a sized
+ * `position: relative` (and usually `overflow: hidden`) parent. LifeTotal renders
+ * this internally; TeamPanel mounts it in its life-box overlay layer, where the
+ * StepperControl-nested LifeTotal can't scope swipes correctly.
+ */
+export function LifeSwipes({ damageFlash = 0 }: { damageFlash?: number }) {
+  if (damageFlash <= 0) return null;
+  const slashes = damageFlash >= 5 ? SWIPES : SWIPES.filter((s) => !s.big);
+  return (
+    <>
+      {slashes.map((s) => (
+        <Box
+          key={s.name}
+          sx={{
+            ...SWIPE_BASE,
+            background: s.bg,
+            ...(s.fade && { opacity: 0 }),
+            animation: s.anim,
+            [`@keyframes ${s.name}`]: {
+              '0%': { transform: s.from, ...(s.fade && { opacity: 1 }) },
+              '100%': { transform: s.to, ...(s.fade && { opacity: 1 }) },
+            },
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
 export function LifeTotal({
   value,
   fontSize,
@@ -101,8 +132,6 @@ export function LifeTotal({
   const energetic = enabled.energy && energyPulseAnim;
   const boiling = enabled.poison && poisonBoilAnim;
 
-  const slashes = damageFlash >= 5 ? SWIPES : SWIPES.filter((s) => !s.big);
-
   return (
     <>
       <Typography
@@ -124,21 +153,7 @@ export function LifeTotal({
       >
         {value}
       </Typography>
-      {flashing && enabled.swipes && slashes.map((s) => (
-        <Box
-          key={s.name}
-          sx={{
-            ...SWIPE_BASE,
-            background: s.bg,
-            ...(s.fade && { opacity: 0 }),
-            animation: s.anim,
-            [`@keyframes ${s.name}`]: {
-              '0%': { transform: s.from, ...(s.fade && { opacity: 1 }) },
-              '100%': { transform: s.to, ...(s.fade && { opacity: 1 }) },
-            },
-          }}
-        />
-      ))}
+      {flashing && enabled.swipes && <LifeSwipes damageFlash={damageFlash} />}
     </>
   );
 }

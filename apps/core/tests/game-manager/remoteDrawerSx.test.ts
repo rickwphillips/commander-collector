@@ -36,23 +36,24 @@ describe('remoteDrawerContentSx', () => {
 });
 
 describe('remoteDrawerChevronSx', () => {
-  // Left column (cmd damage) sits LEFT of the life center; its chevron points
-  // right (toward life) when open. Right column (counters) is mirror image.
-  it('points inward toward the life center when open (landscape)', () => {
-    expect(remoteDrawerChevronSx(true, 'left')[landscape].transform).toBe('rotate(0deg)');
-    expect(remoteDrawerChevronSx(true, 'right')[landscape].transform).toBe('rotate(180deg)');
+  // Left column (cmd damage) sits LEFT of the life center. When OPEN its chevron
+  // points outward (toward its own edge, "collapse me"); when CLOSED it points
+  // inward toward life ("open me"). Right column is the mirror image.
+  it('points outward when open (landscape)', () => {
+    expect(remoteDrawerChevronSx(true, 'left')[landscape].transform).toBe('rotate(180deg)');
+    expect(remoteDrawerChevronSx(true, 'right')[landscape].transform).toBe('rotate(0deg)');
   });
 
-  it('points outward when closed (landscape)', () => {
-    expect(remoteDrawerChevronSx(false, 'left')[landscape].transform).toBe('rotate(180deg)');
-    expect(remoteDrawerChevronSx(false, 'right')[landscape].transform).toBe('rotate(0deg)');
+  it('points inward toward the life center when closed (landscape)', () => {
+    expect(remoteDrawerChevronSx(false, 'left')[landscape].transform).toBe('rotate(0deg)');
+    expect(remoteDrawerChevronSx(false, 'right')[landscape].transform).toBe('rotate(180deg)');
   });
 
   it('rotates to the vertical inner edge in portrait', () => {
-    // Portrait stacks the sections, so "inner" becomes down (left/top) or up (right/bottom).
-    expect(remoteDrawerChevronSx(true, 'left')[portrait].transform).toBe('rotate(90deg)');
-    expect(remoteDrawerChevronSx(true, 'right')[portrait].transform).toBe('rotate(270deg)');
-    expect(remoteDrawerChevronSx(false, 'left')[portrait].transform).toBe('rotate(270deg)');
-    expect(remoteDrawerChevronSx(false, 'right')[portrait].transform).toBe('rotate(90deg)');
+    // Portrait stacks the sections. Open points outward, closed points toward life.
+    expect(remoteDrawerChevronSx(true, 'left')[portrait].transform).toBe('rotate(270deg)');
+    expect(remoteDrawerChevronSx(true, 'right')[portrait].transform).toBe('rotate(90deg)');
+    expect(remoteDrawerChevronSx(false, 'left')[portrait].transform).toBe('rotate(90deg)');
+    expect(remoteDrawerChevronSx(false, 'right')[portrait].transform).toBe('rotate(270deg)');
   });
 });

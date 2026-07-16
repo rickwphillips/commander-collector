@@ -525,6 +525,7 @@ export type LiveGameEvent =
   | (LiveGameEventBase & { type: 'undo_eliminate'; playerIdx: number })
   | (LiveGameEventBase & { type: 'pass_turn' })
   | (LiveGameEventBase & { type: 'prev_turn' })
+  | (LiveGameEventBase & { type: 'set_team_name'; team: number; name: string })
   | (LiveGameEventBase & { type: 'checkin' })
   | (LiveGameEventBase & {
       type: 'life_kill_attr';

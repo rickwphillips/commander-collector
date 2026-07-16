@@ -513,7 +513,7 @@ function RemotePageInner() {
           teamNumber={myTeam ?? 1}
           teamName={teamName2hg}
           opponentTeamName={oppTeamName2hg}
-          onTeamNameChange={() => { /* host owns team names; phone is read-only here */ }}
+          onTeamNameChange={(name) => { if (myTeam != null) sendEvent({ type: 'set_team_name', team: myTeam, name }); }}
           members={teamMembers}
           opponents={teamOpponents}
           commanderDamage={state.commanderDamage}
