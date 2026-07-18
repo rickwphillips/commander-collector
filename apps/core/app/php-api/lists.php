@@ -131,9 +131,10 @@ elseif ($method === 'POST') {
     if ($action === 'detach_deck') {
         if (!$listId) sendError('id required');
 
-        // 1. Verify list exists and is not soft-deleted
-        $chkL = $db->prepare('SELECT id, deck_id, version FROM lists WHERE id = ? AND deleted_at IS NULL');
-        $chkL->execute([$listId]);
+        // 1. Verify list exists, is not soft-deleted, and is owned by the caller
+        //    (404 on non-ownership so we don't reveal another user's list ids).
+        $chkL = $db->prepare('SELECT id, deck_id, version FROM lists WHERE id = ? AND user_id = ? AND deleted_at IS NULL');
+        $chkL->execute([$listId, $userId]);
         $listRow = $chkL->fetch();
         if (!$listRow) sendError('List not found', 404);
 
@@ -194,9 +195,9 @@ elseif ($method === 'POST') {
         $deckId = trim($input['deck_id'] ?? '');
         if (!$deckId) sendError('deck_id required');
 
-        // 1. Verify list exists and is not soft-deleted
-        $chkL = $db->prepare('SELECT id, deck_id, role, version FROM lists WHERE id = ? AND deleted_at IS NULL');
-        $chkL->execute([$listId]);
+        // 1. Verify list exists, is not soft-deleted, and is owned by the caller.
+        $chkL = $db->prepare('SELECT id, deck_id, role, version FROM lists WHERE id = ? AND user_id = ? AND deleted_at IS NULL');
+        $chkL->execute([$listId, $userId]);
         $listRow = $chkL->fetch();
         if (!$listRow) sendError('List not found', 404);
 
@@ -273,8 +274,8 @@ elseif ($method === 'POST') {
     if ($action === 'restore') {
         if (!$listId) sendError('id required');
 
-        $chk = $db->prepare('SELECT id, deleted_at, version FROM lists WHERE id = ?');
-        $chk->execute([$listId]);
+        $chk = $db->prepare('SELECT id, deleted_at, version FROM lists WHERE id = ? AND user_id = ?');
+        $chk->execute([$listId, $userId]);
         $listRow = $chk->fetch();
         if (!$listRow) sendError('List not found', 404);
 
@@ -388,9 +389,9 @@ elseif ($method === 'PATCH') {
     if (!$id) sendError('id required');
 
     $chk = $db->prepare(
-        'SELECT id, deck_id, format, role, name, description, version FROM lists WHERE id = ? AND deleted_at IS NULL'
+        'SELECT id, deck_id, format, role, name, description, version FROM lists WHERE id = ? AND user_id = ? AND deleted_at IS NULL'
     );
-    $chk->execute([$id]);
+    $chk->execute([$id, $userId]);
     $listRow = $chk->fetch();
     if (!$listRow) sendError('List not found', 404);
 
@@ -535,9 +536,9 @@ elseif ($method === 'DELETE') {
     if (!$id) sendError('id required');
 
     $chk = $db->prepare(
-        'SELECT id, deck_id, format, role, name, description, version FROM lists WHERE id = ? AND deleted_at IS NULL'
+        'SELECT id, deck_id, format, role, name, description, version FROM lists WHERE id = ? AND user_id = ? AND deleted_at IS NULL'
     );
-    $chk->execute([$id]);
+    $chk->execute([$id, $userId]);
     $listRow = $chk->fetch();
     if (!$listRow) sendError('List not found', 404);
 
