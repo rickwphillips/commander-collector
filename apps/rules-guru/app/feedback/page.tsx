@@ -19,10 +19,12 @@ const LIMIT = 25;
 
 function IssueChips({ item }: { item: FeedbackItem }) {
   const chips = [
-    item.wrong_ruling  && { label: 'Wrong ruling',  color: 'error'   as const },
-    item.wrong_cr_cite && { label: 'Wrong CR cite', color: 'warning' as const },
-    item.incomplete    && { label: 'Incomplete',    color: 'warning' as const },
-    item.unclear       && { label: 'Unclear',       color: 'default' as const },
+    item.wrong_conclusion   && { label: 'Wrong conclusion',   color: 'error'   as const },
+    item.wrong_cr_cite      && { label: 'Wrong CR cite',      color: 'error'   as const },
+    item.missing_cr_rules   && { label: 'Missing CR rules',   color: 'warning' as const },
+    item.hard_to_apply      && { label: 'Hard to apply',      color: 'warning' as const },
+    item.off_topic          && { label: 'Off topic',          color: 'default' as const },
+    item.cards_not_relevant && { label: 'Cards not relevant', color: 'default' as const },
   ].filter(Boolean) as Array<{ label: string; color: 'error' | 'warning' | 'default' }>;
 
   if (!chips.length) return null;

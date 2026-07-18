@@ -1,8 +1,16 @@
 <?php
 require_once 'config.php';
+require_once __DIR__ . '/auth/middleware.php';
 
 $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+// GET (reading the changelog) is public. All mutations require an admin token —
+// there is no legitimate client writer (releases are seeded via
+// scripts/seed-changelog.php), so an ungated write path is pure attack surface.
+if (in_array($method, ['POST', 'PUT', 'DELETE'], true)) {
+    requireAdmin();
+}
 
 switch ($method) {
     case 'GET':

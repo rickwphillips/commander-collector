@@ -119,10 +119,12 @@ export const rulesApi = {
         message_id: number | null;
         message_snippet: string | null;
         rating: 'up' | 'down';
-        wrong_ruling: number;
+        wrong_conclusion: number;
         wrong_cr_cite: number;
-        incomplete: number;
-        unclear: number;
+        missing_cr_rules: number;
+        off_topic: number;
+        hard_to_apply: number;
+        cards_not_relevant: number;
         notes: string | null;
         flag_pattern: number;
         created_at: string;
