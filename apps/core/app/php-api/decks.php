@@ -2,7 +2,7 @@
 require_once 'config.php';
 require_once __DIR__ . '/auth/middleware.php';
 require_once __DIR__ . '/lib/sql-helpers.php';
-requireAuth();
+$currentUser = requireAuth();
 
 function colorsToFields(string $colors): array {
     $s = strtoupper(trim($colors));
@@ -111,6 +111,12 @@ switch ($method) {
             sendError('Commander is required');
         }
 
+        // Ownership: a deck may only be created for a player the caller owns
+        // (admins may create for anyone).
+        if (!isAdmin($currentUser) && !userOwnsPlayer($pdo, (string)$data['player_id'], $currentUser['sub'])) {
+            sendError('You can only create decks for your own player', 403);
+        }
+
         $colorFields = colorsToFields(isset($data['colors']) ? $data['colors'] : '');
         $partner = isset($data['partner']) && trim($data['partner']) !== '' ? trim($data['partner']) : null;
 
@@ -154,6 +160,16 @@ switch ($method) {
             sendError('Deck ID is required');
         }
 
+        // Ownership: must own the deck (via its player) or be admin.
+        $exists = $pdo->prepare('SELECT id FROM decks WHERE id = ?');
+        $exists->execute([$id]);
+        if (!$exists->fetch()) {
+            sendError('Deck not found', 404);
+        }
+        if (!isAdmin($currentUser) && !userOwnsDeck($pdo, $id, $currentUser['sub'])) {
+            sendError('You can only edit your own decks', 403);
+        }
+
         $data = getJSONInput();
         $updates = [];
         $params = [];
@@ -182,6 +198,12 @@ switch ($method) {
             $params[] = $colorFields['has_g'];
         }
         if (isset($data['player_id'])) {
+            // Reassigning a deck: the target player must also belong to the
+            // caller (or the caller is admin), so a deck can't be handed to or
+            // taken from another user's identity.
+            if (!isAdmin($currentUser) && !userOwnsPlayer($pdo, (string)$data['player_id'], $currentUser['sub'])) {
+                sendError('You can only assign decks to your own player', 403);
+            }
             $updates[] = 'player_id = ?';
             $params[] = (string)$data['player_id'];
         }
@@ -208,6 +230,16 @@ switch ($method) {
     case 'DELETE':
         if (!$id) {
             sendError('Deck ID is required');
+        }
+
+        // Ownership: must own the deck (via its player) or be admin.
+        $exists = $pdo->prepare('SELECT id FROM decks WHERE id = ?');
+        $exists->execute([$id]);
+        if (!$exists->fetch()) {
+            sendError('Deck not found', 404);
+        }
+        if (!isAdmin($currentUser) && !userOwnsDeck($pdo, $id, $currentUser['sub'])) {
+            sendError('You can only delete your own decks', 403);
         }
 
         $stmt = $pdo->prepare('DELETE FROM decks WHERE id = ?');
