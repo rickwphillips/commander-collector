@@ -43,7 +43,7 @@ import { ColorIdentityChips } from '@/components/ColorIdentityChips';
 import { CardTooltip } from '@commander/shared/components/CardTooltip';
 import { CardListDisplay } from '@/components/CardListDisplay';
 import type { CardListEntry } from '@/components/CardListDisplay';
-import { api } from '@/lib/api';
+import { api, ASSET_BASE } from '@/lib/api';
 import type { MyCollectionResponse } from '@/lib/types';
 import { GuruChat, GURU_DRAWER_WIDTH } from '@/components/GuruChat';
 import type { GuruChatHandle, ActiveListContext } from '@/components/GuruChat';
@@ -346,7 +346,7 @@ export default function MyCollectionPage() {
                   <Card
                     key={g.game_id}
                     variant="outlined"
-                    onClick={() => window.open(`/games/detail?id=${g.game_id}`, '_blank')}
+                    onClick={() => window.open(`${ASSET_BASE}/games/detail?id=${g.game_id}`, '_blank')}
                     sx={{ cursor: 'pointer', borderLeft: 3, borderColor: isWin ? 'success.main' : '#D2691E' }}
                   >
                     <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
