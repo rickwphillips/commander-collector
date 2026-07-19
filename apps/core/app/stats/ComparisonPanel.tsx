@@ -48,6 +48,10 @@ const LOWER_IS_BETTER = new Set<ComparisonMetric>([
   'avg_finish_position',
   'avg_turns_to_win',
   'elimination_rate',
+  // Lower std-dev of finish position = more consistent = better.
+  'std_dev_finish_position',
+  // Being eliminated first more often is worse, so a lower rate wins.
+  'first_elimination_rate',
 ]);
 
 // Metrics that are percentages
