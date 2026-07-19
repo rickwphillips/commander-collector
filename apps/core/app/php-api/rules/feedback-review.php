@@ -4,6 +4,10 @@ require_once dirname(__DIR__) . '/auth/middleware.php';
 
 $db = getDB();
 
+// Admin-only: this endpoint returns every user's free-text feedback notes and
+// message snippets. It included middleware.php but never enforced auth.
+requireAdmin();
+
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     sendError('Method not allowed', 405);
 }
@@ -28,7 +32,8 @@ $whereClause = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
 $stmt = $db->prepare("
     SELECT mf.id, mf.conversation_id, mf.message_id, mf.message_snippet,
-           mf.rating, mf.wrong_ruling, mf.wrong_cr_cite, mf.incomplete, mf.unclear,
+           mf.rating, mf.wrong_conclusion, mf.wrong_cr_cite, mf.missing_cr_rules,
+           mf.off_topic, mf.hard_to_apply, mf.cards_not_relevant,
            mf.notes, mf.flag_pattern, mf.created_at
     FROM rules_guru_message_feedback mf
     $whereClause
