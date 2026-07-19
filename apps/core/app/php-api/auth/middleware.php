@@ -119,3 +119,42 @@ function requireAdmin() {
     }
     return $user;
 }
+
+// ── Per-resource ownership helpers ────────────────────────────────────────────
+// Model: users own player identities (players.user_id = sub). Decks inherit
+// ownership through their player; a game is "owned" by anyone who played in it.
+// Admins override every check. Pass the app DB handle (getDB()); the auth user
+// falls back to $GLOBALS['currentUser'] set by requireAuth().
+
+function isAdmin(?array $user = null): bool {
+    $user = $user ?? ($GLOBALS['currentUser'] ?? null);
+    return is_array($user) && ($user['role'] ?? '') === 'admin';
+}
+
+// True if $userId owns the player identity (an unclaimed player, user_id NULL,
+// is owned by no one and returns false — only an admin may manage it).
+function userOwnsPlayer(PDO $pdo, string $playerId, string $userId): bool {
+    $stmt = $pdo->prepare('SELECT 1 FROM players WHERE id = ? AND user_id = ? LIMIT 1');
+    $stmt->execute([$playerId, $userId]);
+    return (bool) $stmt->fetch();
+}
+
+// True if $userId owns the deck via its player identity.
+function userOwnsDeck(PDO $pdo, string $deckId, string $userId): bool {
+    $stmt = $pdo->prepare(
+        'SELECT 1 FROM decks d JOIN players p ON d.player_id = p.id
+         WHERE d.id = ? AND p.user_id = ? LIMIT 1'
+    );
+    $stmt->execute([$deckId, $userId]);
+    return (bool) $stmt->fetch();
+}
+
+// True if $userId played in the game (owns one of its result seats' players).
+function userInGame(PDO $pdo, string $gameId, string $userId): bool {
+    $stmt = $pdo->prepare(
+        'SELECT 1 FROM game_results gr JOIN players p ON gr.player_id = p.id
+         WHERE gr.game_id = ? AND p.user_id = ? LIMIT 1'
+    );
+    $stmt->execute([$gameId, $userId]);
+    return (bool) $stmt->fetch();
+}

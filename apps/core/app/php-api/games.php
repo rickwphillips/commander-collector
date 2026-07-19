@@ -261,6 +261,17 @@ switch ($method) {
             sendError('Game ID is required');
         }
 
+        // Ownership: must have played in the game (own one of its result seats'
+        // players) or be admin.
+        $exists = $pdo->prepare('SELECT id FROM games WHERE id = ?');
+        $exists->execute([$id]);
+        if (!$exists->fetch()) {
+            sendError('Game not found', 404);
+        }
+        if (!isAdmin($currentUser) && !userInGame($pdo, $id, $currentUser['sub'])) {
+            sendError('You can only edit games you played in', 403);
+        }
+
         $data = getJSONInput();
 
         try {
@@ -355,6 +366,16 @@ switch ($method) {
     case 'DELETE':
         if (!$id) {
             sendError('Game ID is required');
+        }
+
+        // Ownership: participant or admin.
+        $exists = $pdo->prepare('SELECT id FROM games WHERE id = ?');
+        $exists->execute([$id]);
+        if (!$exists->fetch()) {
+            sendError('Game not found', 404);
+        }
+        if (!isAdmin($currentUser) && !userInGame($pdo, $id, $currentUser['sub'])) {
+            sendError('You can only delete games you played in', 403);
         }
 
         try {

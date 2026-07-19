@@ -2,7 +2,7 @@
 require_once 'config.php';
 require_once __DIR__ . '/auth/middleware.php';
 require_once __DIR__ . '/lib/sql-helpers.php';
-requireAuth();
+$currentUser = requireAuth();
 
 $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
@@ -70,10 +70,16 @@ switch ($method) {
             sendError('Name is required');
         }
 
+        // The player roster is communal: any authenticated user may edit a
+        // player's name. Reassigning the account link (user_id) stays admin-only
+        // — it is an account-takeover vector otherwise.
         $fields = ['name = ?'];
         $params = [trim($data['name'])];
 
         if (array_key_exists('user_id', $data)) {
+            if (!isAdmin($currentUser)) {
+                sendError('Only an admin can reassign a player to a different account', 403);
+            }
             $fields[] = 'user_id = ?';
             $params[] = $data['user_id'] !== null ? (string)$data['user_id'] : null;
         }
@@ -99,6 +105,7 @@ switch ($method) {
             sendError('Player ID is required');
         }
 
+        // Communal roster: any authenticated user may remove a player entry.
         $stmt = $pdo->prepare('DELETE FROM players WHERE id = ?');
         $stmt->execute([$id]);
 
