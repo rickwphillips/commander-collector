@@ -3,6 +3,10 @@ require_once dirname(__DIR__) . '/config.php';
 require_once dirname(__DIR__) . '/auth/middleware.php';
 
 $db = getDB();
+// Rules Guru is auth-gated and its client sends a bearer token. Require it here
+// so writes are attributed — $currentUserId was previously undefined, so user_id
+// was always stored NULL.
+$currentUserId = requireAuth()['sub'];
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'POST') {
@@ -42,7 +46,7 @@ if ($method === 'POST') {
         $cardFeedback,
         isset($body['notes']) ? (string)$body['notes'] : null,
         empty($body['flag_pattern'])       ? 0 : 1,
-        $currentUserId ?? null,
+        $currentUserId,
     ]);
 
     sendJSON(['id' => $id, 'success' => true]);
