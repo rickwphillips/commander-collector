@@ -23,6 +23,7 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import GroupsIcon from '@mui/icons-material/Groups';
 import StyleIcon from '@mui/icons-material/Style';
 import ListSubheader from '@mui/material/ListSubheader';
+import Link from 'next/link';
 import { ColorIdentityChips } from './ColorIdentityChips';
 import { LoadingSpinner } from './LoadingSpinner';
 import { api } from '@/lib/api';
@@ -371,7 +372,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
         <CardContent>
           <Alert severity="info">
             You need to create some decks before logging a game.{' '}
-            <Button component="a" href="/decks/new" size="small">
+            <Button component={Link} href="/decks/new" size="small">
               Add Deck
             </Button>
           </Alert>
