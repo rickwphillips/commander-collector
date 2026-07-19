@@ -68,10 +68,25 @@ export function getDeviceId(): string {
   if (typeof window === 'undefined') return 'ssr';
   let id = localStorage.getItem(DEVICE_ID_KEY);
   if (!id) {
-    id = crypto.randomUUID();
+    id = randomDeviceId();
     localStorage.setItem(DEVICE_ID_KEY, id);
   }
   return id;
+}
+
+// crypto.randomUUID() is only defined in a secure context; a phone on the LAN
+// hitting the dev server over plain http has `crypto` but no `randomUUID`, so a
+// bare call throws. Fall back to a non-cryptographic id — this only scopes local
+// drafts to a device, so uniqueness (not unpredictability) is all that matters.
+function randomDeviceId(): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+  } catch {
+    /* insecure context — fall through */
+  }
+  return 'dev-' + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 }
 
 // Helper for API calls

@@ -35,7 +35,8 @@ $userData = [
 
 if ($linkedPlayer) {
     $userData['player'] = [
-        'id' => (int)$linkedPlayer['id'],
+        // players.id is a CHAR(36) UUID — casting to (int) corrupts it to 0.
+        'id' => $linkedPlayer['id'],
         'name' => $linkedPlayer['name'],
     ];
 }

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import { PageContainer } from '@/components/PageContainer';
 import { useAuth } from '@/components/AuthGuard';
+import { ASSET_BASE } from '@/lib/api';
 
 const adminItems = [
   {
@@ -22,7 +23,9 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (user && user.role !== 'admin') {
-      window.location.href = '/';
+      // ASSET_BASE-prefixed so the redirect lands inside the app's basePath in
+      // production (bare '/' escapes to the site root and 404s).
+      window.location.href = `${ASSET_BASE}/`;
     }
   }, [user]);
 
