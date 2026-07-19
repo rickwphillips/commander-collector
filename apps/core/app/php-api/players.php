@@ -70,27 +70,14 @@ switch ($method) {
             sendError('Name is required');
         }
 
-        // Ownership: only the owner or an admin may edit a player. Unclaimed
-        // players (user_id NULL) belong to no one and are admin-only to manage.
-        $lookup = $pdo->prepare('SELECT id, user_id FROM players WHERE id = ?');
-        $lookup->execute([$id]);
-        $existingPlayer = $lookup->fetch();
-        if (!$existingPlayer) {
-            sendError('Player not found', 404);
-        }
-        $admin = isAdmin($currentUser);
-        $owns  = $existingPlayer['user_id'] !== null && $existingPlayer['user_id'] === $currentUser['sub'];
-        if (!$admin && !$owns) {
-            sendError('You can only edit your own player', 403);
-        }
-
+        // The player roster is communal: any authenticated user may edit a
+        // player's name. Reassigning the account link (user_id) stays admin-only
+        // — it is an account-takeover vector otherwise.
         $fields = ['name = ?'];
         $params = [trim($data['name'])];
 
         if (array_key_exists('user_id', $data)) {
-            // Reassigning the account link is admin-only — otherwise a user could
-            // claim another account's identity (account takeover).
-            if (!$admin) {
+            if (!isAdmin($currentUser)) {
                 sendError('Only an admin can reassign a player to a different account', 403);
             }
             $fields[] = 'user_id = ?';
@@ -118,19 +105,7 @@ switch ($method) {
             sendError('Player ID is required');
         }
 
-        // Ownership: only the owner or an admin may delete a player. Unclaimed
-        // players (user_id NULL) are admin-only.
-        $lookup = $pdo->prepare('SELECT id, user_id FROM players WHERE id = ?');
-        $lookup->execute([$id]);
-        $existingPlayer = $lookup->fetch();
-        if (!$existingPlayer) {
-            sendError('Player not found', 404);
-        }
-        if (!isAdmin($currentUser)
-            && !($existingPlayer['user_id'] !== null && $existingPlayer['user_id'] === $currentUser['sub'])) {
-            sendError('You can only delete your own player', 403);
-        }
-
+        // Communal roster: any authenticated user may remove a player entry.
         $stmt = $pdo->prepare('DELETE FROM players WHERE id = ?');
         $stmt->execute([$id]);
 
