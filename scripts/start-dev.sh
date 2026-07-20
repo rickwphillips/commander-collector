@@ -30,7 +30,9 @@ sleep 1
 if [ "$MODE" = "all" ] || [ "$MODE" = "core" ] || [ "$MODE" = "" ]; then
   echo "Starting apps/core on port 3001..."
   cd "$PROJECT_DIR/apps/core"
-  npm run dev > /tmp/nextjs-core.log 2>&1 &
+  # Pin the port: the apps/core `dev` script has no -p and defaults to 3000, so
+  # without this it would land on 3000 (or auto-increment) instead of 3001.
+  npm run dev -- -p 3001 > /tmp/nextjs-core.log 2>&1 &
   echo "apps/core PID: $!"
 fi
 
@@ -50,3 +52,21 @@ echo "  PHP API:     http://localhost:8081/php-api/"
 echo ""
 echo "Logs: tail -f /tmp/php-server.log /tmp/nextjs-*.log"
 echo "Stop: ./scripts/stop-dev.sh"
+
+if [ "$NO_BROWSER" != "1" ] && { [ "$MODE" = "all" ] || [ "$MODE" = "core" ]; }; then
+  # Once Next answers on :3001 (basePath '' in dev), pop an incognito Chrome
+  # window at the app.
+  ( for _ in $(seq 1 60); do
+      curl -s -o /dev/null --max-time 2 http://localhost:3001/ && { "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --incognito "http://localhost:3001/" >/dev/null 2>&1 & break; }
+      sleep 1
+    done ) &
+fi
+
+if [ "$FOREGROUND" = "1" ]; then
+  # Foreground mode (MissionControl play/stop button): stay attached so stopping
+  # this command tears down the servers it started. kill 0 signals this script's
+  # own process group only, so a Portfolio dev server started in a separate
+  # session by the play-button guard is left running.
+  trap 'kill 0' INT TERM
+  wait
+fi
