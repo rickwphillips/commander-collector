@@ -38,7 +38,11 @@ export type TypeCategory = typeof TYPE_CATEGORIES[number];
  * Returns 'other' for anything that doesn't match (tokens, emblems, etc.).
  */
 export function categorizeByType(typeLine: string | null | undefined): TypeCategory {
-  const tl = typeLine ?? '';
+  // A double-faced / modal card's stored type line combines both faces
+  // ("Instant // Land", "Creature — Elf Druid // Land"). A card is classified by
+  // its FRONT face, so only consider the part before the "//" separator; otherwise
+  // a spell with a land back (an MDFC) would be miscounted as a land.
+  const tl = (typeLine ?? '').split('//')[0];
   if (tl.includes('Creature'))     return 'creature';
   if (tl.includes('Planeswalker')) return 'planeswalker';
   if (tl.includes('Battle'))       return 'battle';

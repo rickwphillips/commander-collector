@@ -50,7 +50,9 @@ type TypeCategory = (typeof TYPE_ORDER)[number];
 
 function getCategory(card: BreakdownCard): TypeCategory {
   if (card.is_commander) return 'Commander';
-  const tl = card.type_line ?? '';
+  // Front face only: a DFC/MDFC ("Sorcery // Land") is classified by its front
+  // side, so a spell with a land back is not counted as a Land.
+  const tl = (card.type_line ?? '').split('//')[0];
   if (tl.includes('Creature')) return 'Creature';
   if (tl.includes('Planeswalker')) return 'Planeswalker';
   if (tl.includes('Battle')) return 'Battle';

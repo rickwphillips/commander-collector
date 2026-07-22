@@ -103,7 +103,10 @@ export function hasActiveFilters(f: DeckFilterState) {
 }
 
 export function getTypeCategory(typeLine: string | null | undefined): TypeCategory | 'Other' {
-  const tl = typeLine ?? '';
+  // Classify by the FRONT face only: a DFC/MDFC type line combines both faces
+  // ("Sorcery // Land"), and the card's category is its front side, so a spell
+  // with a land back is not grouped under Land.
+  const tl = (typeLine ?? '').split('//')[0];
   if (tl.includes('Creature'))     return 'Creature';
   if (tl.includes('Planeswalker')) return 'Planeswalker';
   if (tl.includes('Battle'))       return 'Battle';
