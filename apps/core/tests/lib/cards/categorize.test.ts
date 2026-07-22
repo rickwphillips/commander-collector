@@ -66,6 +66,20 @@ describe('categorizeByType', () => {
     expect(categorizeByType('Artifact Land')).toBe('land');
   });
 
+  it('DFC: spell front with a land back is classified by the front face', () => {
+    // MDFCs store both faces in the type line; the card is its front side.
+    expect(categorizeByType('Sorcery // Land')).toBe('sorcery');
+    expect(categorizeByType('Instant // Land')).toBe('instant');
+    expect(categorizeByType('Creature — Elf Druid // Land')).toBe('creature');
+    expect(categorizeByType('Legendary Creature — God // Land')).toBe('creature');
+  });
+
+  it('DFC: a real land keeps its Land category', () => {
+    // Transforming lands and creature-front // land-back must not lose Land when
+    // the front truly is a land.
+    expect(categorizeByType('Land // Creature — Elemental')).toBe('land');
+  });
+
   it('all category results are lowercase strings', () => {
     const inputs = [
       'Creature',
