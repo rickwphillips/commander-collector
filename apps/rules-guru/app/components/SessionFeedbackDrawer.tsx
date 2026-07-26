@@ -161,7 +161,7 @@ export function SessionFeedbackDrawer({ open, onClose, conversationId, messages,
             Clear
           </Button>
         )}
-        <IconButton size="small" onClick={handleClose}>
+        <IconButton size="small" onClick={handleClose} aria-label="Close">
           <CloseIcon fontSize="small" />
         </IconButton>
       </Stack>

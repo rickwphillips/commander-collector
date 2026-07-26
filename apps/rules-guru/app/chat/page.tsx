@@ -862,7 +862,7 @@ export default function ChatPage() {
               key={c.id}
               disablePadding
               secondaryAction={
-                <IconButton size="small" onClick={e => deleteConversation(c.id, e)}>
+                <IconButton size="small" onClick={e => deleteConversation(c.id, e)} aria-label="Delete conversation">
                   <DeleteIcon fontSize="small" />
                 </IconButton>
               }
