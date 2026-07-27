@@ -173,6 +173,26 @@ function ttsWriteCardImages(array $cards, string $side = 'front'): array {
     return $tmpFiles;
 }
 
+// Resolve a usable font file. IM7 (e.g. Homebrew macOS) can ship with no font
+// configuration at all — `montage` then fails initializing its default label
+// font and exits non-zero even though it wrote the sheet. Passing an explicit
+// -font that exists on disk avoids that. Returns '' when none of the candidates
+// exist, preserving default behavior on hosts whose ImageMagick has fonts.
+function ttsFontArg(): string {
+    static $arg = null;
+    if ($arg !== null) return $arg;
+    $candidates = [
+        '/System/Library/Fonts/Supplemental/Arial.ttf',            // macOS
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',         // Debian/Ubuntu
+        '/usr/share/fonts/dejavu/DejaVuSans.ttf',                  // Fedora/RHEL
+        '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+    ];
+    foreach ($candidates as $f) {
+        if (is_file($f)) return $arg = '-font ' . escapeshellarg($f) . ' ';
+    }
+    return $arg = '';
+}
+
 // ── Stitch sheet with ImageMagick montage ─────────────────────────────────────
 function ttsBuildMontage(array $tmpFiles, string $outputPath): bool {
     if (empty(array_filter($tmpFiles))) return false;
@@ -192,7 +212,7 @@ function ttsBuildMontage(array $tmpFiles, string $outputPath): bool {
     $geo  = TTS_CARD_W . 'x' . TTS_CARD_H . '+0+0';
     $args = implode(' ', array_map(fn($f) => escapeshellarg('jpg:' . $f), $tmpFiles));
     $out  = escapeshellarg($outputPath);
-    $cmd  = "montage {$args} -geometry {$geo} -tile " . TTS_COLS . "x -background '#000000' -quality 75 {$out} 2>&1";
+    $cmd  = "montage {$args} -geometry {$geo} -tile " . TTS_COLS . "x -background '#000000' " . ttsFontArg() . "-quality 75 {$out} 2>&1";
     exec($cmd, $result, $code);
     if ($placeholder) @unlink($placeholder);
     return $code === 0 && file_exists($outputPath);

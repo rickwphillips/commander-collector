@@ -6,6 +6,7 @@ if (!defined('MCP_TIMEOUT_SECONDS')) {
     define('MCP_TIMEOUT_SECONDS', 12);
 }
 require_once dirname(__DIR__) . '/lib/mcp-client.php';
+require_once dirname(__DIR__) . '/lib/card-classify.php';
 requireAuth();
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -834,16 +835,8 @@ function executeTool(string $name, array $input): string {
             $did   = (string)$row['deck_id'];
             $entry = $row['quantity'] > 1 ? "{$row['quantity']}x {$row['card_name']}" : $row['card_name'];
             if (!isset($decks[$did])) $decks[$did] = ['player' => $playerByDeck[$did] ?? "Deck {$did}", 'cards' => []];
-            $type = $row['type_line'] ?? '';
-            if ($row['is_commander'])               $group = 'Commander';
-            elseif (str_contains($type, 'Land'))        $group = 'Land';
-            elseif (str_contains($type, 'Creature'))    $group = 'Creature';
-            elseif (str_contains($type, 'Instant'))     $group = 'Instant';
-            elseif (str_contains($type, 'Sorcery'))     $group = 'Sorcery';
-            elseif (str_contains($type, 'Enchantment')) $group = 'Enchantment';
-            elseif (str_contains($type, 'Artifact'))    $group = 'Artifact';
-            elseif (str_contains($type, 'Planeswalker'))$group = 'Planeswalker';
-            else                                        $group = 'Other';
+            // Front-face (side 0) category so a spell//land DFC is not grouped as Land.
+            $group = $row['is_commander'] ? 'Commander' : cardTypeCategory($row['type_line'] ?? '');
             $decks[$did]['cards'][$group][] = $entry;
         }
 
@@ -878,15 +871,8 @@ function executeTool(string $name, array $input): string {
         foreach ($rows as $row) {
             $entry = $row['quantity'] > 1 ? "{$row['quantity']}x {$row['card_name']}" : $row['card_name'];
             if ($row['is_commander']) { $groups['Commander'][] = $entry; continue; }
-            $type = $row['type_line'] ?? '';
-            if (str_contains($type, 'Land'))        { $groups['Land'][]        = $entry; }
-            elseif (str_contains($type, 'Creature'))     { $groups['Creature'][]     = $entry; }
-            elseif (str_contains($type, 'Instant'))      { $groups['Instant'][]      = $entry; }
-            elseif (str_contains($type, 'Sorcery'))      { $groups['Sorcery'][]      = $entry; }
-            elseif (str_contains($type, 'Enchantment'))  { $groups['Enchantment'][]  = $entry; }
-            elseif (str_contains($type, 'Artifact'))     { $groups['Artifact'][]     = $entry; }
-            elseif (str_contains($type, 'Planeswalker')) { $groups['Planeswalker'][] = $entry; }
-            else                                          { $groups['Other'][]        = $entry; }
+            // Front-face (side 0) category: a spell//land DFC groups by its spell front.
+            $groups[cardTypeCategory($row['type_line'] ?? '')][] = $entry;
         }
 
         $out = [];
