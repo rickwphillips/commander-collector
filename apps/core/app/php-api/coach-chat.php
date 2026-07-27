@@ -1719,7 +1719,7 @@ while ($iter < $maxIter) {
     $iter++;
 
     $payload = [
-        'model'      => 'claude-opus-4-7',
+        'model'      => 'claude-opus-4-8',
         'max_tokens' => 8192,
         'system'     => $systemPrompt,
         'tools'      => $tools,
@@ -1825,7 +1825,7 @@ while ($iter < $maxIter) {
 // If we hit the iteration cap, make one final call without tools to force a summary.
 if ($hitIterCap) {
     $finalPayload = [
-        'model'      => 'claude-opus-4-7',
+        'model'      => 'claude-opus-4-8',
         'max_tokens' => 8192,
         'system'     => $systemPrompt,
         'messages'   => $messages,
