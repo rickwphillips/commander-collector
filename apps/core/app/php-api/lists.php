@@ -1,6 +1,7 @@
 <?php
 require_once 'config.php';
 require_once 'auth/middleware.php';
+require_once __DIR__ . '/lib/card-classify.php';
 $currentUser = requireAuth();
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -458,6 +459,21 @@ elseif ($method === 'PATCH') {
         if (isset($input['cards'])) {
             $cardsBefore = getListCardCount($db, $id);
 
+            // Singleton dedup applies ONLY to non-basic cards in Commander: that is
+            // the only format with a singleton rule, and basic lands are exempt. So
+            // in a Commander list we collapse any duplicate non-basic rows (same
+            // name) to a single row, which is what stops duplicates like two "Shizo"
+            // rows from surviving the wipe-and-reinsert save. Basics and every other
+            // format pass through untouched.
+            $listFormat = strtolower(trim($input['format'] ?? ''));
+            if ($listFormat === '') {
+                $fmtStmt = $db->prepare('SELECT format FROM lists WHERE id = ?');
+                $fmtStmt->execute([$id]);
+                $listFormat = strtolower((string) $fmtStmt->fetchColumn());
+            }
+            $dedupSingleton = ($listFormat === 'commander');
+            $seenSingleton  = [];
+
             $del = $db->prepare('DELETE FROM list_cards WHERE list_id = ?');
             $del->execute([$id]);
             $ins = $db->prepare(
@@ -473,6 +489,11 @@ elseif ($method === 'PATCH') {
                 $role        = $isCommander ? 'commander' : null;
                 $isProxy     = empty($card['is_proxy']) ? 0 : 1;
                 if (!$cardName) continue;
+                if ($dedupSingleton && !isBasicLandName($cardName)) {
+                    $key = strtolower($cardName);
+                    if (isset($seenSingleton[$key])) continue; // duplicate non-basic — skip
+                    $seenSingleton[$key] = true;
+                }
                 $ins->execute([$id, $scryfallId ?: null, $cardName, $quantity, $role, $isProxy]);
                 $totalQty += $quantity;
             }

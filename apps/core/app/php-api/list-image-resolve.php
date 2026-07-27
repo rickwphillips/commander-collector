@@ -8,6 +8,7 @@
  */
 require_once 'config.php';
 require_once 'auth/middleware.php';
+require_once __DIR__ . '/lib/card-classify.php';
 $currentUser = requireAuth();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') sendError('Method not allowed', 405);
@@ -124,11 +125,21 @@ foreach ($idChunks as $i => $chunk) {
 $fetchedByName = [];
 $nameChunks = array_chunk(array_values($byName), 75);
 foreach ($nameChunks as $i => $chunk) {
-    $identifiers = array_map(fn($r) => ['name' => $r['card_name']], $chunk);
+    // Scryfall's /cards/collection name identifier matches a single FACE name, not
+    // the combined "Front // Back" Oracle name of a DFC — passing the full name
+    // returns not_found. Query by the front face so DFCs added by their full name
+    // resolve. (The agent is told to use exact Oracle names, which for a DFC IS
+    // "Front // Back".)
+    $identifiers = array_map(fn($r) => ['name' => cardFrontFace($r['card_name'])], $chunk);
     foreach (scryfallBatch($identifiers) as $card) {
         $row = normaliseCard($card);
         cacheAndStore($row, $cacheStmt, $fetched);
-        $fetchedByName[strtolower($card['name'])] = $row;
+        // Key by the returned full name AND its front face, so a list row named by
+        // either form matches below.
+        $fullKey  = strtolower($card['name']);
+        $frontKey = strtolower(cardFrontFace($card['name']));
+        $fetchedByName[$fullKey] = $row;
+        if ($frontKey !== $fullKey) $fetchedByName[$frontKey] = $row;
     }
     if ($i < count($nameChunks) - 1) usleep(100000);
 }

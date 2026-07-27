@@ -39,6 +39,7 @@ function sseEmit(string $event, array $data): void {
 require_once 'config.php';
 require_once __DIR__ . '/auth/middleware.php';
 require_once __DIR__ . '/lib/mcp-client.php';
+require_once __DIR__ . '/lib/card-classify.php';
 $user = requireAuth();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') coachError(405, 'Method not allowed');
@@ -1076,15 +1077,8 @@ function executeTool(string $name, array $input): string {
         foreach ($rows as $row) {
             $entry = $row['quantity'] > 1 ? "{$row['quantity']}x {$row['card_name']}" : $row['card_name'];
             if ($row['is_commander']) { $groups['Commander'][] = $entry; continue; }
-            $type = $row['type_line'] ?? '';
-            if (str_contains($type, 'Land'))             $groups['Land'][]        = $entry;
-            elseif (str_contains($type, 'Creature'))     $groups['Creature'][]    = $entry;
-            elseif (str_contains($type, 'Instant'))      $groups['Instant'][]     = $entry;
-            elseif (str_contains($type, 'Sorcery'))      $groups['Sorcery'][]     = $entry;
-            elseif (str_contains($type, 'Enchantment'))  $groups['Enchantment'][] = $entry;
-            elseif (str_contains($type, 'Artifact'))     $groups['Artifact'][]    = $entry;
-            elseif (str_contains($type, 'Planeswalker')) $groups['Planeswalker'][]= $entry;
-            else                                         $groups['Other'][]       = $entry;
+            // Front-face (side 0) category: a spell//land DFC groups by its spell front.
+            $groups[cardTypeCategory($row['type_line'] ?? '')][] = $entry;
         }
 
         $out = [];
@@ -1183,20 +1177,8 @@ function executeTool(string $name, array $input): string {
         if ($typeCategory && !empty($rows)) {
             $rows = array_values(array_filter($rows, function ($r) use ($typeCategory) {
                 if ($r['is_commander'] && strtolower($typeCategory) === 'commander') return true;
-                $type = $r['type_line'] ?? '';
-                return match ($typeCategory) {
-                    'Creature'     => str_contains($type, 'Creature'),
-                    'Instant'      => str_contains($type, 'Instant'),
-                    'Sorcery'      => str_contains($type, 'Sorcery'),
-                    'Enchantment'  => str_contains($type, 'Enchantment'),
-                    'Artifact'     => str_contains($type, 'Artifact'),
-                    'Planeswalker' => str_contains($type, 'Planeswalker'),
-                    'Land'         => str_contains($type, 'Land'),
-                    default        => !str_contains($type, 'Creature') && !str_contains($type, 'Instant') &&
-                                     !str_contains($type, 'Sorcery')   && !str_contains($type, 'Enchantment') &&
-                                     !str_contains($type, 'Artifact')  && !str_contains($type, 'Planeswalker') &&
-                                     !str_contains($type, 'Land'),
-                };
+                // Match on the front-face category so a spell//land DFC is not treated as a Land.
+                return cardTypeCategory($r['type_line'] ?? '') === $typeCategory;
             }));
         }
 
@@ -1288,15 +1270,8 @@ function executeTool(string $name, array $input): string {
         foreach ($rows as $row) {
             $entry = $row['quantity'] > 1 ? "{$row['quantity']}x {$row['card_name']}" : $row['card_name'];
             if ($row['is_commander']) { $groups['Commander'][] = $entry; continue; }
-            $type = $row['type_line'] ?? '';
-            if (str_contains($type, 'Land'))             $groups['Land'][]        = $entry;
-            elseif (str_contains($type, 'Creature'))     $groups['Creature'][]    = $entry;
-            elseif (str_contains($type, 'Instant'))      $groups['Instant'][]     = $entry;
-            elseif (str_contains($type, 'Sorcery'))      $groups['Sorcery'][]     = $entry;
-            elseif (str_contains($type, 'Enchantment'))  $groups['Enchantment'][] = $entry;
-            elseif (str_contains($type, 'Artifact'))     $groups['Artifact'][]    = $entry;
-            elseif (str_contains($type, 'Planeswalker')) $groups['Planeswalker'][]= $entry;
-            else                                         $groups['Other'][]       = $entry;
+            // Front-face (side 0) category: a spell//land DFC groups by its spell front.
+            $groups[cardTypeCategory($row['type_line'] ?? '')][] = $entry;
         }
         $out = [];
         foreach ($groups as $label => $cards) {
