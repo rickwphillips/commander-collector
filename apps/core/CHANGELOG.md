@@ -1,5 +1,17 @@
 # Changelog
 
+## [5.22.0] - 2026-07-28
+
+### Fixed
+
+- Card counts summed rows instead of copies. A `list_cards` row can hold many copies (Island x13), so `cards.length` / `count($rows)` under-reported every deck: a 99-card deck stored in 79 rows displayed as `79 / 79`. Introduced one aggregator, `totalCardCount()` in `@commander/shared/lib/cardCount`, re-exported from `@/lib/cards/count` so app import paths are unchanged, and routed all 16 call sites through it (deck page counter, `DeckBreakdown` in both core and shared, `CardListDisplay`, `CardImportPanel`, `commander.ts` legality check)
+- The coach/guru agent was handed row counts. `coach-chat.php` injected the front end's `cards.length` into the system prompt as `Cards: N`, while its own `list_decks` tool already used `SUM(lc.quantity)`, so the model could see two different totals for one deck. `lookup_decklist` (`total_cards`) and `get_list_cards` (`total`) also returned `count($rows)`. Added `cardQuantityTotal()` in `php-api/lib/card-count.php` as the PHP mirror and used it in all three places
+
+### Added
+
+- The deck page counter's denominator is the deck's target size rather than the buffer total. `requiredListSize()` (`lib/formats/deckSize.ts`) returns 99 for one commander and 98 for two (partner / background / Doctor's companion), since CR 903.5a puts the commander inside the 100 and commanders are deck-native; 100 when the commanders are stored in the list itself via `list_cards.role`; and null for standalone lists, which fall back to the buffer total
+- The counter renders in `error.main` at weight 600 with an "N cards over the limit" tooltip when the deck exceeds its target, via a new `overBy` prop on `DeckFilters`. Measured against the whole deck rather than the filtered view, so filtering does not clear the warning
+
 ## [5.19.0] - 2026-07-15
 
 ### Added
