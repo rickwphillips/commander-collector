@@ -85,6 +85,30 @@ test.describe('SSE — Live Game State Streaming', () => {
     await page.close();
   });
 
+  /**
+   * Block until the remote is genuinely subscribed: EventSource OPEN and the
+   * initial state painted.
+   *
+   * The tests below used a fixed 1500ms sleep. When connecting took longer, the
+   * host write landed before the client was listening, so the push never
+   * arrived and the assertion timed out. Gating on the real readyState keeps
+   * the delivery-window assertions meaningful (they still measure push latency,
+   * not connection setup) while removing the race.
+   */
+  async function waitForSseReady(page: import('@playwright/test').Page): Promise<void> {
+    await expect
+      .poll(
+        () => page.evaluate(() => (window as unknown as { _sseReadyState?: number })._sseReadyState ?? -1),
+        { timeout: 20_000 },
+      )
+      .toBe(1); // 1 = OPEN
+    // Confirm a message was actually handled by waiting for painted state. Key
+    // on the player name, not a life total: these tests share one session and
+    // the preceding test writes life 35, so waiting for the initial 40 would
+    // hang forever in whichever test runs second.
+    await expect(page.getByText(/SSE Test A/i).first()).toBeVisible({ timeout: 15_000 });
+  }
+
   test('remote receives initial state via SSE', async ({ page }) => {
     if (!sessionCode) { test.skip(true, 'Session setup failed'); return; }
     await goto(page, `/game-manager/remote/?code=${sessionCode}`);
@@ -107,7 +131,7 @@ test.describe('SSE — Live Game State Streaming', () => {
     if (!sessionCode) { test.skip(true, 'Session setup failed'); return; }
     await goto(page, `/game-manager/remote/?code=${sessionCode}`);
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(1500); // let SSE connect and receive initial state
+    await waitForSseReady(page);
 
     // Simulate host writing updated state: SSE Test A life drops to 35
     const updatedState = {
@@ -129,7 +153,7 @@ test.describe('SSE — Live Game State Streaming', () => {
     if (!sessionCode) { test.skip(true, 'Session setup failed'); return; }
     await goto(page, `/game-manager/remote/?code=${sessionCode}`);
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(1500);
+    await waitForSseReady(page);
 
     // Delete the session (simulates host ending game)
     await apiCall(page, 'DELETE', `/live-game.php?code=${sessionCode}`);
