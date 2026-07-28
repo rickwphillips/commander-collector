@@ -72,7 +72,13 @@ test.describe('Dashboard', () => {
   });
 
   test('navigating to /players works from dashboard', async ({ page }) => {
-    const link = page.getByRole('link', { name: /players/i }).first();
+    // Target the href, not the accessible name. /players/i also matched cards
+    // linking to /game-manager/, so .first() navigated there and the test
+    // failed intermittently depending on game data. An exact /^players$/ name
+    // does not work either: the real nav link reads "PlayersManage your
+    // playgroup". The href is the only stable handle.
+    const link = page.locator('a[href*="/players/"]').first();
+    await expect(link).toBeVisible({ timeout: 15_000 });
     await link.click();
     await expect(page).toHaveURL(/players/);
   });
