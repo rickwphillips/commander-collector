@@ -19,6 +19,7 @@
  */
 
 import type { Card } from '../cards/types';
+import { totalCardCount } from '../cards/count';
 import {
   computeColorIdentity,
   isSubsetOf,
@@ -224,7 +225,7 @@ function commanderColorIdentity(
 // ---------------------------------------------------------------------------
 
 function pushCardCountViolation(cards: Card[], violations: Violation[]): void {
-  const total = cards.reduce((sum, c) => sum + c.quantity, 0);
+  const total = totalCardCount(cards);
   if (total !== 100) {
     violations.push({
       rule: 'card_count',

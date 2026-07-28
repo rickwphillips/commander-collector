@@ -246,11 +246,17 @@ interface Props {
   onChange: (f: DeckFilterState) => void;
   resultCount?: number;
   totalCount?: number;
+  /**
+   * How many cards the deck is over totalCount, or 0 when it is not over.
+   * Measured against the whole deck, not the filtered view, so the warning does
+   * not come and go as the user filters. Renders the counter in the error color.
+   */
+  overBy?: number;
   /** Cards in the current view — used to show only relevant filter chips */
   cards?: { card_name: string; type_line?: string | null; mana_cost?: string | null; colors?: string | null; color_identity?: string | null; is_proxy?: number | boolean; is_commander?: number | boolean; back_image_uri?: string | null; }[];
 }
 
-export function DeckFilters({ filters, onChange, resultCount, totalCount, cards = [] }: Props) {
+export function DeckFilters({ filters, onChange, resultCount, totalCount, overBy = 0, cards = [] }: Props) {
   const { nameFilter, typeFilter, cmcFilter, colorFilter, colorMode, useColorIdentity, manaSymbolFilter, proxyOnly, commanderOnly, dfcOnly, sortOrder, sortDirection } = filters;
   const COLOR_MODE_CYCLE: ColorMode[] = ['or', 'and', 'exact'];
 
@@ -538,9 +544,16 @@ export function DeckFilters({ filters, onChange, resultCount, totalCount, cards 
               </Tooltip>
             )}
             {resultCount !== undefined && totalCount !== undefined && (
-              <Typography variant="caption" color="text.secondary">
-                {resultCount} / {totalCount}
-              </Typography>
+              <Tooltip title={overBy > 0 ? `${overBy} card${overBy === 1 ? '' : 's'} over the limit` : ''}>
+                <Typography
+                  variant="caption"
+                  color={overBy > 0 ? 'error.main' : 'text.secondary'}
+                  sx={{ fontWeight: overBy > 0 ? 600 : undefined }}
+                  data-testid="deck-card-count"
+                >
+                  {resultCount} / {totalCount}
+                </Typography>
+              </Tooltip>
             )}
           </Box>
         ) : null}

@@ -16,6 +16,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 
 import { parseImport } from '@/lib/parseImport';
 import type { Card } from '@/lib/cards/types';
+import { totalCardCount } from '@/lib/cards/count';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -184,7 +185,7 @@ export function CardImportPanel({
       return;
     }
 
-    setParsedCount(cards.reduce((s, c) => s + c.quantity, 0));
+    setParsedCount(totalCardCount(cards));
     onCards(parsedToCards(cards));
   };
 

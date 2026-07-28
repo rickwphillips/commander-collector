@@ -24,6 +24,7 @@ import { useList } from '@/lib/lists/useList';
 import { useConfirm } from '@/lib/useConfirm';
 import { api } from '@/lib/api';
 import { GuruChat, type GuruChatHandle } from '@/components/GuruChat';
+import { totalCardCount } from '@/lib/cards/count';
 
 // ── Inner component (uses useSearchParams) ────────────────────────────────────
 
@@ -113,7 +114,7 @@ function ListPageInner() {
     coachRef.current?.setActiveList({
       listId:    list.id,
       listName:  list.name,
-      cardCount: cards.length,
+      cardCount: totalCardCount(cards),
       cardNames,
     });
   }, [list, cards]);
@@ -230,7 +231,7 @@ function ListPageInner() {
   );
 
   const autoGreet = list
-    ? `I want to discuss my "${list.name}" list (${cards.length} cards${list.format ? `, format: ${list.format}` : ''}). Give me a focused overview — key synergies, notable gaps, and anything you'd flag as worth improving.`
+    ? `I want to discuss my "${list.name}" list (${totalCardCount(cards)} cards${list.format ? `, format: ${list.format}` : ''}). Give me a focused overview — key synergies, notable gaps, and anything you'd flag as worth improving.`
     : undefined;
 
   return (

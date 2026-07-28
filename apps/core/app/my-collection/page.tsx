@@ -47,6 +47,7 @@ import { api, ASSET_BASE } from '@/lib/api';
 import type { MyCollectionResponse } from '@/lib/types';
 import { GuruChat, GURU_DRAWER_WIDTH } from '@/components/GuruChat';
 import type { GuruChatHandle, ActiveListContext } from '@/components/GuruChat';
+import { totalCardCount } from '@/lib/cards/count';
 
 export default function MyCollectionPage() {
   const theme = useTheme();
@@ -644,7 +645,7 @@ function DeckRow({
         coachRef.current?.setActiveDeck({
           deckId: deck.id,
           deckName: deck.name,
-          cardCount: fetched.cards.length,
+          cardCount: totalCardCount(fetched.cards),
           commander: deck.commander,
           colors: deck.colors,
         });
@@ -657,7 +658,7 @@ function DeckRow({
       coachRef.current?.setActiveDeck({
         deckId: deck.id,
         deckName: deck.name,
-        cardCount: profile.cards.length,
+        cardCount: totalCardCount(profile.cards),
         commander: deck.commander,
         colors: deck.colors,
       });
@@ -763,7 +764,7 @@ function ListRow({
       try {
         const detail = await api.getList(list.id);
         setCards(detail.cards);
-        coachRef.current?.setActiveList({ ...ctx, cardCount: detail.cards.reduce((s, c) => s + c.quantity, 0) });
+        coachRef.current?.setActiveList({ ...ctx, cardCount: totalCardCount(detail.cards) });
       } catch {
         setCards([]);
       } finally {

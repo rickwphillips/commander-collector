@@ -11,6 +11,7 @@ import { ColorSymbols } from '@/components/ManaSymbol';
 import { BannedCardBadge } from '@/components/BannedCardBadge';
 import { getTypeCategory, sortCards, TYPE_CATEGORIES } from '@/components/DeckFilters';
 import type { SortDirection, SortOrder } from '@/components/DeckFilters';
+import { totalCardCount } from '@/lib/cards/count';
 
 export interface CardListEntry {
   card_name: string;
@@ -126,7 +127,7 @@ export function CardListDisplay<T extends CardListEntry>({
               mb: 0.5,
             }}
           >
-            {type} ({group.reduce((s, c) => s + c.quantity, 0)})
+            {type} ({totalCardCount(group)})
           </Typography>
           {group.map((c, i) => (
             <Box key={`${c.card_name}-${i}`} sx={{ display: 'flex', alignItems: 'center', lineHeight: 1.6, gap: 0.5 }}>
