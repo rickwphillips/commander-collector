@@ -40,6 +40,7 @@ require_once 'config.php';
 require_once __DIR__ . '/auth/middleware.php';
 require_once __DIR__ . '/lib/mcp-client.php';
 require_once __DIR__ . '/lib/card-classify.php';
+require_once __DIR__ . '/lib/card-count.php';
 $user = requireAuth();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') coachError(405, 'Method not allowed');
@@ -1085,7 +1086,7 @@ function executeTool(string $name, array $input): string {
         foreach ($groups as $label => $cards) {
             if (!empty($cards)) $out[$label] = $cards;
         }
-        return json_encode(['deck_id' => $deckId, 'cards' => $out, 'total_cards' => count($rows)]);
+        return json_encode(['deck_id' => $deckId, 'cards' => $out, 'total_cards' => cardQuantityTotal($rows)]);
     }
 
     if ($name === 'lookup_opponent_deck') {
@@ -1286,7 +1287,7 @@ function executeTool(string $name, array $input): string {
             'scryfall_id'  => $r['scryfall_id'] ?? null,
         ], $rows);
 
-        return json_encode(['list_id' => $listId, 'cards_by_type' => $out, 'raw' => $raw, 'total' => count($rows)]);
+        return json_encode(['list_id' => $listId, 'cards_by_type' => $out, 'raw' => $raw, 'total' => cardQuantityTotal($rows)]);
     }
 
     if ($name === 'update_list') {
