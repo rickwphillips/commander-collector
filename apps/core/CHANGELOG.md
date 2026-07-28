@@ -12,6 +12,34 @@
 - The deck page counter's denominator is the deck's target size rather than the buffer total. `requiredListSize()` (`lib/formats/deckSize.ts`) returns 99 for one commander and 98 for two (partner / background / Doctor's companion), since CR 903.5a puts the commander inside the 100 and commanders are deck-native; 100 when the commanders are stored in the list itself via `list_cards.role`; and null for standalone lists, which fall back to the buffer total
 - The counter renders in `error.main` at weight 600 with an "N cards over the limit" tooltip when the deck exceeds its target, via a new `overBy` prop on `DeckFilters`. Measured against the whole deck rather than the filtered view, so filtering does not clear the warning
 
+## [5.21.0] - 2026-07-27
+
+### Fixed
+
+- Cards are classified by their FRONT face across the coach and rules deck groupings, via a new `php-api/lib/card-classify.php` (`cardFrontFace()` / `cardTypeCategory()`). A spell//land DFC such as `Malakir Rebirth // Malakir Mire` was matching "Land" against the whole combined type line and being bucketed as a Land, inflating land totals in deck breakdowns
+- `list-image-resolve.php` queries Scryfall by the front face, so a DFC added by its full `Front // Back` name resolves instead of reporting "cards could not be resolved"
+- `tts-export.php` passes an explicit font to `montage`; ImageMagick 7 ships no default font, so the Tabletop Simulator export was returning a 500
+- `lists.php` dedupes duplicate non-basic rows on save for Commander, enforcing the singleton rule
+
+### Changed
+
+- `packages/shared` declares its `next` / `react` / `@mui` peer and dev dependencies, so `next/image` resolves and the build survives differences in npm version and hoisting
+
+## [5.20.0] - 2026-07-16
+
+### Added
+
+- A `set_team_name` live event, so a paired phone can rename its Two-Headed Giant team
+
+### Changed
+
+- The 2HG team panel reuses the shared components for the monarch crown animation, the life-total damage swipe, and City's Blessing banners for both commanders, bringing it to parity with the single-player panel
+
+### Fixed
+
+- City's Blessing scene: floating windows anchored to the buildings, softened distant-castle edge, a scale parameter for the wider panel, and a reworked exit so elements fade instead of blinking out
+- Remote 2HG layout: centered shared life, monarch crown kept on-screen and above the glass, aligned side drawers so the right one fits, and corrected drawer arrow directions (`remoteDrawerSx`)
+
 ## [5.19.0] - 2026-07-15
 
 ### Added
