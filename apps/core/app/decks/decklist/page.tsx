@@ -23,6 +23,7 @@ import { useList } from '@/lib/lists/useList';
 import { useConfirm } from '@/lib/useConfirm';
 import { api } from '@/lib/api';
 import type { DeckDetail } from '@/lib/types';
+import { totalCardCount } from '@/lib/cards/count';
 
 function DeckListPageInner() {
   const searchParams = useSearchParams();
@@ -73,7 +74,7 @@ function DeckListPageInner() {
     coachRef.current?.setActiveDeck({
       deckId:    deck.id,
       deckName:  deck.name,
-      cardCount: cards.length,
+      cardCount: totalCardCount(cards),
       commander: deck.commander ?? '',
       colors:    deck.colors ?? '',
       listId:    list.id,
@@ -158,7 +159,13 @@ function DeckListPageInner() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const deckContext = { id: deckId, name: deck.name };
+  // commander/partner drive the deck-size target: 99 for one, 98 for two.
+  const deckContext = {
+    id: deckId,
+    name: deck.name,
+    commander: deck.commander,
+    partner: deck.partner,
+  };
 
   return (
     <PageContainer

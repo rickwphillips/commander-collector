@@ -13,6 +13,7 @@ import {
   Typography,
 } from '@mui/material';
 import { ManaSymbol } from './ManaSymbol';
+import { totalCardCount } from '../lib/cardCount';
 
 export interface BreakdownCard {
   card_name: string;
@@ -117,7 +118,7 @@ export function DeckBreakdown({ cards, showList = false }: Props) {
           <Grid container spacing={0.5}>
             {presentTypes.map((type) => {
               const group = byType[type]!;
-              const qty = group.reduce((s, c) => s + (c.quantity ?? 1), 0);
+              const qty = totalCardCount(group);
               return (
                 <Grid key={type} size={{ xs: 6, sm: 4 }}>
                   <Stack direction="row" justifyContent="space-between" sx={{ pr: 1 }}>
@@ -174,7 +175,7 @@ export function DeckBreakdown({ cards, showList = false }: Props) {
                 color="text.secondary"
                 sx={{ mb: 0.5, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: 1 }}
               >
-                {type} ({byType[type]!.reduce((s, c) => s + (c.quantity ?? 1), 0)})
+                {type} ({totalCardCount(byType[type]!)})
               </Typography>
               <Divider sx={{ mb: 0.5 }} />
               <Stack spacing={0.25}>

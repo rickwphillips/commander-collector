@@ -17,6 +17,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { ManaSymbol } from '@/components/ManaSymbol';
 import { CardListDisplay } from '@/components/CardListDisplay';
 import type { SortDirection, SortOrder } from '@/components/DeckFilters';
+import { totalCardCount } from '@/lib/cards/count';
 
 export interface BreakdownCard {
   card_name: string;
@@ -211,7 +212,7 @@ export function DeckBreakdown({ cards, showList = false, sortOrder, sortDirectio
     .filter((t) => t !== 'Commander')
     .map((t) => ({
       label: t,
-      value: byType[t]!.reduce((s, c) => s + (c.quantity ?? 1), 0),
+      value: totalCardCount(byType[t]!),
       color: TYPE_COLORS[t],
     }));
 
@@ -243,7 +244,7 @@ export function DeckBreakdown({ cards, showList = false, sortOrder, sortDirectio
           <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
             <Grid container spacing={0.5} sx={{ flex: 1 }}>
               {presentTypes.map((type) => {
-                const qty = byType[type]!.reduce((s, c) => s + (c.quantity ?? 1), 0);
+                const qty = totalCardCount(byType[type]!);
                 return (
                   <Grid key={type} size={{ xs: 6, sm: 4 }}>
                     <Stack direction="row" justifyContent="space-between" sx={{ pr: 1 }}>

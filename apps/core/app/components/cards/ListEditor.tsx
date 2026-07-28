@@ -25,6 +25,8 @@ import {
   sortCards,
   type DeckFilterState,
 } from '@/components/DeckFilters';
+import { requiredListSize } from '@/lib/formats';
+import { totalCardCount } from '@/lib/cards/count';
 import type { Card } from '@/lib/cards/types';
 import type { SaveDestination } from '@/components/cards/SaveToListDialog';
 
@@ -54,8 +56,16 @@ export interface ListEditorProps {
   conflict: boolean;
   /** Reload from server (used by conflict-resolution Reload button). */
   refresh: () => Promise<void>;
-  /** Optional deck context — used to render the detach button on the toolbar. */
-  deckContext?: { id: string; name: string } | null;
+  /**
+   * Optional deck context — used to render the detach button on the toolbar and,
+   * via commander/partner, to size the deck (99 for one commander, 98 for two).
+   */
+  deckContext?: {
+    id: string;
+    name: string;
+    commander?: string | null;
+    partner?: string | null;
+  } | null;
   /** Called when the user clicks Detach. Parent handles navigation if any. */
   onDetachFromDeck?: () => Promise<void> | void;
   /** Notified whenever the buffer becomes dirty/clean relative to server cards. */
@@ -259,14 +269,27 @@ export function ListEditor({
           filters.sortOrder,
           filters.sortDirection,
         );
+        const total = totalCardCount(buffer);
+        // Denominator is the size the deck should be (99, or 98 with a second
+        // commander), falling back to the buffer total for standalone lists.
+        const target =
+          requiredListSize(
+            list?.format ?? 'commander',
+            buffer,
+            deckContext
+              ? { commander: deckContext.commander, partner: deckContext.partner }
+              : null,
+          ) ?? total;
         return (
           <>
             <DeckFilters
               filters={filters}
               onChange={setFilters}
               cards={buffer}
-              resultCount={visible.length}
-              totalCount={buffer.length}
+              resultCount={totalCardCount(visible)}
+              totalCount={target}
+              // Measured on the whole deck so filtering does not clear the warning.
+              overBy={Math.max(0, total - target)}
             />
             {viewMode === 'gallery' ? (
           <ListGallery

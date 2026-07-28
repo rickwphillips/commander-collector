@@ -15,4 +15,6 @@ export function validate(format: string, cards: Card[], deck?: DeckContext) {
   return getValidator(format).validate(cards, deck);
 }
 
+export { requiredListSize, COMMANDER_DECK_SIZE } from './deckSize';
+
 export type { ValidationResult, Violation, FormatValidator, DeckContext } from './types';

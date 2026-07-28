@@ -14,6 +14,7 @@
  */
 
 export * from './types';
+export * from './count';
 export * from './fromScryfall';
 export * from './tempId';
 

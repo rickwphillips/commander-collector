@@ -40,6 +40,7 @@ import { commanderSearch, partnerSearch, getCardDetail, type CommanderSearchResu
 import { ManaCost } from '@/components/ManaCost';
 import { getOrdinalSuffix, MTG_COLORS_WITH_C } from '@/lib/utils';
 import type { DeckDetail as DeckDetailType, GameWithResults, Card as DeckCardEntry } from '@/lib/types';
+import { totalCardCount } from '@/lib/cards/count';
 
 
 
@@ -91,7 +92,7 @@ export default function DeckDetailPage() {
       coachRef.current?.setActiveDeck({
         deckId: deckData.id,
         deckName: deckData.name,
-        cardCount: cardsData.length,
+        cardCount: totalCardCount(cardsData),
         commander: deckData.commander ?? '',
         colors: deckData.colors ?? '',
       });
