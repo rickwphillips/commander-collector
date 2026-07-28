@@ -54,12 +54,17 @@ test.describe('Changelog', () => {
 
   test('change type labels are visible (Added/Fixed/Improved/Changed)', async ({ page }) => {
     // Chip labels: "Added", "Fixed", "Improved", "Changed"
+    // The changelog is client-rendered from the PHP API, and locator.count()
+    // does NOT auto-retry, so a single sample after domcontentloaded races the
+    // fetch and reads 0. Poll instead; the sibling tests here pass only because
+    // expect().toBeVisible() retries for them.
     const types = ['Added', 'Fixed', 'Improved', 'Changed'];
-    let found = 0;
-    for (const type of types) {
-      const els = page.getByText(new RegExp(`^${type}$`, 'i'));
-      if (await els.count() > 0) found++;
-    }
-    expect(found).toBeGreaterThan(0);
+    await expect.poll(async () => {
+      let found = 0;
+      for (const type of types) {
+        if (await page.getByText(new RegExp(`^${type}$`, 'i')).count() > 0) found++;
+      }
+      return found;
+    }, { timeout: 20_000 }).toBeGreaterThan(0);
   });
 });
