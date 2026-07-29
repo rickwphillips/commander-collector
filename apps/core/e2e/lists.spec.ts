@@ -9,7 +9,8 @@
  *  - Dialog: name field
  *  - Cancel dialog
  *  - Click list opens detail (?id= URL)
- *  - List detail: editor heading, add-card search, qty control, save button, delete
+ *  - Per-card delete button (on the index — the detail page has no delete)
+ *  - List detail: editor heading, add-card search, qty control, save button
  */
 
 import { test, expect } from '@playwright/test';
@@ -58,6 +59,17 @@ test.describe('Lists', () => {
     await expect(page.getByRole('dialog')).not.toBeVisible();
   });
 
+  test('delete list button is present on each list card', async ({ page }) => {
+    // This assertion used to live in the List Detail / Editor describe below,
+    // where it could never pass: the detail page has no delete control at all
+    // (its toolbar is Add / Edit mode / Undo / Redo / Export / Clear / Save).
+    // Deleting a list is done from this index page, via the per-card icon
+    // button whose Tooltip supplies the accessible name "Delete list".
+    await page.waitForLoadState('domcontentloaded');
+    const deleteBtn = page.getByRole('button', { name: 'Delete list' }).first();
+    await expect(deleteBtn).toBeVisible({ timeout: 30_000 });
+  });
+
   test('clicking a list opens detail page (?id= URL)', async ({ page }) => {
     await page.waitForLoadState('domcontentloaded');
     const firstList = page.locator('.MuiCardActionArea-root').first();
@@ -101,11 +113,6 @@ test.describe('Lists', () => {
       // Save button has aria-label="Save cards" or "Save unsaved changes"
       const saveBtn = page.getByRole('button', { name: /save/i }).first();
       await expect(saveBtn).toBeVisible({ timeout: 8000 });
-    });
-
-    test('delete list button is present', async ({ page }) => {
-      const deleteBtn = page.getByRole('button', { name: /delete/i }).first();
-      await expect(deleteBtn).toBeVisible();
     });
 
     test.describe('Export Panel', () => {

@@ -94,10 +94,20 @@ test.describe('Decks', () => {
   });
 
   test.describe('Deck Detail / Decklist', () => {
+    // The hook's explicit 30s wait for the client-side fetch can consume most
+    // of the default 30s per-test budget on a slow response.
+    test.describe.configure({ timeout: 90_000 });
+
     test.beforeEach(async ({ page }) => {
       await goto(page, '/decks/');
       await page.waitForLoadState('domcontentloaded');
+      // The deck cards are fetched client-side. Calling click() straight away
+      // makes its 15s actionability timeout double as the data-load wait, so a
+      // slow response surfaces as "locator.click: Timeout 15000ms exceeded"
+      // from the hook rather than as a slow page. Wait for the card explicitly,
+      // then confirm the navigation actually happened.
       const firstDeck = page.locator('.MuiCardActionArea-root').first();
+      await expect(firstDeck).toBeVisible({ timeout: 30_000 });
       await firstDeck.click();
       await page.waitForLoadState('domcontentloaded');
     });
