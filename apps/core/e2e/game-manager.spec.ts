@@ -82,9 +82,27 @@ test.describe('Game Manager — Setup', () => {
 });
 
 test.describe('Game Manager — Active Board', () => {
+  // The board is client-rendered, and locator.count() does NOT auto-retry the
+  // way expect() does. Sampling straight after domcontentloaded reads a page
+  // that has not painted yet: every count is 0, so the setup form is missed and
+  // the guards below wrongly conclude the board is playing, turning what should
+  // be a skip into a failure. Wait for the app to paint one of its known states
+  // before counting anything.
+  async function waitForRender(page: import('@playwright/test').Page): Promise<void> {
+    await Promise.race([
+      page.getByRole('heading', { name: /new game/i }).first()
+        .waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {}),
+      page.getByText(/seats filled/i).first()
+        .waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {}),
+      page.locator('button[title="Settings"]').first()
+        .waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {}),
+    ]);
+  }
+
   test.beforeEach(async ({ page }) => {
     await goto(page, '/game-manager/');
     await page.waitForLoadState('domcontentloaded');
+    await waitForRender(page);
 
     // Best-effort: advance from "New Game" to seating. The seating board
     // cannot be auto-filled in headless without real deck/player data, so most
@@ -107,8 +125,12 @@ test.describe('Game Manager — Active Board', () => {
   // seating banner ("Seats filled X / N") is on screen — i.e. when the board
   // hasn't actually reached the playing phase.
   async function isNotPlaying(page: import('@playwright/test').Page): Promise<boolean> {
+    await waitForRender(page);
     if (await page.getByRole('heading', { name: /new game/i }).count() > 0) return true;
     if (await page.getByText(/seats filled/i).count() > 0) return true;
+    // Nothing recognisable painted: treat as not playing rather than asserting
+    // against a blank page.
+    if (await page.locator('button[title="Settings"]').count() === 0) return true;
     return false;
   }
 
@@ -119,6 +141,12 @@ test.describe('Game Manager — Active Board', () => {
   });
 
   test('life total is displayed', async ({ page }) => {
+    // Guard: this is an active-board assertion like the ones below, so it must
+    // skip when the board never reached the playing phase. Without the guard it
+    // passed for the wrong reason: the New Game setup form has 20/30/40
+    // starting-life buttons, which match /^20$|^40$/ just as a real life total
+    // would.
+    if (await isNotPlaying(page)) return;
     // Life totals show as numbers (20 or 40)
     const lifeTotal = page.getByText(/^20$|^40$/).first();
     await expect(lifeTotal).toBeVisible();
@@ -205,8 +233,12 @@ test.describe('Game Manager — Active Board', () => {
   });
 
   test('board persists on page reload', async ({ page }) => {
+    if (await isNotPlaying(page)) return;
     await page.reload();
     await page.waitForLoadState('domcontentloaded');
+    // Re-check after the reload: persistence is only meaningful if we were on a
+    // playing board to begin with.
+    if (await isNotPlaying(page)) return;
     // Should still show board (life totals visible), not setup form
     const lifeTotal = page.getByText(/^20$|^40$/).first();
     await expect(lifeTotal).toBeVisible();

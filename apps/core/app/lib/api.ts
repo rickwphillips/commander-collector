@@ -351,7 +351,15 @@ export const api = {
         if (msg.type === 'state' && msg.state) {
           onState(msg.state);
         } else if (msg.type === 'inactive') {
-          es.close();
+          // Do NOT close here. The remote panel requires 3 consecutive
+          // 'inactive' messages before it ends the session (guarding against
+          // transient responses during deploys). Closing on the first one meant
+          // the 2nd and 3rd could never arrive, making that counter
+          // unsatisfiable: after the host ended a game, a paired phone kept
+          // showing a live, tappable board indefinitely. The server emits one
+          // 'inactive' per connection and exits; EventSource reconnects
+          // (retry: 100) to deliver the rest. The consumer closes the stream
+          // through the returned cleanup once it decides the session ended.
           onInactive();
         }
         // 'close' = planned reconnect — EventSource handles it automatically
