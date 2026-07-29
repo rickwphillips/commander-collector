@@ -66,11 +66,25 @@ test.describe('Lists', () => {
   });
 
   test.describe('List Detail / Editor', () => {
+    // The default 30s per-test budget is not enough here: the beforeEach loads
+    // the lists index, waits for the client-side fetch, clicks through to a
+    // detail page and waits for that to settle. With the explicit 30s waits
+    // below, the hook alone could consume the entire test timeout and abort
+    // before a single assertion ran.
+    test.describe.configure({ timeout: 90_000 });
+
     test.beforeEach(async ({ page }) => {
       await goto(page, '/lists/');
       await page.waitForLoadState('domcontentloaded');
+      // The list cards are fetched client-side. Relying on click()'s 15s
+      // actionability timeout to cover that fetch is what made every Export
+      // Panel test fail together with "locator.click: Timeout 15000ms exceeded
+      // waiting for .MuiCardActionArea-root". Wait for the card explicitly,
+      // then confirm the navigation actually happened.
       const firstList = page.locator('.MuiCardActionArea-root').first();
+      await expect(firstList).toBeVisible({ timeout: 30_000 });
       await firstList.click();
+      await page.waitForURL(/lists\/detail\/\?id=/, { timeout: 30_000 });
       await page.waitForLoadState('domcontentloaded');
     });
 
@@ -101,7 +115,12 @@ test.describe('Lists', () => {
         const exportBtn = page.getByRole('button', { name: /export cards/i }).first();
         await expect(exportBtn).toBeVisible({ timeout: 10000 });
         await exportBtn.click();
-        await page.waitForTimeout(300);
+        // Wait for the popover's own controls rather than sleeping 300ms: the
+        // MUI transition plus the export payload build can exceed a fixed
+        // delay, leaving the tests asserting against a half-open popover.
+        await expect(
+          page.getByRole('button', { name: /copy tcgplayer text to clipboard/i }),
+        ).toBeVisible({ timeout: 10_000 });
       });
 
       test('export popover opens', async ({ page }) => {
