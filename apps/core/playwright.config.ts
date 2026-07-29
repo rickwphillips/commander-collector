@@ -7,7 +7,13 @@ export default defineConfig({
   testIgnore: ['**/scratch/**'],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: 0,
+  // The system under test is live production on shared hosting, so a single
+  // attempt conflates "the app regressed" with "the host was busy for 15s".
+  // One retry separates them: a genuine regression fails both attempts and is
+  // still reported as failed, while a host hiccup is reported as `flaky` —
+  // visible in the output rather than silently swallowed. `trace` below is set
+  // to on-first-retry precisely so those retries leave evidence behind.
+  retries: 1,
   workers: 1,
   reporter: [['html', { open: 'never' }], ['list']],
   use: {
