@@ -102,17 +102,30 @@ test.describe('Players', () => {
   test('clicking a player opens detail page', async ({ page }) => {
     await page.waitForLoadState('domcontentloaded');
     const firstPlayer = page.locator('.MuiCardActionArea-root').first();
+    await expect(firstPlayer).toBeVisible({ timeout: 30_000 });
     await firstPlayer.click();
     await expect(page).toHaveURL(/players\/detail\/\?id=/);
   });
 
   test.describe('Player Detail', () => {
+    // The hook below loads the index, waits up to 30s for the client-side
+    // fetch, clicks through and waits up to 30s for the detail page. Under the
+    // default 30s per-test budget the hook alone could exhaust it and abort
+    // before a single assertion ran.
+    test.describe.configure({ timeout: 90_000 });
+
     test.beforeEach(async ({ page }) => {
       await goto(page, '/players/');
       await page.waitForLoadState('domcontentloaded');
-      // Navigate to first player via CardActionArea
+      // Navigate to first player via CardActionArea. The cards are fetched
+      // client-side, so wait for one explicitly instead of letting click()'s
+      // 15s actionability timeout stand in for the data load — that is what
+      // turned a slow response into "locator.click: Timeout 15000ms exceeded"
+      // failing every test in this describe at once.
       const firstPlayer = page.locator('.MuiCardActionArea-root').first();
+      await expect(firstPlayer).toBeVisible({ timeout: 30_000 });
       await firstPlayer.click();
+      await page.waitForURL(/players\/detail\/\?id=/, { timeout: 30_000 });
       await page.waitForLoadState('domcontentloaded');
     });
 
