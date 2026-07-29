@@ -889,12 +889,24 @@ describe('api — SSE EventSource streams', () => {
     es.onmessage!({ data: 'not json' });
     es.onmessage!({ data: JSON.stringify({ type: 'inactive' }) });
     expect(onInactive).toHaveBeenCalled();
-    expect(es.closed).toBe(true);
+    // The stream must stay OPEN on 'inactive'. The remote panel ends the
+    // session only after 3 consecutive 'inactive' messages, and the server
+    // sends one per connection before exiting, so closing here made the 2nd and
+    // 3rd unreachable and the remote never showed "Game Over". Reconnects
+    // deliver the rest; the consumer closes via the returned cleanup.
+    expect(es.closed).toBe(false);
+
+    // Three in a row is what the remote actually needs to see.
+    es.onmessage!({ data: JSON.stringify({ type: 'inactive' }) });
+    es.onmessage!({ data: JSON.stringify({ type: 'inactive' }) });
+    expect(onInactive).toHaveBeenCalledTimes(3);
+    expect(es.closed).toBe(false);
 
     es.onerror!();
     expect(onError).toHaveBeenCalled();
 
     cleanup();
+    expect(es.closed).toBe(true);
   });
 
   it('openLiveGameHostStream delivers events and handles inactive/error', () => {
