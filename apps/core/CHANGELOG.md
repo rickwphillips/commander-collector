@@ -1,5 +1,17 @@
 # Changelog
 
+## [5.23.0] - 2026-07-29
+
+### Fixed
+
+- Live-game remote never reached its `ended` phase. `openLiveGameStream` closed the `EventSource` on the FIRST `inactive` message, while `remote/page.tsx` requires THREE consecutive ones before setting `phase='ended'` (a deliberate guard against transient responses during deploys). Closing on the first made the 2nd and 3rd unreachable, so the counter was unsatisfiable by construction and a paired phone kept rendering a live, tappable panel after the host ended the game. Reproduced against prod: `DELETE` returns 200, the server emits one `{"type":"inactive"}` at ~307ms, and the panel was still live 12s later having received 2 frames total. Fixed by not closing on `inactive` — the server sends one per connection then exits, and `EventSource` reconnects (`retry: 100`) to deliver more. Verified against the live endpoint: a stream left open on a deactivated session receives 22 `inactive` frames in 6s, so the remote reaches its threshold of 3 in ~780ms. Scoped to the remote stream; `openLiveGameHostStream` still closes on the first `inactive` because its consumer's `onInactive` is an intentional no-op
+
+### Changed
+
+- `tests/lib/api.test.ts` had pinned the buggy behaviour with `expect(es.closed).toBe(true)`. It now asserts the stream stays open across three `inactive` messages and closes only via the returned cleanup
+- e2e: `locator.count()` does not auto-retry the way `expect()` does, and both `changelog` and `game-manager` sampled it right after `domcontentloaded` against a client-rendered app. In `game-manager` the early sample fed the `isNotPlaying` guard, so five active-board tests asserted against an unrendered page instead of skipping. Fixing that surfaced two tests passing for the wrong reason: `life total is displayed` and `board persists on page reload` were matching the New Game form's 20/30/40 starting-life buttons rather than a real life total
+- e2e: `dashboard` targeted the players nav by accessible name, which also matched recent-game cards linking to `/game-manager/`; now targets the href. `game-manager-sse` gated on a fixed 1500ms sleep before mutating state, so the write could land before the client subscribed; now waits for `EventSource` readyState OPEN. `lists` leaned on `click()`'s actionability timeout to cover a client-side fetch
+
 ## [5.22.0] - 2026-07-28
 
 ### Fixed
