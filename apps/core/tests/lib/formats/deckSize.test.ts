@@ -4,7 +4,7 @@ import { requiredListSize, COMMANDER_DECK_SIZE } from '@/lib/formats/deckSize';
 import type { Card } from '@/lib/cards/types';
 
 function card(card_name: string, quantity = 1, role?: 'commander' | 'partner'): Card {
-  return { card_name, quantity, is_commander: false, is_proxy: false, role: role ?? null };
+  return { card_name, quantity, color_identity: '', is_commander: false, is_proxy: false, ...(role ? { role } : {}) };
 }
 
 describe('requiredListSize', () => {

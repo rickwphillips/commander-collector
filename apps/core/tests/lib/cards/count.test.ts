@@ -18,6 +18,7 @@ describe('totalCardCount', () => {
 
   it('accepts any object carrying a quantity', () => {
     // Cards, API rows and coach profile entries all flow through this.
-    expect(totalCardCount([{ card_name: 'Island', quantity: 13 }])).toBe(13);
+    const row = { card_name: 'Island', quantity: 13 };
+    expect(totalCardCount([row])).toBe(13);
   });
 });
