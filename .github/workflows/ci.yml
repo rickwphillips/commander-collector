@@ -55,13 +55,15 @@ jobs:
           cache: 'npm'
 
       - name: Install
-        # Workaround npm/cli#4828: macOS-generated lockfiles do not include
-        # rollup's linux-x64-gnu native binary as an optional dep, so even
-        # plain npm install respects the lockfile and skips it. Removing
-        # the lockfile forces a platform-correct fresh resolution.
-        run: |
-          rm -f package-lock.json
-          npm install --no-audit --no-fund
+        # Install against the committed lockfile so a run builds the dependency
+        # set that was actually audited. This used to `rm -f package-lock.json`
+        # to work around npm/cli#4828 (linux native bindings missing from a
+        # macOS-generated lockfile); the lockfile now carries the linux
+        # bindings, so the deletion only bought transitive drift, and a PR that
+        # touched nothing relevant could go red when a fresh resolution picked
+        # up a newer major. `install` rather than `ci` so a lockfile lagging
+        # package.json is repaired instead of failing the run.
+        run: npm install --no-audit --no-fund
 
       - name: Lint (Turbo, informational, does not block)
         run: npm run lint
