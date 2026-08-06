@@ -55,15 +55,14 @@ jobs:
           cache: 'npm'
 
       - name: Install
-        # Install against the committed lockfile so a run builds the dependency
-        # set that was actually audited. This used to `rm -f package-lock.json`
-        # to work around npm/cli#4828 (linux native bindings missing from a
-        # macOS-generated lockfile); the lockfile now carries the linux
-        # bindings, so the deletion only bought transitive drift, and a PR that
-        # touched nothing relevant could go red when a fresh resolution picked
-        # up a newer major. `install` rather than `ci` so a lockfile lagging
-        # package.json is repaired instead of failing the run.
-        run: npm install --no-audit --no-fund
+        # `ci`, not `install`: it installs exactly what the lockfile records and
+        # refuses to run when the lockfile has drifted from package.json, so a
+        # desync fails here instead of being silently repaired on every run.
+        # This step used to `rm -f package-lock.json` (npm/cli#4828, linux
+        # native bindings missing from a macOS-generated lockfile). The lockfile
+        # carries the linux bindings now, and deleting it meant no run ever
+        # built the dependency set the repo records.
+        run: npm ci --no-audit --no-fund
 
       - name: Lint (Turbo, informational, does not block)
         run: npm run lint
