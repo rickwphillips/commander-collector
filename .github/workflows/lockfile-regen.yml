@@ -1,7 +1,8 @@
 name: Lockfile regen (temporary)
 
 on:
-  workflow_dispatch:
+  pull_request:
+    branches: [main]
 
 jobs:
   regen:
