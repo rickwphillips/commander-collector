@@ -39,7 +39,7 @@ vi.mock('@/components/cards/CardListToolbar', () => ({
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function card(card_name: string, quantity: number): Card {
-  return { card_name, quantity, is_commander: false, is_proxy: false };
+  return { card_name, quantity, color_identity: '', is_commander: false, is_proxy: false };
 }
 
 function renderWith(
