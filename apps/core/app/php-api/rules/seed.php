@@ -59,9 +59,17 @@ if (empty($files)) {
 
 $db = getDB();
 
+// `id` MUST be supplied. It is char(36) NOT NULL with no default and no
+// auto-increment, so omitting it made MySQL substitute '' for every new row.
+// The first new pattern inserted as id=''; every later one then collided with
+// it on the PRIMARY KEY and fell into ON DUPLICATE KEY UPDATE, overwriting
+// that row's name/content while leaving its pattern_id untouched. The seed
+// still printed "Upserted: pNNN" for each, so it reported success while
+// silently refusing to add more than one new pattern ever. Found 2026-09-01
+// after p811-p827 all collapsed into the row holding pattern_id p810.
 $upsertSQL = "
-    INSERT INTO rules_patterns (pattern_id, name, category, cr_refs, tags, content, examples_count)
-    VALUES (:pattern_id, :name, :category, :cr_refs, :tags, :content, :examples_count)
+    INSERT INTO rules_patterns (id, pattern_id, name, category, cr_refs, tags, content, examples_count)
+    VALUES (UUID(), :pattern_id, :name, :category, :cr_refs, :tags, :content, :examples_count)
     ON DUPLICATE KEY UPDATE
         name           = VALUES(name),
         category       = VALUES(category),
