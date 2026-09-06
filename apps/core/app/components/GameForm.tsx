@@ -13,7 +13,6 @@ import {
   Box,
   IconButton,
   Grow,
-  Divider,
   ToggleButtonGroup,
   ToggleButton,
 } from '@mui/material';
@@ -501,7 +500,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
                         </Typography>
                       </Stack>
                       {results.length > 2 && (
-                        <IconButton onClick={() => removePlayer(index)} color="error" size="small">
+                        <IconButton onClick={() => removePlayer(index)} color="error" size="small" aria-label={`Remove player ${index + 1}`}>
                           <RemoveIcon />
                         </IconButton>
                       )}

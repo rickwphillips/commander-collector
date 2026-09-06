@@ -383,9 +383,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
   // ─── Derived from animations bundle (cheap, recompute every render) ─────
   // showCrown / monarchAnimStr were lifted as props in Phase 1; the card owns
   // them now because they're pure functions of `monarchAnim`.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { monarchAnim } = animations;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const showCrown = player.isMonarch || monarchAnim === 'exiting';
 
   // ─── XP keyframes (pure functions of player.experience) ─────────────────
