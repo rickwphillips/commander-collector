@@ -1,3 +1,116 @@
+// Dashboard styles. The autumn palette lives in `app/theme/theme.ts`; the literal
+// hexes below are the same accent values, repeated here because these gradients are
+// decorative and never read back out of the MUI theme.
+$nav-colors: (
+  players: #d2691e,
+  decks: #8b4513,
+  games: #daa520,
+  stats: #cd853f,
+  lists: #5b7b5b,
+  collection: #7b6b8e,
+  play: #a0522d,
+  rules: #6b8e6b,
+);
+
+.container {
+  padding-top: 32px;
+  padding-bottom: 32px;
+}
+
+/* Hero */
+.hero {
+  margin-bottom: 48px;
+  text-align: center;
+}
+
+.heroTitle {
+  margin-bottom: 16px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #d2691e 0%, #8b4513 50%, #daa520 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+
+  [data-theme='dark'] & {
+    background: linear-gradient(135deg, #ff8c00 0%, #daa520 50%, #cd853f 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+  }
+}
+
+.heroActions {
+  margin-top: 16px;
+}
+
+/* Section grids */
+.statsGrid,
+.quickActions,
+.navGrid,
+.alert {
+  margin-bottom: 32px;
+}
+
+/* Quick action cards */
+.quickActionCard {
+  height: 100%;
+
+  &:global(.MuiPaper-root) {
+    background: linear-gradient(135deg, #8b451310 0%, #d2691e08 100%);
+  }
+
+  [data-theme='dark'] &:global(.MuiPaper-root) {
+    background: linear-gradient(135deg, #daa52020 0%, #cd853f10 100%);
+  }
+}
+
+.quickActionCardNew {
+  &:global(.MuiPaper-root) {
+    background: linear-gradient(135deg, #d2691e10 0%, #8b451308 100%);
+  }
+
+  [data-theme='dark'] &:global(.MuiPaper-root) {
+    background: linear-gradient(135deg, #ff8c0020 0%, #daa52010 100%);
+  }
+}
+
+.quickActionCardResume {
+  &:global(.MuiPaper-root) {
+    background: linear-gradient(135deg, #6b8e6b15 0%, #4a7a4a08 100%);
+  }
+
+  [data-theme='dark'] &:global(.MuiPaper-root) {
+    background: linear-gradient(135deg, #6b8e6b30 0%, #4a7a4a15 100%);
+  }
+}
+
+.cardAction {
+  height: 100%;
+}
+
+.quickActionBody {
+  padding-top: 32px;
+  padding-bottom: 32px;
+  text-align: center;
+}
+
+.quickActionIcon {
+  margin-bottom: 8px;
+  font-size: 48px;
+}
+
+.quickActionTitle {
+  font-weight: 600;
+}
+
+.resumeMeta {
+  margin-bottom: 4px;
+}
+
+.resumeCommanders {
+  display: block;
+}
+
+/* Navigation cards */
 .navCard {
   height: 100%;
   transition:
@@ -6,5 +119,61 @@
 
   &:hover {
     transform: translateY(-4px);
+  }
+}
+
+.navCardBody {
+  padding-top: 24px;
+  padding-bottom: 24px;
+  text-align: center;
+}
+
+.navIcon {
+  margin-bottom: 16px;
+
+  :global(.MuiSvgIcon-root) {
+    font-size: 40px;
+  }
+}
+
+@each $name, $color in $nav-colors {
+  .navIcon-#{$name} {
+    color: $color;
+  }
+}
+
+.navTitle {
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+/* Recent games */
+.sectionTitle {
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.trophyIcon {
+  color: #daa520;
+  font-size: 20px;
+}
+
+.winnerName {
+  font-weight: 600;
+}
+
+/* Version footer */
+.footer {
+  margin-top: 48px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.versionChip {
+  font-weight: 600;
+  opacity: 0.6;
+
+  &:hover {
+    opacity: 1;
   }
 }
