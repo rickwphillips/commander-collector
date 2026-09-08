@@ -16,91 +16,39 @@ import {
   Alert,
 } from '@mui/material';
 import Link from 'next/link';
-import PeopleIcon from '@mui/icons-material/People';
-import StyleIcon from '@mui/icons-material/Style';
-import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
-import BarChartIcon from '@mui/icons-material/BarChart';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
-import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
-import AddCircleIcon from '@mui/icons-material/AddCircle';
 import AddIcon from '@mui/icons-material/Add';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import RestoreIcon from '@mui/icons-material/Restore';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import CollectionsIcon from '@mui/icons-material/Collections';
 import { SettingsTab } from './components/SettingsTab';
 import { StatsCard } from './components/StatsCard';
-import { ColorIdentityChips } from './components/ColorIdentityChips';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { RematchButton } from './components/RematchButton';
+import { useThemeMode } from './components/ThemeProvider';
 import { useAuth } from './components/AuthGuard';
 import { api } from './lib/api';
+import { navItems, resolveNavHref } from './page.types';
 import { APP_VERSION } from './lib/version';
 import type { StatsResponse, RecentGame, GameManagerState } from './lib/types';
 import styles from './page.module.scss';
 
-const navItems = [
-  {
-    title: 'Players',
-    description: 'Manage your playgroup',
-    href: '/players',
-    icon: <PeopleIcon sx={{ fontSize: 40 }} />,
-    color: '#D2691E',
-  },
-  {
-    title: 'Decks',
-    description: 'Track commanders and decks',
-    href: '/decks',
-    icon: <StyleIcon sx={{ fontSize: 40 }} />,
-    color: '#8B4513',
-  },
-  {
-    title: 'Games',
-    description: 'View game history',
-    href: '/games',
-    icon: <SportsEsportsIcon sx={{ fontSize: 40 }} />,
-    color: '#DAA520',
-  },
-  {
-    title: 'Stats',
-    description: 'Win rates and analytics',
-    href: '/stats',
-    icon: <BarChartIcon sx={{ fontSize: 40 }} />,
-    color: '#CD853F',
-  },
-  {
-    title: 'Lists',
-    description: 'Standalone card collections',
-    href: '/lists',
-    icon: <PlaylistAddIcon sx={{ fontSize: 40 }} />,
-    color: '#5B7B5B',
-  },
-  {
-    title: 'My Collection',
-    description: 'Your decks, stats & coach',
-    href: '/my-collection',
-    icon: <CollectionsIcon sx={{ fontSize: 40 }} />,
-    color: '#7B6B8E',
-  },
-  {
-    title: 'Play Game',
-    description: 'Log a new Commander match',
-    href: '/game-manager',
-    icon: <AddCircleIcon sx={{ fontSize: 40 }} />,
-    color: '#A0522D',
-  },
-  {
-    title: 'Rules Guru',
-    description: 'Ask questions about MTG rules',
-    href: '/rules/chat',
-    icon: <MenuBookIcon sx={{ fontSize: 40 }} />,
-    color: '#6B8E6B',
-    external: true,
-  },
-];
-
+/**
+ * The app's landing page: a snapshot of the playgroup plus the entry points into
+ * every other section.
+ *
+ * Renders, top to bottom: the hero, four headline stats, a resume-or-start
+ * quick action pair, the {@link navItems} tile grid, the five most recent games,
+ * and the version chip linking to the changelog. Stats and the active-game probe
+ * are fetched once on mount; a stats failure degrades to an info alert rather
+ * than blocking the page, and an active-game failure is swallowed so the tile
+ * simply offers a new game.
+ *
+ * All animations are gated on `mounted` (set on a zero-delay timer) so the MUI
+ * transitions actually run on first paint instead of starting mid-flight.
+ */
 export default function Dashboard() {
   const { user } = useAuth();
+  const { mode } = useThemeMode();
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -137,30 +85,17 @@ export default function Dashboard() {
   return (
     <>
       <SettingsTab />
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Container maxWidth="lg" className={styles.container} data-theme={mode}>
         {/* Hero Section */}
         <Fade in={mounted} timeout={800}>
-          <Box sx={{ textAlign: 'center', mb: 6 }}>
-            <Typography
-              variant="h2"
-              sx={{
-                fontWeight: 700,
-                mb: 2,
-                background: (theme) =>
-                  theme.palette.mode === 'dark'
-                    ? 'linear-gradient(135deg, #FF8C00 0%, #DAA520 50%, #CD853F 100%)'
-                    : 'linear-gradient(135deg, #D2691E 0%, #8B4513 50%, #DAA520 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-              }}
-            >
+          <Box className={styles.hero}>
+            <Typography variant="h2" className={styles.heroTitle}>
               The Commander Collector
             </Typography>
             <Typography variant="h6" color="text.secondary">
               Track your Magic: The Gathering Commander games
             </Typography>
-            <Box sx={{ mt: 2 }}>
+            <Box className={styles.heroActions}>
               <RematchButton size="large" />
             </Box>
           </Box>
@@ -169,7 +104,7 @@ export default function Dashboard() {
         {/* Quick Stats */}
         {!loading && stats && (
           <Fade in={mounted} timeout={1000}>
-            <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid container spacing={3} className={styles.statsGrid}>
               <Grid size={{ xs: 6, md: 3 }}>
                 <StatsCard title="Total Games" value={stats.overall.total_games} color="#D2691E" href="/games" />
               </Grid>
@@ -197,47 +132,39 @@ export default function Dashboard() {
 
         {/* Error Alert */}
         {error && (
-          <Alert severity="info" sx={{ mb: 4 }}>
+          <Alert severity="info" className={styles.alert}>
             {error}
           </Alert>
         )}
 
         {/* Quick Actions */}
         <Fade in={mounted} timeout={1100}>
-          <Grid container spacing={2} sx={{ mb: 4 }}>
+          <Grid container spacing={2} className={styles.quickActions}>
             <Grid size={{ xs: 12, sm: 6 }}>
               <Card
-                sx={{
-                  height: '100%',
-                  background: (theme) =>
-                    activeGame
-                      ? theme.palette.mode === 'dark'
-                        ? 'linear-gradient(135deg, #6B8E6B30 0%, #4A7A4A15 100%)'
-                        : 'linear-gradient(135deg, #6B8E6B15 0%, #4A7A4A08 100%)'
-                      : theme.palette.mode === 'dark'
-                        ? 'linear-gradient(135deg, #FF8C0020 0%, #DAA52010 100%)'
-                        : 'linear-gradient(135deg, #D2691E10 0%, #8B451308 100%)',
-                }}
+                className={`${styles.quickActionCard} ${
+                  activeGame ? styles.quickActionCardResume : styles.quickActionCardNew
+                }`}
               >
-                <CardActionArea component={Link} href="/game-manager" sx={{ height: '100%' }}>
-                  <CardContent sx={{ textAlign: 'center', py: 4 }}>
+                <CardActionArea component={Link} href="/game-manager" className={styles.cardAction}>
+                  <CardContent className={styles.quickActionBody}>
                     {activeGame ? (
                       <>
-                        <RestoreIcon sx={{ fontSize: 48, color: 'success.main', mb: 1 }} />
-                        <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                        <RestoreIcon color="success" className={styles.quickActionIcon} />
+                        <Typography variant="h5" className={styles.quickActionTitle}>
                           Resume Game
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                        <Typography variant="body2" color="text.secondary" className={styles.resumeMeta}>
                           Turn {activeGame.turnNumber} · {activeGame.players.length} players
                         </Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                        <Typography variant="caption" color="text.secondary" className={styles.resumeCommanders}>
                           {activeGame.players.map(p => p.commander?.name ?? p.playerName).join(' · ')}
                         </Typography>
                       </>
                     ) : (
                       <>
-                        <PlayArrowIcon sx={{ fontSize: 48, color: 'success.main', mb: 1 }} />
-                        <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                        <PlayArrowIcon color="success" className={styles.quickActionIcon} />
+                        <Typography variant="h5" className={styles.quickActionTitle}>
                           Play New Game
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
@@ -250,19 +177,11 @@ export default function Dashboard() {
               </Card>
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <Card
-                sx={{
-                  height: '100%',
-                  background: (theme) =>
-                    theme.palette.mode === 'dark'
-                      ? 'linear-gradient(135deg, #DAA52020 0%, #CD853F10 100%)'
-                      : 'linear-gradient(135deg, #8B451310 0%, #D2691E08 100%)',
-                }}
-              >
-                <CardActionArea component={Link} href="/games/new" sx={{ height: '100%' }}>
-                  <CardContent sx={{ textAlign: 'center', py: 4 }}>
-                    <AddIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
-                    <Typography variant="h5" sx={{ fontWeight: 600 }}>
+              <Card className={styles.quickActionCard}>
+                <CardActionArea component={Link} href="/games/new" className={styles.cardAction}>
+                  <CardContent className={styles.quickActionBody}>
+                    <AddIcon color="primary" className={styles.quickActionIcon} />
+                    <Typography variant="h5" className={styles.quickActionTitle}>
                       Log New Game
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -276,15 +195,21 @@ export default function Dashboard() {
         </Fade>
 
         {/* Navigation Cards */}
-        <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid container spacing={3} className={styles.navGrid}>
           {navItems.map((item, index) => (
             <Grid key={item.title} size={{ xs: 6, md: 3 }}>
               <Grow in={mounted} timeout={800 + index * 150}>
                 <Card className={styles.navCard}>
-                  <CardActionArea component={item.external ? 'a' : Link} href={item.external ? (process.env.NODE_ENV === 'development' ? 'http://localhost:3003/chat' : '/app/projects/commander/rules/chat') : item.href} sx={{ height: '100%' }}>
-                    <CardContent sx={{ textAlign: 'center', py: 3 }}>
-                      <Box sx={{ color: item.color, mb: 2 }}>{item.icon}</Box>
-                      <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+                  <CardActionArea
+                    component={item.external ? 'a' : Link}
+                    href={resolveNavHref(item)}
+                    className={styles.cardAction}
+                  >
+                    <CardContent className={styles.navCardBody}>
+                      <Box className={`${styles.navIcon} ${styles[`navIcon-${item.slug}`]}`}>
+                        <item.icon />
+                      </Box>
+                      <Typography variant="h6" className={styles.navTitle}>
                         {item.title}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
@@ -304,7 +229,7 @@ export default function Dashboard() {
         ) : stats && stats.recentGames.length > 0 ? (
           <Fade in={mounted} timeout={1200}>
             <Box>
-              <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
+              <Typography variant="h5" className={styles.sectionTitle}>
                 Recent Games
               </Typography>
               <Stack spacing={2}>
@@ -320,8 +245,8 @@ export default function Dashboard() {
                         >
                           <Box>
                             <Stack direction="row" alignItems="center" spacing={1}>
-                              <EmojiEventsIcon sx={{ color: '#DAA520', fontSize: 20 }} />
-                              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                              <EmojiEventsIcon className={styles.trophyIcon} />
+                              <Typography variant="subtitle1" className={styles.winnerName}>
                                 {game.winner}
                               </Typography>
                             </Stack>
@@ -353,7 +278,7 @@ export default function Dashboard() {
 
         {/* Version Footer */}
         <Fade in={mounted} timeout={1400}>
-          <Box sx={{ textAlign: 'center', mt: 6, mb: 2 }}>
+          <Box className={styles.footer}>
             <Chip
               component={Link}
               href="/changelog"
@@ -361,11 +286,7 @@ export default function Dashboard() {
               size="small"
               clickable
               variant="outlined"
-              sx={{
-                fontWeight: 600,
-                opacity: 0.6,
-                '&:hover': { opacity: 1 },
-              }}
+              className={styles.versionChip}
             />
           </Box>
         </Fade>
