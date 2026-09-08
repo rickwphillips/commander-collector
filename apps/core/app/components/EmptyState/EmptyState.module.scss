@@ -1,0 +1,30 @@
+@use '../../styles/tokens';
+
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-top: tokens.$spacing * 8;
+  padding-bottom: tokens.$spacing * 8;
+  text-align: center;
+}
+
+.icon {
+  margin-bottom: tokens.$spacing * 2;
+  // Applies to a plain node passed as `icon`. An MUI icon sets its own
+  // font-size and ignores this, which was true before these styles moved out
+  // of `sx` too; a caller that wants a big glyph sizes it at the call site.
+  font-size: 64px;
+}
+
+.title {
+  margin-bottom: tokens.$spacing;
+}
+
+.description {
+  // Narrow enough that the copy wraps into a readable column rather than
+  // running the full width of a wide page.
+  max-width: 400px;
+  margin-bottom: tokens.$spacing * 3;
+}

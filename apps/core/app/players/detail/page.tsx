@@ -196,16 +196,16 @@ export default function PlayerDetailPage() {
       {stats && (
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid size={{ xs: 6, sm: 3 }}>
-            <StatsCard title="Total Games" value={stats.total_games} color="#D2691E" />
+            <StatsCard title="Total Games" value={stats.total_games} accent="primary" />
           </Grid>
           <Grid size={{ xs: 6, sm: 3 }}>
-            <StatsCard title="Wins" value={stats.wins} icon={<EmojiEventsIcon />} color="#DAA520" />
+            <StatsCard title="Wins" value={stats.wins} icon={<EmojiEventsIcon />} accent="gold" />
           </Grid>
           <Grid size={{ xs: 6, sm: 3 }}>
             <StatsCard
               title="Win Rate"
               value={stats.win_rate ? `${stats.win_rate}%` : '-'}
-              color="#8B4513"
+              accent="secondary"
             />
           </Grid>
           <Grid size={{ xs: 6, sm: 3 }}>
@@ -216,7 +216,7 @@ export default function PlayerDetailPage() {
                   ? Number(stats.avg_finish_position).toFixed(2)
                   : '-'
               }
-              color="#CD853F"
+              accent="sand"
             />
           </Grid>
         </Grid>
