@@ -1,0 +1,21 @@
+// Non-colour design tokens. These mirror values MUI resolves at runtime so a
+// stylesheet can match a component that is still using MUI props next to it.
+
+/// theme.shape.borderRadius is 8, and MUI multiplies it by the `borderRadius`
+/// sx value, so sx={{ borderRadius: 2 }} is $radius * 2.
+$radius: 8px;
+
+/// theme.spacing(n) is n * 8px.
+$spacing: 8px;
+
+// MUI elevation shadows, copied from its default shadow scale. Here so an
+// element styled in CSS can sit beside one using elevation={n} and match.
+$shadow-4: 0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14),
+  0 1px 10px 0 rgba(0, 0, 0, 0.12);
+$shadow-8: 0 5px 5px -3px rgba(0, 0, 0, 0.2), 0 8px 10px 1px rgba(0, 0, 0, 0.14),
+  0 3px 14px 2px rgba(0, 0, 0, 0.12);
+
+// MUI's default breakpoints, for translating responsive sx objects.
+$bp-sm: 600px;
+$bp-md: 900px;
+$bp-lg: 1200px;

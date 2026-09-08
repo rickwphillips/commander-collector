@@ -296,16 +296,16 @@ export default function DeckDetailPage() {
       {/* Stats */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid size={{ xs: 6, sm: 3 }}>
-          <StatsCard title="Total Games" value={deck.total_games} color="#D2691E" />
+          <StatsCard title="Total Games" value={deck.total_games} accent="primary" />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
-          <StatsCard title="Wins" value={deck.wins} icon={<EmojiEventsIcon />} color="#DAA520" />
+          <StatsCard title="Wins" value={deck.wins} icon={<EmojiEventsIcon />} accent="gold" />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
           <StatsCard
             title="Win Rate"
             value={deck.win_rate ? `${deck.win_rate}%` : '-'}
-            color="#8B4513"
+            accent="secondary"
           />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
@@ -314,7 +314,7 @@ export default function DeckDetailPage() {
             value={
               deck.avg_finish_position != null ? Number(deck.avg_finish_position).toFixed(2) : '-'
             }
-            color="#CD853F"
+            accent="sand"
           />
         </Grid>
       </Grid>

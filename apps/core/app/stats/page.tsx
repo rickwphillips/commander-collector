@@ -273,14 +273,14 @@ function StatsPageInner() {
       return (
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid size={{ xs: 6, sm: 3 }}>
-            <StatsCard title="Total Games" value={stats.overall.total_games} color="#D2691E" href="/games" />
+            <StatsCard title="Total Games" value={stats.overall.total_games} accent="primary" href="/games" />
           </Grid>
           <Grid size={{ xs: 6, sm: 3 }}>
             <StatsCard
               title="Players"
               value={stats.overall.total_players}
               icon={<PeopleIcon />}
-              color="#8B4513"
+              accent="secondary"
               href="/players"
             />
           </Grid>
@@ -289,7 +289,7 @@ function StatsPageInner() {
               title="Decks"
               value={stats.overall.total_decks}
               icon={<StyleIcon />}
-              color="#DAA520"
+              accent="gold"
               href="/decks"
             />
           </Grid>
@@ -302,7 +302,7 @@ function StatsPageInner() {
                   : '-'
               }
               subtitle="turns"
-              color="#CD853F"
+              accent="sand"
             />
           </Grid>
         </Grid>

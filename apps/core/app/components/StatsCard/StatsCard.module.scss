@@ -1,0 +1,39 @@
+@use '../../styles/palette';
+@use '../../styles/mixins';
+
+.card {
+  height: 100%;
+}
+
+// One class per named accent profile in palette.$accents. Every tint is
+// resolved by Sass at build time, so nothing about colour is computed at
+// runtime and the component takes an accent name rather than a hex.
+@each $name, $color in palette.$accents {
+  .accent-#{$name} {
+    @include mixins.accent-card($color);
+
+    .icon,
+    .value {
+      color: $color;
+    }
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.icon {
+  display: flex;
+}
+
+.value {
+  font-weight: 700;
+}
+
+.subtitle {
+  margin-top: 8px;
+}

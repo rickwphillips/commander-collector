@@ -1,15 +1,17 @@
-// Dashboard styles. The autumn palette lives in `app/theme/theme.ts`; the literal
-// hexes below are the same accent values, repeated here because these gradients are
-// decorative and never read back out of the MUI theme.
+@use 'styles/palette';
+@use 'styles/mixins';
+
+// Accent per navigation tile. Keys match the `slug` on each entry in
+// page.types.ts; hues come from the shared palette rather than local hexes.
 $nav-colors: (
-  players: #d2691e,
-  decks: #8b4513,
-  games: #daa520,
-  stats: #cd853f,
-  lists: #5b7b5b,
-  collection: #7b6b8e,
-  play: #a0522d,
-  rules: #6b8e6b,
+  'players': palette.$burnt-orange,
+  'decks': palette.$saddle-brown,
+  'games': palette.$goldenrod,
+  'stats': palette.$peru,
+  'lists': palette.$sage,
+  'collection': palette.$plum,
+  'play': palette.$sienna,
+  'rules': palette.$moss,
 );
 
 .container {
@@ -26,15 +28,25 @@ $nav-colors: (
 .heroTitle {
   margin-bottom: 16px;
   font-weight: 700;
-  background: linear-gradient(135deg, #d2691e 0%, #8b4513 50%, #daa520 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
 
-  [data-theme='dark'] & {
-    background: linear-gradient(135deg, #ff8c00 0%, #daa520 50%, #cd853f 100%);
-    background-clip: text;
-    -webkit-background-clip: text;
+  @include mixins.gradient-text(
+    linear-gradient(
+      135deg,
+      palette.$burnt-orange 0%,
+      palette.$saddle-brown 50%,
+      palette.$goldenrod 100%
+    )
+  );
+
+  @include mixins.dark-ancestor {
+    @include mixins.gradient-text(
+      linear-gradient(
+        135deg,
+        palette.$dark-orange 0%,
+        palette.$goldenrod 50%,
+        palette.$peru 100%
+      )
+    );
   }
 }
 
@@ -54,32 +66,68 @@ $nav-colors: (
 .quickActionCard {
   height: 100%;
 
-  &:global(.MuiPaper-root) {
-    background: linear-gradient(135deg, #8b451310 0%, #d2691e08 100%);
+  @include mixins.paper {
+    @include mixins.wash(
+      palette.$saddle-brown,
+      palette.$tint-soft,
+      palette.$burnt-orange,
+      palette.$tint-faint
+    );
   }
 
-  [data-theme='dark'] &:global(.MuiPaper-root) {
-    background: linear-gradient(135deg, #daa52020 0%, #cd853f10 100%);
+  @include mixins.dark-ancestor {
+    @include mixins.paper {
+      @include mixins.wash(
+        palette.$goldenrod,
+        palette.$tint-strong,
+        palette.$peru,
+        palette.$tint-soft
+      );
+    }
   }
 }
 
 .quickActionCardNew {
-  &:global(.MuiPaper-root) {
-    background: linear-gradient(135deg, #d2691e10 0%, #8b451308 100%);
+  @include mixins.paper {
+    @include mixins.wash(
+      palette.$burnt-orange,
+      palette.$tint-soft,
+      palette.$saddle-brown,
+      palette.$tint-faint
+    );
   }
 
-  [data-theme='dark'] &:global(.MuiPaper-root) {
-    background: linear-gradient(135deg, #ff8c0020 0%, #daa52010 100%);
+  @include mixins.dark-ancestor {
+    @include mixins.paper {
+      @include mixins.wash(
+        palette.$dark-orange,
+        palette.$tint-strong,
+        palette.$goldenrod,
+        palette.$tint-soft
+      );
+    }
   }
 }
 
 .quickActionCardResume {
-  &:global(.MuiPaper-root) {
-    background: linear-gradient(135deg, #6b8e6b15 0%, #4a7a4a08 100%);
+  @include mixins.paper {
+    @include mixins.wash(
+      palette.$moss,
+      palette.$tint-medium,
+      palette.$forest,
+      palette.$tint-faint
+    );
   }
 
-  [data-theme='dark'] &:global(.MuiPaper-root) {
-    background: linear-gradient(135deg, #6b8e6b30 0%, #4a7a4a15 100%);
+  @include mixins.dark-ancestor {
+    @include mixins.paper {
+      @include mixins.wash(
+        palette.$moss,
+        palette.$tint-heavy,
+        palette.$forest,
+        palette.$tint-medium
+      );
+    }
   }
 }
 
@@ -154,7 +202,7 @@ $nav-colors: (
 }
 
 .trophyIcon {
-  color: #daa520;
+  color: palette.$goldenrod;
   font-size: 20px;
 }
 

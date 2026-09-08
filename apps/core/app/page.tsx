@@ -106,13 +106,13 @@ export default function Dashboard() {
           <Fade in={mounted} timeout={1000}>
             <Grid container spacing={3} className={styles.statsGrid}>
               <Grid size={{ xs: 6, md: 3 }}>
-                <StatsCard title="Total Games" value={stats.overall.total_games} color="#D2691E" href="/games" />
+                <StatsCard title="Total Games" value={stats.overall.total_games} accent="primary" href="/games" />
               </Grid>
               <Grid size={{ xs: 6, md: 3 }}>
-                <StatsCard title="Players" value={stats.overall.total_players} color="#8B4513" href="/players" />
+                <StatsCard title="Players" value={stats.overall.total_players} accent="secondary" href="/players" />
               </Grid>
               <Grid size={{ xs: 6, md: 3 }}>
-                <StatsCard title="Decks" value={stats.overall.total_decks} color="#DAA520" href="/decks" />
+                <StatsCard title="Decks" value={stats.overall.total_decks} accent="gold" href="/decks" />
               </Grid>
               <Grid size={{ xs: 6, md: 3 }}>
                 <StatsCard
@@ -122,7 +122,7 @@ export default function Dashboard() {
                       ? Number(stats.overall.avg_game_length).toFixed(1)
                       : '-'
                   }
-                  color="#CD853F"
+                  accent="sand"
                   href="/stats"
                 />
               </Grid>
