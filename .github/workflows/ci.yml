@@ -100,6 +100,12 @@ jobs:
       # Note this deliberately does NOT use `npm install --package-lock-only`,
       # which produces a different (smaller) tree than a real install and would
       # fail here on a perfectly good lockfile.
+      # npm bundled with Node 22 crashes re-resolving this workspace with no
+      # lockfile present ("Cannot read properties of null (reading 'edgesOut')",
+      # an arborist bug). Pin the major that handles it.
+      - name: Use npm 11
+        run: npm install -g npm@11
+
       - name: Re-resolve dependencies from scratch
         run: |
           rm -rf node_modules apps/*/node_modules packages/*/node_modules package-lock.json
