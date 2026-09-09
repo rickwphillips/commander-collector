@@ -1,0 +1,66 @@
+version: 2
+
+# Dependabot alerts (the security scanner) are enabled in repo settings and are
+# what actually catches CVEs. This file only governs the scheduled *version
+# update* PRs, which exist so the tree doesn't drift so far that a future
+# security bump becomes a major-version migration.
+#
+# Grouping is deliberate: this is a Turborepo with four package.json files, so
+# ungrouped updates produce a wall of near-duplicate PRs. One PR per group per
+# week is reviewable; twenty is not.
+updates:
+  - package-ecosystem: npm
+    # npm workspaces: one entry at the root covers apps/* and packages/*.
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # Order matters: Dependabot puts each dependency in the FIRST group it
+      # matches, so the catch-all has to come last or it swallows everything
+      # and the specific groups below never fire.
+      #
+      # Next + its lint config move in lockstep (eslint-config-next is pinned to
+      # the same version as next). Splitting them produces a broken PR, and the
+      # 16.2.11 -> 16.3.0 bump is exactly the case that proved it.
+      next:
+        patterns:
+          - next
+          - eslint-config-next
+          - '@next/*'
+      react:
+        patterns:
+          - react
+          - react-dom
+          - '@types/react'
+          - '@types/react-dom'
+      mui:
+        patterns:
+          - '@mui/*'
+          - '@emotion/*'
+      # Everything the groups above didn't claim, in one PR. These carry the
+      # security backports and almost never need per-package review.
+      dev-minor-and-patch:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Majors are migrations, not updates. Surface them by hand when there's
+      # time to read a changelog, not as an auto-PR against a live app.
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns:
+          - '*'
