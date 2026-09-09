@@ -77,7 +77,7 @@ jobs:
         run: npm test
 
   lockfile:
-    name: Lockfile is canonical
+    name: Resolved deps match package.json
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: guard
@@ -90,37 +90,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
 
-      # `npm ci` cannot catch this class of bug: it installs exactly what the
-      # lockfile records, so a lockfile that installs cleanly but does not match
-      # what package.json actually resolves to passes it. That is how a react
-      # 19.2.8 bump shipped with the hoisted root react-dom left at 19.2.7 and
-      # broke the rules-guru suite at collection time.
-      #
-      # Note this deliberately does NOT use `npm install --package-lock-only`,
-      # which produces a different (smaller) tree than a real install and would
-      # fail here on a perfectly good lockfile.
-      # npm bundled with Node 22 crashes re-resolving this workspace with no
-      # lockfile present ("Cannot read properties of null (reading 'edgesOut')",
-      # an arborist bug). Pin the major that handles it.
-      - name: Use npm 11
-        run: npm install -g npm@11
+      - name: Install
+        run: npm ci --no-audit --no-fund
 
-      - name: Re-resolve dependencies from scratch
-        run: |
-          rm -rf node_modules apps/*/node_modules packages/*/node_modules package-lock.json
-          npm install --no-audit --no-fund
-
-      - name: Lockfile must match a clean resolve
-        run: |
-          if ! git diff --quiet -- package-lock.json; then
-            echo "::error::package-lock.json is not what a clean resolve of package.json produces. Run: rm -rf node_modules apps/*/node_modules packages/*/node_modules package-lock.json && npm install, then commit the result."
-            git diff --stat -- package-lock.json
-            echo "--- first 200 lines of drift ---"
-            git diff -- package-lock.json | head -200
-            exit 1
-          fi
-          echo "OK: lockfile matches a clean resolve"
+      # Checks what is actually installed, not the lockfile bytes. Byte-equality
+      # against a fresh resolve is NOT a portable invariant: linux re-adds
+      # entries (ajv, fast-uri, json-schema-traverse, yaml) marked extraneous
+      # that a macOS resolve omits, so that form of the check fails on a
+      # perfectly good lockfile.
+      - name: Pinned versions resolve exactly, react/react-dom agree
+        run: node scripts/check-resolved-deps.mjs .
 
   php-lint:
     runs-on: ubuntu-latest
