@@ -17,8 +17,10 @@ describe('totalCardCount', () => {
   });
 
   it('accepts any object carrying a quantity', () => {
-    // Cards, API rows and coach profile entries all flow through this.
-    const row = { card_name: 'Island', quantity: 13 };
-    expect(totalCardCount([row])).toBe(13);
+    // Cards, API rows and coach profile entries all flow through this. Bound to a
+    // variable first because a fresh object literal would trip TS's excess-property
+    // check against `Countable`, which real (already-typed) callers never hit.
+    const apiRow = { card_name: 'Island', quantity: 13 };
+    expect(totalCardCount([apiRow])).toBe(13);
   });
 });
