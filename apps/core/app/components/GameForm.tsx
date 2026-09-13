@@ -500,7 +500,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
                         </Typography>
                       </Stack>
                       {results.length > 2 && (
-                        <IconButton onClick={() => removePlayer(index)} color="error" size="small">
+                        <IconButton aria-label="Remove player" onClick={() => removePlayer(index)} color="error" size="small">
                           <RemoveIcon />
                         </IconButton>
                       )}
