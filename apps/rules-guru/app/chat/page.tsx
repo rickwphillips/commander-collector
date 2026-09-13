@@ -859,7 +859,7 @@ export default function ChatPage() {
               key={c.id}
               disablePadding
               secondaryAction={
-                <IconButton size="small" onClick={e => deleteConversation(c.id, e)}>
+                <IconButton size="small" aria-label="Delete conversation" onClick={e => deleteConversation(c.id, e)}>
                   <DeleteIcon fontSize="small" />
                 </IconButton>
               }
@@ -1111,7 +1111,7 @@ export default function ChatPage() {
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <AutoStoriesIcon color="primary" />
           Review New Pattern
-          <IconButton sx={{ ml: 'auto' }} onClick={() => setPatternDialog(null)}>
+          <IconButton sx={{ ml: 'auto' }} aria-label="Close pattern details" onClick={() => setPatternDialog(null)}>
             <CloseIcon />
           </IconButton>
         </DialogTitle>

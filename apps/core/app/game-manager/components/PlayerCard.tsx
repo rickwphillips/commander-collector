@@ -789,7 +789,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
                     </Box>
                     <Typography sx={{ fontSize: 'clamp(28px, 8dvmax, 56px)', fontWeight: 900, lineHeight: 1, color: srcLifeColor || 'primary.main', textDecoration: src.isEliminated ? 'line-through' : 'none', flexShrink: 0 }}>{src.life}</Typography>
                     <Stack direction="column" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
-                      <IconButton size="small" onClick={() => setOpenSnapshotKey(null)} sx={{ p: 0.25 }}>
+                      <IconButton size="small" aria-label="Close snapshot" onClick={() => setOpenSnapshotKey(null)} sx={{ p: 0.25 }}>
                         <CloseIcon sx={{ fontSize: sizes.fsSourceName }} />
                       </IconButton>
                       {onSwitchToPlayer && !src.isEliminated && srcIdx !== playerIdx && (
