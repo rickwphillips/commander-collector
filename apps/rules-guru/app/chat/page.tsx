@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback, useMemo, useImperativeHandle } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
   Box,
   Typography,
-  TextField,
   IconButton,
   Paper,
   Drawer,
@@ -26,7 +25,6 @@ import {
   DialogActions,
   Collapse, // used for pattern expand
 } from '@mui/material';
-import SendIcon from '@mui/icons-material/Send';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import HistoryIcon from '@mui/icons-material/History';
 import AddIcon from '@mui/icons-material/Add';
@@ -41,7 +39,6 @@ import AddCommentIcon from '@mui/icons-material/AddComment';
 import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import NoteAddIcon from '@mui/icons-material/NoteAdd';
 import CheckIcon from '@mui/icons-material/Check';
-import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import RateReviewIcon from '@mui/icons-material/RateReview';
 import { rulesApi } from '../lib/api';
 import { MessageFeedback } from '../components/MessageFeedback';
@@ -862,7 +859,7 @@ export default function ChatPage() {
               key={c.id}
               disablePadding
               secondaryAction={
-                <IconButton size="small" onClick={e => deleteConversation(c.id, e)}>
+                <IconButton size="small" aria-label="Delete conversation" onClick={e => deleteConversation(c.id, e)}>
                   <DeleteIcon fontSize="small" />
                 </IconButton>
               }
@@ -1114,7 +1111,7 @@ export default function ChatPage() {
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <AutoStoriesIcon color="primary" />
           Review New Pattern
-          <IconButton sx={{ ml: 'auto' }} onClick={() => setPatternDialog(null)}>
+          <IconButton sx={{ ml: 'auto' }} aria-label="Close pattern details" onClick={() => setPatternDialog(null)}>
             <CloseIcon />
           </IconButton>
         </DialogTitle>
@@ -1169,7 +1166,7 @@ export default function ChatPage() {
           open={sessionFeedbackOpen}
           onClose={() => setSessionFeedbackOpen(false)}
           conversationId={conversationId}
-          messages={messages.filter((m): m is LocalMessage & { id: number } => m.id != null) as import('../lib/types').RulesMessage[]}
+          messages={messages.filter((m): m is LocalMessage & { id: number } => m.id != null) as RulesMessage[]}
           onPointHover={(msgIdx) => {
             document.getElementById(`chat-msg-${msgIdx}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
           }}

@@ -30,7 +30,6 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import CollectionsIcon from '@mui/icons-material/Collections';
 import { SettingsTab } from './components/SettingsTab';
 import { StatsCard } from './components/StatsCard';
-import { ColorIdentityChips } from './components/ColorIdentityChips';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { RematchButton } from './components/RematchButton';
 import { useAuth } from './components/AuthGuard';
