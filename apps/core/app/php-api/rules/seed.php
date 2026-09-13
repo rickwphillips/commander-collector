@@ -8,7 +8,17 @@
  *   php seed.php --dry-run
  */
 
-$isLocalDev = php_sapi_name() === 'cli-server' || php_sapi_name() === 'cli';
+// CLI-only guard. This file lives under php-api/, which is served from the web
+// root in prod, so without this an unauthenticated GET of
+// /php-api/rules/seed.php would run the whole upsert loop against the live DB:
+// $argv is unset under a web SAPI, so $dryRun would be false and the writes
+// real. Every caller is CLI (scripts/sync-rules-patterns.sh and the deploy
+// script both invoke `php seed.php`), so refusing non-CLI costs nothing.
+// Mirrors the guard in apps/core/scripts/refresh-card-cache.php.
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
 
 // Load config (DB credentials)
 $scriptDir  = __DIR__;
