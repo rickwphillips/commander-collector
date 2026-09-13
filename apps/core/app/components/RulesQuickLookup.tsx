@@ -104,7 +104,7 @@ export function RulesQuickLookup() {
           <Typography variant="h6" sx={{ fontWeight: 600, flex: 1 }}>
             Quick Lookup
           </Typography>
-          <IconButton size="small" onClick={() => setOpen(false)}>
+          <IconButton size="small" aria-label="Close rules lookup" onClick={() => setOpen(false)}>
             <CloseIcon fontSize="small" />
           </IconButton>
         </Stack>
@@ -120,7 +120,7 @@ export function RulesQuickLookup() {
           InputProps={{
             endAdornment: (
               <InputAdornment position="end">
-                <IconButton size="small" onClick={() => doLookup(query)}>
+                <IconButton size="small" aria-label="Search rules" onClick={() => doLookup(query)}>
                   <SearchIcon fontSize="small" />
                 </IconButton>
               </InputAdornment>
