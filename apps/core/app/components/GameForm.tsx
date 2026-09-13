@@ -13,7 +13,6 @@ import {
   Box,
   IconButton,
   Grow,
-  Divider,
   ToggleButtonGroup,
   ToggleButton,
 } from '@mui/material';
