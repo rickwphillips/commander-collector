@@ -26,7 +26,6 @@ import {
   IconButton,
   Menu,
   MenuItem,
-  Paper,
   Popover,
   ToggleButton,
   ToggleButtonGroup,
@@ -47,7 +46,6 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import RedoIcon from '@mui/icons-material/Redo';
 import SaveIcon from '@mui/icons-material/Save';
 import SubjectIcon from '@mui/icons-material/Subject';
-import TableChartIcon from '@mui/icons-material/TableChart';
 import UndoIcon from '@mui/icons-material/Undo';
 
 import { CardInputPanel } from '@/components/cards/CardInputPanel';
