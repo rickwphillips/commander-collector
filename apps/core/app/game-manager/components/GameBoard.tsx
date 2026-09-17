@@ -1055,6 +1055,7 @@ export function GameBoard({
               {/* Read-only blocker — prevents all interaction with the panel */}
               <Box sx={{ position: 'absolute', inset: 0, zIndex: 5, cursor: 'pointer' }} onClick={() => setViewingPlayerIdx(null)} />
               <IconButton
+                aria-label="Close player view"
                 onClick={() => setViewingPlayerIdx(null)}
                 sx={{ position: 'absolute', top: 8, right: 8, zIndex: 10, bgcolor: 'rgba(0,0,0,0.5)', color: '#fff', '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' } }}
               >

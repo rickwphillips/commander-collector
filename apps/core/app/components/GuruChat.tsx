@@ -407,7 +407,6 @@ export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruC
         ctrl.signal,
       );
       if (ctrl.signal.aborted) return;
-      console.log('[coach] response received', { len: response.length, tools: toolsUsed.length, empty: response === '' });
       setPartialResponse('');
       const assistantMsg: CoachMessage = {
         role: 'assistant',

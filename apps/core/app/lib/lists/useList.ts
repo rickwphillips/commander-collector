@@ -181,7 +181,6 @@ export function useList(opts: UseListOptions): UseListResult {
           '/list-image-resolve',
           { method: 'POST', body: JSON.stringify({ list_id: listId, limit: BATCH }) }
         );
-        console.log(`[useList] batch resolved ${updated.length}, remaining ${remaining}`);
         if (updated.length > 0) {
           const patchMap = new Map(updated.map((u) => [u.id, u]));
           setCards((prev) =>
@@ -252,7 +251,6 @@ export function useList(opts: UseListOptions): UseListResult {
         (c) => !c.scryfall_id || !c.type_line || !c.image_uri || c.colors === undefined || !c.color_identity
       ).length;
       if (unresolvedCount > 0) {
-        console.log(`[useList] ${unresolvedCount} cards missing metadata — resolving…`);
         resolveMetadata(id, unresolvedCount);
       }
     } catch (err) {
@@ -288,8 +286,7 @@ export function useList(opts: UseListOptions): UseListResult {
           (c) => !c.scryfall_id || !c.type_line || !c.image_uri || c.colors === undefined || !c.color_identity
         ).length;
         if (unresolvedCount > 0) {
-          console.log(`[useList] ${unresolvedCount} cards missing metadata — resolving…`);
-          resolveMetadata(raw.id, unresolvedCount);
+            resolveMetadata(raw.id, unresolvedCount);
         }
       } else {
         // No main list exists yet — not an error condition; caller handles null.

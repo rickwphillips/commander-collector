@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Box, Typography, TextField, Button, Stack, CircularProgress, IconButton, Chip, Fab, Dialog, DialogTitle, DialogContent } from '@mui/material';
+import { Box, Typography, TextField, Button, Stack, CircularProgress, IconButton, Chip, Dialog, DialogTitle, DialogContent } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { PlayerPanel } from '../components/PlayerPanel';
 import { TeamPanel } from '../components/TeamPanel';
@@ -629,7 +629,7 @@ function RemotePageInner() {
                   Read Only — {vPlayer.playerName}
                 </Typography>
               </Box>
-              <IconButton onClick={() => setViewingPlayerIdx(null)}
+              <IconButton aria-label="Close player view" onClick={() => setViewingPlayerIdx(null)}
                 sx={{ position: 'absolute', top: 4, right: 8, zIndex: 11, p: 0.5, color: 'rgba(255,255,255,0.7)' }}>
                 <CloseIcon sx={{ fontSize: 18 }} />
               </IconButton>
@@ -643,7 +643,7 @@ function RemotePageInner() {
       <Dialog open={logOpen} onClose={() => setLogOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1.5, fontWeight: 600, fontSize: '1rem' }}>
           Game Log
-          <IconButton size="small" onClick={() => setLogOpen(false)} sx={{ p: 0.25 }}>
+          <IconButton size="small" aria-label="Close game log" onClick={() => setLogOpen(false)} sx={{ p: 0.25 }}>
             <CloseIcon sx={{ fontSize: 18 }} />
           </IconButton>
         </DialogTitle>

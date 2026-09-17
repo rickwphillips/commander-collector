@@ -189,7 +189,7 @@ export function SeatPickerModal({
         <Typography variant="caption" component="div" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
           {seatLabel}
         </Typography>
-        <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }}>
+        <IconButton aria-label="Close seat picker" onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }}>
           <CloseIcon />
         </IconButton>
       </DialogTitle>

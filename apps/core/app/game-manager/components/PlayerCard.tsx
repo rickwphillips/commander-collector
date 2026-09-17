@@ -383,9 +383,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
   // ─── Derived from animations bundle (cheap, recompute every render) ─────
   // showCrown / monarchAnimStr were lifted as props in Phase 1; the card owns
   // them now because they're pure functions of `monarchAnim`.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { monarchAnim } = animations;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const showCrown = player.isMonarch || monarchAnim === 'exiting';
 
   // ─── XP keyframes (pure functions of player.experience) ─────────────────
@@ -791,7 +789,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
                     </Box>
                     <Typography sx={{ fontSize: 'clamp(28px, 8dvmax, 56px)', fontWeight: 900, lineHeight: 1, color: srcLifeColor || 'primary.main', textDecoration: src.isEliminated ? 'line-through' : 'none', flexShrink: 0 }}>{src.life}</Typography>
                     <Stack direction="column" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
-                      <IconButton size="small" onClick={() => setOpenSnapshotKey(null)} sx={{ p: 0.25 }}>
+                      <IconButton size="small" aria-label="Close snapshot" onClick={() => setOpenSnapshotKey(null)} sx={{ p: 0.25 }}>
                         <CloseIcon sx={{ fontSize: sizes.fsSourceName }} />
                       </IconButton>
                       {onSwitchToPlayer && !src.isEliminated && srcIdx !== playerIdx && (

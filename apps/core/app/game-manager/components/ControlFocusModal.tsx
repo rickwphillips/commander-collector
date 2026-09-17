@@ -63,7 +63,7 @@ export function ControlFocusModal({
         {/* Header */}
         <Box sx={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
           <Typography sx={{ fontWeight: 700, fontSize: 15 }}>{label}</Typography>
-          <IconButton size="small" onClick={onClose}><CloseIcon fontSize="small" /></IconButton>
+          <IconButton size="small" aria-label="Close" onClick={onClose}><CloseIcon fontSize="small" /></IconButton>
         </Box>
 
         {/* ±1 row */}

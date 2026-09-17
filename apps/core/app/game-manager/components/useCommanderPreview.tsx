@@ -53,6 +53,7 @@ export function useCommanderPreview(): {
     >
       <IconButton
         size="small"
+        aria-label="Close commander preview"
         onClick={(e) => { e.stopPropagation(); close(); }}
         sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1, color: 'rgba(255,255,255,0.85)', bgcolor: 'rgba(0,0,0,0.5)', '&:hover': { bgcolor: 'rgba(0,0,0,0.75)' } }}
       >
