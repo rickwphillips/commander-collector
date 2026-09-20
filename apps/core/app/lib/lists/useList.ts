@@ -23,13 +23,12 @@
  * resolution UI (e.g., a "Reload and merge" dialog). The hook never retries
  * internally — conflict resolution is the caller's responsibility.
  *
- * ATTACH / DETACH (Step 6 NOTE):
- * TODO(Step 6): attachToDeck / detachFromDeck currently call a no-op shim on the
- * PHP side (introduced in Step 2 as a placeholder). Once Step 6 (list_history
- * audit) makes the underlying SQL functional, these calls will take effect and
- * a subsequent refresh() will reflect the new deck_id. Until Step 6 lands,
- * calling attachToDeck or detachFromDeck will succeed (2xx) but leave the DB
- * unchanged. Callers should always call refresh() after attach/detach.
+ * ATTACH / DETACH:
+ * attachToDeck / detachFromDeck update lists.deck_id on the server. The PHP
+ * handlers (lists.php, action=attach_deck / detach_deck) verify ownership,
+ * bump `version` and write a list_history audit row. Neither updates local
+ * state, so callers should still call refresh() afterwards to pick up the new
+ * deck_id and version.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -90,13 +89,13 @@ export interface UseListResult {
   /** Apply a partial patch to a card by its DB id (string UUID), then save. */
   updateCard: (cardId: string, patch: Partial<Card>) => Promise<void>;
   /**
-   * Attach this list to a deck. Calls the PHP shim; see TODO(Step 6) above.
-   * Always call refresh() after this to pick up the updated deck_id.
+   * Attach this list to a deck. Always call refresh() after this to pick up
+   * the updated deck_id and version.
    */
   attachToDeck: (deckId: string) => Promise<void>;
   /**
-   * Detach this list from its deck. Calls the PHP shim; see TODO(Step 6) above.
-   * Always call refresh() after this to pick up the cleared deck_id.
+   * Detach this list from its deck. Always call refresh() after this to pick
+   * up the cleared deck_id and new version.
    */
   detachFromDeck: () => Promise<void>;
   /** Re-fetch list metadata and cards from the server. */
@@ -181,7 +180,6 @@ export function useList(opts: UseListOptions): UseListResult {
           '/list-image-resolve',
           { method: 'POST', body: JSON.stringify({ list_id: listId, limit: BATCH }) }
         );
-        console.log(`[useList] batch resolved ${updated.length}, remaining ${remaining}`);
         if (updated.length > 0) {
           const patchMap = new Map(updated.map((u) => [u.id, u]));
           setCards((prev) =>
@@ -252,7 +250,6 @@ export function useList(opts: UseListOptions): UseListResult {
         (c) => !c.scryfall_id || !c.type_line || !c.image_uri || c.colors === undefined || !c.color_identity
       ).length;
       if (unresolvedCount > 0) {
-        console.log(`[useList] ${unresolvedCount} cards missing metadata — resolving…`);
         resolveMetadata(id, unresolvedCount);
       }
     } catch (err) {
@@ -288,8 +285,7 @@ export function useList(opts: UseListOptions): UseListResult {
           (c) => !c.scryfall_id || !c.type_line || !c.image_uri || c.colors === undefined || !c.color_identity
         ).length;
         if (unresolvedCount > 0) {
-          console.log(`[useList] ${unresolvedCount} cards missing metadata — resolving…`);
-          resolveMetadata(raw.id, unresolvedCount);
+            resolveMetadata(raw.id, unresolvedCount);
         }
       } else {
         // No main list exists yet — not an error condition; caller handles null.
@@ -408,9 +404,7 @@ export function useList(opts: UseListOptions): UseListResult {
       return;
     }
     try {
-      // TODO(Step 6): This is a no-op shim until Step 6 makes the SQL functional.
-      // The call will succeed (2xx) but leave deck_id unchanged until Step 6 lands.
-      // Always call refresh() after this.
+      // Does not update local state — call refresh() after this.
       await apiFetch<{ success: boolean }>(
         `/lists?id=${encodeURIComponent(list.id)}&action=attach_deck`,
         {
@@ -433,9 +427,7 @@ export function useList(opts: UseListOptions): UseListResult {
       throw new Error(msg);
     }
     try {
-      // TODO(Step 6): This is a no-op shim until Step 6 makes the SQL functional.
-      // The call will succeed (2xx) but leave deck_id unchanged until Step 6 lands.
-      // Always call refresh() after this.
+      // Does not update local state — call refresh() after this.
       await apiFetch<{ success: boolean }>(
         `/lists?id=${encodeURIComponent(list.id)}&action=detach_deck`,
         { method: 'POST' }
