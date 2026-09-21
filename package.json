@@ -16,7 +16,7 @@
     "local-stop": "bash ./scripts/stop-dev.sh"
   },
   "devDependencies": {
-    "turbo": "^2.3.3"
+    "turbo": "^2.10.13"
   },
   "overrides": {
     "postcss": "^8.5.10",
