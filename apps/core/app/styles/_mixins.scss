@@ -1,0 +1,79 @@
+@use 'palette';
+
+// The MUI theme is JS-only and puts nothing on the DOM, so components that need
+// scheme-aware CSS stamp `data-theme={mode}` (from useThemeMode) on an element
+// and select through it. Two variants, depending on which element carries it.
+
+/// Content applies when the styled element itself carries data-theme="dark".
+@mixin dark-self {
+  &[data-theme='dark'] {
+    @content;
+  }
+}
+
+/// Content applies when any ancestor carries data-theme="dark".
+@mixin dark-ancestor {
+  [data-theme='dark'] & {
+    @content;
+  }
+}
+
+/// Out-specify emotion. MUI injects its Paper/Card styles as a single generated
+/// class, so a plain CSS-module class ties with it and loses on source order;
+/// chaining .MuiPaper-root wins on specificity instead.
+@mixin paper {
+  &:global(.MuiPaper-root) {
+    @content;
+  }
+}
+
+/// The shared "tinted card" treatment: an accent left border, a diagonal wash
+/// fading to transparent, and a matching lift-and-glow on hover.
+@mixin accent-card($color) {
+  @include paper {
+    border-left: 4px solid $color;
+    background: linear-gradient(135deg, rgba($color, palette.$wash-light) 0%, transparent 100%);
+    transition: all 0.3s ease;
+  }
+
+  @include paper {
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba($color, palette.$glow-light);
+    }
+  }
+
+  @include dark-self {
+    @include paper {
+      background: linear-gradient(135deg, rgba($color, palette.$wash-dark) 0%, transparent 100%);
+    }
+
+    @include paper {
+      &:hover {
+        box-shadow: 0 8px 24px rgba($color, palette.$glow-dark);
+      }
+    }
+  }
+}
+
+/// Diagonal two-stop wash, the dashboard's quick-action card treatment.
+@mixin wash($from, $from-alpha, $to, $to-alpha) {
+  background: linear-gradient(135deg, rgba($from, $from-alpha) 0%, rgba($to, $to-alpha) 100%);
+}
+
+/// Paint text with a gradient. Needs a background, so the fill is knocked out
+/// and the box clipped to the glyphs.
+@mixin gradient-text($gradient) {
+  background: $gradient;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/// Min-width media query, matching how MUI reads a responsive sx object
+/// (`{ xs: a, sm: b }` means a until $bp-sm, then b).
+@mixin up($breakpoint) {
+  @media (min-width: $breakpoint) {
+    @content;
+  }
+}
