@@ -378,7 +378,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
   const { openPreview: setCmdPreviewName, overlay: cmdPreviewOverlay } = useCommanderPreview();
 
   // Auto-close QR when remote player connects.
-  useEffect(() => { if (remoteConnected && qrOpen) setQrOpen(false); }, [remoteConnected, qrOpen]);
+  if (remoteConnected && qrOpen) setQrOpen(false);
 
   // ─── Derived from animations bundle (cheap, recompute every render) ─────
   // showCrown / monarchAnimStr were lifted as props in Phase 1; the card owns

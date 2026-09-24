@@ -28,12 +28,17 @@ export function useCommanderPreview(): {
   const [base, setBase] = useState<{ w: number; h: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Resolve preview URL when the name changes; reset zoom/base.
-  useEffect(() => {
-    if (!name) { setUrl(null); setZoom(1); setBase(null); return; }
+  // Reset url/zoom/base when the name changes...
+  const [prevName, setPrevName] = useState(name);
+  if (name !== prevName) {
+    setPrevName(name);
     setUrl(null);
     setZoom(1);
     setBase(null);
+  }
+  // ...then resolve the preview URL.
+  useEffect(() => {
+    if (!name) return;
     getCardImageByName(name).then((u) => setUrl(u));
   }, [name]);
 
