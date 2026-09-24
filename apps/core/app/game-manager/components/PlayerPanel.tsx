@@ -201,14 +201,17 @@ export function PlayerPanel({
     return () => clearTimeout(t);
   }, [isBeingViewedByAnyone, viewerPlayerNames.length, viewerBannerNonce]);
 
-  // ─── Preload all commander art once on mount ─────────────────────────────
+  // ─── Preload every commander's art ───────────────────────────────────────
+  // Keyed on the set of art URLs (not the players array, which changes on every
+  // game update), so it runs on mount and again only if a commander changes.
+  // preloadArt skips URLs it has already loaded.
+  const artUrlsKey = allPlayers
+    .flatMap((p) => [p.commander.artCropUrl, p.partner?.artCropUrl])
+    .filter(Boolean)
+    .join('\n');
   useEffect(() => {
-    allPlayers.forEach(p => {
-      preloadArt(p.commander.artCropUrl);
-      preloadArt(p.partner?.artCropUrl);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    artUrlsKey.split('\n').forEach(preloadArt);
+  }, [artUrlsKey]);
 
   // ─── Derived: timer (shared with the 2HG TeamPanel via useTimerTokens) ─────
   const timer = useTimerTokens(elapsedSeconds, turnTimerSeconds, isCurrentPlayer);

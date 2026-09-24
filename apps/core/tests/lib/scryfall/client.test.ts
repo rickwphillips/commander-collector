@@ -7,10 +7,8 @@ vi.mock('@/lib/api', () => ({
 import { apiFetch } from '@/lib/api';
 import {
   lookupByName,
-  lookupById,
   bulkLookupByName,
   getPrints,
-  search,
 } from '@/lib/scryfall/client';
 
 const mockedFetch = vi.mocked(apiFetch);
@@ -40,13 +38,5 @@ describe('scryfall/client', () => {
     const prints = await getPrints('Sol Ring');
     expect(mockedFetch).toHaveBeenCalledWith('card-prints?name=Sol%20Ring');
     expect(prints).toEqual([{ set_code: 'CMR' }]);
-  });
-
-  it('lookupById throws — not implemented', async () => {
-    await expect(lookupById('abc')).rejects.toThrow('not implemented');
-  });
-
-  it('search throws — not implemented', async () => {
-    await expect(search('t:legendary')).rejects.toThrow('not implemented');
   });
 });

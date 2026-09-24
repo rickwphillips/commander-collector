@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useEffect, useLayoutEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useLayoutEffect, useCallback, useEffectEvent } from 'react';
 import { Box, Button, Typography, IconButton, Stack, useMediaQuery } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -262,22 +262,24 @@ export function GameBoard({
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
 
+  // Apply the saved settings when they arrive. An effect event, so it compares
+  // against the turn timer at that moment without re-running the load.
+  const applyGameSettings = useEffectEvent((settings: Awaited<ReturnType<typeof api.getGameSettings>>) => {
+    setHighlightMode(settings.highlight_mode);
+    setSoundEnabled(settings.sound_enabled);
+    const timerVal = settings.turn_timer_enabled ? settings.turn_timer_seconds : 0;
+    if (timerVal !== turnTimerSeconds) {
+      onUpdate((prev) => ({ ...prev, turnTimerSeconds: timerVal }));
+    }
+  });
+
   // Load game settings from DB on mount
   useEffect(() => {
     if (settingsLoadedRef.current) return;
     settingsLoadedRef.current = true;
-
     api.getGameSettings()
-      .then((settings) => {
-        setHighlightMode(settings.highlight_mode);
-        setSoundEnabled(settings.sound_enabled);
-        const timerVal = settings.turn_timer_enabled ? settings.turn_timer_seconds : 0;
-        if (timerVal !== turnTimerSeconds) {
-          onUpdate((prev) => ({ ...prev, turnTimerSeconds: timerVal }));
-        }
-      })
+      .then((settings) => applyGameSettings(settings))
       .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Re-apply all settings when game resets (firstPlayerSet goes false)

@@ -52,9 +52,9 @@ export interface XpKeyframes {
  * XP-tracker keyframes. `xpGlow` and `xpGlowIntensity` are derived inline by
  * the caller and threaded through here so the shimmer body stays identical.
  *
- * Note: the four conditional XP anims invalidate only on `experience`
- * changes (matching the original deps array). `xpGlow` / `xpGlowIntensity`
- * are functions of `experience` so this is safe and matches prior behavior.
+ * `xpGlow` / `xpGlowIntensity` are primitives derived from `experience`, so
+ * listing them as dependencies rebuilds the keyframes exactly when
+ * `experience` changes, as before.
  */
 export function useXpKeyframes(
   experience: number,
@@ -64,7 +64,7 @@ export function useXpKeyframes(
   const xpShimmerAnim = useMemo(() => experience > 0 ? keyframes`
     0%,100% { text-shadow: ${xpGlow}; filter: brightness(1); }
     45%, 55% { text-shadow: 0 0 ${6 + xpGlowIntensity * 16}px rgba(255,223,0,0.95), 0 0 ${18 + xpGlowIntensity * 28}px rgba(218,165,32,0.7); filter: brightness(1.5); }
-  ` : null, [experience]); // eslint-disable-line react-hooks/exhaustive-deps
+  ` : null, [experience, xpGlow, xpGlowIntensity]);
 
   const xpFlashAnim = useMemo(() => keyframes`
     0%   { box-shadow: 0 2px 8px rgba(218,165,32,0.5); transform: rotate(45deg) scale(1); }
@@ -131,8 +131,8 @@ export interface EnergyKeyframes {
 
 /**
  * Energy-tracker keyframes. `energyStaticShadow` and `sizzleAmp` are derived
- * by the caller and threaded through; original deps were `[player.energy]`
- * on both memos, so we keep that invalidation surface.
+ * by the caller and threaded through; both are primitives derived from
+ * `energy`, so the memos still rebuild exactly when `energy` changes.
  */
 export function useEnergyKeyframes(
   energy: number,
@@ -142,7 +142,7 @@ export function useEnergyKeyframes(
   const energyPulseAnim = useMemo(() => energy > 5 ? keyframes`
     0%   { text-shadow: ${energyStaticShadow}, 0 0 4px rgba(80,200,255,0.95), 0 0 8px rgba(80,200,255,0.8); }
     100% { text-shadow: ${energyStaticShadow}, 0 0 ${30 + energy * 5}px rgba(80,200,255,0), 0 0 ${60 + energy * 10}px rgba(80,200,255,0); }
-  ` : null, [energy]); // eslint-disable-line react-hooks/exhaustive-deps
+  ` : null, [energy, energyStaticShadow]);
 
   const energySizzleAnim = useMemo(() => energy > 5 ? keyframes`
     0%   { transform: translate(0, 0); }
@@ -156,7 +156,7 @@ export function useEnergyKeyframes(
     80%  { transform: translate(${sizzleAmp}px, ${-sizzleAmp * 0.5}px); }
     90%  { transform: translate(${-sizzleAmp * 0.5}px, ${-sizzleAmp}px); }
     100% { transform: translate(0, 0); }
-  ` : null, [energy]); // eslint-disable-line react-hooks/exhaustive-deps
+  ` : null, [energy, sizzleAmp]);
 
   return { energyPulseAnim, energySizzleAnim };
 }

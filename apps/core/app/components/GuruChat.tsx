@@ -252,26 +252,6 @@ export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruC
     scrollToBottom();
   }, [messages, loading, scrollToBottom]);
 
-  // Load history and restore last session once initialized
-  useEffect(() => {
-    if (!initialized) return;
-    const sessions = loadHistory();
-    setHistory(sessions);
-    if (sessions.length > 0 && messages.length === 0) {
-      const latest = sessions[0];
-      sessionIdRef.current = latest.id;
-      // Backfill uuids for messages saved before the rating-chip system landed
-      // so re-renders have stable keys for the chips.
-      const backfilled = latest.messages.map((m) =>
-        m.role === 'assistant' && !m.uuid
-          ? { ...m, uuid: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `m-${Date.now()}-${Math.random()}` }
-          : m
-      );
-      setMessages(backfilled);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialized]);
-
   // Auto-save current session whenever messages change
   useEffect(() => {
     if (messages.length > 0) {
@@ -305,9 +285,27 @@ export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruC
     },
   });
 
+  // The first open initializes the drawer: load saved sessions and restore the
+  // most recent one (done here, in the handler that initializes, rather than in
+  // an effect watching the flag).
   const handleOpen = () => {
     onToggle(true);
-    if (!initialized) setInitialized(true);
+    if (initialized) return;
+    setInitialized(true);
+    const sessions = loadHistory();
+    setHistory(sessions);
+    if (sessions.length > 0 && messages.length === 0) {
+      const latest = sessions[0];
+      sessionIdRef.current = latest.id;
+      // Backfill uuids for messages saved before the rating-chip system landed
+      // so re-renders have stable keys for the chips.
+      const backfilled = latest.messages.map((m) =>
+        m.role === 'assistant' && !m.uuid
+          ? { ...m, uuid: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `m-${Date.now()}-${Math.random()}` }
+          : m
+      );
+      setMessages(backfilled);
+    }
   };
 
   // No auto-greet: opening the drawer with a deck/list active should attach

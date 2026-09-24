@@ -39,7 +39,6 @@ function ScanPageInner() {
       .then((d) => setDeckName(d.name))
       .catch(() => setDeckLoadError('Failed to load deck'))
       .finally(() => setDeckLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editDeckId]);
 
   // Save dialog state

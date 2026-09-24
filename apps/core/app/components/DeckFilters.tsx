@@ -241,6 +241,39 @@ export function sortCards<T extends {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+type FilterCard = NonNullable<Props['cards']>[number];
+
+/** Filterable mana symbols (hybrid slashes dropped) across a set of cards. */
+function extractManaSymbols(subset: FilterCard[]): Set<string> {
+  const s = new Set<string>();
+  for (const c of subset) {
+    for (const m of (c.mana_cost ?? '').matchAll(/\{([^}]+)\}/g)) {
+      const code = m[1].replace('/', '');
+      if (FILTERABLE_SYMBOLS.has(code)) s.add(code);
+    }
+  }
+  return s;
+}
+
+/** Colors across a set of cards; lands always use color identity. */
+function extractColors(subset: FilterCard[], useColorIdentity: boolean): Set<string> {
+  const s = new Set<string>();
+  for (const c of subset) {
+    const isLand = c.type_line?.includes('Land') ?? false;
+    if (useColorIdentity || isLand) {
+      // Always use color_identity for lands; use it for everyone when identity mode is on
+      const ci = c.color_identity ?? '';
+      if (ci === '') s.add('C');
+      else for (const ch of ci) if ('WUBRG'.includes(ch)) s.add(ch);
+    } else {
+      const col = c.colors ?? '';
+      if (col === '') s.add('C');
+      else for (const ch of col) if ('WUBRG'.includes(ch)) s.add(ch);
+    }
+  }
+  return s;
+}
+
 interface Props {
   filters: DeckFilterState;
   onChange: (f: DeckFilterState) => void;
@@ -320,56 +353,22 @@ export function DeckFilters({ filters, onChange, resultCount, totalCount, overBy
     return s;
   }, [cards, withoutCmc]);
 
-  const extractManaSymbols = (subset: typeof cards) => {
-    const s = new Set<string>();
-    for (const c of subset) {
-      for (const m of (c.mana_cost ?? '').matchAll(/\{([^}]+)\}/g)) {
-        const code = m[1].replace('/', '');
-        if (FILTERABLE_SYMBOLS.has(code)) s.add(code);
-      }
-    }
-    return s;
-  };
-
-  const allManaSymbols = useMemo(() => extractManaSymbols(cards),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cards]);
+  const allManaSymbols = useMemo(() => extractManaSymbols(cards), [cards]);
 
   const validManaSymbols = useMemo(
     () => extractManaSymbols(cards.filter(c => matchesFilters(c, withoutManaSymbol))),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [cards, withoutManaSymbol],
   );
 
-  const extractColors = (subset: typeof cards) => {
-    const s = new Set<string>();
-    for (const c of subset) {
-      const isLand = c.type_line?.includes('Land') ?? false;
-      if (useColorIdentity || isLand) {
-        // Always use color_identity for lands; use it for everyone when identity mode is on
-        const ci = c.color_identity ?? '';
-        if (ci === '') s.add('C');
-        else for (const ch of ci) if ('WUBRG'.includes(ch)) s.add(ch);
-      } else {
-        const col = c.colors ?? '';
-        if (col === '') s.add('C');
-        else for (const ch of col) if ('WUBRG'.includes(ch)) s.add(ch);
-      }
-    }
-    return s;
-  };
-
   // All colors present in the full unfiltered card pool
   const allColors = useMemo(
-    () => MTG_COLORS.filter(c => extractColors(cards).has(c)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    () => MTG_COLORS.filter(c => extractColors(cards, useColorIdentity).has(c)),
     [cards, useColorIdentity],
   );
 
   // Colors still available given every OTHER active filter
   const validColors = useMemo(
-    () => new Set(MTG_COLORS.filter(c => extractColors(cards.filter(c2 => matchesFilters(c2, withoutColor))).has(c))),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    () => new Set(MTG_COLORS.filter(c => extractColors(cards.filter(c2 => matchesFilters(c2, withoutColor)), useColorIdentity).has(c))),
     [cards, withoutColor, useColorIdentity],
   );
 
