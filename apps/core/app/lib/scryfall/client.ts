@@ -5,10 +5,9 @@
  * php-api/scryfall-cache.php or php-api/card-prints.php.
  *
  * Name-level search (autocomplete, commander/partner typeahead, full-syntax query)
- * routes through scryfall-cache.php?action=search. Two methods remain unimplemented
- * stubs with no caller: lookupById (no ?id= branch) and the full-card search (use
- * queryNames instead). getPrints takes a card name, since card-prints.php keys on
- * ?name= not ?oracle_id=.
+ * routes through scryfall-cache.php?action=search; use queryNames for it (there is
+ * no full-card search or lookup by Scryfall id). getPrints takes a card name, since
+ * card-prints.php keys on ?name= not ?oracle_id=.
  */
 
 import { apiFetch } from '@/lib/api';
@@ -17,18 +16,6 @@ import type { ScryfallCachedCard, CardPrint } from '@/lib/types';
 // ── Public type exports ────────────────────────────────────────────────────────
 
 export type { ScryfallCachedCard };
-
-export interface ScryfallSearchOptions {
-  page?: number;
-  unique?: 'cards' | 'art' | 'prints';
-  order?: 'name' | 'released' | 'set' | 'rarity' | 'color' | 'cmc' | 'edhrec';
-}
-
-export interface ScryfallSearchResult {
-  cards: ScryfallCachedCard[];
-  hasMore: boolean;
-  totalCards: number;
-}
 
 // ── Internal response shapes ───────────────────────────────────────────────────
 
@@ -54,18 +41,6 @@ export async function lookupByName(name: string): Promise<ScryfallCachedCard | n
   return apiFetch<ScryfallCachedCard | null>(
     `scryfall-cache?name=${encodeURIComponent(name)}`
   );
-}
-
-/**
- * Look up a card by its Scryfall UUID.
- * Not implemented: the cache is keyed by name, and scryfall-cache.php has no ?id=
- * branch. No caller needs id lookup today.
- *
- * @throws Always — not implemented.
- */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function lookupById(_scryfallId: string): Promise<ScryfallCachedCard | null> {
-  throw new Error('scryfall.lookupById is not implemented; scryfall-cache.php has no ?id= branch.');
 }
 
 /**
@@ -108,22 +83,6 @@ export async function getPrints(cardName: string): Promise<CardPrint[]> {
     `card-prints?name=${encodeURIComponent(cardName)}`
   );
   return response.prints;
-}
-
-/**
- * Full-card Scryfall search with pagination (resolves whole cards, not just names).
- * Not implemented: no caller needs it. For name-level search use `queryNames`, which
- * powers CardLookupField's query mode through scryfall-cache.php.
- *
- * @throws Always — not implemented.
- */
-export async function search(
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _query: string,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _opts?: ScryfallSearchOptions
-): Promise<ScryfallSearchResult> {
-  throw new Error('scryfall.search is not implemented; use queryNames for name-level search.');
 }
 
 // ── Typeahead search (commander / partner / autocomplete) ───────────────────────

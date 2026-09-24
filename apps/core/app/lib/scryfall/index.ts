@@ -7,8 +7,6 @@
 
 export type {
   ScryfallCachedCard,
-  ScryfallSearchOptions,
-  ScryfallSearchResult,
   CommanderSearchResult,
   ScryfallSearchOpts,
   QueryNamesFilter,
@@ -18,10 +16,8 @@ export type {
 
 export {
   lookupByName,
-  lookupById,
   bulkLookupByName,
   getPrints,
-  search,
   autocomplete,
   commanderSearch,
   partnerSearch,

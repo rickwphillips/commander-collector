@@ -11,12 +11,14 @@
  */
 
 import {
+  useEffectEvent,
   useCallback,
   useEffect,
   useRef,
   useState,
   type ReactElement,
 } from 'react';
+import Image from 'next/image';
 import {
   Alert,
   Box,
@@ -197,7 +199,9 @@ export function ScanInput({
 
   // ── autoSave: restore draft on mount ────────────────────────────────────────
 
-  useEffect(() => {
+  // Restore once on mount. An effect event: it reads the current props without
+  // re-running when a parent passes a new initialBuffer array.
+  const restoreDraft = useEffectEvent(() => {
     if (!autoSave) return;
     // If initialBuffer is provided, skip restoring draft (caller wins)
     if (initialBuffer && initialBuffer.length > 0) return;
@@ -211,7 +215,10 @@ export function ScanInput({
       })
       .catch(() => {})
       .finally(() => setDraftReady(true));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+
+  useEffect(() => {
+    restoreDraft();
   }, []);
 
   // ── autoSave: debounce-save on cards change ──────────────────────────────────
@@ -234,8 +241,7 @@ export function ScanInput({
     return () => {
       if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoSave, draftReady, cards]);
+  }, [autoSave, draftReady, cards, deviceId]);
 
   // ── File / Camera input ──────────────────────────────────────────────────────
 
@@ -529,11 +535,16 @@ export function ScanInput({
                       justifyContent: 'center',
                     }}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    {/* The captured photo (a blob: URL) at its own size, bounded by CSS. */}
+                    <Image
                       src={previewUrl}
                       alt="Preview"
+                      width={0}
+                      height={0}
+                      loading="eager"
                       style={{
+                        width: 'auto',
+                        height: 'auto',
                         maxWidth: '100%',
                         maxHeight: compact ? 200 : 360,
                         objectFit: 'contain',

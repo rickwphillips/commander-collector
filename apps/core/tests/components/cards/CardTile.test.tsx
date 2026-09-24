@@ -4,12 +4,6 @@ import userEvent from '@testing-library/user-event';
 import { CardTile } from '@/components/cards/CardTile';
 import type { Card } from '@/lib/cards/types';
 
-// next/image → plain <img> so jsdom can render it
-vi.mock('next/image', () => ({
-  default: ({ src, alt, fill: _fill, sizes: _sizes, style: _style, priority: _priority, ...rest }: Record<string, unknown>) =>
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={src as string} alt={alt as string} {...rest} />,
-}));
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 

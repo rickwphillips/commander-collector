@@ -186,6 +186,73 @@ const mdComponents = {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Rotating status lines typed out while the assistant is working. */
+const THINKING_MESSAGES = [
+  // Core rules flow
+  'Consulting the Comprehensive Rules…',
+  'Checking state-based actions (CR 704)…',
+  'Resolving triggered abilities…',
+  'Passing priority around the table…',
+  'Searching the pattern library…',
+  'Looking up Oracle text…',
+  'Verifying with Gatherer rulings…',
+  'Untap, upkeep, draw…',
+  // Stack & priority
+  'Checking the stack for responses…',
+  'Holding priority (CR 117.3c)…',
+  'Resolving top of stack…',
+  'Checking for split second (CR 702.61)…',
+  'Determining APNAP order (CR 101.4)…',
+  // Combat
+  'Declaring attackers (CR 508)…',
+  'Assigning combat damage (CR 510)…',
+  'Checking first strike damage step…',
+  'Evaluating trample assignment (CR 702.19)…',
+  'Processing combat triggers…',
+  // Layers & continuous effects
+  'Applying layer 7 — P/T effects (CR 613.4)…',
+  'Resolving dependency in layers (CR 613.8)…',
+  'Checking timestamps on continuous effects…',
+  'Evaluating characteristic-defining abilities…',
+  // Casting & costs
+  'Checking casting restrictions (CR 601)…',
+  'Calculating total cost after modifications…',
+  'Verifying alternative cost legality…',
+  'Checking X value determination (CR 107.3)…',
+  // Zones & movement
+  'Tracking zone changes (CR 400.7)…',
+  'Checking replacement effects on entry…',
+  'Verifying last-known information (CR 113.7a)…',
+  'Checking if tokens cease to exist (CR 111.8)…',
+  // Commander-specific
+  'Checking commander tax (CR 903.8)…',
+  'Tracking commander damage (CR 903.10a)…',
+  'Evaluating color identity (CR 903.4)…',
+  'Checking command zone replacement (CR 903.9a)…',
+  // Keywords & abilities
+  'Resolving ward trigger (CR 702.21)…',
+  'Checking protection scope (CR 702.16)…',
+  'Evaluating hexproof limitations…',
+  'Verifying indestructible vs. sacrifice…',
+  'Checking deathtouch assignment (CR 702.2)…',
+  // Copies & tokens
+  'Determining copiable values (CR 707.2)…',
+  'Checking copy of a copy chain…',
+  'Evaluating token characteristics…',
+  // Misc rules deep cuts
+  'Reviewing the golden rules (CR 101.1)…',
+  'Checking "as though" permissions (CR 609.4)…',
+  'Verifying mana abilities (CR 605)…',
+  'Checking for applicable replacement effects…',
+  'Evaluating intervening if clause…',
+  'Determining timestamp order…',
+  'Cross-referencing interaction patterns…',
+  'Reviewing relevant errata and rulings…',
+  'Scanning Scryfall for card data…',
+  'Checking modal spell restrictions (CR 700.2)…',
+  'Verifying target legality on resolution…',
+];
+
 export default function ChatPage() {
   const chatInputRef = useRef<ChatInputHandle>(null);
   // Opened from the game manager? Read the handoff once. The app renders only
@@ -236,71 +303,6 @@ export default function ChatPage() {
     },
   });
 
-  const THINKING_MESSAGES = [
-    // Core rules flow
-    'Consulting the Comprehensive Rules…',
-    'Checking state-based actions (CR 704)…',
-    'Resolving triggered abilities…',
-    'Passing priority around the table…',
-    'Searching the pattern library…',
-    'Looking up Oracle text…',
-    'Verifying with Gatherer rulings…',
-    'Untap, upkeep, draw…',
-    // Stack & priority
-    'Checking the stack for responses…',
-    'Holding priority (CR 117.3c)…',
-    'Resolving top of stack…',
-    'Checking for split second (CR 702.61)…',
-    'Determining APNAP order (CR 101.4)…',
-    // Combat
-    'Declaring attackers (CR 508)…',
-    'Assigning combat damage (CR 510)…',
-    'Checking first strike damage step…',
-    'Evaluating trample assignment (CR 702.19)…',
-    'Processing combat triggers…',
-    // Layers & continuous effects
-    'Applying layer 7 — P/T effects (CR 613.4)…',
-    'Resolving dependency in layers (CR 613.8)…',
-    'Checking timestamps on continuous effects…',
-    'Evaluating characteristic-defining abilities…',
-    // Casting & costs
-    'Checking casting restrictions (CR 601)…',
-    'Calculating total cost after modifications…',
-    'Verifying alternative cost legality…',
-    'Checking X value determination (CR 107.3)…',
-    // Zones & movement
-    'Tracking zone changes (CR 400.7)…',
-    'Checking replacement effects on entry…',
-    'Verifying last-known information (CR 113.7a)…',
-    'Checking if tokens cease to exist (CR 111.8)…',
-    // Commander-specific
-    'Checking commander tax (CR 903.8)…',
-    'Tracking commander damage (CR 903.10a)…',
-    'Evaluating color identity (CR 903.4)…',
-    'Checking command zone replacement (CR 903.9a)…',
-    // Keywords & abilities
-    'Resolving ward trigger (CR 702.21)…',
-    'Checking protection scope (CR 702.16)…',
-    'Evaluating hexproof limitations…',
-    'Verifying indestructible vs. sacrifice…',
-    'Checking deathtouch assignment (CR 702.2)…',
-    // Copies & tokens
-    'Determining copiable values (CR 707.2)…',
-    'Checking copy of a copy chain…',
-    'Evaluating token characteristics…',
-    // Misc rules deep cuts
-    'Reviewing the golden rules (CR 101.1)…',
-    'Checking "as though" permissions (CR 609.4)…',
-    'Verifying mana abilities (CR 605)…',
-    'Checking for applicable replacement effects…',
-    'Evaluating intervening if clause…',
-    'Determining timestamp order…',
-    'Cross-referencing interaction patterns…',
-    'Reviewing relevant errata and rulings…',
-    'Scanning Scryfall for card data…',
-    'Checking modal spell restrictions (CR 700.2)…',
-    'Verifying target legality on resolution…',
-  ];
 
   useEffect(() => {
     if (!loading) {
@@ -354,7 +356,6 @@ export default function ChatPage() {
 
     raf = requestAnimationFrame((now) => { phaseStart = now; tick(now); });
     return () => { cancelled = true; cancelAnimationFrame(raf); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
   const scrollToBottom = useCallback(() => {

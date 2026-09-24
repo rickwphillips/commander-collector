@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import { useState, useEffect, useEffectEvent, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Box, Typography, TextField, Button, Stack, CircularProgress, IconButton, Chip, Fab, Dialog, DialogTitle, DialogContent } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
@@ -138,10 +138,14 @@ function RemotePageInner() {
   }, [joinSession]);
 
   // ── Auto-connect from URL param ───────────────────────────────────────────
-  useEffect(() => {
+  // Once, on mount. An effect event because handleSubmit later rewrites ?code=,
+  // and reacting to that would join the same session a second time.
+  const joinFromUrl = useEffectEvent(() => {
     const trimmed = urlCode.trim().toLowerCase();
     if (trimmed) joinSession(trimmed);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => {
+    joinFromUrl();
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
