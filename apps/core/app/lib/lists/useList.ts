@@ -139,6 +139,37 @@ interface ApiListByDeckRow {
   cards: ApiCardRow[];
 }
 
+// ── Requests ──────────────────────────────────────────────────────────────────
+
+function requestById(id: string): Promise<ApiListDetailRow> {
+  return apiFetch<ApiListDetailRow>(`/lists?id=${encodeURIComponent(id)}`);
+}
+
+/** The deck's role='main' list, or null when the deck has none yet. */
+async function requestByDeckId(deckId: string): Promise<ApiListByDeckRow | null> {
+  // Try the deck_id+role query first. If the endpoint doesn't support it,
+  // fall back to /decks/<id> to get the main list id.
+  try {
+    return await apiFetch<ApiListByDeckRow>(`/lists?deck_id=${encodeURIComponent(deckId)}&role=main`);
+  } catch {
+    const deck = await apiFetch<{ main_list_id?: string | null }>(`/decks?id=${encodeURIComponent(deckId)}`);
+    return deck.main_list_id
+      ? apiFetch<ApiListByDeckRow>(`/lists?id=${encodeURIComponent(deck.main_list_id)}`)
+      : null;
+  }
+}
+
+type ListSource = { id: string } | { deckId: string };
+
+function requestSource(source: ListSource): Promise<ApiListDetailRow | ApiListByDeckRow | null> {
+  return 'id' in source ? requestById(source.id) : requestByDeckId(source.deckId);
+}
+
+function loadErrorMessage(err: unknown, source: ListSource): string {
+  if (err instanceof Error) return err.message;
+  return 'id' in source ? 'Failed to load list' : 'Failed to load list for deck';
+}
+
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 /**
@@ -236,99 +267,76 @@ export function useList(opts: UseListOptions): UseListResult {
     setError(null);
   }, []);
 
-  // ── Internal: fetch by list UUID ─────────────────────────────────────────
+  // ── Internal: apply a loaded list, then resolve any missing metadata ─────
 
-  const fetchById = useCallback(async (id: string) => {
-    setLoading(true);
-    try {
-      const raw = await apiFetch<ApiListDetailRow>(`/lists?id=${encodeURIComponent(id)}`);
-      loadFromDetail(raw);
-      // Background: resolve scryfall metadata for any cards that are missing it.
-      // Happens after text-import or coach update_list where scryfall_id is null.
-      // Trigger resolver if any Scryfall metadata is missing.
-      // type_line: always present on real cards — null means cache join returned nothing.
-      // image_uri: may legitimately be null for some cards; PHP handles the no-infinite-loop case.
-      const unresolvedCount = (raw.cards ?? []).filter(
-        (c) => !c.scryfall_id || !c.type_line || !c.image_uri || c.colors === undefined || !c.color_identity
-      ).length;
-      if (unresolvedCount > 0) {
-        console.log(`[useList] ${unresolvedCount} cards missing metadata — resolving…`);
-        resolveMetadata(id, unresolvedCount);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load list');
-    } finally {
-      setLoading(false);
+  const applyLoaded = useCallback((raw: ApiListDetailRow | ApiListByDeckRow | null) => {
+    if (!raw) {
+      // No main list exists yet — not an error condition; caller handles null.
+      setList(null);
+      setCards([]);
+      setConflict(false);
+      setError(null);
+      return;
+    }
+    loadFromDetail(raw);
+    // Background: resolve scryfall metadata for any cards that are missing it.
+    // Happens after text-import or coach update_list where scryfall_id is null.
+    // type_line: always present on real cards — null means cache join returned nothing.
+    // image_uri: may legitimately be null for some cards; PHP handles the no-infinite-loop case.
+    const unresolvedCount = (raw.cards ?? []).filter(
+      (c) => !c.scryfall_id || !c.type_line || !c.image_uri || c.colors === undefined || !c.color_identity
+    ).length;
+    if (unresolvedCount > 0) {
+      console.log(`[useList] ${unresolvedCount} cards missing metadata — resolving…`);
+      resolveMetadata(raw.id, unresolvedCount);
     }
   }, [loadFromDetail, resolveMetadata]);
 
-  // ── Internal: fetch by deck UUID (finds role='main' list) ─────────────────
+  // ── Internal: load a list by UUID, or a deck's role='main' list ──────────
+  // Used by refresh(); the initial-load effect below chains the same request.
 
-  const fetchByDeckId = useCallback(async (deckId: string) => {
-    setLoading(true);
+  const load = useCallback(async (source: ListSource) => {
     try {
-      // Try the deck_id+role query first. If the endpoint doesn't support it,
-      // we fall back to /decks/<id> to get the main list id.
-      let raw: ApiListByDeckRow | null = null;
-      try {
-        raw = await apiFetch<ApiListByDeckRow>(
-          `/lists?deck_id=${encodeURIComponent(deckId)}&role=main`
-        );
-      } catch {
-        // Fallback: fetch deck detail to get the main list id, then load by id.
-        const deck = await apiFetch<{ main_list_id?: string | null }>(`/decks?id=${encodeURIComponent(deckId)}`);
-        if (deck.main_list_id) {
-          raw = await apiFetch<ApiListByDeckRow>(`/lists?id=${encodeURIComponent(deck.main_list_id)}`);
-        }
-      }
-
-      if (raw) {
-        loadFromDetail(raw);
-        const unresolvedCount = (raw.cards ?? []).filter(
-          (c) => !c.scryfall_id || !c.type_line || !c.image_uri || c.colors === undefined || !c.color_identity
-        ).length;
-        if (unresolvedCount > 0) {
-          console.log(`[useList] ${unresolvedCount} cards missing metadata — resolving…`);
-          resolveMetadata(raw.id, unresolvedCount);
-        }
-      } else {
-        // No main list exists yet — not an error condition; caller handles null.
-        setList(null);
-        setCards([]);
-        setConflict(false);
-        setError(null);
-      }
+      applyLoaded(await requestSource(source));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load list for deck');
+      setError(loadErrorMessage(err, source));
     } finally {
       setLoading(false);
     }
-  }, [loadFromDetail, resolveMetadata]);
+  }, [applyLoaded]);
 
-  // ── Effect: initial load ─────────────────────────────────────────────────
+  // ── Effect: load whenever the id/deckId changes ──────────────────────────
 
+  // Show the spinner as soon as the source changes, adjusting state during
+  // render rather than in the effect (React's "adjust state on prop change").
+  const sourceKey = opts.id ? `id:${opts.id}` : opts.deckId ? `deck:${opts.deckId}` : '';
+  const [loadingKey, setLoadingKey] = useState(sourceKey);
+  if (loadingKey !== sourceKey) {
+    setLoadingKey(sourceKey);
+    setLoading(Boolean(sourceKey));
+  }
+
+  // State is only set in the request's callbacks, and a response that arrives
+  // after the id/deckId has changed again is ignored.
   useEffect(() => {
-    if (opts.id) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- loads the list from the API (external system); refresh() reuses these fetchers
-      fetchById(opts.id);
-    } else if (opts.deckId) {
-      fetchByDeckId(opts.deckId);
-    }
-    // Re-fetch only when the id/deckId reference changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opts.id, opts.deckId]);
+    const source: ListSource | null = opts.id ? { id: opts.id } : opts.deckId ? { deckId: opts.deckId } : null;
+    if (!source) return;
+    let current = true;
+    requestSource(source)
+      .then((raw) => { if (current) applyLoaded(raw); })
+      .catch((err) => { if (current) setError(loadErrorMessage(err, source)); })
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
+  }, [opts.id, opts.deckId, applyLoaded]);
 
   // ── refresh ──────────────────────────────────────────────────────────────
 
   const refresh = useCallback(async () => {
-    if (list?.id) {
-      await fetchById(list.id);
-    } else if (opts.id) {
-      await fetchById(opts.id);
-    } else if (opts.deckId) {
-      await fetchByDeckId(opts.deckId);
-    }
-  }, [list, opts.id, opts.deckId, fetchById, fetchByDeckId]);
+    const id = list?.id ?? opts.id;
+    if (!id && !opts.deckId) return;
+    setLoading(true);
+    await load(id ? { id } : { deckId: opts.deckId! });
+  }, [list, opts.id, opts.deckId, load]);
 
   // ── save ─────────────────────────────────────────────────────────────────
 
