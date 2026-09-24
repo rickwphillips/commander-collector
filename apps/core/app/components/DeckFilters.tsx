@@ -256,6 +256,17 @@ interface Props {
   cards?: { card_name: string; type_line?: string | null; mana_cost?: string | null; colors?: string | null; color_identity?: string | null; is_proxy?: number | boolean; is_commander?: number | boolean; back_image_uri?: string | null; }[];
 }
 
+const VDivider = () => (
+  <Box sx={{
+    alignSelf: 'stretch',
+    width: '1px',
+    mx: 0.5,
+    background: (theme) =>
+      `linear-gradient(to bottom, transparent, ${theme.palette.divider} 30%, ${theme.palette.divider} 70%, transparent)`,
+    flexShrink: 0,
+  }} />
+);
+
 export function DeckFilters({ filters, onChange, resultCount, totalCount, overBy = 0, cards = [] }: Props) {
   const { nameFilter, typeFilter, cmcFilter, colorFilter, colorMode, useColorIdentity, manaSymbolFilter, proxyOnly, commanderOnly, dfcOnly, sortOrder, sortDirection } = filters;
   const COLOR_MODE_CYCLE: ColorMode[] = ['or', 'and', 'exact'];
@@ -382,17 +393,6 @@ export function DeckFilters({ filters, onChange, resultCount, totalCount, overBy
     set({ colorFilter: colorFilter.includes(c) ? colorFilter.filter(x => x !== c) : [...colorFilter, c] });
 
   const active = hasActiveFilters(filters);
-
-  const VDivider = () => (
-    <Box sx={{
-      alignSelf: 'stretch',
-      width: '1px',
-      mx: 0.5,
-      background: (theme) =>
-        `linear-gradient(to bottom, transparent, ${theme.palette.divider} 30%, ${theme.palette.divider} 70%, transparent)`,
-      flexShrink: 0,
-    }} />
-  );
 
   return (
     <Stack spacing={1} sx={{ mb: 2 }}>
