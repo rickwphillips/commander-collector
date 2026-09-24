@@ -86,50 +86,6 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
   const [winningTeam, setWinningTeam] = useState<number>(1);
   const [teamElimTurns, setTeamElimTurns] = useState<Record<number, number | ''>>({ 2: '' });
 
-  useEffect(() => {
-    fetchData();
-  }, [gameId]);
-
-  const fetchData = async () => {
-    try {
-      const [deckData, playerData] = await Promise.all([api.getDecks(), api.getPlayers()]);
-      setDecks(deckData as DeckOption[]);
-      setPlayers(playerData);
-
-      // Check for game manager pre-fill
-      const prefillRaw = typeof window !== 'undefined' ? localStorage.getItem('commander_game_prefill') : null;
-      if (prefillRaw && mode === 'create') {
-        try {
-          const prefill = JSON.parse(prefillRaw) as GameManagerPrefill;
-          localStorage.removeItem('commander_game_prefill');
-          // Apply prefill: set playedAt, and build results array from prefill data
-          setPlayedAt(prefill.playedAt);
-          const prefillResults: PlayerResult[] = prefill.results.map(r => ({
-            player_id: r.playerId,
-            deck_id: r.deckId,
-            finish_position: r.finishPosition,
-            eliminated_turn: r.eliminatedTurn,
-            team_number: null,
-          }));
-          setResults(prefillResults);
-          return; // Skip edit mode population
-        } catch {
-          // ignore malformed prefill
-        }
-      }
-
-      // If editing, load existing game data
-      if (mode === 'edit' && gameId) {
-        const gameData = await api.getGame(gameId);
-        populateFromGame(gameData);
-      }
-    } catch {
-      setError('Failed to load data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const populateFromGame = (gameData: GameWithResults) => {
     setPlayedAt(gameData.played_at.split('T')[0]);
     setNotes(gameData.notes ?? '');
@@ -167,6 +123,50 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
       }
     }
   };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [deckData, playerData] = await Promise.all([api.getDecks(), api.getPlayers()]);
+        setDecks(deckData as DeckOption[]);
+        setPlayers(playerData);
+
+        // Check for game manager pre-fill
+        const prefillRaw = typeof window !== 'undefined' ? localStorage.getItem('commander_game_prefill') : null;
+        if (prefillRaw && mode === 'create') {
+          try {
+            const prefill = JSON.parse(prefillRaw) as GameManagerPrefill;
+            localStorage.removeItem('commander_game_prefill');
+            // Apply prefill: set playedAt, and build results array from prefill data
+            setPlayedAt(prefill.playedAt);
+            const prefillResults: PlayerResult[] = prefill.results.map(r => ({
+              player_id: r.playerId,
+              deck_id: r.deckId,
+              finish_position: r.finishPosition,
+              eliminated_turn: r.eliminatedTurn,
+              team_number: null,
+            }));
+            setResults(prefillResults);
+            return; // Skip edit mode population
+          } catch {
+            // ignore malformed prefill
+          }
+        }
+
+        // If editing, load existing game data
+        if (mode === 'edit' && gameId) {
+          const gameData = await api.getGame(gameId);
+          populateFromGame(gameData);
+        }
+      } catch {
+        setError('Failed to load data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [gameId]);
 
   const addPlayer = () => {
     if (gameType === 'standard' && results.length < 8) {

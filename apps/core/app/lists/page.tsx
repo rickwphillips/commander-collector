@@ -51,18 +51,20 @@ export default function ListsPage() {
   const [deleteTarget, setDeleteTarget] = useState<CardList | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => { fetchLists(); }, []);
+  useEffect(() => {
+    const fetchLists = async () => {
+      try {
+        const data = await api.getLists();
+        setLists(data);
+      } catch {
+        setError('Failed to load lists');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const fetchLists = async () => {
-    try {
-      const data = await api.getLists();
-      setLists(data);
-    } catch {
-      setError('Failed to load lists');
-    } finally {
-      setLoading(false);
-    }
-  };
+    fetchLists();
+  }, []);
 
   const filteredLists = useMemo(() => {
     if (!searchQuery.trim()) return lists;

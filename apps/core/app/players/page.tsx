@@ -44,20 +44,15 @@ export default function PlayersPage() {
   const [newPlayerName, setNewPlayerName] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const fetchPlayers = () =>
+    api.getPlayers()
+      .then((data) => setPlayers(data as PlayerWithStats[]))
+      .catch(() => setError('Failed to load players'))
+      .finally(() => setLoading(false));
+
   useEffect(() => {
     fetchPlayers();
   }, []);
-
-  const fetchPlayers = async () => {
-    try {
-      const data = await api.getPlayers();
-      setPlayers(data as PlayerWithStats[]);
-    } catch {
-      setError('Failed to load players');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleAddPlayer = async () => {
     if (!newPlayerName.trim()) return;

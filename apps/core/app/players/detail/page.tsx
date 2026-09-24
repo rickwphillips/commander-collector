@@ -72,6 +72,24 @@ export default function PlayerDetailPage() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [playerData, statsData, decksData] = await Promise.all([
+          api.getPlayer(playerId),
+          api.getPlayerStats(playerId),
+          api.getDecksByPlayer(playerId),
+        ]);
+        setPlayer(playerData);
+        setEditName(playerData.name);
+        setStats(statsData);
+        setDecks(decksData as DeckWithStats[]);
+      } catch {
+        setError('Failed to load player data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (playerId) {
       fetchData();
     }
@@ -83,24 +101,6 @@ export default function PlayerDetailPage() {
         .catch(() => {});
     }
   }, [playerId, currentUser?.role]);
-
-  const fetchData = async () => {
-    try {
-      const [playerData, statsData, decksData] = await Promise.all([
-        api.getPlayer(playerId),
-        api.getPlayerStats(playerId),
-        api.getDecksByPlayer(playerId),
-      ]);
-      setPlayer(playerData);
-      setEditName(playerData.name);
-      setStats(statsData);
-      setDecks(decksData as DeckWithStats[]);
-    } catch {
-      setError('Failed to load player data');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleEdit = () => {
     setEditName(player?.name || '');

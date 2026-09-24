@@ -36,19 +36,19 @@ export default function GamesPage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
+    const fetchGames = async () => {
+      try {
+        const data = await api.getGames();
+        setGames(data);
+      } catch {
+        setError('Failed to load games');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchGames();
   }, []);
-
-  const fetchGames = async () => {
-    try {
-      const data = await api.getGames();
-      setGames(data);
-    } catch {
-      setError('Failed to load games');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const filteredGames = useMemo(() => {
     if (!searchQuery.trim()) return games;

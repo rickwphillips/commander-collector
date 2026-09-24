@@ -56,31 +56,31 @@ export default function Dashboard() {
   const [activeGame, setActiveGame] = useState<GameManagerState | null>(null);
 
   useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const data = await api.getStats();
+        setStats(data);
+      } catch {
+        setError('Unable to load stats. Make sure the database is set up.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const fetchActiveGame = async () => {
+      try {
+        const data = await api.getActiveGame();
+        if (data.is_active && data.state) setActiveGame(data.state);
+      } catch {
+        // silently ignore — just show Play New Game
+      }
+    };
+
     const timer = setTimeout(() => setMounted(true), 0);
     fetchStats();
     fetchActiveGame();
     return () => clearTimeout(timer);
   }, []);
-
-  const fetchStats = async () => {
-    try {
-      const data = await api.getStats();
-      setStats(data);
-    } catch {
-      setError('Unable to load stats. Make sure the database is set up.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchActiveGame = async () => {
-    try {
-      const data = await api.getActiveGame();
-      if (data.is_active && data.state) setActiveGame(data.state);
-    } catch {
-      // silently ignore — just show Play New Game
-    }
-  };
 
   return (
     <>

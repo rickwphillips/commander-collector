@@ -309,6 +309,7 @@ export function useList(opts: UseListOptions): UseListResult {
 
   useEffect(() => {
     if (opts.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- loads the list from the API (external system); refresh() reuses these fetchers
       fetchById(opts.id);
     } else if (opts.deckId) {
       fetchByDeckId(opts.deckId);
