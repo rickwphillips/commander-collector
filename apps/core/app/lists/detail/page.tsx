@@ -52,7 +52,14 @@ function ListPageInner() {
 
   // ── Deck name (only fetched when list is attached to a deck) ──────────────
   const [deckName, setDeckName] = useState<string | null>(null);
-  const [deckNameLoading, setDeckNameLoading] = useState(false);
+  const [deckNameLoading, setDeckNameLoading] = useState(() => Boolean(list?.deck_id));
+  // Reset when the attached deck changes; the effect below does the fetch.
+  const [prevListDeckId, setPrevListDeckId] = useState(list?.deck_id);
+  if (list?.deck_id !== prevListDeckId) {
+    setPrevListDeckId(list?.deck_id);
+    if (!list?.deck_id) setDeckName(null);
+    else setDeckNameLoading(true);
+  }
 
   // ── Guru chat ─────────────────────────────────────────────────────────────
   const [coachOpen, setCoachOpen] = useState(false);
@@ -87,12 +94,8 @@ function ListPageInner() {
   // ── Load deck name when list has a deck_id ────────────────────────────────
 
   useEffect(() => {
-    if (!list?.deck_id) {
-      setDeckName(null);
-      return;
-    }
+    if (!list?.deck_id) return;
     let cancelled = false;
-    setDeckNameLoading(true);
     api.getDeck(list.deck_id)
       .then((deck) => {
         if (!cancelled) setDeckName(deck.name);

@@ -40,7 +40,7 @@ function DeckListPageInner() {
   const coachRef = useRef<GuruChatHandle>(null);
 
   useEffect(() => {
-    if (!deckId) { setDeckLoading(false); return; }
+    if (!deckId) return;
     api.getDeck(deckId)
       .then(d => {
         setDeck(d);
@@ -130,7 +130,7 @@ function DeckListPageInner() {
 
   // ── Guards ────────────────────────────────────────────────────────────────
 
-  const loading = deckLoading || listLoading;
+  const loading = (!!deckId && deckLoading) || listLoading;
 
   if (!deckId) {
     return (

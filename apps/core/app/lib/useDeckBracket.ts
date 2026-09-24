@@ -49,18 +49,21 @@ export function useDeckBracket(deckId: string | null | undefined, commander?: st
     return cache.get(deckId) ?? { ...EMPTY, loading: true };
   });
 
+  // Reset to loading (or empty) when the inputs change; cached results are
+  // read straight from the cache below, and the effect fetches the rest.
+  const [prevDeckId, setPrevDeckId] = useState(deckId);
+  const [prevCommander, setPrevCommander] = useState(commander);
+  if (deckId !== prevDeckId || commander !== prevCommander) {
+    setPrevDeckId(deckId);
+    setPrevCommander(commander);
+    setState(deckId ? { ...EMPTY, loading: true } : EMPTY);
+  }
+
   useEffect(() => {
-    if (!deckId) {
-      setState(EMPTY);
-      return;
-    }
+    if (!deckId) return;
     const cached = cache.get(deckId);
-    if (cached && !cached.loading) {
-      setState(cached);
-      return;
-    }
+    if (cached && !cached.loading) return;
     let cancelled = false;
-    setState({ ...EMPTY, loading: true });
 
     (async () => {
       try {
@@ -119,7 +122,8 @@ export function useDeckBracket(deckId: string | null | undefined, commander?: st
     return () => { cancelled = true; };
   }, [deckId, commander]);
 
-  return state;
+  const cached = deckId ? cache.get(deckId) : undefined;
+  return cached && !cached.loading ? cached : state;
 }
 
 /** Test helper: clear the per-page cache. */

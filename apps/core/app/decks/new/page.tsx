@@ -87,13 +87,6 @@ export default function NewDeckPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Auto-suggest deck name when commander is picked and name is still blank.
-  useEffect(() => {
-    if (commander && !name.trim()) {
-      setName(`${commander.card_name} deck`);
-    }
-  }, [commander]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const handleCommanderChange = (card: CardData | null) => {
     setCommander(card);
     // If no name set yet, auto-fill; if name was auto-filled from old commander, replace it.

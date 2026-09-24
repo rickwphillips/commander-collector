@@ -65,6 +65,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Skip auth for public routes
     if (PUBLIC_PATHS.some(p => window.location.pathname.includes(p))) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reads window.location/localStorage after hydration; render-time reads would mismatch the static HTML
       setChecking(false);
       return;
     }

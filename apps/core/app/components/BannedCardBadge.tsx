@@ -28,13 +28,12 @@ const cache = new Map<string, NoteState>();
  */
 export function BannedCardBadge({ name, format = 'commander' }: Props) {
   const key = `${name.toLowerCase()}|${format}`;
-  const [state, setState] = useState<NoteState | null>(() => cache.get(key) ?? null);
+  // Fetched result tagged with the key it belongs to; cached results are read directly.
+  const [fetched, setFetched] = useState<{ key: string; state: NoteState } | null>(null);
+  const state = cache.get(key) ?? (fetched?.key === key ? fetched.state : null);
 
   useEffect(() => {
-    if (cache.has(key)) {
-      setState(cache.get(key) ?? null);
-      return;
-    }
+    if (cache.has(key)) return;
     let cancelled = false;
     (async () => {
       try {
@@ -44,12 +43,12 @@ export function BannedCardBadge({ name, format = 'commander' }: Props) {
           : { kind: null, reason: null };
         if (!cancelled) {
           cache.set(key, next);
-          setState(next);
+          setFetched({ key, state: next });
         }
       } catch {
         if (!cancelled) {
           // Don't cache transient errors; let next render retry.
-          setState({ kind: null, reason: null });
+          setFetched({ key, state: { kind: null, reason: null } });
         }
       }
     })();

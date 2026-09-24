@@ -96,11 +96,15 @@ export function ListEditor({
   const [canRedo, setCanRedo] = useState(false);
 
   // Sync buffer when server cards change (initial load + refresh).
-  useEffect(() => {
+  const [syncedCards, setSyncedCards] = useState(cards);
+  if (cards !== syncedCards) {
+    setSyncedCards(cards);
     setBuffer(cards);
-    undoStack.current = { past: [], future: [] };
     setCanUndo(false);
     setCanRedo(false);
+  }
+  useEffect(() => {
+    undoStack.current = { past: [], future: [] };
   }, [cards]);
 
   // Dirty flag: buffer differs from server cards. Cheap shallow check by
