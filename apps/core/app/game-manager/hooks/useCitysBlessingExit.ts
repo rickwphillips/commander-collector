@@ -24,16 +24,25 @@ export function useCitysBlessingExit(
   const [cityBlessingExiting, setCityBlessingExiting] = useState(false);
   const prevHasCitysBlessing = useRef(hasCitysBlessing);
 
+  // Show immediately on true; start the fade-out tail on true → false.
+  const [prevHas, setPrevHas] = useState(hasCitysBlessing);
+  if (hasCitysBlessing !== prevHas) {
+    setPrevHas(hasCitysBlessing);
+    if (hasCitysBlessing) {
+      setCityBlessingVisible(true);
+      setCityBlessingExiting(false);
+    } else if (cityBlessingVisible) {
+      setCityBlessingExiting(true);
+    }
+  }
+
   useEffect(() => {
     if (hasCitysBlessing) {
       if (!prevHasCitysBlessing.current) onEnter();
       prevHasCitysBlessing.current = true;
-      setCityBlessingVisible(true);
-      setCityBlessingExiting(false);
     } else {
       prevHasCitysBlessing.current = false;
       if (cityBlessingVisible) {
-        setCityBlessingExiting(true);
         const t = setTimeout(() => {
           setCityBlessingVisible(false);
           setCityBlessingExiting(false);

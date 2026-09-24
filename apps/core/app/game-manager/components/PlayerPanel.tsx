@@ -184,12 +184,19 @@ export function PlayerPanel({
     if (viewerPlayerNames.length > 2) return `${viewerPlayerNames.slice(0, 2).join(', ')} and ${viewerPlayerNames.length - 2} other${viewerPlayerNames.length - 2 > 1 ? 's' : ''} are viewing your panel`;
     return 'Someone is viewing your panel';
   }, [viewerPlayerNames]);
-  const [viewerBannerVisible, setViewerBannerVisible] = useState(false);
+  const [viewerBannerVisible, setViewerBannerVisible] = useState(isBeingViewedByAnyone);
   const [viewerBannerNonce, setViewerBannerNonce] = useState(0);
   const showViewerBanner = useCallback(() => setViewerBannerNonce((n) => n + 1), []);
+  // Show the banner whenever the view state changes (or on a manual ping)...
+  const viewerBannerTrigger = `${isBeingViewedByAnyone}|${viewerPlayerNames.length}|${viewerBannerNonce}`;
+  const [prevViewerBannerTrigger, setPrevViewerBannerTrigger] = useState(viewerBannerTrigger);
+  if (viewerBannerTrigger !== prevViewerBannerTrigger) {
+    setPrevViewerBannerTrigger(viewerBannerTrigger);
+    if (isBeingViewedByAnyone || viewerBannerNonce !== 0) setViewerBannerVisible(true);
+  }
+  // ...and hide it 2.5s later.
   useEffect(() => {
     if (!isBeingViewedByAnyone && viewerBannerNonce === 0) return;
-    setViewerBannerVisible(true);
     const t = setTimeout(() => setViewerBannerVisible(false), 2500);
     return () => clearTimeout(t);
   }, [isBeingViewedByAnyone, viewerPlayerNames.length, viewerBannerNonce]);

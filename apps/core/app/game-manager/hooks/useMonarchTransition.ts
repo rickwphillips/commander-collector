@@ -31,7 +31,10 @@ export function useMonarchTransition(
   );
   const [monarchEnterIsTransfer, setMonarchEnterIsTransfer] = useState(false);
   const monarchTransferRef = useRef(monarchTransfer);
-  monarchTransferRef.current = monarchTransfer;
+  // Keep the ref current; declared before the isMonarch effect so it runs first.
+  useEffect(() => {
+    monarchTransferRef.current = monarchTransfer;
+  });
   const prevIsMonarchRef = useRef(isMonarch);
 
   useEffect(() => {

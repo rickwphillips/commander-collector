@@ -7,7 +7,7 @@
  * modal when the user taps its empty CTA (or its edit affordance on a filled
  * seat). Behavior mirrors the per-slot block that used to live in GameSetup.
  */
-import { useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Autocomplete,
   Box,
@@ -76,17 +76,23 @@ export function SeatPickerModal({
   const [hasPartner, setHasPartner] = useState<boolean>(!!initial?.partner);
   const [partner, setPartner] = useState<CommanderFieldState>(emptyCommanderField(initial?.partner));
   const [error, setError] = useState<string | null>(null);
-  const [debounceTimers] = useState<Record<string, ReturnType<typeof setTimeout>>>({});
+  const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  useEffect(() => {
-    if (!open) return;
-    setPlayerId(initial?.playerId ?? '');
-    setDeckId(initial?.deckId ?? '');
-    setCommander(emptyCommanderField(initial?.commander));
-    setHasPartner(!!initial?.partner);
-    setPartner(emptyCommanderField(initial?.partner));
-    setError(null);
-  }, [open, initial]);
+  // Reset the form whenever the modal opens or its initial setup changes while open.
+  const [prevOpen, setPrevOpen] = useState(open);
+  const [prevInitial, setPrevInitial] = useState(initial);
+  if (open !== prevOpen || initial !== prevInitial) {
+    setPrevOpen(open);
+    setPrevInitial(initial);
+    if (open) {
+      setPlayerId(initial?.playerId ?? '');
+      setDeckId(initial?.deckId ?? '');
+      setCommander(emptyCommanderField(initial?.commander));
+      setHasPartner(!!initial?.partner);
+      setPartner(emptyCommanderField(initial?.partner));
+      setError(null);
+    }
+  }
 
   async function fetchArt(field: 'commander' | 'partner', name: string) {
     const card = await getCardDetail(name);
@@ -99,8 +105,8 @@ export function SeatPickerModal({
     if (field === 'commander') setCommander((s) => ({ ...s, name: value, artCropUrl: undefined }));
     else setPartner((s) => ({ ...s, name: value, artCropUrl: undefined }));
     const key = `pick-${field}`;
-    clearTimeout(debounceTimers[key]);
-    debounceTimers[key] = setTimeout(async () => {
+    clearTimeout(debounceTimers.current[key]);
+    debounceTimers.current[key] = setTimeout(async () => {
       if (value.length < 2) return;
       if (field === 'commander') setCommander((s) => ({ ...s, loading: true }));
       else setPartner((s) => ({ ...s, loading: true }));
@@ -204,7 +210,7 @@ export function SeatPickerModal({
             fullWidth
           >
             <MenuItem value="">Select a deck</MenuItem>
-            {playerDecks.length > 0 && <ListSubheader>Player's Decks</ListSubheader>}
+            {playerDecks.length > 0 && <ListSubheader>Player&apos;s Decks</ListSubheader>}
             {playerDecks.map((d) => (
               <MenuItem key={d.id} value={d.id}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>

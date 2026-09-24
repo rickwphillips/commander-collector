@@ -29,8 +29,11 @@ function RemotePageInner() {
   const searchParams = useSearchParams();
   const urlCode = searchParams.get('code') ?? '';
 
-  const [phase, setPhase] = useState<RemotePhase>('enter-code');
-  const [codeInput, setCodeInput] = useState('');
+  // A ?code= URL param auto-connects on mount, so start in the loading phase.
+  const [phase, setPhase] = useState<RemotePhase>(() =>
+    urlCode.trim() ? 'loading' : 'enter-code',
+  );
+  const [codeInput, setCodeInput] = useState(urlCode);
   const [code, setCode] = useState('');
   const [seat, setSeat] = useState('');
   const [state, setState] = useState<GameManagerState | null>(null);
@@ -83,59 +86,75 @@ function RemotePageInner() {
     };
   }, []);
 
-  const lastSuccessfulPollRef = useRef<number>(Date.now());
+  const lastSuccessfulPollRef = useRef<number>(0);
+  useEffect(() => {
+    lastSuccessfulPollRef.current = Date.now();
+  }, []);
   const lastEventTimeRef = useRef<number>(0);
   const pollFailCountRef = useRef(0);
   const inactiveCountRef = useRef(0);
   const [showReconnect, setShowReconnect] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  // Wall-clock time as of the last tick, for render-time freshness checks.
+  const [nowMs, setNowMs] = useState(0);
   const tickTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Tick elapsed seconds every second, reset on turn change
   useEffect(() => {
     if (tickTimer.current) clearInterval(tickTimer.current);
-    if (phase !== 'connected' || !state) { setElapsedSeconds(0); return; }
-    setElapsedSeconds(Math.round((Date.now() - state.turnStartTime) / 1000));
-    tickTimer.current = setInterval(() => {
-      setElapsedSeconds(Math.round((Date.now() - (state?.turnStartTime ?? Date.now())) / 1000));
-    }, 1000);
+    const turnStartTime = phase === 'connected' && state ? state.turnStartTime : null;
+    const tick = () => {
+      const now = Date.now();
+      setNowMs(now);
+      setElapsedSeconds(turnStartTime === null ? 0 : Math.round((now - turnStartTime) / 1000));
+    };
+    tick();
+    if (turnStartTime === null) return;
+    tickTimer.current = setInterval(tick, 1000);
     return () => { if (tickTimer.current) clearInterval(tickTimer.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state?.currentPlayerIdx, phase]);
 
-  // ── Auto-connect from URL param ───────────────────────────────────────────
-  useEffect(() => {
-    if (urlCode) {
-      setCodeInput(urlCode);
-      connect(urlCode);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // ── Connect by code ───────────────────────────────────────────────────────
+  // Loads the live game for an already-trimmed code (phase is 'loading').
+  const joinSession = useCallback(
+    (trimmed: string) =>
+      api
+        .getLiveGame(trimmed)
+        .then((res) => {
+          if (!res.is_active) {
+            setPhase('ended');
+            return;
+          }
+          setCode(trimmed);
+          // Authorize the card-image proxy by this session code (no JWT on the remote).
+          setRemoteSessionCode(trimmed);
+          setSeat(res.seat);
+          setState(res.state);
+          // Send checkin event so host sees us immediately
+          api.sendLiveGameEvent(trimmed, { type: 'checkin', seat: res.seat, ts: Date.now() }).catch(() => {});
+          setPhase('connected');
+        })
+        .catch(() => {
+          setPhase('enter-code');
+          setErrorMsg('Code not found or session expired.');
+        }),
+    [],
+  );
+
   const connect = useCallback(async (raw: string) => {
     const trimmed = raw.trim().toLowerCase();
     if (!trimmed) return;
     setPhase('loading');
     setErrorMsg('');
-    try {
-      const res = await api.getLiveGame(trimmed);
-      if (!res.is_active) {
-        setPhase('ended');
-        return;
-      }
-      setCode(trimmed);
-      // Authorize the card-image proxy by this session code (no JWT on the remote).
-      setRemoteSessionCode(trimmed);
-      setSeat(res.seat);
-      setState(res.state);
-      // Send checkin event so host sees us immediately
-      api.sendLiveGameEvent(trimmed, { type: 'checkin', seat: res.seat, ts: Date.now() }).catch(() => {});
-      setPhase('connected');
-    } catch {
-      setPhase('enter-code');
-      setErrorMsg('Code not found or session expired.');
-    }
+    await joinSession(trimmed);
+  }, [joinSession]);
+
+  // ── Auto-connect from URL param ───────────────────────────────────────────
+  useEffect(() => {
+    const trimmed = urlCode.trim().toLowerCase();
+    if (trimmed) joinSession(trimmed);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -565,7 +584,7 @@ function RemotePageInner() {
         soundEnabled={soundEnabled}
         highlightMode={true}
         remoteMode={true}
-        viewerPlayerNames={Object.values(state.viewerMap ?? {}).filter(e => e.targetIdx === playerIdx && Date.now() - e.ts < 20000).map(e => e.viewerName)}
+        viewerPlayerNames={Object.values(state.viewerMap ?? {}).filter(e => e.targetIdx === playerIdx && nowMs - e.ts < 20000).map(e => e.viewerName)}
         onSwitchToPlayer={(targetIdx) => setViewingPlayerIdx(targetIdx)}
         onToggleTheme={toggleTheme}
         themeMode={mode}
