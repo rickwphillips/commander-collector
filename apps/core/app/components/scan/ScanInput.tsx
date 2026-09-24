@@ -182,7 +182,8 @@ export function ScanInput({
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
 
   const [error, setError] = useState<string | null>(null);
-  const [draftReady, setDraftReady] = useState(!autoSave);
+  // A caller-provided initialBuffer skips draft restore, so it is ready immediately.
+  const [draftReady, setDraftReady] = useState(!autoSave || (initialBuffer?.length ?? 0) > 0);
 
   // Inline card name editing
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
@@ -199,10 +200,7 @@ export function ScanInput({
   useEffect(() => {
     if (!autoSave) return;
     // If initialBuffer is provided, skip restoring draft (caller wins)
-    if (initialBuffer && initialBuffer.length > 0) {
-      setDraftReady(true);
-      return;
-    }
+    if (initialBuffer && initialBuffer.length > 0) return;
     api
       .getBufferDraft(deviceId, DRAFT_CONTEXT_TYPE)
       .then(({ state }) => {
