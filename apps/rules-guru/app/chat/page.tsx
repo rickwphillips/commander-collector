@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback, useMemo, useImperativeHandle } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useImperativeHandle, useLayoutEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -60,7 +60,7 @@ import {
 } from '@commander/shared/components/cardNameUtils';
 import { loadCardCatalog, isKnownCardName } from '@commander/shared/lib/cardCatalog';
 import type { ActiveGameContext, RulesConversation, RulesMessage, RulesPattern } from '../lib/types';
-import { formatBoardStateLines, mapRawGameContext } from '../lib/gameContext';
+import { mapRawGameContext, readGameHandoff } from '../lib/gameContext';
 
 // ── Local message type (includes pending_pattern for new messages) ──────────
 interface LocalMessage {
@@ -188,7 +188,14 @@ const mdComponents = {
 
 export default function ChatPage() {
   const chatInputRef = useRef<ChatInputHandle>(null);
-  const [messages, setMessages] = useState<LocalMessage[]>([]);
+  // Opened from the game manager? Read the handoff once. The app renders only
+  // in the browser (the shared ThemeProvider waits for the client), so the URL
+  // is available here and nothing is hydrated from server HTML.
+  const [handoff] = useState(readGameHandoff);
+  const isEmbedded = handoff !== null;
+  const [messages, setMessages] = useState<LocalMessage[]>(() =>
+    handoff?.openingMessage ? [{ role: 'assistant', content: handoff.openingMessage }] : [],
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -206,8 +213,7 @@ export default function ChatPage() {
   const [sessionFeedbackOpen, setSessionFeedbackOpen] = useState(false);
   const [showToolDetails, setShowToolDetails] = useState(false);
 
-  const [gameContext, setGameContext] = useState<ActiveGameContext | null>(null);
-  const [isEmbedded, setIsEmbedded] = useState(false);
+  const [gameContext, setGameContext] = useState<ActiveGameContext | null>(handoff?.ctx ?? null);
   const [savedNoteIndices, setSavedNoteIndices] = useState<Set<number>>(new Set());
 
   const thinkingRef = useRef<HTMLSpanElement>(null);
@@ -215,7 +221,10 @@ export default function ChatPage() {
   const retryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<(() => void) | null>(null);
   const loadingRef = useRef(false);
-  loadingRef.current = loading;
+  // Latest `loading` for keyboard handlers registered once; updated after commit.
+  useLayoutEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
 
   useChatKeys({
     onToggleToolDetails: () => setShowToolDetails(v => !v),
@@ -393,57 +402,11 @@ export default function ChatPage() {
       .catch(() => {})
       .finally(() => setPatternsLoading(false));
 
-    // Check for inline game context passed via ?ctx= (from game manager chat button)
-    const params = new URLSearchParams(window.location.search);
-    const ctxParam = params.get('ctx');
-    if (ctxParam) {
-      setIsEmbedded(true);
-      try {
-        const raw = JSON.parse(atob(decodeURIComponent(ctxParam)));
-        const ctx = mapRawGameContext(raw as Record<string, unknown>);
-        setGameContext(ctx);
-        liveGameStateRef.current = ctx;
-        // Opening UI message — mirrors board state the backend now receives too
-        if (raw.turnNumber || raw.currentPlayer) {
-          const playerLines = formatBoardStateLines(ctx).join('\n');
-          const formatLabel = ctx.gameType === '2hg' ? '2HG' : 'Commander';
-          const turnLabel = ctx.currentTeam
-            ? `Turn ${raw.turnNumber ?? '?'}, ${ctx.currentTeam}'s turn`
-            : `Turn ${raw.turnNumber ?? '?'}, ${raw.currentPlayer ?? '?'}'s turn`;
-          const systemMsg = [`**Active ${formatLabel} game — ${turnLabel}**`, playerLines].join('\n');
-          // Build hidden timer note for AI context (not shown to user)
-          if (raw.timerSeconds && raw.currentPlayer) {
-            const elapsed = (raw.elapsedSeconds as number) ?? 0;
-            const total = raw.timerSeconds as number;
-            const remaining = Math.max(0, total - elapsed);
-            const pct = elapsed / total;
-            const name = raw.currentPlayer as string;
-            const quips =
-              pct >= 0.75
-                ? [
-                    `${name} has used ${Math.round(pct * 100)}% of the turn timer and still hasn't acted. Feel free to weave in a gentle ribbing if it's relevant.`,
-                    `${name} is deep in the tank with only ~${Math.round(remaining)}s left on the timer. You can playfully acknowledge the delay if appropriate.`,
-                  ]
-                : pct >= 0.4
-                ? [
-                    `${name} is about halfway through the turn timer (${Math.round(elapsed)}s elapsed). You can lightly tease them about thinking time if it fits.`,
-                  ]
-                : [
-                    `${name}'s turn just started — timer is running but no pressure yet.`,
-                  ];
-            ctx._timerNote = quips[Math.floor(Math.random() * quips.length)];
-            setGameContext(ctx);
-          }
-          setMessages([{ role: 'assistant', content: systemMsg }]);
-        }
-      } catch {
-        // Malformed ctx param — fall back to DB lookup
-        rulesApi.getActiveGame().then(r => setGameContext(r.game)).catch(() => {});
-      }
-    } else {
+    // No usable game handed over in ?ctx=: look up the active game instead.
+    if (!handoff?.ctx) {
       rulesApi.getActiveGame().then(r => setGameContext(r.game)).catch(() => {});
     }
-  }, []);
+  }, [handoff]);
 
   // postMessage bridge for saving notes back to game manager (embedded mode only)
   const saveToGameNotes = useCallback((content: string) => {
@@ -454,7 +417,7 @@ export default function ChatPage() {
 
   // Real-time timer state pushed from parent every second
   const liveTimerRef = useRef<ActiveGameContext['_liveTimer']>(undefined);
-  const liveGameStateRef = useRef<Partial<ActiveGameContext> | null>(null);
+  const liveGameStateRef = useRef<Partial<ActiveGameContext> | null>(handoff?.ctx ?? null);
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       if (event.data?.type === 'rules_timer_update') {

@@ -45,17 +45,29 @@ export default function FeedbackReviewPage() {
   const [flaggedOnly, setFlaggedOnly] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  // Show the spinner as soon as the page or a filter changes, adjusting state
+  // during render rather than in the effect (React's "adjust state on change").
+  const queryKey = `${page}|${ratingFilter}|${flaggedOnly}`;
+  const [loadingKey, setLoadingKey] = useState(queryKey);
+  if (loadingKey !== queryKey) {
+    setLoadingKey(queryKey);
     setLoading(true);
+  }
+
+  // State is only set in the request's callbacks; a response for a page or
+  // filter that has since changed is ignored.
+  useEffect(() => {
+    let current = true;
     rulesApi.getFeedbackReview({
       flagged: flaggedOnly || undefined,
       rating: ratingFilter === 'all' ? undefined : ratingFilter,
       limit: LIMIT,
       offset: (page - 1) * LIMIT,
     })
-      .then((r) => { setItems(r.items); setTotal(r.total); })
+      .then((r) => { if (current) { setItems(r.items); setTotal(r.total); } })
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
   }, [page, ratingFilter, flaggedOnly]);
 
   const pageCount = Math.ceil(total / LIMIT);
