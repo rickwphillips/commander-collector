@@ -13,6 +13,7 @@ import type { GameManagerState, PlayerState, LiveGameEvent, DistributiveOmit, Ga
 import { applyEvent } from '../remoteTransforms';
 import { otherTeam, teamName } from '@/lib/teams';
 import { useThemeMode } from '@/components/ThemeProvider';
+import { useNow } from '@/lib/useNow';
 
 // After sending an event, suppress incoming SSE state for this long.
 // The host polls at 500ms, so within ~600ms the event is processed and
@@ -94,26 +95,12 @@ function RemotePageInner() {
   const pollFailCountRef = useRef(0);
   const inactiveCountRef = useRef(0);
   const [showReconnect, setShowReconnect] = useState(false);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  // Wall-clock time as of the last tick, for render-time freshness checks.
-  const [nowMs, setNowMs] = useState(0);
-  const tickTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Tick elapsed seconds every second, reset on turn change
-  useEffect(() => {
-    if (tickTimer.current) clearInterval(tickTimer.current);
-    const turnStartTime = phase === 'connected' && state ? state.turnStartTime : null;
-    const tick = () => {
-      const now = Date.now();
-      setNowMs(now);
-      setElapsedSeconds(turnStartTime === null ? 0 : Math.round((now - turnStartTime) / 1000));
-    };
-    tick();
-    if (turnStartTime === null) return;
-    tickTimer.current = setInterval(tick, 1000);
-    return () => { if (tickTimer.current) clearInterval(tickTimer.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state?.currentPlayerIdx, phase]);
+  // Seconds into the current turn, derived from a ticking clock; it restarts
+  // whenever the turn's start time changes.
+  const nowMs = useNow();
+  const turnStartTime = phase === 'connected' && state ? state.turnStartTime : null;
+  const elapsedSeconds =
+    turnStartTime === null || nowMs === 0 ? 0 : Math.max(0, Math.round((nowMs - turnStartTime) / 1000));
 
   // ── Connect by code ───────────────────────────────────────────────────────
   // Loads the live game for an already-trimmed code (phase is 'loading').

@@ -426,6 +426,38 @@ describe('useList', () => {
 
   // ── G) refresh ───────────────────────────────────────────────────────────
 
+  describe('changing the source', () => {
+    it('ignores a slow response for a list that is no longer requested', async () => {
+      let resolveFirst!: (v: unknown) => void;
+      const first = new Promise((r) => { resolveFirst = r; });
+      mockApiFetch.mockImplementation((url: string) => {
+        if (url.includes('list-a')) return first as never;
+        return Promise.resolve({ ...makeListDetail(), id: 'list-b', name: 'List B' }) as never;
+      });
+
+      const { result, rerender } = renderHook(({ id }) => useList({ id }), { initialProps: { id: 'list-a' } });
+      expect(result.current.loading).toBe(true);
+
+      rerender({ id: 'list-b' });
+      await waitFor(() => expect(result.current.list?.name).toBe('List B'));
+
+      // The stale list-a response lands late and must not replace list-b.
+      await act(async () => { resolveFirst({ ...makeListDetail(), id: 'list-a', name: 'List A' }); });
+      expect(result.current.list?.name).toBe('List B');
+      expect(result.current.loading).toBe(false);
+    });
+
+    it('shows loading again as soon as the id changes', async () => {
+      mockApiFetch.mockResolvedValueOnce(makeListDetail() as never);
+      const { result, rerender } = renderHook(({ id }) => useList({ id }), { initialProps: { id: 'list-a' } });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      mockApiFetch.mockImplementationOnce(() => new Promise(() => {}) as never);
+      rerender({ id: 'list-b' });
+      expect(result.current.loading).toBe(true);
+    });
+  });
+
   describe('refresh', () => {
     it('re-fetches by the loaded list id', async () => {
       mockApiFetch

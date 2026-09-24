@@ -1,19 +1,16 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { Box, CircularProgress, Typography } from '@mui/material';
-
-const AUTH_TOKEN_KEY = 'auth_token';
-const LOGIN_URL =
-  process.env.NODE_ENV === 'development' ? 'http://localhost:3000/app/login/' : '/app/login/';
-
-interface AuthUser {
-  id: string;
-  username: string;
-  display_name: string;
-  role: 'admin' | 'user';
-  player?: { id: string; name: string } | null;
-}
+import {
+  clearToken,
+  consumeUrlToken,
+  getValidToken,
+  redirectToLogin,
+  type AuthUser,
+} from '@commander/shared/lib/auth';
+import { useAuthUser } from '@commander/shared/lib/useAuthUser';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -27,83 +24,41 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
-function isTokenExpired(token: string): boolean {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.exp < Date.now() / 1000;
-  } catch {
-    return true;
-  }
-}
-
-function getUserFromToken(token: string): AuthUser | null {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return {
-      id: payload.sub,
-      username: payload.username,
-      display_name: payload.display_name,
-      role: payload.role,
-    };
-  } catch {
-    return null;
-  }
-}
-
+/** Routes that render without signing in (the phone remote joins by code). */
 const PUBLIC_PATHS = ['/game-manager/remote'];
 
+/**
+ * Renders its children only for a signed-in user, except on public routes.
+ * Children do not mount until the token is stored, so their effects never call
+ * the API before a token handed over in the URL has been saved.
+ */
 export function AuthGuard({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [checking, setChecking] = useState(true);
+  const pathname = usePathname();
+  const isPublic = PUBLIC_PATHS.some((p) => pathname?.includes(p));
+  const { user, known } = useAuthUser();
 
   const logout = () => {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    const currentPath = window.location.href;
-    window.location.href = `${LOGIN_URL}?logout=1&redirect=${encodeURIComponent(currentPath)}`;
+    clearToken();
+    redirectToLogin({ logout: true });
   };
 
+  // Store a token handed over as ?token= (cross-origin dev flow). storeToken
+  // notifies useAuthUser, which re-renders with the user.
   useEffect(() => {
-    // Skip auth for public routes
-    if (PUBLIC_PATHS.some(p => window.location.pathname.includes(p))) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- reads window.location/localStorage after hydration; render-time reads would mismatch the static HTML
-      setChecking(false);
-      return;
-    }
+    if (!isPublic) consumeUrlToken();
+  }, [isPublic]);
 
-    // Check for token passed via URL param (needed for cross-origin dev flow)
-    const params = new URLSearchParams(window.location.search);
-    const urlToken = params.get('token');
-    if (urlToken) {
-      localStorage.setItem(AUTH_TOKEN_KEY, urlToken);
-      // Clean token from URL without reload
-      params.delete('token');
-      const cleanUrl = params.toString()
-        ? `${window.location.pathname}?${params}`
-        : window.location.pathname;
-      window.history.replaceState({}, '', cleanUrl);
-    }
+  // Send signed-out visitors to login once the token can be read. Reads the
+  // store directly: a URL token stored by the effect above is not yet in `user`.
+  useEffect(() => {
+    if (!isPublic && known && !getValidToken()) redirectToLogin();
+  }, [isPublic, known, user]);
 
-    const token = urlToken || localStorage.getItem(AUTH_TOKEN_KEY);
+  if (isPublic) {
+    return <AuthContext.Provider value={{ user: null, logout }}>{children}</AuthContext.Provider>;
+  }
 
-    if (!token || isTokenExpired(token)) {
-      // No valid token - redirect to login
-      const currentPath = window.location.href;
-      window.location.href = `${LOGIN_URL}?redirect=${encodeURIComponent(currentPath)}`;
-      return;
-    }
-
-    const tokenUser = getUserFromToken(token);
-    if (!tokenUser) {
-      logout();
-      return;
-    }
-
-    setUser(tokenUser);
-    setChecking(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  if (checking) {
+  if (!user) {
     return (
       <Box
         sx={{
