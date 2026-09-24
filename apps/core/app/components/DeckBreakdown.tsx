@@ -116,13 +116,14 @@ function DonutChart({ data, size = 140 }: { data: PieSlice[]; size?: number }) {
   const outerR = size / 2 - 2;
   const innerR = outerR * 0.52;
 
+  const slices: (PieSlice & { start: number; end: number; sweep: number })[] = [];
   let angle = -Math.PI / 2;
-  const slices = data.map((d) => {
+  for (const d of data) {
     const start = angle;
     const sweep = (d.value / total) * 2 * Math.PI;
     angle += sweep;
-    return { ...d, start, end: angle, sweep };
-  });
+    slices.push({ ...d, start, end: angle, sweep });
+  }
 
   function arcPath(s: (typeof slices)[0]) {
     if (s.sweep < 0.001) return null;
