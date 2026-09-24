@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useRef } from 'react';
 import {
@@ -80,41 +80,41 @@ export default function DeckDetailPage() {
   const [coachOpen, setCoachOpen] = useState(false);
   const coachRef = useRef<GuruChatHandle>(null);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [deckData, gamesData, cardsData] = await Promise.all([
-        api.getDeck(deckId),
-        api.getGames(),
-        api.getDeckCards(deckId),
-      ]);
-      setDeckCards(cardsData);
-      setDeck(deckData);
-      coachRef.current?.setActiveDeck({
-        deckId: deckData.id,
-        deckName: deckData.name,
-        cardCount: totalCardCount(cardsData),
-        commander: deckData.commander ?? '',
-        colors: deckData.colors ?? '',
-      });
-      setEditName(deckData.name);
-      setEditCommander(deckData.commander);
-      setEditColors(deckData.colors ? deckData.colors.split('') : []);
-
-      // Filter games where this deck participated
-      const deckGames = gamesData.filter((game) => game.results?.some((r) => r.deck_id === deckId));
-      setGames(deckGames);
-    } catch {
-      setError('Failed to load deck data');
-    } finally {
-      setLoading(false);
-    }
-  }, [deckId]);
-
   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [deckData, gamesData, cardsData] = await Promise.all([
+          api.getDeck(deckId),
+          api.getGames(),
+          api.getDeckCards(deckId),
+        ]);
+        setDeckCards(cardsData);
+        setDeck(deckData);
+        coachRef.current?.setActiveDeck({
+          deckId: deckData.id,
+          deckName: deckData.name,
+          cardCount: totalCardCount(cardsData),
+          commander: deckData.commander ?? '',
+          colors: deckData.colors ?? '',
+        });
+        setEditName(deckData.name);
+        setEditCommander(deckData.commander);
+        setEditColors(deckData.colors ? deckData.colors.split('') : []);
+
+        // Filter games where this deck participated
+        const deckGames = gamesData.filter((game) => game.results?.some((r) => r.deck_id === deckId));
+        setGames(deckGames);
+      } catch {
+        setError('Failed to load deck data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (deckId) {
       fetchData();
     }
-  }, [deckId, fetchData]);
+  }, [deckId]);
 
   const handleEdit = () => {
     setEditName(deck?.name || '');

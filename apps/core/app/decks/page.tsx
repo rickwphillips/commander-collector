@@ -72,19 +72,19 @@ export default function DecksPage() {
   const [hasListFilter, setHasListFilter] = useState(false);
 
   useEffect(() => {
+    const fetchDecks = async () => {
+      try {
+        const data = await api.getDecks();
+        setDecks(data as DeckWithStats[]);
+      } catch {
+        setError('Failed to load decks');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchDecks();
   }, []);
-
-  const fetchDecks = async () => {
-    try {
-      const data = await api.getDecks();
-      setDecks(data as DeckWithStats[]);
-    } catch {
-      setError('Failed to load decks');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const uniquePlayers = useMemo(() => {
     const names = [...new Set(decks.map((d) => d.player_name))];

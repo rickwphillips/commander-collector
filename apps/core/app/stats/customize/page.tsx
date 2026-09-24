@@ -73,23 +73,18 @@ export default function CustomizePage() {
     }
   }, [showBuilder]);
 
+  const fetchPanels = () =>
+    api.getStatPanels()
+      .then((data) => setPanels(data.own))
+      .catch(() => setSnackbar('Failed to load panels'))
+      .finally(() => setLoading(false));
+
   useEffect(() => {
     fetchPanels();
     Promise.all([api.getPlayers(), api.getDecks()])
       .then(([p, d]) => { setPlayers(p); setDecks(d); })
       .catch(() => { /* non-fatal */ });
   }, []);
-
-  const fetchPanels = async () => {
-    try {
-      const data = await api.getStatPanels();
-      setPanels(data.own);
-    } catch {
-      setSnackbar('Failed to load panels');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const resetComparisonState = () => {
     setCompGroupBy('player');

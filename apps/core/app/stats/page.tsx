@@ -105,10 +105,6 @@ function StatsPageInner() {
     loaded: hiddenLoaded,
   } = useHiddenStats();
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   // Helper: activate a panel (handles comparison data fetch)
   const activatePanel = useCallback((panel: StatPanel) => {
     setActiveView(panel.id);
@@ -123,6 +119,56 @@ function StatsPageInner() {
         .finally(() => setComparisonLoading(false));
     }
   }, []);
+
+  useEffect(() => {
+    // Apply ?panel_id=<id> (own panels by UUID), then ?panel=<code> (own, shared, or
+    // fetched by code) once panels have loaded. A later activation wins, as before.
+    const activateUrlPanel = (loaded: StatPanelsResponse) => {
+      if (panelIdParam) {
+        const match = loaded.own.find((p) => p.id === panelIdParam);
+        if (match) activatePanel(match);
+      }
+      if (!panelCode) return;
+      const match = [...loaded.own, ...loaded.shared].find((p) => p.share_code === panelCode);
+      if (match) {
+        activatePanel(match);
+      } else {
+        // Try fetching by code
+        api
+          .getStatPanelByCode(panelCode)
+          .then((p) => {
+            activatePanel(p);
+          })
+          .catch(() => {
+            setSnackbar('Shared panel not found');
+          });
+      }
+    };
+
+    const fetchData = async () => {
+      let loadedPanels: StatPanelsResponse = { own: [], shared: [] };
+      try {
+        const [statsData, h2hData, advData, panelsData] = await Promise.all([
+          api.getStats(),
+          api.getHeadToHead(),
+          api.getAdvancedStats(),
+          api.getStatPanels().catch(() => ({ own: [], shared: [] }) as StatPanelsResponse),
+        ]);
+        setStats(statsData);
+        setHeadToHead(h2hData);
+        setAdvancedStats(advData);
+        setPanels(panelsData);
+        loadedPanels = panelsData;
+      } catch {
+        setError('Failed to load stats');
+      } finally {
+        setLoading(false);
+      }
+      activateUrlPanel(loadedPanels);
+    };
+
+    fetchData();
+  }, [panelIdParam, panelCode, activatePanel]);
 
   const toggleInlinePanel = useCallback(
     (panel: StatPanel) => {
@@ -144,64 +190,6 @@ function StatsPageInner() {
     },
     [inlinePanelData]
   );
-
-  // Handle ?panel_id=<id> URL param (own panels by UUID)
-  useEffect(() => {
-    if (!panelIdParam || loading) return;
-    const id = panelIdParam;
-    const match = panels.own.find((p) => p.id === id);
-    if (match) activatePanel(match);
-  }, [panelIdParam, panels.own, loading, activatePanel]);
-
-  // Handle ?panel=<code> URL param
-  useEffect(() => {
-    if (panelCode && panels.own.length + panels.shared.length > 0) {
-      // Check own panels first, then shared
-      const allPanels = [...panels.own, ...panels.shared];
-      const match = allPanels.find((p) => p.share_code === panelCode);
-      if (match) {
-        activatePanel(match);
-      } else {
-        // Try fetching by code
-        api
-          .getStatPanelByCode(panelCode)
-          .then((p) => {
-            activatePanel(p);
-          })
-          .catch(() => {
-            setSnackbar('Shared panel not found');
-          });
-      }
-    } else if (panelCode && !loading) {
-      api
-        .getStatPanelByCode(panelCode)
-        .then((p) => {
-          activatePanel(p);
-        })
-        .catch(() => {
-          setSnackbar('Shared panel not found');
-        });
-    }
-  }, [panelCode, panels, loading, activatePanel]);
-
-  const fetchData = async () => {
-    try {
-      const [statsData, h2hData, advData, panelsData] = await Promise.all([
-        api.getStats(),
-        api.getHeadToHead(),
-        api.getAdvancedStats(),
-        api.getStatPanels().catch(() => ({ own: [], shared: [] }) as StatPanelsResponse),
-      ]);
-      setStats(statsData);
-      setHeadToHead(h2hData);
-      setAdvancedStats(advData);
-      setPanels(panelsData);
-    } catch {
-      setError('Failed to load stats');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSort = (table: string, key: string) => {
     setSortConfigs((prev) => ({

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Typography, IconButton, Chip, Stack, Alert, TextField, Dialog,
@@ -31,18 +31,19 @@ export default function CoachNotesAdminPage() {
     if (user && user.role !== 'admin') window.location.href = '/';
   }, [user]);
 
-  const load = useCallback(async () => {
-    try {
-      const data = await api.getAllCoachNotes();
-      setNotes(data);
-    } catch {
-      setError('Failed to load coach notes.');
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = await api.getAllCoachNotes();
+        setNotes(data);
+      } catch {
+        setError('Failed to load coach notes.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, []);
-
-  useEffect(() => { load(); }, [load]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this note?')) return;
