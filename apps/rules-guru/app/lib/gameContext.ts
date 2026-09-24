@@ -100,3 +100,59 @@ export function formatBoardStateLines(ctx: ActiveGameContext): string[] {
 
   return ctx.players.map((p) => `  • ${p.playerName}: ${formatPlayerStateLine(p)}`);
 }
+
+/** Game handed over by the game manager's chat button as `?ctx=` (base64 JSON). */
+export interface GameHandoff {
+  /** Parsed game context; null when the param is malformed. */
+  ctx: ActiveGameContext | null;
+  /** Opening "active game" message, when the handoff includes turn info. */
+  openingMessage: string | null;
+}
+
+/**
+ * Read the `?ctx=` handoff from the URL, or null when the page was not opened
+ * from the game manager. Called once, from a state initializer.
+ */
+export function readGameHandoff(): GameHandoff | null {
+  const ctxParam = new URLSearchParams(window.location.search).get('ctx');
+  if (!ctxParam) return null;
+  try {
+    const raw = JSON.parse(atob(decodeURIComponent(ctxParam))) as Record<string, unknown>;
+    const ctx = mapRawGameContext(raw);
+    if (!raw.turnNumber && !raw.currentPlayer) return { ctx, openingMessage: null };
+
+    // Opening UI message — mirrors board state the backend now receives too
+    const playerLines = formatBoardStateLines(ctx).join('\n');
+    const formatLabel = ctx.gameType === '2hg' ? '2HG' : 'Commander';
+    const turnLabel = ctx.currentTeam
+      ? `Turn ${raw.turnNumber ?? '?'}, ${ctx.currentTeam}'s turn`
+      : `Turn ${raw.turnNumber ?? '?'}, ${raw.currentPlayer ?? '?'}'s turn`;
+    const openingMessage = [`**Active ${formatLabel} game — ${turnLabel}**`, playerLines].join('\n');
+    // Build hidden timer note for AI context (not shown to user)
+    if (raw.timerSeconds && raw.currentPlayer) {
+      const elapsed = (raw.elapsedSeconds as number) ?? 0;
+      const total = raw.timerSeconds as number;
+      const remaining = Math.max(0, total - elapsed);
+      const pct = elapsed / total;
+      const name = raw.currentPlayer as string;
+      const quips =
+        pct >= 0.75
+          ? [
+              `${name} has used ${Math.round(pct * 100)}% of the turn timer and still hasn't acted. Feel free to weave in a gentle ribbing if it's relevant.`,
+              `${name} is deep in the tank with only ~${Math.round(remaining)}s left on the timer. You can playfully acknowledge the delay if appropriate.`,
+            ]
+          : pct >= 0.4
+          ? [
+              `${name} is about halfway through the turn timer (${Math.round(elapsed)}s elapsed). You can lightly tease them about thinking time if it fits.`,
+            ]
+          : [
+              `${name}'s turn just started — timer is running but no pressure yet.`,
+            ];
+      ctx._timerNote = quips[Math.floor(Math.random() * quips.length)];
+    }
+    return { ctx, openingMessage };
+  } catch {
+    // Malformed ctx param — the page falls back to a DB lookup
+    return { ctx: null, openingMessage: null };
+  }
+}
