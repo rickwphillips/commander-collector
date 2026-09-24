@@ -1,0 +1,42 @@
+// Autumn palette, SCSS side. Mirrors the hexes in app/theme/theme.ts, which is
+// the JS source of truth for anything MUI resolves at runtime. These exist so a
+// stylesheet can reference a brand colour without hardcoding a hex inline.
+
+// Light-scheme hues
+$burnt-orange: #d2691e; // primary
+$saddle-brown: #8b4513; // secondary
+$goldenrod: #daa520; // accent
+$peru: #cd853f; // dark-scheme secondary
+$sienna: #a0522d;
+$sage: #5b7b5b;
+$moss: #6b8e6b;
+$plum: #7b6b8e;
+
+// Dark-scheme hues
+$dark-orange: #ff8c00; // primary
+$sandy-brown: #f4a460; // accent
+$forest: #4a7a4a;
+
+/// Named accent profiles. Components expose these keys as a prop instead of
+/// taking a raw colour, so every tint can be computed by Sass at build time.
+$accents: (
+  'primary': $burnt-orange,
+  'secondary': $saddle-brown,
+  'gold': $goldenrod,
+  'sand': $peru,
+);
+
+/// Alpha steps for accent washes and glows, weakest to strongest. Named rather
+/// than inlined so the same handful of strengths is reused across stylesheets.
+$tint-faint: 0.03;
+$tint-soft: 0.06;
+$tint-medium: 0.08;
+$tint-strong: 0.13;
+$tint-heavy: 0.19;
+
+/// How hard an accent leans on its surface. Dark mode keeps the same hue and
+/// raises the alpha so the card stays legible on the dark brown background.
+$wash-light: $tint-faint;
+$wash-dark: $tint-medium;
+$glow-light: $tint-strong;
+$glow-dark: $tint-heavy;

@@ -1,0 +1,78 @@
+@use '../../styles/palette';
+@use '../../styles/tokens';
+@use '../../styles/mixins';
+
+.container {
+  padding-top: tokens.$spacing * 4;
+  padding-bottom: tokens.$spacing * 4;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: tokens.$spacing * 3;
+}
+
+.header {
+  margin-bottom: tokens.$spacing * 4;
+}
+
+.headerRow {
+  display: flex;
+  flex-direction: row;
+  gap: tokens.$spacing * 2;
+  align-items: flex-start;
+}
+
+/* Card thumbnail beside the title */
+.titleImage {
+  display: block;
+  flex-shrink: 0;
+  width: 70px;
+  border-radius: tokens.$radius * 2;
+  box-shadow: tokens.$shadow-4;
+  // The image only opens a tooltip; it is not clickable.
+  cursor: default;
+
+  @include mixins.up(tokens.$bp-sm) {
+    width: 90px;
+  }
+
+  @include mixins.up(tokens.$bp-md) {
+    width: 110px;
+  }
+}
+
+// The tooltip holds nothing but the enlarged image, so its own surface is
+// stripped back to let the artwork sit on the page unframed.
+.imageTooltip:global(.MuiTooltip-tooltip) {
+  padding: 0;
+  background-color: transparent;
+  box-shadow: tokens.$shadow-8;
+}
+
+.titleImageLarge {
+  display: block;
+  width: 220px;
+  border-radius: tokens.$radius * 1.5;
+}
+
+/* Heading */
+.title {
+  font-weight: 700;
+
+  @include mixins.gradient-text(
+    linear-gradient(135deg, palette.$burnt-orange 0%, palette.$saddle-brown 100%)
+  );
+
+  @include mixins.dark-ancestor {
+    @include mixins.gradient-text(
+      linear-gradient(135deg, palette.$dark-orange 0%, palette.$goldenrod 100%)
+    );
+  }
+}
+
+.titleSpaced {
+  margin-bottom: tokens.$spacing;
+}

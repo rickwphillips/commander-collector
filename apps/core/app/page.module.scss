@@ -1,3 +1,164 @@
+@use 'styles/palette';
+@use 'styles/mixins';
+
+// Accent per navigation tile. Keys match the `slug` on each entry in
+// page.types.ts; hues come from the shared palette rather than local hexes.
+$nav-colors: (
+  'players': palette.$burnt-orange,
+  'decks': palette.$saddle-brown,
+  'games': palette.$goldenrod,
+  'stats': palette.$peru,
+  'lists': palette.$sage,
+  'collection': palette.$plum,
+  'play': palette.$sienna,
+  'rules': palette.$moss,
+);
+
+.container {
+  padding-top: 32px;
+  padding-bottom: 32px;
+}
+
+/* Hero */
+.hero {
+  margin-bottom: 48px;
+  text-align: center;
+}
+
+.heroTitle {
+  margin-bottom: 16px;
+  font-weight: 700;
+
+  @include mixins.gradient-text(
+    linear-gradient(
+      135deg,
+      palette.$burnt-orange 0%,
+      palette.$saddle-brown 50%,
+      palette.$goldenrod 100%
+    )
+  );
+
+  @include mixins.dark-ancestor {
+    @include mixins.gradient-text(
+      linear-gradient(
+        135deg,
+        palette.$dark-orange 0%,
+        palette.$goldenrod 50%,
+        palette.$peru 100%
+      )
+    );
+  }
+}
+
+.heroActions {
+  margin-top: 16px;
+}
+
+/* Section grids */
+.statsGrid,
+.quickActions,
+.navGrid,
+.alert {
+  margin-bottom: 32px;
+}
+
+/* Quick action cards */
+.quickActionCard {
+  height: 100%;
+
+  @include mixins.paper {
+    @include mixins.wash(
+      palette.$saddle-brown,
+      palette.$tint-soft,
+      palette.$burnt-orange,
+      palette.$tint-faint
+    );
+  }
+
+  @include mixins.dark-ancestor {
+    @include mixins.paper {
+      @include mixins.wash(
+        palette.$goldenrod,
+        palette.$tint-strong,
+        palette.$peru,
+        palette.$tint-soft
+      );
+    }
+  }
+}
+
+.quickActionCardNew {
+  @include mixins.paper {
+    @include mixins.wash(
+      palette.$burnt-orange,
+      palette.$tint-soft,
+      palette.$saddle-brown,
+      palette.$tint-faint
+    );
+  }
+
+  @include mixins.dark-ancestor {
+    @include mixins.paper {
+      @include mixins.wash(
+        palette.$dark-orange,
+        palette.$tint-strong,
+        palette.$goldenrod,
+        palette.$tint-soft
+      );
+    }
+  }
+}
+
+.quickActionCardResume {
+  @include mixins.paper {
+    @include mixins.wash(
+      palette.$moss,
+      palette.$tint-medium,
+      palette.$forest,
+      palette.$tint-faint
+    );
+  }
+
+  @include mixins.dark-ancestor {
+    @include mixins.paper {
+      @include mixins.wash(
+        palette.$moss,
+        palette.$tint-heavy,
+        palette.$forest,
+        palette.$tint-medium
+      );
+    }
+  }
+}
+
+.cardAction {
+  height: 100%;
+}
+
+.quickActionBody {
+  padding-top: 32px;
+  padding-bottom: 32px;
+  text-align: center;
+}
+
+.quickActionIcon {
+  margin-bottom: 8px;
+  font-size: 48px;
+}
+
+.quickActionTitle {
+  font-weight: 600;
+}
+
+.resumeMeta {
+  margin-bottom: 4px;
+}
+
+.resumeCommanders {
+  display: block;
+}
+
+/* Navigation cards */
 .navCard {
   height: 100%;
   transition:
@@ -6,5 +167,61 @@
 
   &:hover {
     transform: translateY(-4px);
+  }
+}
+
+.navCardBody {
+  padding-top: 24px;
+  padding-bottom: 24px;
+  text-align: center;
+}
+
+.navIcon {
+  margin-bottom: 16px;
+
+  :global(.MuiSvgIcon-root) {
+    font-size: 40px;
+  }
+}
+
+@each $name, $color in $nav-colors {
+  .navIcon-#{$name} {
+    color: $color;
+  }
+}
+
+.navTitle {
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+/* Recent games */
+.sectionTitle {
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.trophyIcon {
+  color: palette.$goldenrod;
+  font-size: 20px;
+}
+
+.winnerName {
+  font-weight: 600;
+}
+
+/* Version footer */
+.footer {
+  margin-top: 48px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.versionChip {
+  font-weight: 600;
+  opacity: 0.6;
+
+  &:hover {
+    opacity: 1;
   }
 }
