@@ -12,6 +12,13 @@
 require_once dirname(__DIR__) . '/config.php';
 require_once dirname(__DIR__) . '/auth/middleware.php';
 
+// The middleware was required but never invoked, so this endpoint served
+// conversation content to anonymous callers while every other /rules/*
+// endpoint required a login. The client (rules-guru api.ts sendMessage)
+// already sends the bearer token on this request, so gating it changes
+// nothing for legitimate callers. Must run before the SSE headers below.
+requireAuth();
+
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
     exit;

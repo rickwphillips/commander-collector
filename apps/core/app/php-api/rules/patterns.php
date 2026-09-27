@@ -116,7 +116,9 @@ if ($method === 'POST' || $method === 'PUT') {
         ':examples_count' => $examplesCount,
     ]);
 
-    $row = $db->query("SELECT * FROM rules_patterns WHERE pattern_id = " . $db->quote($patternId))->fetch();
+    $read = $db->prepare("SELECT * FROM rules_patterns WHERE pattern_id = ?");
+    $read->execute([$patternId]);
+    $row = $read->fetch();
     sendJSON(['pattern' => $row], 201);
 }
 
