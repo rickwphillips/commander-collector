@@ -95,8 +95,15 @@ export function subscribeAuth(onChange: () => void): () => void {
 }
 
 /**
- * Accept a token handed over as `?token=` (the cross-origin dev login flow),
- * store it, and strip it from the URL so it does not linger in history.
+ * Accept a token handed over as `?token=`, store it, and strip it from the URL
+ * so it does not linger in history.
+ *
+ * The token is only stored if it decodes and is unexpired. Anything else is
+ * dropped: a malformed or stale `?token=` would otherwise overwrite a good
+ * stored token, so a link carrying one signed the visitor out. Storing it could
+ * never have authenticated them either, since `getValidToken()` rejects exactly
+ * what `isTokenExpired()` rejects here. The signature is still verified by the
+ * PHP API on every request; this decodes without verifying.
  */
 export function consumeUrlToken(): void {
   const params = new URLSearchParams(window.location.search);
@@ -105,6 +112,7 @@ export function consumeUrlToken(): void {
   params.delete('token');
   const cleanUrl = params.toString() ? `${window.location.pathname}?${params}` : window.location.pathname;
   window.history.replaceState({}, '', cleanUrl);
+  if (isTokenExpired(urlToken)) return;
   storeToken(urlToken);
 }
 
