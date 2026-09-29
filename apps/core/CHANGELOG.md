@@ -1,5 +1,9 @@
 # Changelog
 
+## [5.23.1] - 2026-09-29
+
+- Upgraded Next.js 16.3.4 → 16.3.6, patching a critical remote-code-execution vulnerability in next/og ImageResponse (CVE-2026-94545, CVSS 9.5).
+
 ## [5.23.0] - 2026-07-29
 
 ### Fixed
