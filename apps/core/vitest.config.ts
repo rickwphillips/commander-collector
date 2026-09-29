@@ -29,5 +29,8 @@ export default defineConfig({
   resolve: {
     // Match tsconfig "@/*": ["./app/*"] so test imports resolve the same as app imports
     alias: { '@': path.resolve(__dirname, 'app') },
+    // Prevent duplicate instances of next/react from packages/shared's own node_modules.
+    // Without this, vi.mock('next/navigation') targets a different copy than shared imports.
+    dedupe: ['next', 'react', 'react-dom'],
   },
 });
