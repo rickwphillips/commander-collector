@@ -903,7 +903,7 @@ export function CenterZone({
               <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                 Settings
               </Typography>
-              <IconButton size="small" onClick={() => setSettingsOpen(false)} sx={{ p: 0.25 }}>
+              <IconButton size="small" aria-label="Close settings" onClick={() => setSettingsOpen(false)} sx={{ p: 0.25 }}>
                 <CloseIcon sx={{ fontSize: 16 }} />
               </IconButton>
             </Stack>
@@ -1001,7 +1001,7 @@ export function CenterZone({
         <Dialog open={logOpen} onClose={() => setLogOpen(false)} fullWidth maxWidth="sm">
           <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1.5, fontWeight: 600, fontSize: '1rem' }}>
             Game Log
-            <IconButton size="small" onClick={() => setLogOpen(false)} sx={{ p: 0.25 }}>
+            <IconButton size="small" aria-label="Close game log" onClick={() => setLogOpen(false)} sx={{ p: 0.25 }}>
               <CloseIcon sx={{ fontSize: 18 }} />
             </IconButton>
           </DialogTitle>
