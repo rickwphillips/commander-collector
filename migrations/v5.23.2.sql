@@ -1,7 +1,7 @@
 -- v5.23.2: Security fixes
 
 INSERT INTO changelog_releases (id, version, date, title, sort_order)
-VALUES (UUID(), '5.23.2', '2026-10-07', 'Security fixes', 118)
+VALUES (UUID(), '5.23.2', '2026-10-07', 'Security fixes', 119)
 ON DUPLICATE KEY UPDATE date=VALUES(date), title=VALUES(title), sort_order=VALUES(sort_order);
 
 SET @rid = (SELECT id FROM changelog_releases WHERE version = '5.23.2');
