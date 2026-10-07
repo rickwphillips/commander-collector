@@ -1,5 +1,9 @@
 # Changelog
 
+## [5.23.2] - 2026-10-07
+
+- Upgraded Next.js 16.3.6 → 16.3.8, patching CVE-2026-94483 (SSRF, CVSS 8.3); gated rules/seed.php to CLI only and required auth on rules/chat-stream.php; a stale ?token= link no longer signs out a logged-in user.
+
 ## [5.23.1] - 2026-09-29
 
 - Upgraded Next.js 16.3.4 → 16.3.6, patching a critical remote-code-execution vulnerability in next/og ImageResponse (CVE-2026-94545, CVSS 9.5).
