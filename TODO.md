@@ -1,3 +1,4 @@
+- [ ] Rotate the FTP password for the rickwphillips.com host (used by deploy-scripts/deploy-commander.sh via apps/core/.env.local FTP_PASS). It was printed into a Claude session transcript on 2026-10-07; after rotating, update FTP_PASS in apps/core/.env.local. #security
 - [ ] Create a game manager diagram
 - [ ] Selecting the autosearch results of a commander on the create deck page is not registering in the input field when selected. #bug
 - [~] Update the game manager to accommodate 2HG. (first pass done: shared life/poison, team roll, collective team turns, two-panel left/right layout, remote disabled)
