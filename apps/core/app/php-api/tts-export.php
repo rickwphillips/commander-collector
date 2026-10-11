@@ -149,6 +149,9 @@ function ttsWriteCardImages(array $cards, string $side = 'front'): array {
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_FOLLOWLOCATION => true,
+                // Bound the redirect chain and keep it on http(s).
+                CURLOPT_MAXREDIRS      => 3,
+                CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
                 CURLOPT_TIMEOUT        => 20,
                 CURLOPT_USERAGENT      => 'MTGCommander-TTS/1.0',
             ]);
