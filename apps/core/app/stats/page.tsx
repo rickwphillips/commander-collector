@@ -1257,7 +1257,7 @@ function StatsPageInner() {
           severity="info"
           sx={{ mb: 3 }}
           action={
-            <IconButton size="small" onClick={() => handleViewChange('default')}>
+            <IconButton size="small" onClick={() => handleViewChange('default')} aria-label="Clear the active panel and return to the default view">
               <CloseIcon fontSize="small" />
             </IconButton>
           }

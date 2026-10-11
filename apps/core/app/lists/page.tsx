@@ -145,7 +145,7 @@ export default function ListsPage() {
                     ),
                     endAdornment: searchQuery ? (
                       <InputAdornment position="end">
-                        <IconButton size="small" onClick={() => setSearchQuery('')}>
+                        <IconButton size="small" onClick={() => setSearchQuery('')} aria-label="Clear search">
                           <ClearIcon fontSize="small" />
                         </IconButton>
                       </InputAdornment>
