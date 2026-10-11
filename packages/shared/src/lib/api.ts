@@ -192,16 +192,10 @@ export const api = {
   deleteLiveGame: (code: string) =>
     apiFetch<{ success: boolean }>(`/live-game?code=${code}`, { method: 'DELETE' }),
 
-  // Deck Cards (card list for a deck)
-  getDeckCards: (deckId: number) =>
-    apiFetch<import('./types').DeckCard[]>(`/deck-cards?deck_id=${deckId}`),
-  saveDeckCards: (deckId: number, cards: import('./types').CreateDeckCardInput[]) =>
-    apiFetch<{ success: boolean; deck_id: number }>('/deck-cards', {
-      method: 'POST',
-      body: JSON.stringify({ deck_id: deckId, cards }),
-    }),
-  deleteDeckCards: (deckId: number) =>
-    apiFetch<{ success: boolean }>(`/deck-cards?deck_id=${deckId}`, { method: 'DELETE' }),
+  // Deck cards are NOT addressable from here. deck-cards.php was removed in
+  // v5.0.0 (it is a 410 Gone shim) and card storage moved to list_cards via
+  // lists.deck_id. apps/core/app/lib/api.ts has the replacements, which resolve
+  // the deck's main list first; this package has no equivalent on purpose.
 
   // Scryfall card cache
   lookupCard: (name: string) =>
