@@ -185,6 +185,8 @@ export function SessionFeedbackDrawer({ open, onClose, conversationId, messages,
                   key={n}
                   size="small"
                   onClick={() => setRating(n)}
+                  aria-label={`Rate ${n} out of 5`}
+                  aria-pressed={n <= rating}
                   sx={{ color: n <= rating ? 'warning.main' : 'text.disabled' }}
                 >
                   {n <= rating ? <StarIcon /> : <StarOutlineIcon />}

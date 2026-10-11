@@ -748,7 +748,7 @@ export function CenterZone({
                 <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                   Who goes first?
                 </Typography>
-                <IconButton size="small" onClick={() => setChoosingFirst(false)} sx={{ p: 0.25 }}>
+                <IconButton size="small" onClick={() => setChoosingFirst(false)} aria-label="Close the who-goes-first picker" sx={{ p: 0.25 }}>
                   <CloseIcon sx={{ fontSize: 16 }} />
                 </IconButton>
               </Stack>
@@ -1035,7 +1035,7 @@ export function CenterZone({
               <IconButton size="small" onClick={() => { setChatMinimized(true); setChatHasNewContent(false); }} title="Minimize">
                 <MinimizeIcon />
               </IconButton>
-              <IconButton size="small" onClick={() => { setChatOpen(false); setChatMinimized(false); setChatHasNewContent(false); setChatSearching(false); setChatUrl(null); }}>
+              <IconButton size="small" onClick={() => { setChatOpen(false); setChatMinimized(false); setChatHasNewContent(false); setChatSearching(false); setChatUrl(null); }} aria-label="Close Rules Guru">
                 <CloseIcon />
               </IconButton>
             </Box>
@@ -1072,7 +1072,7 @@ export function CenterZone({
               <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                 {rollOffState.phase !== 'idle' ? 'Roll-Off' : 'Dice / Flips'}
               </Typography>
-              <IconButton size="small" onClick={() => { if (rollOffState.phase !== 'idle') cancelRollOff(); setDiceOpen(false); }} sx={{ p: 0.25 }}>
+              <IconButton size="small" onClick={() => { if (rollOffState.phase !== 'idle') cancelRollOff(); setDiceOpen(false); }} aria-label="Close dice and flips" sx={{ p: 0.25 }}>
                 <CloseIcon sx={{ fontSize: 16 }} />
               </IconButton>
             </Stack>

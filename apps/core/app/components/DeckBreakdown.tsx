@@ -287,6 +287,8 @@ export function DeckBreakdown({ cards, showList = false, sortOrder, sortDirectio
                 <IconButton
                   size="small"
                   onClick={() => setColorExpanded(x => !x)}
+                  aria-label={colorExpanded ? 'Collapse breakdown charts' : 'Expand breakdown charts'}
+                  aria-expanded={colorExpanded}
                   sx={{ transform: colorExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
                 >
                   <ExpandMoreIcon fontSize="small" />
