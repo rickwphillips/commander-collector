@@ -1638,6 +1638,9 @@ function executeTool(string $name, array $input): string {
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 12,
             CURLOPT_FOLLOWLOCATION => true,
+            // Bound the redirect chain and keep it on http(s).
+            CURLOPT_MAXREDIRS      => 3,
+            CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
             CURLOPT_USERAGENT      => 'Mozilla/5.0 (compatible; CommanderCollector/1.0; coach-research)',
             CURLOPT_HTTPHEADER     => ['Accept: text/html'],
         ]);
