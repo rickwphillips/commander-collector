@@ -647,7 +647,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
                 <SmartphoneIcon sx={{ fontSize: sizes.fsSmallIcon, color: 'success.main', animation: 'remotePulse 2s ease-in-out infinite', '@keyframes remotePulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.4 } }, flexShrink: 0 }} />
               )}
               {/* Submenu trigger */}
-              <IconButton size="small" onClick={() => setStateMenuOpen(o => !o)} onPointerDown={(e) => e.stopPropagation()} sx={{ p: 0.5, color: stateMenuOpen ? 'primary.main' : 'text.secondary' }}>
+              <IconButton size="small" onClick={() => setStateMenuOpen(o => !o)} onPointerDown={(e) => e.stopPropagation()} aria-label={stateMenuOpen ? `Close the state menu for ${player.playerName}` : `Open the state menu for ${player.playerName}`} aria-expanded={stateMenuOpen} sx={{ p: 0.5, color: stateMenuOpen ? 'primary.main' : 'text.secondary' }}>
                 <AddIcon sx={{ fontSize: sizes.fsMenuTrigger, transition: 'transform 0.2s ease', transform: stateMenuOpen ? 'rotate(45deg)' : 'none' }} />
               </IconButton>
             </>
@@ -1224,6 +1224,7 @@ function PlayerCardImpl(props: PlayerCardProps) {
                   <IconButton
                     size="small"
                     onClick={(e) => { e.stopPropagation(); toggleRules(`m:${label}`); }}
+                    aria-label={`Show the rules note for ${label}`}
                     sx={{ p: 0.25, ml: 'auto', color: rulesOpenLabel === `m:${label}` ? 'primary.main' : 'text.disabled' }}
                   >
                     <InfoOutlinedIcon sx={{ fontSize: 14 }} />

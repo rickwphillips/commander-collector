@@ -72,6 +72,7 @@ export function ControlFocusModal({
             size="large"
             onClick={onDec}
             disabled={disableDec}
+            aria-label={`Decrease ${label} by 1`}
             sx={{ width: 64, height: 64 }}
           >
             <RemoveIcon sx={{ fontSize: 32 }} />
@@ -82,6 +83,7 @@ export function ControlFocusModal({
           <IconButton
             size="large"
             onClick={onInc}
+            aria-label={`Increase ${label} by 1`}
             sx={{ width: 64, height: 64 }}
           >
             <AddIcon sx={{ fontSize: 32 }} />
