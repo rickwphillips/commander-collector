@@ -1,4 +1,5 @@
 import type { ActiveGameContext, GameContextPlayer } from './types';
+import { decodeGameContextParam } from '@commander/shared/lib/gameContextCodec';
 
 /** Map a player record from the game manager ctx payload into GameContextPlayer. */
 export function mapRawPlayer(p: Record<string, unknown>): GameContextPlayer {
@@ -117,7 +118,7 @@ export function readGameHandoff(): GameHandoff | null {
   const ctxParam = new URLSearchParams(window.location.search).get('ctx');
   if (!ctxParam) return null;
   try {
-    const raw = JSON.parse(atob(decodeURIComponent(ctxParam))) as Record<string, unknown>;
+    const raw = decodeGameContextParam(ctxParam) as Record<string, unknown>;
     const ctx = mapRawGameContext(raw);
     if (!raw.turnNumber && !raw.currentPlayer) return { ctx, openingMessage: null };
 

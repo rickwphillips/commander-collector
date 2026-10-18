@@ -38,6 +38,7 @@ import { RulesQuickLookup } from '@/components/RulesQuickLookup';
 import type { PlayerState, CommanderDamageMap } from '../types';
 import type { GameType, GameLogEvent, GameLogEntry } from '@/lib/types';
 import { GameLogList } from '@/components/GameLogList';
+import { encodeGameContextParam } from '@commander/shared/lib/gameContextCodec';
 
 const TWO_HEADED_GIANT_RULES_URL = 'https://magic.wizards.com/en/formats/two-headed-giant';
 
@@ -808,7 +809,7 @@ export function CenterZone({
                 is2hg,
                 activeTeam,
               });
-                const ctxParam = encodeURIComponent(btoa(JSON.stringify(ctx)));
+                const ctxParam = encodeGameContextParam(ctx);
                 const base = typeof window !== 'undefined' && process.env.NODE_ENV === 'development'
                   ? 'http://localhost:3003'
                   : '/app/projects/commander/rules';
