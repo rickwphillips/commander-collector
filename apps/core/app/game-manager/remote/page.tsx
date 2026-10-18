@@ -9,6 +9,7 @@ import { TeamPanel } from '../components/TeamPanel';
 import { GameLogList } from '@/components/GameLogList';
 import { api } from '@/lib/api';
 import { setRemoteSessionCode } from '@commander/shared/lib/api';
+import { encodeGameContextParam } from '@commander/shared/lib/gameContextCodec';
 import type { GameManagerState, PlayerState, LiveGameEvent, DistributiveOmit, GameLogEntry } from '@/lib/types';
 import { applyEvent } from '../remoteTransforms';
 import { otherTeam, teamName } from '@/lib/teams';
@@ -358,7 +359,7 @@ function RemotePageInner() {
       turnNumber: state.turnNumber ?? null,
       currentPlayer: state.players[state.currentPlayerIdx]?.playerName ?? null,
     };
-    const ctxParam = encodeURIComponent(btoa(JSON.stringify(ctx)));
+    const ctxParam = encodeGameContextParam(ctx);
     const base = process.env.NODE_ENV === 'development'
       ? 'http://localhost:3003'
       : '/app/projects/commander/rules';

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readGameHandoff } from '@/lib/gameContext';
+import { encodeGameContextParam } from '@commander/shared/lib/gameContextCodec';
 
 function setSearch(search: string) {
   window.history.replaceState({}, '', `/chat/${search}`);
@@ -19,6 +20,13 @@ describe('readGameHandoff', () => {
     const handoff = readGameHandoff();
     expect(handoff?.ctx?.currentPlayer).toBe('Mason');
     expect(handoff?.openingMessage).toContain("Turn 4, Mason's turn");
+  });
+
+  it('parses a handoff carrying smart punctuation in names', () => {
+    // The encoder is UTF-8 safe; plain btoa threw on U+2019 and dropped the
+    // handoff, so the chat opened with no game attached.
+    setSearch(`?ctx=${encodeGameContextParam({ turnNumber: 3, currentPlayer: 'Rick\u2019s Pod', players: [] })}`);
+    expect(readGameHandoff()?.ctx?.currentPlayer).toBe('Rick\u2019s Pod');
   });
 
   it('adds a hidden timer note when the turn timer is running', () => {

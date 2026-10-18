@@ -15,30 +15,6 @@ export interface ScryfallCachedCard {
   cached_at?: string;
 }
 
-// Deck card list entry
-export interface DeckCard {
-  id?: number;
-  deck_id: number;
-  scryfall_id: string | null;
-  card_name: string;
-  quantity: number;
-  is_commander: number; // 0 or 1
-  is_proxy: number;     // 0 or 1
-  // Joined from scryfall_card_cache
-  image_uri?: string | null;
-  colors?: string;
-  color_identity?: string;
-  type_line?: string | null;
-  mana_cost?: string | null;
-}
-
-export interface CreateDeckCardInput {
-  card_name: string;
-  scryfall_id?: string | null;
-  quantity?: number;
-  is_commander?: boolean;
-  is_proxy?: boolean;
-}
 
 export interface CardPrint {
   scryfall_id: string;

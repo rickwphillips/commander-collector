@@ -38,6 +38,7 @@ import { RulesQuickLookup } from '@/components/RulesQuickLookup';
 import type { PlayerState, CommanderDamageMap } from '../types';
 import type { GameType, GameLogEvent, GameLogEntry } from '@/lib/types';
 import { GameLogList } from '@/components/GameLogList';
+import { encodeGameContextParam } from '@commander/shared/lib/gameContextCodec';
 
 const TWO_HEADED_GIANT_RULES_URL = 'https://magic.wizards.com/en/formats/two-headed-giant';
 
@@ -748,7 +749,7 @@ export function CenterZone({
                 <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                   Who goes first?
                 </Typography>
-                <IconButton size="small" onClick={() => setChoosingFirst(false)} sx={{ p: 0.25 }}>
+                <IconButton size="small" onClick={() => setChoosingFirst(false)} aria-label="Close the who-goes-first picker" sx={{ p: 0.25 }}>
                   <CloseIcon sx={{ fontSize: 16 }} />
                 </IconButton>
               </Stack>
@@ -808,7 +809,7 @@ export function CenterZone({
                 is2hg,
                 activeTeam,
               });
-                const ctxParam = encodeURIComponent(btoa(JSON.stringify(ctx)));
+                const ctxParam = encodeGameContextParam(ctx);
                 const base = typeof window !== 'undefined' && process.env.NODE_ENV === 'development'
                   ? 'http://localhost:3003'
                   : '/app/projects/commander/rules';
@@ -1035,7 +1036,7 @@ export function CenterZone({
               <IconButton size="small" onClick={() => { setChatMinimized(true); setChatHasNewContent(false); }} title="Minimize">
                 <MinimizeIcon />
               </IconButton>
-              <IconButton size="small" onClick={() => { setChatOpen(false); setChatMinimized(false); setChatHasNewContent(false); setChatSearching(false); setChatUrl(null); }}>
+              <IconButton size="small" onClick={() => { setChatOpen(false); setChatMinimized(false); setChatHasNewContent(false); setChatSearching(false); setChatUrl(null); }} aria-label="Close Rules Guru">
                 <CloseIcon />
               </IconButton>
             </Box>
@@ -1072,7 +1073,7 @@ export function CenterZone({
               <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                 {rollOffState.phase !== 'idle' ? 'Roll-Off' : 'Dice / Flips'}
               </Typography>
-              <IconButton size="small" onClick={() => { if (rollOffState.phase !== 'idle') cancelRollOff(); setDiceOpen(false); }} sx={{ p: 0.25 }}>
+              <IconButton size="small" onClick={() => { if (rollOffState.phase !== 'idle') cancelRollOff(); setDiceOpen(false); }} aria-label="Close dice and flips" sx={{ p: 0.25 }}>
                 <CloseIcon sx={{ fontSize: 16 }} />
               </IconButton>
             </Stack>

@@ -44,6 +44,12 @@ if ($artFlag) {
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 30,
         CURLOPT_FOLLOWLOCATION => true,
+        // Follow redirects, but bound them and keep them on http(s): the host
+        // allow-list above only vets the FIRST url, so an open or hijacked
+        // redirect could otherwise walk this fetch to file:// or an internal
+        // address. Scryfall serves these in 0-1 hops.
+        CURLOPT_MAXREDIRS      => 3,
+        CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
         CURLOPT_HTTPHEADER     => ['User-Agent: CommanderCollector/2.3.0'],
     ]);
     $imageData = curl_exec($ch);
@@ -93,6 +99,10 @@ curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_TIMEOUT        => 30,
     CURLOPT_FOLLOWLOCATION => true,
+    // Same bound as the art-crop fetch above: the cards.scryfall.io allow-list
+    // only vets the first url, so cap the chain and keep it on http(s).
+    CURLOPT_MAXREDIRS      => 3,
+    CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
     CURLOPT_HTTPHEADER     => ['User-Agent: CommanderCollector/2.3.0'],
 ]);
 $imageData = curl_exec($ch);
