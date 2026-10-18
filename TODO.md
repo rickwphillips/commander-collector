@@ -1,4 +1,9 @@
 - [ ] Rotate the FTP password for the rickwphillips.com host (used by deploy-scripts/deploy-commander.sh via apps/core/.env.local FTP_PASS). It was printed into a Claude session transcript on 2026-10-07; after rotating, update FTP_PASS in apps/core/.env.local. #security
+- [ ] Give cloud Claude Code sessions the credentials + tooling they need to release. They can build and verify today (full static export, all gates) but cannot deploy at all. #infra #security
+  - [ ] `apps/core/.env.local` is gitignored, so it never exists in a fresh clone. Supply `FTP_HOST` / `FTP_USER` / `FTP_PASS` as **environment secrets in the cloud environment config**, not pasted into a session — pasting is how the password leaked on 2026-10-07. Rotate first (see the item above), then store.
+  - [ ] `deploy.sh` is a gitignored symlink to the private `deploy-scripts/` dir, so it is absent in cloud sessions. Decide: commit a portable version, or keep releases local-only and have cloud sessions hand off a verified artifact.
+  - [ ] The cloud container has no transfer tooling at all — `lftp`, `ftp`, `sftp`, `rsync` and `ssh` are all missing, only `curl` is present. Add one via the environment setup script if remote deploys should ever run from there.
+  - [ ] Grant the `workflow` OAuth scope so `.github/workflows/` can be pushed. Without it the `php-lint` CI step that actually runs `endpoint-auth.test.php` cannot be added, and an auth-enforcement regression can land green (snippet in #61).
 - [ ] Create a game manager diagram
 - [ ] Selecting the autosearch results of a commander on the create deck page is not registering in the input field when selected. #bug
 - [~] Update the game manager to accommodate 2HG. (first pass done: shared life/poison, team roll, collective team turns, two-panel left/right layout, remote disabled)
