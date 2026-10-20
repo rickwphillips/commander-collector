@@ -1,5 +1,9 @@
 # Changelog
 
+## [5.23.3] - 2026-10-20
+
+- Upgraded Next.js 16.3.8 → 16.4.2, patching CVE-2026-96889 (critical RCE in the image optimizer), GHSA-673q-mjm6-r5xr, GHSA-p3m5-59mp-jv5r, CVE-2026-94543 and CVE-2026-94484; named 11 icon-only buttons for screen readers; UTF-8-safe Rules Guru handoff; bounded redirect chains on outbound PHP fetches; removed the dead /deck-cards API.
+
 ## [5.23.2] - 2026-10-07
 
 - Upgraded Next.js 16.3.6 → 16.3.8, patching CVE-2026-94483 (SSRF, CVSS 8.3); gated rules/seed.php to CLI only and required auth on rules/chat-stream.php; a stale ?token= link no longer signs out a logged-in user.
