@@ -45,13 +45,13 @@
     "@types/react-dom": "^19",
     "@types/react-window": "^1.8.8",
     "@vitejs/plugin-react": "^5.1.4",
-    "@vitest/coverage-v8": "^4.1.0",
+    "@vitest/coverage-v8": "^4.1.12",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
     "eslint-config-prettier": "^10.1.8",
     "jsdom": "^28.1.0",
     "prettier": "^3.9.10",
     "typescript": "^5",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.12"
   }
 }
