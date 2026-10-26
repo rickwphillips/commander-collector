@@ -32,7 +32,7 @@ test.describe('Players', () => {
     const page = await browser.newPage();
     try {
       await goto(page, '/players/');
-      const result = await apiCall(page, 'GET', '/players.php');
+      const result = await apiCall(page, 'GET', '/players.php?include_test=1');
       const testPlayers = (result ?? []).filter((p: { name: string }) =>
         p.name.startsWith('__pw_player')
       );

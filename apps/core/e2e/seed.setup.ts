@@ -21,7 +21,7 @@ setup('seed fixtures', async ({ page }) => {
   await goto(page, '/players/');
 
   // Idempotent: clear any leftovers from a previously interrupted run.
-  const stalePlayers = await apiCall(page, 'GET', '/players.php');
+  const stalePlayers = await apiCall(page, 'GET', '/players.php?include_test=1');
   for (const p of (Array.isArray(stalePlayers) ? stalePlayers : []).filter(
     (x: { name?: string }) => x?.name?.startsWith(PREFIX)
   )) {

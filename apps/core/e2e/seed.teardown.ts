@@ -11,7 +11,7 @@ const PREFIX = '__pw_seed';
 teardown('remove seed fixtures', async ({ page }) => {
   await goto(page, '/players/');
 
-  const players = await apiCall(page, 'GET', '/players.php');
+  const players = await apiCall(page, 'GET', '/players.php?include_test=1');
   for (const p of (Array.isArray(players) ? players : []).filter(
     (x: { name?: string }) => x?.name?.startsWith(PREFIX)
   )) {

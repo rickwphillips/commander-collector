@@ -81,7 +81,7 @@ $overall = $pdo->query('
     SELECT
         (SELECT COUNT(*) FROM games) as total_games,
         (SELECT AVG(winning_turn) FROM games WHERE winning_turn IS NOT NULL) as avg_game_length,
-        (SELECT COUNT(*) FROM players) as total_players,
+        (SELECT COUNT(*) FROM players WHERE name NOT LIKE "\\_\\_pw\\_%") as total_players,
         (SELECT COUNT(*) FROM decks) as total_decks
 ')->fetch();
 

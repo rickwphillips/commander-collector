@@ -21,7 +21,10 @@ switch ($method) {
             }
             sendJSON($player);
         } else {
-            // Get all players with stats
+            // Get all players with stats. Playwright fixtures (names starting
+            // with __pw_) are hidden unless the caller passes include_test=1,
+            // which the e2e seed/teardown use to find and delete their own rows.
+            $includeTest = isset($_GET['include_test']) && $_GET['include_test'] === '1';
             $_tg = totalGamesDistinct();
             $_w  = winsExpr();
             $_wr = winRateDistinct();
@@ -33,7 +36,7 @@ switch ($method) {
                     $_wr
                 FROM players p
                 LEFT JOIN game_results gr ON gr.player_id = p.id
-                WHERE p.name NOT LIKE '\\_\\_pw\\_%'
+                " . ($includeTest ? '' : "WHERE p.name NOT LIKE '\\_\\_pw\\_%'") . "
                 GROUP BY p.id
                 ORDER BY p.name ASC
             ");
