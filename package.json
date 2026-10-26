@@ -16,7 +16,7 @@
     "local-stop": "bash ./scripts/stop-dev.sh"
   },
   "devDependencies": {
-    "turbo": "^2.11.8",
+    "turbo": "^2.11.10",
     "vite": "^8.3.5"
   },
   "overrides": {
