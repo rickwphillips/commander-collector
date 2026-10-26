@@ -71,7 +71,7 @@ const unique = [...new Set(problems)];
 if (unique.length) {
   console.error('Resolved dependency check FAILED:\n');
   for (const p of unique) console.error('  - ' + p);
-  console.error('\nFix: rm -rf node_modules apps/*/node_modules packages/*/node_modules package-lock.json && npm install, then commit the lockfile.');
+  console.error('\nFix (needs npm 11+; npm 10 crashes in #loadPeerSet when rebuilding this tree):\n  rm -rf node_modules apps/*/node_modules packages/*/node_modules package-lock.json && npm install\nthen commit the lockfile.');
   process.exit(1);
 }
 console.log(`OK: ${manifests.length} manifests checked, all pinned versions resolve exactly and react/react-dom agree.`);
