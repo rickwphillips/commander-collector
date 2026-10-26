@@ -2,7 +2,7 @@
   "name": "commander-workspace",
   "version": "1.0.0",
   "private": true,
-  "packageManager": "npm@10.9.4",
+  "packageManager": "npm@11.13.0",
   "workspaces": [
     "apps/*",
     "packages/*"
