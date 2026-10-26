@@ -18,7 +18,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { goto, apiCall } from './helpers';
+import { goto, purgeTestFixtures } from './helpers';
 
 const TEST_PLAYER_NAME = `__pw_player_${Date.now()}`;
 
@@ -32,13 +32,7 @@ test.describe('Players', () => {
     const page = await browser.newPage();
     try {
       await goto(page, '/players/');
-      const result = await apiCall(page, 'GET', '/players.php?include_test=1');
-      const testPlayers = (result ?? []).filter((p: { name: string }) =>
-        p.name.startsWith('__pw_player')
-      );
-      for (const p of testPlayers) {
-        await apiCall(page, 'DELETE', `/players.php?id=${p.id}`);
-      }
+      await purgeTestFixtures(page);
     } finally {
       await page.close();
     }

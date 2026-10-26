@@ -31,6 +31,15 @@ export async function apiCall(page: Page, method: string, path: string, body?: o
   );
 }
 
+/**
+ * Hard-delete every `__pw_` fixture on the server (players, lists, list cards,
+ * list history), including stragglers from earlier or interrupted runs.
+ * Backed by DELETE /test-fixtures.php, which only ever matches that prefix.
+ */
+export async function purgeTestFixtures(page: Page) {
+  return apiCall(page, 'DELETE', '/test-fixtures.php');
+}
+
 /** Wait for a toast / alert to appear with given text */
 export async function expectToast(page: Page, text: string | RegExp) {
   await expect(page.getByRole('alert')).toContainText(text);

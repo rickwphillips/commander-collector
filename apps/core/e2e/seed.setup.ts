@@ -11,7 +11,7 @@
 import { test as setup } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
-import { goto, apiCall } from './helpers';
+import { goto, apiCall, purgeTestFixtures } from './helpers';
 
 const SEED_FILE = path.join(__dirname, '.auth/seed.json');
 const PREFIX = '__pw_seed';
@@ -20,19 +20,8 @@ setup('seed fixtures', async ({ page }) => {
   // Navigate first so storageState's auth_token is live in localStorage for apiCall.
   await goto(page, '/players/');
 
-  // Idempotent: clear any leftovers from a previously interrupted run.
-  const stalePlayers = await apiCall(page, 'GET', '/players.php?include_test=1');
-  for (const p of (Array.isArray(stalePlayers) ? stalePlayers : []).filter(
-    (x: { name?: string }) => x?.name?.startsWith(PREFIX)
-  )) {
-    await apiCall(page, 'DELETE', `/players.php?id=${(p as { id: string }).id}`);
-  }
-  const staleLists = await apiCall(page, 'GET', '/lists.php');
-  for (const l of (Array.isArray(staleLists) ? staleLists : []).filter(
-    (x: { name?: string }) => x?.name?.startsWith(PREFIX)
-  )) {
-    await apiCall(page, 'DELETE', `/lists.php?id=${(l as { id: string }).id}`);
-  }
+  // Idempotent: hard-delete leftovers from any previous or interrupted run.
+  await purgeTestFixtures(page);
 
   // Seed a player (gives the player-detail tests a card to click).
   const player = await apiCall(page, 'POST', '/players.php', { name: `${PREFIX}_player` });
