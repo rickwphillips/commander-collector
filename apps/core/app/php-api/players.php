@@ -37,7 +37,7 @@ switch ($method) {
                 GROUP BY p.id
                 ORDER BY p.name ASC
             ");
-            sendJSON($stmt->fetchAll());
+            sendJSON(castStatRows($stmt->fetchAll()));
         }
         break;
 

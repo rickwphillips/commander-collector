@@ -95,3 +95,28 @@ function comparisonMetricExpr(string $metric): string {
         default:                        return 'NULL';
     }
 }
+
+// ── Output typing ────────────────────────────────────────────────────────────
+/**
+ * MySQL hands DECIMAL results back as strings through PDO, so ROUND(), AVG()
+ * and SUM() aggregates (win_rate, avg_finish, card_count) arrive as "33.3" or
+ * "100". JavaScript shrugs; a typed client generated from docs/openapi.yaml
+ * (the native app) refuses the whole response. Cast the known stat fields to
+ * the numbers the contract promises. Null stays null.
+ */
+const STAT_INT_FIELDS   = ['total_games', 'wins', 'card_count', 'deck_count'];
+const STAT_FLOAT_FIELDS = ['win_rate', 'avg_finish', 'avg_finish_position'];
+
+function castStatFields(array $row): array {
+    foreach (STAT_INT_FIELDS as $f) {
+        if (array_key_exists($f, $row) && $row[$f] !== null) $row[$f] = (int)$row[$f];
+    }
+    foreach (STAT_FLOAT_FIELDS as $f) {
+        if (array_key_exists($f, $row) && $row[$f] !== null) $row[$f] = (float)$row[$f];
+    }
+    return $row;
+}
+
+function castStatRows(array $rows): array {
+    return array_map('castStatFields', $rows);
+}

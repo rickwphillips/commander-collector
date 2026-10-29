@@ -531,7 +531,7 @@ components:
           properties:
             total_games: { type: integer }
             wins: { type: integer }
-            win_rate: { type: number, description: Percentage, 0 to 100. }
+            win_rate: { type: [number, 'null'], description: Percentage 0 to 100, null with no games. }
     Deck:
       type: object
       required: [id, player_id, name, commander, partner, colors, has_w, has_u, has_b, has_r, has_g, created_at]
@@ -557,8 +557,8 @@ components:
             player_name: { type: string }
             total_games: { type: integer }
             wins: { type: integer }
-            win_rate: { type: number }
-            avg_finish: { type: [number, 'null'] }
+            win_rate: { type: [number, 'null'], description: Percentage 0 to 100, null with no games. }
+            avg_finish_position: { type: [number, 'null'], description: By-id endpoint only. }
             card_count: { type: integer, description: Main-list card count (list endpoint only). }
     GameSettings:
       type: object

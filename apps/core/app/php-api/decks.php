@@ -57,7 +57,7 @@ switch ($method) {
             if (!$deck) {
                 sendError('Deck not found', 404);
             }
-            sendJSON($deck);
+            sendJSON(castStatFields($deck));
         } elseif ($playerId) {
             // Get all decks for a player
             $stmt = $pdo->prepare("
@@ -74,7 +74,7 @@ switch ($method) {
                 ORDER BY d.name ASC
             ");
             $stmt->execute([$playerId]);
-            sendJSON($stmt->fetchAll());
+            sendJSON(castStatRows($stmt->fetchAll()));
         } else {
             // Get all decks with player info
             $stmt = $pdo->query("
@@ -94,7 +94,7 @@ switch ($method) {
                 GROUP BY d.id
                 ORDER BY d.name ASC
             ");
-            sendJSON($stmt->fetchAll());
+            sendJSON(castStatRows($stmt->fetchAll()));
         }
         break;
 
