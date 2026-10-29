@@ -1,0 +1,6 @@
+# SwiftPM / Xcode build products
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcuserstate

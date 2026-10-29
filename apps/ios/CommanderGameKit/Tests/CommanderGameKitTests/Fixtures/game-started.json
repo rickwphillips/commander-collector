@@ -1,0 +1,625 @@
+[
+  {
+    "name": "standard four players",
+    "state": {
+      "players": [
+        {
+          "playerId": "id-Rick",
+          "deckId": "deck-Rick",
+          "playerName": "Rick",
+          "deckName": "Rick's deck",
+          "commander": {
+            "name": "Rick Commander"
+          },
+          "position": "bottom",
+          "life": 40,
+          "poison": 0,
+          "commanderTax": 0,
+          "partnerCommanderTax": 0,
+          "isMonarch": false,
+          "hasInitiative": false,
+          "hasCitysBlessing": false,
+          "energy": 0,
+          "experience": 0,
+          "isEliminated": false,
+          "isConceded": false,
+          "eliminatedTurn": null,
+          "teamNumber": null
+        },
+        {
+          "playerId": "id-Sam",
+          "deckId": "deck-Sam",
+          "playerName": "Sam",
+          "deckName": "Sam's deck",
+          "commander": {
+            "name": "Sam Commander"
+          },
+          "position": "left",
+          "life": 40,
+          "poison": 0,
+          "commanderTax": 0,
+          "partnerCommanderTax": 0,
+          "isMonarch": false,
+          "hasInitiative": false,
+          "hasCitysBlessing": false,
+          "energy": 0,
+          "experience": 0,
+          "isEliminated": false,
+          "isConceded": false,
+          "eliminatedTurn": null,
+          "teamNumber": null,
+          "partner": {
+            "name": "Sam Partner"
+          }
+        },
+        {
+          "playerId": "id-Amy",
+          "deckId": "deck-Amy",
+          "playerName": "Amy",
+          "deckName": "Amy's deck",
+          "commander": {
+            "name": "Amy Commander"
+          },
+          "position": "top",
+          "life": 40,
+          "poison": 0,
+          "commanderTax": 0,
+          "partnerCommanderTax": 0,
+          "isMonarch": false,
+          "hasInitiative": false,
+          "hasCitysBlessing": false,
+          "energy": 0,
+          "experience": 0,
+          "isEliminated": false,
+          "isConceded": false,
+          "eliminatedTurn": null,
+          "teamNumber": null
+        },
+        {
+          "playerId": "id-Jo",
+          "deckId": "deck-Jo",
+          "playerName": "Jo",
+          "deckName": "Jo's deck",
+          "commander": {
+            "name": "Jo Commander"
+          },
+          "position": "right",
+          "life": 40,
+          "poison": 0,
+          "commanderTax": 0,
+          "partnerCommanderTax": 0,
+          "isMonarch": false,
+          "hasInitiative": false,
+          "hasCitysBlessing": false,
+          "energy": 0,
+          "experience": 0,
+          "isEliminated": false,
+          "isConceded": false,
+          "eliminatedTurn": null,
+          "teamNumber": null
+        }
+      ],
+      "commanderDamage": {
+        "0": {
+          "1": [
+            0,
+            0
+          ],
+          "2": [
+            0,
+            0
+          ],
+          "3": [
+            0,
+            0
+          ]
+        },
+        "1": {
+          "0": [
+            0,
+            0
+          ],
+          "2": [
+            0,
+            0
+          ],
+          "3": [
+            0,
+            0
+          ]
+        },
+        "2": {
+          "0": [
+            0,
+            0
+          ],
+          "1": [
+            0,
+            0
+          ],
+          "3": [
+            0,
+            0
+          ]
+        },
+        "3": {
+          "0": [
+            0,
+            0
+          ],
+          "1": [
+            0,
+            0
+          ],
+          "2": [
+            0,
+            0
+          ]
+        }
+      },
+      "currentPlayerIdx": 0,
+      "turnNumber": 1,
+      "startingLife": 40,
+      "phase": "playing",
+      "turnTimerSeconds": 300,
+      "turnStartTime": 0,
+      "notes": "",
+      "firstPlayerIdx": 0,
+      "gameType": "standard"
+    },
+    "expected": {
+      "type": "game_started",
+      "payload": {
+        "gameType": "standard",
+        "startingLife": 40,
+        "players": [
+          {
+            "seat": 0,
+            "position": "bottom",
+            "name": "Rick",
+            "deck": "Rick's deck",
+            "commander": "Rick Commander",
+            "team": null
+          },
+          {
+            "seat": 1,
+            "position": "left",
+            "name": "Sam",
+            "deck": "Sam's deck",
+            "commander": "Sam Commander",
+            "team": null
+          },
+          {
+            "seat": 2,
+            "position": "top",
+            "name": "Amy",
+            "deck": "Amy's deck",
+            "commander": "Amy Commander",
+            "team": null
+          },
+          {
+            "seat": 3,
+            "position": "right",
+            "name": "Jo",
+            "deck": "Jo's deck",
+            "commander": "Jo Commander",
+            "team": null
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "gameType absent defaults to standard",
+    "state": {
+      "players": [
+        {
+          "playerId": "id-Rick",
+          "deckId": "deck-Rick",
+          "playerName": "Rick",
+          "deckName": "Rick's deck",
+          "commander": {
+            "name": "Rick Commander"
+          },
+          "position": "bottom",
+          "life": 40,
+          "poison": 0,
+          "commanderTax": 0,
+          "partnerCommanderTax": 0,
+          "isMonarch": false,
+          "hasInitiative": false,
+          "hasCitysBlessing": false,
+          "energy": 0,
+          "experience": 0,
+          "isEliminated": false,
+          "isConceded": false,
+          "eliminatedTurn": null,
+          "teamNumber": null
+        },
+        {
+          "playerId": "id-Sam",
+          "deckId": "deck-Sam",
+          "playerName": "Sam",
+          "deckName": "Sam's deck",
+          "commander": {
+            "name": "Sam Commander"
+          },
+          "position": "left",
+          "life": 40,
+          "poison": 0,
+          "commanderTax": 0,
+          "partnerCommanderTax": 0,
+          "isMonarch": false,
+          "hasInitiative": false,
+          "hasCitysBlessing": false,
+          "energy": 0,
+          "experience": 0,
+          "isEliminated": false,
+          "isConceded": false,
+          "eliminatedTurn": null,
+          "teamNumber": null
+        },
+        {
+          "playerId": "id-Amy",
+          "deckId": "deck-Amy",
+          "playerName": "Amy",
+          "deckName": "Amy's deck",
+          "commander": {
+            "name": "Amy Commander"
+          },
+          "position": "top",
+          "life": 40,
+          "poison": 0,
+          "commanderTax": 0,
+          "partnerCommanderTax": 0,
+          "isMonarch": false,
+          "hasInitiative": false,
+          "hasCitysBlessing": false,
+          "energy": 0,
+          "experience": 0,
+          "isEliminated": false,
+          "isConceded": false,
+          "eliminatedTurn": null,
+          "teamNumber": null
+        },
+        {
+          "playerId": "id-Jo",
+          "deckId": "deck-Jo",
+          "playerName": "Jo",
+          "deckName": "Jo's deck",
+          "commander": {
+            "name": "Jo Commander"
+          },
+          "position": "right",
+          "life": 40,
+          "poison": 0,
+          "commanderTax": 0,
+          "partnerCommanderTax": 0,
+          "isMonarch": false,
+          "hasInitiative": false,
+          "hasCitysBlessing": false,
+          "energy": 0,
+          "experience": 0,
+          "isEliminated": false,
+          "isConceded": false,
+          "eliminatedTurn": null,
+          "teamNumber": null
+        }
+      ],
+      "commanderDamage": {
+        "0": {
+          "1": [
+            0,
+            0
+          ],
+          "2": [
+            0,
+            0
+          ],
+          "3": [
+            0,
+            0
+          ]
+        },
+        "1": {
+          "0": [
+            0,
+            0
+          ],
+          "2": [
+            0,
+            0
+          ],
+          "3": [
+            0,
+            0
+          ]
+        },
+        "2": {
+          "0": [
+            0,
+            0
+          ],
+          "1": [
+            0,
+            0
+          ],
+          "3": [
+            0,
+            0
+          ]
+        },
+        "3": {
+          "0": [
+            0,
+            0
+          ],
+          "1": [
+            0,
+            0
+          ],
+          "2": [
+            0,
+            0
+          ]
+        }
+      },
+      "currentPlayerIdx": 0,
+      "turnNumber": 1,
+      "startingLife": 40,
+      "phase": "playing",
+      "turnTimerSeconds": 300,
+      "turnStartTime": 0,
+      "notes": "",
+      "firstPlayerIdx": 0
+    },
+    "expected": {
+      "type": "game_started",
+      "payload": {
+        "gameType": "standard",
+        "startingLife": 40,
+        "players": [
+          {
+            "seat": 0,
+            "position": "bottom",
+            "name": "Rick",
+            "deck": "Rick's deck",
+            "commander": "Rick Commander",
+            "team": null
+          },
+          {
+            "seat": 1,
+            "position": "left",
+            "name": "Sam",
+            "deck": "Sam's deck",
+            "commander": "Sam Commander",
+            "team": null
+          },
+          {
+            "seat": 2,
+            "position": "top",
+            "name": "Amy",
+            "deck": "Amy's deck",
+            "commander": "Amy Commander",
+            "team": null
+          },
+          {
+            "seat": 3,
+            "position": "right",
+            "name": "Jo",
+            "deck": "Jo's deck",
+            "commander": "Jo Commander",
+            "team": null
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "2hg teams",
+    "state": {
+      "players": [
+        {
+          "playerId": "id-Rick",
+          "deckId": "deck-Rick",
+          "playerName": "Rick",
+          "deckName": "Rick's deck",
+          "commander": {
+            "name": "Rick Commander"
+          },
+          "position": "bottom",
+          "life": 40,
+          "poison": 0,
+          "commanderTax": 0,
+          "partnerCommanderTax": 0,
+          "isMonarch": false,
+          "hasInitiative": false,
+          "hasCitysBlessing": false,
+          "energy": 0,
+          "experience": 0,
+          "isEliminated": false,
+          "isConceded": false,
+          "eliminatedTurn": null,
+          "teamNumber": 1
+        },
+        {
+          "playerId": "id-Sam",
+          "deckId": "deck-Sam",
+          "playerName": "Sam",
+          "deckName": "Sam's deck",
+          "commander": {
+            "name": "Sam Commander"
+          },
+          "position": "left",
+          "life": 40,
+          "poison": 0,
+          "commanderTax": 0,
+          "partnerCommanderTax": 0,
+          "isMonarch": false,
+          "hasInitiative": false,
+          "hasCitysBlessing": false,
+          "energy": 0,
+          "experience": 0,
+          "isEliminated": false,
+          "isConceded": false,
+          "eliminatedTurn": null,
+          "teamNumber": 1
+        },
+        {
+          "playerId": "id-Amy",
+          "deckId": "deck-Amy",
+          "playerName": "Amy",
+          "deckName": "Amy's deck",
+          "commander": {
+            "name": "Amy Commander"
+          },
+          "position": "top",
+          "life": 40,
+          "poison": 0,
+          "commanderTax": 0,
+          "partnerCommanderTax": 0,
+          "isMonarch": false,
+          "hasInitiative": false,
+          "hasCitysBlessing": false,
+          "energy": 0,
+          "experience": 0,
+          "isEliminated": false,
+          "isConceded": false,
+          "eliminatedTurn": null,
+          "teamNumber": 2
+        },
+        {
+          "playerId": "id-Jo",
+          "deckId": "deck-Jo",
+          "playerName": "Jo",
+          "deckName": "Jo's deck",
+          "commander": {
+            "name": "Jo Commander"
+          },
+          "position": "right",
+          "life": 40,
+          "poison": 0,
+          "commanderTax": 0,
+          "partnerCommanderTax": 0,
+          "isMonarch": false,
+          "hasInitiative": false,
+          "hasCitysBlessing": false,
+          "energy": 0,
+          "experience": 0,
+          "isEliminated": false,
+          "isConceded": false,
+          "eliminatedTurn": null,
+          "teamNumber": 2
+        }
+      ],
+      "commanderDamage": {
+        "0": {
+          "1": [
+            0,
+            0
+          ],
+          "2": [
+            0,
+            0
+          ],
+          "3": [
+            0,
+            0
+          ]
+        },
+        "1": {
+          "0": [
+            0,
+            0
+          ],
+          "2": [
+            0,
+            0
+          ],
+          "3": [
+            0,
+            0
+          ]
+        },
+        "2": {
+          "0": [
+            0,
+            0
+          ],
+          "1": [
+            0,
+            0
+          ],
+          "3": [
+            0,
+            0
+          ]
+        },
+        "3": {
+          "0": [
+            0,
+            0
+          ],
+          "1": [
+            0,
+            0
+          ],
+          "2": [
+            0,
+            0
+          ]
+        }
+      },
+      "currentPlayerIdx": 0,
+      "turnNumber": 1,
+      "startingLife": 30,
+      "phase": "playing",
+      "turnTimerSeconds": 300,
+      "turnStartTime": 0,
+      "notes": "",
+      "firstPlayerIdx": 0,
+      "gameType": "2hg"
+    },
+    "expected": {
+      "type": "game_started",
+      "payload": {
+        "gameType": "2hg",
+        "startingLife": 30,
+        "players": [
+          {
+            "seat": 0,
+            "position": "bottom",
+            "name": "Rick",
+            "deck": "Rick's deck",
+            "commander": "Rick Commander",
+            "team": 1
+          },
+          {
+            "seat": 1,
+            "position": "left",
+            "name": "Sam",
+            "deck": "Sam's deck",
+            "commander": "Sam Commander",
+            "team": 1
+          },
+          {
+            "seat": 2,
+            "position": "top",
+            "name": "Amy",
+            "deck": "Amy's deck",
+            "commander": "Amy Commander",
+            "team": 2
+          },
+          {
+            "seat": 3,
+            "position": "right",
+            "name": "Jo",
+            "deck": "Jo's deck",
+            "commander": "Jo Commander",
+            "team": 2
+          }
+        ]
+      }
+    }
+  }
+]

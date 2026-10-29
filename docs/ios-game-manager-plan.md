@@ -77,6 +77,14 @@ travel peer-to-peer, the host remains the single writer of the event log, and no
 leaves the table until upload. Phones can run the same app in seat mode; a web seat is
 not supported in this mode.
 
+Seat QR codes carry over (requested 2026-10-29). Today each PlayerCard / TeamPanel
+shows a QR of `<origin>/game-manager/remote/?code=<seatCode>` plus the bare code for
+typing. In the native host the QR per seat encodes a join token (host peer id + seat +
+one-time code); the iPhone app scans it with VisionKit's DataScannerViewController
+(camera) and auto-joins that seat over Multipeer, with the short code still shown for
+manual entry. CoreImage's CIQRCodeGenerator renders the codes, so no third-party
+package replaces qrcode.react.
+
 ## Phases and rough effort (evenings and weekends)
 
 | Phase | Content | Effort |
@@ -85,6 +93,33 @@ not supported in this mode.
 | 1 | Xcode project, SwiftData models, event log + state fold ported from `gameLog.ts`, iPad board: life, commander damage, poison, turns, timer, elimination, winner, end summary; login; players/decks cache; finished-game outbox and upload; TestFlight | 6 to 8 weeks |
 | 2 | Multipeer remote seats (iPhone seat view), monarch/initiative/ring/energy/experience/rad/City's Blessing, 2HG teams, first-player roll, sounds | 4 to 6 weeks |
 | 3 | Polish: commander art cache, haptics, Dynamic Type, Stage Manager on iPad, App Store listing | 2 to 3 weeks |
+
+## Status effects: how the native board renders them (decided 2026-10-29)
+
+The web effects are CSS keyframes and stacked absolutely-positioned DOM/SVG
+(PlayerCard.keyframes.ts, PoisonOverlay, CityBlessing, EliminatedOverlay,
+counterEffects.ts). On an iPad every one of them has a GPU-native equivalent that
+costs less than compositing a DOM; the art direction carries over, the mechanism
+does not. Mapping:
+
+| Web effect | Native mechanism |
+|---|---|
+| Damage flash (red text-shadow + brightness burst on a life hit) | SwiftUI `.phaseAnimator` on the life label driving `.shadow` and `.brightness`; a `.sensoryFeedback(.impact)` on the same change. |
+| Poison boil (translate/skew jitter from 8 poison), counter blur as poison nears lethal | `.distortionEffect` Metal shader (per-pixel wobble whose amplitude is the poison progress) over the card surface; blur via `.blur(radius:)` keyed to the same progress. One shader replaces three keyframes. |
+| Poison overlay: green wash, drips, rising/boiling bubbles, phyrexian glyphs | SpriteKit `SKEmitterNode` for bubbles hosted in a `SpriteView` with a transparent background; drips and wash as a `.colorEffect` shader (`Canvas` for the glyphs). Emitter birth rate = poison progress. |
+| XP shimmer / sweep / ember / rune glow (gold, intensity ramps to 10 XP) | `.layerEffect` shader for the sweep and shimmer (a moving highlight band over the counter), `TimelineView(.animation)` + `Canvas` for the embers. Glow as `.shadow` with the counterEffects ramp. |
+| Energy pulse / sizzle (cyan, above 5) | `.phaseAnimator` pulse on scale + glow; sizzle as a `.distortionEffect` with tiny amplitude, gated on energy > 5. |
+| City's Blessing scene: god rays, castle, hills, skyline, cathedral, fireworks, clouds, marching flags, with enter/exit | A SwiftUI scene composed of `Canvas` layers (skyline, hills, castle) with `TimelineView` for clouds and flags, god rays as a `.colorEffect` shader, fireworks as a short-lived `SKEmitterNode`. Flags still show commander art (cached). Enter/exit with `.transition(.asymmetric)` and `matchedGeometryEffect`. |
+| Eliminated / Conceded / Poisoned word + falling tears | Word as a `Text` with `.contentTransition(.numericText())`-style reveal; tears as a small `SKEmitterNode`. |
+| Monarch, initiative crown/torch, winner countdown | Symbol Effects on SF Symbols (`.symbolEffect(.pulse)`, `.bounce`) and `.phaseAnimator` for the countdown. |
+
+Rules for the port: every effect is gated on the same thresholds as the web
+(counterEffects.ts formulas move into the Kit as pure functions so the thresholds are
+tested, not eyeballed); all effects respect Reduce Motion (`accessibilityReduceMotion`
+drops emitters and distortion, keeps colour changes); shaders live in one `.metal`
+file under apps/ios/App/Shaders and are compiled at build time; emitters are `.sks`
+files editable in Xcode's particle editor so the look can be tuned without code. No
+Lottie or other animation package.
 
 ## Testing
 
