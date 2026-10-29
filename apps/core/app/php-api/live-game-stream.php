@@ -2,9 +2,11 @@
 // SSE endpoint — streams live game state/events to remote panels and the host.
 // No auth required: the seat code IS the credential, same as live-game.php.
 //
-// Self-close at SSE_MAX_SECONDS and send retry:100 so the browser reconnects
-// in 100ms (invisible to the user). The cap is set well below the smallest
-// upstream proxy timeout we have to live under:
+// Self-close at SSE_MAX_SECONDS and emit {"type":"close"}; the client
+// (app/lib/sseReconnect.ts) owns reconnect timing: fast after a planned close,
+// exponential random backoff after an error. The retry: directive below is only
+// a fallback for a stray native reconnect. The cap is set well below the
+// smallest upstream proxy timeout we have to live under:
 //   prod (Apache):        Timeout 300s   → close at 270s
 //   dev (Next.js rewrite): proxyTimeout 120s → close at 90s
 // We pick the dev-safe value everywhere so the same script works on both.
@@ -107,8 +109,9 @@ $stmt = $pdo->prepare("
 $stmt->execute([$code]);
 $row = $stmt->fetch();
 
-// Send retry directive first so even an inactive response uses fast reconnect
-echo "retry: 100\n";
+// Fallback retry for native EventSource reconnects (the client normally closes
+// and reconnects itself). 3s keeps a stray client from hammering the host.
+echo "retry: 3000\n";
 
 if (!$row || !$row['is_active']) {
     sseEmit(['type' => 'inactive']);

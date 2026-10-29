@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const BASE = 'https://rickwphillips.com/app/projects/commander';
+const BASE = process.env.E2E_BASE ?? 'https://rickwphillips.com/app/projects/commander';
 
 export default defineConfig({
   testDir: './e2e',

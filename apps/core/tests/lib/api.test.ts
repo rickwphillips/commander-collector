@@ -869,8 +869,9 @@ describe('api — SSE EventSource streams', () => {
   beforeEach(() => {
     MockEventSource.last = null;
     vi.stubGlobal('EventSource', MockEventSource as unknown as typeof EventSource);
+    vi.useFakeTimers();
   });
-  afterEach(() => { vi.unstubAllGlobals(); });
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
   it('openLiveGameStream delivers state, handles inactive, malformed, open and error', () => {
     const onState = vi.fn();
@@ -904,9 +905,17 @@ describe('api — SSE EventSource streams', () => {
 
     es.onerror!();
     expect(onError).toHaveBeenCalled();
+    // An error closes the socket; the reconnect helper reopens it after backoff
+    // instead of letting the browser retry every 100 ms.
+    expect(es.closed).toBe(true);
+    expect(window._sseReadyState).toBe(es.readyState);
+    vi.advanceTimersByTime(30_000);
+    const reopened = MockEventSource.last!;
+    expect(reopened).not.toBe(es);
+    expect(reopened.url).toBe(es.url);
 
     cleanup();
-    expect(es.closed).toBe(true);
+    expect(reopened.closed).toBe(true);
   });
 
   it('openLiveGameHostStream delivers events and handles inactive/error', () => {
@@ -921,14 +930,23 @@ describe('api — SSE EventSource streams', () => {
     expect(onEvents).toHaveBeenCalledWith([{ type: 'life' }]);
 
     es.onmessage!({ data: 'garbage' });
-    es.onmessage!({ data: JSON.stringify({ type: 'inactive' }) });
-    expect(onInactive).toHaveBeenCalled();
 
     es.onerror!();
     expect(onError).toHaveBeenCalled();
+    expect(es.closed).toBe(true);
+    vi.advanceTimersByTime(30_000);
+    const reopened = MockEventSource.last!;
+    expect(reopened).not.toBe(es);
+
+    // 'inactive' on the host stream ends it for good: no reconnect follows.
+    reopened.onmessage!({ data: JSON.stringify({ type: 'inactive' }) });
+    expect(onInactive).toHaveBeenCalled();
+    expect(reopened.closed).toBe(true);
+    vi.advanceTimersByTime(60_000);
+    expect(MockEventSource.last).toBe(reopened);
 
     cleanup();
-    expect(es.closed).toBe(true);
+    expect(reopened.closed).toBe(true);
   });
 
   it('stream onmessage without a handler for the type is a no-op', () => {

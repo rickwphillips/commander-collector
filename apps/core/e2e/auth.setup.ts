@@ -12,10 +12,10 @@ import fs from 'fs';
 import path from 'path';
 
 const AUTH_FILE = path.join(__dirname, '.auth/state.json');
-const JWT_SECRET = '***REMOVED-ROTATED-2026-10-29***';
+const JWT_SECRET = process.env.E2E_JWT_SECRET ?? '***REMOVED-ROTATED-2026-10-29***';
 const USER_ID    = 'b0059aba-0dd1-11f1-92ad-a0981cc1760c';
 const USERNAME   = 'rick';
-const BASE       = 'https://rickwphillips.com/app/projects/commander';
+const BASE       = process.env.E2E_BASE ?? 'https://rickwphillips.com/app/projects/commander';
 
 function mintJWT(): string {
   return execSync(

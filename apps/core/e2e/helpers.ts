@@ -4,8 +4,10 @@
 
 import { Page, expect } from '@playwright/test';
 
-export const BASE = 'https://rickwphillips.com/app/projects/commander';
-export const API  = 'https://rickwphillips.com/php-api';
+// Prod by default; point at the local stack with
+//   E2E_BASE=http://localhost:3001 E2E_API=http://localhost:8081/php-api
+export const BASE = process.env.E2E_BASE ?? 'https://rickwphillips.com/app/projects/commander';
+export const API  = process.env.E2E_API  ?? 'https://rickwphillips.com/php-api';
 
 /** Navigate relative to the commander base path */
 export async function goto(page: Page, path: string) {
@@ -15,9 +17,9 @@ export async function goto(page: Page, path: string) {
 /** Call the PHP API directly from the test (with auth from storage state) */
 export async function apiCall(page: Page, method: string, path: string, body?: object) {
   return page.evaluate(
-    async ([m, p, b]) => {
+    async ([m, p, b, apiBase]) => {
       const token = localStorage.getItem('auth_token');
-      const res = await fetch(`https://rickwphillips.com/php-api${p}`, {
+      const res = await fetch(`${apiBase}${p}`, {
         method: m as string,
         headers: {
           'Content-Type': 'application/json',
@@ -27,7 +29,7 @@ export async function apiCall(page: Page, method: string, path: string, body?: o
       });
       return res.json();
     },
-    [method, path, body ?? null] as [string, string, object | null]
+    [method, path, body ?? null, API] as [string, string, object | null, string]
   );
 }
 

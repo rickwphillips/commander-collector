@@ -2,6 +2,7 @@
 export const API_BASE = '/php-api/';
 
 import { fromApiCard } from './cards/types';
+import { openReconnectingEventSource } from './sseReconnect';
 import type { ApiCardRow } from './cards/types';
 
 // Asset base path — Next.js basePath is NOT auto-prepended to src="" attributes
@@ -327,7 +328,8 @@ export const api = {
   },
 
   // Open an SSE stream for a remote panel. Pushes state as the host writes.
-  // Returns a cleanup function — call it to close the EventSource.
+  // Reconnects with incremental random backoff (see sseReconnect.ts).
+  // Returns a cleanup function — call it to close the stream.
   openLiveGameStream: (
     code: string,
     onState: (state: import('./types').GameManagerState) => void,
@@ -335,48 +337,43 @@ export const api = {
     onError?: () => void,
   ): (() => void) => {
     const url = `${SSE_BASE}live-game-stream.php?code=${encodeURIComponent(code)}`;
-    const es = new EventSource(url);
-
     // Expose readyState on window for e2e testability (typed in types/globals.d.ts)
-    if (typeof window !== 'undefined') window._sseReadyState = es.readyState;
-
-    es.onopen = () => { if (typeof window !== 'undefined') window._sseReadyState = 1; };
-
-    es.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data.trim()) as {
-          type: string;
-          state?: import('./types').GameManagerState;
-        };
-        if (msg.type === 'state' && msg.state) {
-          onState(msg.state);
-        } else if (msg.type === 'inactive') {
-          // Do NOT close here. The remote panel requires 3 consecutive
-          // 'inactive' messages before it ends the session (guarding against
-          // transient responses during deploys). Closing on the first one meant
-          // the 2nd and 3rd could never arrive, making that counter
-          // unsatisfiable: after the host ended a game, a paired phone kept
-          // showing a live, tappable board indefinitely. The server emits one
-          // 'inactive' per connection and exits; EventSource reconnects
-          // (retry: 100) to deliver the rest. The consumer closes the stream
-          // through the returned cleanup once it decides the session ended.
-          onInactive();
-        }
-        // 'close' = planned reconnect — EventSource handles it automatically
-      } catch { /* ignore malformed events */ }
+    const setReadyState = (value: number) => {
+      if (typeof window !== 'undefined') window._sseReadyState = value;
     };
 
-    es.onerror = () => {
-      if (typeof window !== 'undefined') window._sseReadyState = es.readyState;
-      onError?.();
-    };
-
-    return () => es.close();
+    return openReconnectingEventSource(url, {
+      onOpen: () => { setReadyState(1); },
+      onMessage: (data) => {
+        try {
+          const msg = JSON.parse(data.trim()) as {
+            type: string;
+            state?: import('./types').GameManagerState;
+          };
+          if (msg.type === 'state' && msg.state) {
+            onState(msg.state);
+          } else if (msg.type === 'inactive') {
+            // Do NOT close here. The remote panel requires 3 consecutive
+            // 'inactive' messages before it ends the session (guarding against
+            // transient responses during deploys). The server emits one
+            // 'inactive' per connection and exits; the reconnect delivers the
+            // rest. The consumer closes the stream through the returned cleanup
+            // once it decides the session ended.
+            onInactive();
+          }
+        } catch { /* ignore malformed events */ }
+      },
+      onError: (es) => {
+        setReadyState(es.readyState);
+        onError?.();
+      },
+    });
   },
 
   // Open an SSE stream for the HOST. Pushes remote events as they arrive,
   // atomically consuming the queue server-side so events are never double-applied.
-  // Returns a cleanup function — call it to close the EventSource.
+  // Reconnects with incremental random backoff (see sseReconnect.ts).
+  // Returns a cleanup function — call it to close the stream.
   openLiveGameHostStream: (
     code: string,
     onEvents: (events: import('./types').LiveGameEvent[]) => void,
@@ -384,27 +381,24 @@ export const api = {
     onError?: () => void,
   ): (() => void) => {
     const url = `${SSE_BASE}live-game-stream.php?code=${encodeURIComponent(code)}&role=host`;
-    const es = new EventSource(url);
-
-    es.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data.trim()) as {
-          type: string;
-          events?: import('./types').LiveGameEvent[];
-        };
-        if (msg.type === 'events' && msg.events?.length) {
-          onEvents(msg.events);
-        } else if (msg.type === 'inactive') {
-          es.close();
-          onInactive();
-        }
-        // 'close' = planned reconnect — EventSource handles automatically
-      } catch { /* ignore malformed events */ }
-    };
-
-    es.onerror = () => { onError?.(); };
-
-    return () => es.close();
+    const close = openReconnectingEventSource(url, {
+      onMessage: (data) => {
+        try {
+          const msg = JSON.parse(data.trim()) as {
+            type: string;
+            events?: import('./types').LiveGameEvent[];
+          };
+          if (msg.type === 'events' && msg.events?.length) {
+            onEvents(msg.events);
+          } else if (msg.type === 'inactive') {
+            close();
+            onInactive();
+          }
+        } catch { /* ignore malformed events */ }
+      },
+      onError: () => { onError?.(); },
+    });
+    return close;
   },
 
   // Get user's active game session (requires auth)
