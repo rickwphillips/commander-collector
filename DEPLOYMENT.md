@@ -73,8 +73,10 @@ files, and runs the post-deploy Playwright suite (`--skip-tests` to opt out).
 | Rules Guru static      | `~/public_html/app/projects/commander/rules/` |
 | PHP API                | `~/public_html/php-api/` (canonical)          |
 
-`~/public_html/app/php-api` is a symlink to `~/public_html/php-api`; the commander
-PHP API is written to the canonical path. Do not "fix" the symlink.
+`~/public_html/php-api/` belongs to commander alone. The portfolio API lives in
+`~/public_html/app/php-api/` (a real directory since 2026-04-06, no longer a
+symlink to this one) and grandkid's in `~/public_html/grandkid-api/`. All three
+share `~/auth_secrets.php`, so the JWT secret is one value for every app.
 
 ## URLs
 
