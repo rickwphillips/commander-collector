@@ -3,6 +3,14 @@
  * Mints a JWT locally with the signing secret + Rick's user UUID,
  * injects it into localStorage, verifies auth works, saves storage state.
  *
+ * The token carries the same claims createToken() in php-api/auth/jwt.php
+ * issues on a real login (sub, username, display_name, role), and `sub` is
+ * Rick's row in auth_users, which has the same id on the local and prod auth
+ * DBs. Until 2026-10-29 it was a UUID that matched no row anywhere: pure
+ * signature checks passed, but anything that looked the user up (auth/me)
+ * answered 401. Override with E2E_USER_ID / E2E_USERNAME / E2E_ROLE when
+ * running as someone else.
+ *
  * The secret comes from E2E_JWT_SECRET (local stack runs) or, when unset,
  * from the macOS keychain entry the mcp-skills Playwright targets use
  * (prod runs). It is never written into this public repo.
@@ -35,8 +43,9 @@ function resolveSecret(): string {
 }
 
 const JWT_SECRET = resolveSecret();
-const USER_ID    = 'b0059aba-0dd1-11f1-92ad-a0981cc1760c';
-const USERNAME   = 'rick';
+const USER_ID    = process.env.E2E_USER_ID  ?? '786efb3f-0dd4-11f1-ad3b-02001720fff7';
+const USERNAME   = process.env.E2E_USERNAME ?? 'rick';
+const ROLE       = process.env.E2E_ROLE     ?? 'admin';
 const BASE       = process.env.E2E_BASE ?? 'https://rickwphillips.com/app/projects/commander';
 
 function mintJWT(): string {
@@ -48,7 +57,7 @@ def b(d):
     return base64.urlsafe_b64encode(d).rstrip(b'=').decode()
 s='${JWT_SECRET}'
 h=b(json.dumps({'alg':'HS256','typ':'JWT'},separators=(',',':')))
-p=b(json.dumps({'sub':'${USER_ID}','username':'${USERNAME}','iat':int(time.time()),'exp':int(time.time())+86400},separators=(',',':')))
+p=b(json.dumps({'sub':'${USER_ID}','username':'${USERNAME}','display_name':'${USERNAME}','role':'${ROLE}','iat':int(time.time()),'exp':int(time.time())+86400},separators=(',',':')))
 sig=b(hmac.new(s.encode(),f'{h}.{p}'.encode(),hashlib.sha256).digest())
 print(f'{h}.{p}.{sig}')
 "`
