@@ -50,7 +50,8 @@ final class CachedDeck {
 /// [GameLogEvent] that goes up with the save.
 @Model
 final class OutboxGame {
-    enum Status: String, Codable { case pending, uploading, uploaded, failed }
+    /// rejected: the server answered 400; the payload will never be accepted and is not retried.
+    enum Status: String, Codable { case pending, uploading, uploaded, failed, rejected }
 
     @Attribute(.unique) var clientGameId: String
     var playedAt: Date

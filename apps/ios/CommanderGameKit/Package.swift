@@ -28,6 +28,7 @@ let package = Package(
         .target(
             name: "CommanderAPI",
             dependencies: [
+                "CommanderGameKit",
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
                 .product(name: "OpenAPIURLSession", package: "swift-openapi-urlsession"),
             ],

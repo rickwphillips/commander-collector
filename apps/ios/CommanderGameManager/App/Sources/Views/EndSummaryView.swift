@@ -12,12 +12,33 @@ struct EndSummaryView: View {
     @State private var notes: String = ""
     @State private var confirmDiscard = false
     @State private var queued = false
+    /// Seats still alive, best placed first; only shown when the game was
+    /// ended before it was decided (the web asks for placements then too).
+    @State private var survivorOrder: [Int] = []
 
-    private var results: [GameOutcome.Result] { GameOutcome.results(session.state) }
+    private var undecided: Bool { !session.state.isTwoHeadedGiant && GameOutcome.activeSeats(session.state).count > 1 }
+    private var results: [GameOutcome.Result] { GameOutcome.results(session.state, survivorOrder: undecided ? survivorOrder : nil) }
 
     var body: some View {
         NavigationStack {
             Form {
+                if undecided {
+                    Section {
+                        ForEach(survivorOrder, id: \.self) { idx in
+                            let p = session.state.players[idx]
+                            HStack {
+                                Text(ordinal((survivorOrder.firstIndex(of: idx) ?? 0) + 1)).font(.headline).frame(width: 44)
+                                Text(p.playerName)
+                                Spacer()
+                                Text("\(p.life) life").foregroundStyle(.secondary)
+                            }
+                        }
+                        .onMove { from, to in survivorOrder.move(fromOffsets: from, toOffset: to) }
+                    } header: {
+                        Text("Game ended with \(survivorOrder.count) players alive: drag to order the placements")
+                    }
+                    .environment(\.editMode, .constant(.active))
+                }
                 Section("Result") {
                     ForEach(results, id: \.playerId) { r in
                         let p = session.state.players.first { $0.playerId == r.playerId }
@@ -47,6 +68,7 @@ struct EndSummaryView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(queued)
+                    .accessibilityIdentifier("saveGame")
                     Button(role: .destructive) { confirmDiscard = true } label: {
                         Label("Discard game", systemImage: "trash").frame(maxWidth: .infinity)
                     }
@@ -56,7 +78,10 @@ struct EndSummaryView: View {
                 }
             }
             .navigationTitle("Game over")
-            .onAppear { notes = GameOutcome.cleanNotes(session.state.notes) ?? "" }
+            .onAppear {
+                notes = GameOutcome.cleanNotes(session.state.notes) ?? ""
+                survivorOrder = GameOutcome.defaultSurvivorOrder(session.state)
+            }
             .confirmationDialog("Discard this game? It will not be recorded.", isPresented: $confirmDiscard, titleVisibility: .visible) {
                 Button("Discard", role: .destructive) { session.discard(); onDone() }
             }
@@ -70,7 +95,8 @@ struct EndSummaryView: View {
     private func queue() {
         var state = session.state
         state.notes = notes
-        let game = OutboxGame.make(clientGameId: session.clientGameId, playedAt: session.startedAt, state: state, log: session.log)
+        let game = OutboxGame.make(clientGameId: session.clientGameId, playedAt: session.startedAt, state: state,
+                                   survivorOrder: undecided ? survivorOrder : nil, log: session.log)
         context.insert(game)
         try? context.save()
         session.discard()

@@ -8,10 +8,10 @@ struct CommanderGameManagerApp: App {
     let container: ModelContainer = {
         let schema = Schema([CachedPlayer.self, CachedDeck.self, OutboxGame.self])
         do {
-            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: DemoMode.isEnabled)
+            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: DemoMode.usesFakeAccount)
             let container = try ModelContainer(for: schema, configurations: [config])
             DemoMode.seed(container.mainContext)
-            if DemoMode.wantsBoard { ActiveGameStore.save(DemoMode.board()) }
+            if DemoMode.wantsBoard { ActiveGameStore.save(DemoMode.board(from: container.mainContext)) }
             return container
         } catch {
             fatalError("SwiftData store could not be opened: \(error)")

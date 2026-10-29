@@ -160,6 +160,7 @@ struct CenterZoneView: View {
                 } label: { Label(lastRoll ?? "Roll", systemImage: "dice") }
                 Button { showLog = true } label: { Label("Log", systemImage: "list.bullet.rectangle") }
                 Button(role: .destructive) { confirmEnd = true } label: { Label("End", systemImage: "stop.fill") }
+                    .accessibilityIdentifier("endGame")
             }
             .buttonStyle(.bordered)
             .controlSize(.small)

@@ -28,10 +28,24 @@ public enum GameOutcome {
         public var teamNumber: Int?
     }
 
+    /// Seats still alive, in the default finishing order for a game ended
+    /// early: highest life first, then seat order. The host can reorder.
+    public static func defaultSurvivorOrder(_ state: GameState) -> [Int] {
+        activeSeats(state).sorted { a, b in
+            let la = state.players[a].life, lb = state.players[b].life
+            return la != lb ? la > lb : a < b
+        }
+    }
+
     /// Finish positions as handleSaveGame derives them: the survivor is 1st and
     /// the eliminated are ordered by how late they fell. 2HG places the
     /// surviving team 1st and the other team 2nd.
-    public static func results(_ state: GameState) -> [Result] {
+    ///
+    /// `survivorOrder` covers a game ended before it was decided: the seats
+    /// still alive, best placed first. They take positions 1...k and the
+    /// eliminated follow from k+1. Ignored in 2HG, where a team either survived
+    /// or did not.
+    public static func results(_ state: GameState, survivorOrder: [Int]? = nil) -> [Result] {
         if state.isTwoHeadedGiant {
             let winningTeam = state.players.first { !$0.isEliminated }?.teamNumber
             return state.players.map { p in
@@ -41,7 +55,14 @@ public enum GameOutcome {
             }
         }
         var out: [Result] = []
-        if let winner = state.players.first(where: { !$0.isEliminated }) {
+        let alive = activeSeats(state)
+        if let order = survivorOrder, alive.count > 1 {
+            let ordered = order.filter { alive.contains($0) } + alive.filter { !order.contains($0) }
+            for (i, idx) in ordered.enumerated() {
+                let p = state.players[idx]
+                out.append(Result(deckId: p.deckId, playerId: p.playerId, finishPosition: i + 1, eliminatedTurn: nil, teamNumber: nil))
+            }
+        } else if let winner = state.players.first(where: { !$0.isEliminated }) {
             out.append(Result(deckId: winner.deckId, playerId: winner.playerId, finishPosition: 1, eliminatedTurn: nil, teamNumber: nil))
         }
         // Stable sort, descending by eliminatedTurn (nil counts as 0), as the web's sort does.
@@ -51,8 +72,9 @@ public enum GameOutcome {
                 return ta != tb ? ta > tb : a.offset < b.offset
             }
             .map(\.element)
+        let firstLoserPosition = out.count + 1
         for (i, p) in losers.enumerated() {
-            out.append(Result(deckId: p.deckId, playerId: p.playerId, finishPosition: i + 2, eliminatedTurn: p.eliminatedTurn, teamNumber: nil))
+            out.append(Result(deckId: p.deckId, playerId: p.playerId, finishPosition: firstLoserPosition + i, eliminatedTurn: p.eliminatedTurn, teamNumber: nil))
         }
         return out
     }

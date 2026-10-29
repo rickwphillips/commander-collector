@@ -51,6 +51,20 @@ final class OutcomeTests: XCTestCase {
         XCTAssertEqual(r.map(\.eliminatedTurn), [5, 5, nil, nil])
     }
 
+    func testEarlyEndUsesSurvivorOrderThenEliminationOrder() {
+        var s = fourPlayerGame()
+        s = GameReducer.applyEvent(s, LiveGameEvent(seat: "bottom", ts: 1, kind: .eliminate(playerIdx: 3)), now: 0)   // Dave out turn 1
+        s = GameReducer.applyEvent(s, LiveGameEvent(seat: "bottom", ts: 2, kind: .lifeChange(playerIdx: 0, delta: -10)), now: 0)
+        XCTAssertNil(GameOutcome.winnerIdx(s))
+        XCTAssertEqual(GameOutcome.defaultSurvivorOrder(s), [1, 2, 0], "highest life first, then seat order")
+        let r = GameOutcome.results(s, survivorOrder: [2, 0, 1])
+        XCTAssertEqual(r.map(\.playerId), ["p-Carol", "p-Alice", "p-Bob", "p-Dave"])
+        XCTAssertEqual(r.map(\.finishPosition), [1, 2, 3, 4])
+        XCTAssertEqual(r.map(\.eliminatedTurn), [nil, nil, nil, 1])
+        // Without an order, an undecided game still reports a single winner (web behaviour).
+        XCTAssertEqual(GameOutcome.results(s).count, 2)
+    }
+
     func testCleanNotesStripsKillTags() {
         XCTAssertEqual(GameOutcome.cleanNotes("[cmdkill:2:0] Amy eliminated (turn 6)\nreal note"), "Amy eliminated (turn 6)\nreal note")
         XCTAssertNil(GameOutcome.cleanNotes("[poisonkill:0] "))
@@ -58,9 +72,12 @@ final class OutcomeTests: XCTestCase {
     }
 
     func testRollOffPicksHighestAndRerollsTies() {
+        // A constant generator. It must not return 0: Swift's bounded sampler
+        // rejects and re-draws when the low product bits fall under its
+        // threshold, and 0 always does, so a zero generator loops forever.
+        // UInt64.max is accepted and maps every d20 roll to 20, so every seat ties.
         struct Fixed: RandomNumberGenerator {
-            var values: [UInt64]
-            mutating func next() -> UInt64 { values.isEmpty ? 0 : values.removeFirst() }
+            mutating func next() -> UInt64 { UInt64.max }
         }
         let s = fourPlayerGame()
         var rng = SystemRandomNumberGenerator()
@@ -71,7 +88,7 @@ final class OutcomeTests: XCTestCase {
             let t = GameOutcome.rollForFirstTeam(s, using: &rng)
             XCTAssertTrue((0..<4).contains(t.winnerIdx))
         }
-        var fixed = Fixed(values: [])
+        var fixed = Fixed()
         let r = GameOutcome.rollForFirstPlayer(s, using: &fixed)
         XCTAssertEqual(r.winnerIdx, 0, "all-ties fall back to the first contender")
     }

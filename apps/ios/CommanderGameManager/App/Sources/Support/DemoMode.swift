@@ -2,11 +2,17 @@ import Foundation
 import SwiftData
 import CommanderGameKit
 
-/// `-demo` launch argument (DEBUG builds only): skip sign-in with a throwaway
-/// token and seed four players and decks, so the board can be exercised in the
-/// simulator and screenshotted without an account. `-demoBoard` also seats a
-/// four-player game and starts it.
+/// `-demo` launch argument (DEBUG builds only): exercise the board without
+/// signing in. On a device that already holds a real token (the iPad), the real
+/// account, server and cache are kept and only the board is seeded, from the
+/// real cached players and decks, so a game saved from it is a genuine upload.
+/// Without a token, a throwaway token and in-memory demo players are used
+/// (simulator screenshots). `-demoBoard` also seats a four-player game and
+/// starts it.
 enum DemoMode {
+    /// True when there is no real session to reuse.
+    static var usesFakeAccount: Bool { isEnabled && KeychainStore.read("jwt") == nil }
+
     static var isEnabled: Bool {
         #if DEBUG
         CommandLine.arguments.contains("-demo") || CommandLine.arguments.contains("-demoBoard")
@@ -34,7 +40,7 @@ enum DemoMode {
 
     @MainActor
     static func seed(_ context: ModelContext) {
-        guard isEnabled else { return }
+        guard usesFakeAccount else { return }
         let existing = (try? context.fetch(FetchDescriptor<CachedPlayer>()))?.map(\.id) ?? []
         for (id, name) in players where !existing.contains(id) {
             context.insert(CachedPlayer(id: id, name: name, userId: nil))
@@ -47,15 +53,27 @@ enum DemoMode {
         try? context.save()
     }
 
-    /// A seated, started four-player game for `-demoBoard`.
-    static func board() -> ActiveGame {
+    /// A seated, started four-player game for `-demoBoard`. Seats come from the
+    /// real cache when it holds enough distinct players with decks.
+    @MainActor
+    static func board(from context: ModelContext) -> ActiveGame {
         var s = GameSetup.seatingState(playerCount: 4, startingLife: 40, turnTimerSeconds: 300, gameType: .standard)
-        for (i, d) in decks.enumerated() {
-            let owner = players.first { $0.0 == d.1 }!
-            s = GameSetup.seating(s, idx: i, seat: GameSetup.Seat(
-                playerId: owner.0, playerName: owner.1, deckId: d.0, deckName: d.2,
-                commander: CommanderInfo(name: d.3), partner: d.4.map { CommanderInfo(name: $0) }))
+        var seats: [GameSetup.Seat] = []
+        let cached = (try? context.fetch(FetchDescriptor<CachedDeck>(sortBy: [SortDescriptor(\.name)]))) ?? []
+        var usedPlayers = Set<String>()
+        for d in cached where !usedPlayers.contains(d.playerId) && seats.count < 4 && !d.id.hasPrefix("demo-") {
+            usedPlayers.insert(d.playerId)
+            seats.append(GameSetup.Seat(playerId: d.playerId, playerName: d.playerName, deckId: d.id, deckName: d.name,
+                                        commander: CommanderInfo(name: d.commander), partner: d.partner.map { CommanderInfo(name: $0) }))
         }
+        if seats.count < 4 {
+            seats = decks.map { d in
+                let owner = players.first { $0.0 == d.1 }!
+                return GameSetup.Seat(playerId: owner.0, playerName: owner.1, deckId: d.0, deckName: d.2,
+                                      commander: CommanderInfo(name: d.3), partner: d.4.map { CommanderInfo(name: $0) })
+            }
+        }
+        for (i, seat) in seats.prefix(4).enumerated() { s = GameSetup.seating(s, idx: i, seat: seat) }
         s = GameSetup.start(GameSetup.chooseFirstPlayer(s, idx: 0), now: GameReducer.nowMillis())
         let initial = s
         let events: [LiveGameEvent] = [
@@ -71,6 +89,6 @@ enum DemoMode {
             log += GameLog.diff(s, next)
             s = next
         }
-        return ActiveGame(clientGameId: "demo-\(UUID().uuidString.lowercased())", startedAt: .now, initialState: initial, events: events, log: log, state: s)
+        return ActiveGame(clientGameId: UUID().uuidString.lowercased(), startedAt: .now, initialState: initial, events: events, log: log, state: s)
     }
 }

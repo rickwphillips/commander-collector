@@ -4,35 +4,20 @@ import CommanderGameKit
 import CommanderAPI
 import OpenAPIRuntime
 
-/// The payload a finished game is saved with: exactly what POST games.php takes.
-struct GameUpload: Codable {
-    var playedAt: String
-    var gameType: GameType
-    var notes: String?
-    var results: [Result]
-    struct Result: Codable {
-        var deckId: String
-        var playerId: String
-        var finishPosition: Int
-        var eliminatedTurn: Int?
-        var teamNumber: Int?
-    }
+/// What the end screen froze: the board plus, for a game ended early, the
+/// host's ordering of the seats still alive.
+struct FinishedGame: Codable {
+    var state: GameState
+    var survivorOrder: [Int]?
 }
 
 extension OutboxGame {
-    static func make(clientGameId: String, playedAt: Date, state: GameState, log: [GameLogEvent]) -> OutboxGame {
-        let day = Calendar.current.dateComponents([.year, .month, .day], from: playedAt)
-        let upload = GameUpload(
-            playedAt: String(format: "%04d-%02d-%02d", day.year!, day.month!, day.day!),
-            gameType: state.gameType ?? .standard,
-            notes: GameOutcome.cleanNotes(state.notes),
-            results: GameOutcome.results(state).map {
-                .init(deckId: $0.deckId, playerId: $0.playerId, finishPosition: $0.finishPosition,
-                      eliminatedTurn: $0.eliminatedTurn, teamNumber: $0.teamNumber)
-            })
+    /// The finished game as JSON; the request body is rebuilt from it at
+    /// upload time by GameUploadBuilder.
+    static func make(clientGameId: String, playedAt: Date, state: GameState, survivorOrder: [Int]?, log: [GameLogEvent]) -> OutboxGame {
         let encoder = JSONEncoder()
         return OutboxGame(clientGameId: clientGameId, playedAt: playedAt,
-                          payload: (try? encoder.encode(upload)) ?? Data(),
+                          payload: (try? encoder.encode(FinishedGame(state: state, survivorOrder: survivorOrder))) ?? Data(),
                           eventLog: (try? encoder.encode(log)) ?? Data())
     }
 }
@@ -60,18 +45,11 @@ enum UploadService {
         game.lastAttemptAt = .now
         try? context.save()
         do {
-            let payload = try JSONDecoder().decode(GameUpload.self, from: game.payload)
+            let finished = try JSONDecoder().decode(FinishedGame.self, from: game.payload)
             let log = try JSONDecoder().decode([GameLogEvent].self, from: game.eventLog)
-            let body = Components.Schemas.CreateGameInput(
-                playedAt: payload.playedAt,
-                notes: payload.notes,
-                gameType: .init(rawValue: payload.gameType.rawValue),
-                results: payload.results.map {
-                    .init(deckId: $0.deckId, playerId: $0.playerId, finishPosition: $0.finishPosition,
-                          eliminatedTurn: $0.eliminatedTurn, teamNumber: $0.teamNumber)
-                },
-                clientGameId: game.clientGameId,
-                events: try log.map { try apiEvent($0) })
+            let body = try GameUploadBuilder.createGameInput(
+                clientGameId: game.clientGameId, playedAt: game.playedAt, state: finished.state, log: log,
+                survivorOrder: finished.survivorOrder)
             let response = try await client.createGame(body: .json(body))
             switch response {
             case .created(let r):
@@ -83,7 +61,7 @@ enum UploadService {
                 game.status = .uploaded
                 game.lastError = nil
             case .badRequest(let r):
-                game.status = .failed
+                game.status = .rejected
                 game.lastError = (try? r.body.json.error) ?? "Bad request"
             case .unauthorized:
                 game.status = .failed
@@ -100,13 +78,5 @@ enum UploadService {
             game.lastError = error.localizedDescription
         }
         try? context.save()
-    }
-
-    /// A Kit log event as the generated schema type: free-form payload, ISO timestamp.
-    private static func apiEvent(_ e: GameLogEvent) throws -> Components.Schemas.GameLogEvent {
-        let payloadData = try JSONEncoder().encode(e.payload ?? [:])
-        let container = try JSONDecoder().decode(OpenAPIObjectContainer.self, from: payloadData)
-        let ts = e.ts.flatMap { ISO8601DateFormatter().date(from: $0) }
-        return .init(_type: e.type, payload: .init(additionalProperties: container), ts: ts)
     }
 }

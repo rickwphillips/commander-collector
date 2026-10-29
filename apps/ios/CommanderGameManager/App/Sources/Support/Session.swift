@@ -16,7 +16,7 @@ final class Session {
     var server: URL
 
     init() {
-        if DemoMode.isEnabled {
+        if DemoMode.usesFakeAccount {
             token = "demo"
             username = "demo"
             server = CommanderServer.local

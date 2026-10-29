@@ -58,13 +58,27 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: true
         ENABLE_USER_SCRIPT_SANDBOXING: false
+  CommanderGameManagerUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: App/UITests
+    dependencies:
+      - target: CommanderGameManager
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.rickwphillips.commander.uitests
+        TEST_TARGET_NAME: CommanderGameManager
+        GENERATE_INFOPLIST_FILE: YES
 schemes:
   CommanderGameManager:
     build:
       targets:
         CommanderGameManager: all
+        CommanderGameManagerUITests: [test]
     run:
       config: Debug
     test:
       config: Debug
-      targets: []
+      targets:
+        - CommanderGameManagerUITests

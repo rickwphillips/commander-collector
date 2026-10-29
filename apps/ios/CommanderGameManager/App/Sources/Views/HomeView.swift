@@ -73,12 +73,19 @@ struct HomeView: View {
                         ForEach(outbox) { game in
                             VStack(alignment: .leading, spacing: 2) {
                                 LabeledContent(game.playedAt.formatted(date: .abbreviated, time: .shortened), value: game.status.rawValue.capitalized)
-                                if let err = game.lastError, game.status == .failed {
+                                    .accessibilityIdentifier("outbox-\(game.status.rawValue)")
+                                if let err = game.lastError, game.status == .failed || game.status == .rejected {
                                     Text(err).font(.caption).foregroundStyle(.red)
+                                        .accessibilityIdentifier("outbox-error")
+                                }
+                            }
+                            .swipeActions {
+                                if game.status != .uploaded {
+                                    Button("Delete", role: .destructive) { context.delete(game); try? context.save() }
                                 }
                             }
                         }
-                        if outbox.contains(where: { $0.status != .uploaded }) {
+                        if outbox.contains(where: { $0.status == .pending || $0.status == .failed }) {
                             Button { Task { await UploadService.flush(client: session.client, context: context) } } label: {
                                 Label("Upload now", systemImage: "icloud.and.arrow.up")
                             }
@@ -106,8 +113,8 @@ struct HomeView: View {
             }
             .task {
                 if DemoMode.wantsBoard && activeGame != nil { resume = true; return }
-                if players.isEmpty && !DemoMode.isEnabled { refresh() }
-                if !DemoMode.isEnabled { await UploadService.flush(client: session.client, context: context) }
+                if players.isEmpty && !DemoMode.usesFakeAccount { refresh() }
+                if !DemoMode.usesFakeAccount { await UploadService.flush(client: session.client, context: context) }
             }
             .onAppear { activeGame = ActiveGameStore.load() }
             .navigationDestination(isPresented: $resume) {
