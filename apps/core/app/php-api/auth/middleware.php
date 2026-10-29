@@ -158,3 +158,19 @@ function userInGame(PDO $pdo, string $gameId, string $userId): bool {
     $stmt->execute([$gameId, $userId]);
     return (bool) $stmt->fetch();
 }
+
+/**
+ * 404 if the game does not exist, 403 unless the user played in it (owns one of
+ * its result seats' players) or is admin. Shared by games.php (edit, delete)
+ * and game-log.php (finished-log upload).
+ */
+function requireGameAccess(PDO $pdo, string $gameId, array $user, string $denied): void {
+    $stmt = $pdo->prepare('SELECT id FROM games WHERE id = ?');
+    $stmt->execute([$gameId]);
+    if (!$stmt->fetch()) {
+        sendError('Game not found', 404);
+    }
+    if (!isAdmin($user) && !userInGame($pdo, $gameId, $user['sub'])) {
+        sendError($denied, 403);
+    }
+}

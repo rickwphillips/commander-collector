@@ -1,0 +1,710 @@
+openapi: 3.1.0
+info:
+  title: Commander Collector API (game manager surface)
+  version: 5.25.0
+  description: |
+    The subset of the PHP API that the game manager clients use: sign-in,
+    players, decks, per-user game settings, finished games, and the game event
+    log. The web app (`apps/core/app/lib/api.ts`) and the native iOS app
+    (`apps/ios/`, generated with swift-openapi-generator) are both built against
+    this document, so a change to one of these endpoints is a change here first.
+
+    Conventions shared by every endpoint:
+    - JSON request and response bodies. Errors are `{ "error": "<message>" }`.
+    - Ids are UUID strings (CHAR(36) in MySQL).
+    - Authentication is a bearer JWT (HS256) from `POST /auth/login.php`, sent as
+      `Authorization: Bearer <token>`. A missing or invalid token is 401.
+    - Dates are `YYYY-MM-DD`; timestamps are `YYYY-MM-DD HH:MM:SS` (server local)
+      except event log timestamps, which are ISO 8601 UTC.
+    - The web app also drives a live session (`live-game.php`, SSE stream,
+      buffered game log). Native-hosted games do not use it: they play offline
+      and upload the finished game with its whole event log.
+servers:
+  - url: https://rickwphillips.com/php-api
+    description: Production
+  - url: http://localhost:8081/php-api
+    description: Local dev (`php -S 127.0.0.1:8081 -t apps/core/app`)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: auth
+  - name: players
+  - name: decks
+  - name: game-settings
+  - name: games
+  - name: game-log
+
+paths:
+  /auth/login.php:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Sign in and receive a bearer token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string, format: password }
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, user]
+                properties:
+                  token:
+                    type: string
+                    description: HS256 JWT. Claims include `sub` (user id), `username`, `role`, `exp`.
+                  user: { $ref: '#/components/schemas/AuthUser' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401':
+          description: Invalid username or password
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /players.php:
+    get:
+      tags: [players]
+      operationId: listPlayers
+      summary: List players, or fetch one by id
+      description: |
+        Without `id`: every player (test fixtures prefixed `__pw_` excluded) with
+        aggregate game stats. With `id`: that player's bare row.
+      parameters:
+        - $ref: '#/components/parameters/OptionalId'
+      responses:
+        '200':
+          description: Players
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items: { $ref: '#/components/schemas/PlayerWithStats' }
+                  - $ref: '#/components/schemas/Player'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [players]
+      operationId: createPlayer
+      summary: Add a player to the communal roster
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, name, created_at]
+                properties:
+                  id: { $ref: '#/components/schemas/Uuid' }
+                  name: { type: string }
+                  created_at: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [players]
+      operationId: updatePlayer
+      summary: Rename a player (admin may also relink the account)
+      parameters:
+        - $ref: '#/components/parameters/RequiredId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                user_id:
+                  type: [string, 'null']
+                  description: Admin only. Account that owns this player seat.
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [players]
+      operationId: deletePlayer
+      summary: Remove a player
+      parameters:
+        - $ref: '#/components/parameters/RequiredId'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /decks.php:
+    get:
+      tags: [decks]
+      operationId: listDecks
+      summary: List decks, decks for one player, or one deck by id
+      description: |
+        Without parameters: every deck with its player name, stats and main-list
+        card count. With `player_id`: that player's decks. With `id`: one deck.
+        Deck colors use the `WUBRG` letters in canonical order, or `C` for
+        colorless; the `has_*` flags are 0/1 integers.
+      parameters:
+        - $ref: '#/components/parameters/OptionalId'
+        - name: player_id
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/Uuid' }
+      responses:
+        '200':
+          description: Decks
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items: { $ref: '#/components/schemas/DeckWithPlayer' }
+                  - $ref: '#/components/schemas/DeckWithPlayer'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [decks]
+      operationId: createDeck
+      summary: Create a deck for a player the caller owns
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [player_id, name, commander]
+              properties:
+                player_id: { $ref: '#/components/schemas/Uuid' }
+                name: { type: string }
+                commander: { type: string }
+                partner: { type: [string, 'null'] }
+                colors:
+                  type: string
+                  description: Any order of WUBRG letters; stored canonically. Empty means colorless.
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Deck' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [decks]
+      operationId: updateDeck
+      summary: Update a deck the caller owns
+      parameters:
+        - $ref: '#/components/parameters/RequiredId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                commander: { type: string }
+                partner: { type: [string, 'null'] }
+                colors: { type: string }
+                player_id: { $ref: '#/components/schemas/Uuid' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [decks]
+      operationId: deleteDeck
+      summary: Delete a deck the caller owns
+      parameters:
+        - $ref: '#/components/parameters/RequiredId'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /game-settings.php:
+    get:
+      tags: [game-settings]
+      operationId: getGameSettings
+      summary: The signed-in user's game manager settings (defaults if none saved)
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameSettings' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [game-settings]
+      operationId: updateGameSettings
+      summary: Save settings (partial update; omitted fields keep their value)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GameSettingsInput' }
+      responses:
+        '200':
+          description: Saved; echoes the merged settings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - type: object
+                    required: [success]
+                    properties:
+                      success: { type: boolean, const: true }
+                  - $ref: '#/components/schemas/GameSettings'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /games.php:
+    get:
+      tags: [games]
+      operationId: listGames
+      summary: List games, fetch one by id, or the most recent
+      description: |
+        Without parameters: every game, newest first, each with its per-seat
+        `results` and winner summary fields. With `id`: that game with `results`
+        and its durable event `log` (null if none). With `recent=1`: the most
+        recent game in the by-id shape, or JSON `null` when there are no games.
+      parameters:
+        - $ref: '#/components/parameters/OptionalId'
+        - name: recent
+          in: query
+          required: false
+          schema: { type: string, enum: ['1'] }
+      responses:
+        '200':
+          description: Games
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items: { $ref: '#/components/schemas/GameSummary' }
+                  - $ref: '#/components/schemas/GameWithResults'
+                  - type: 'null'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [games]
+      operationId: createGame
+      summary: Save a finished game (idempotent with client_game_id)
+      description: |
+        Validation: at least 2 results; standard games at most 8; 2HG games need
+        an even count of at least 4, every seat assigned a `team_number`, at
+        least two teams, exactly two seats per team. `winning_turn` is derived
+        as the highest `eliminated_turn` among non-winning seats.
+
+        Idempotency: when `client_game_id` is present and a game already carries
+        it, the request returns that game with `created: false` and status 200.
+        This is checked before validation, so a retry of a request that already
+        succeeded is never rejected. Two simultaneous retries resolve the same
+        way via the unique index.
+
+        Event log: `events`, when present and non-empty, is stored as the game's
+        durable log. Otherwise, with `session_code`, the live session's buffered
+        log is promoted; with neither, a single `manual_entry` event is recorded.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateGameInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreateGameResult' }
+        '200':
+          description: Already saved under this client_game_id
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreateGameResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500':
+          description: Failed to create game
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    put:
+      tags: [games]
+      operationId: updateGame
+      summary: Edit a game the caller played in (or admin)
+      description: When `results` is supplied it replaces every seat and re-derives `winning_turn`.
+      parameters:
+        - $ref: '#/components/parameters/RequiredId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                played_at: { type: string, format: date }
+                notes: { type: [string, 'null'] }
+                game_type: { $ref: '#/components/schemas/GameType' }
+                results:
+                  type: array
+                  items: { $ref: '#/components/schemas/GameResultInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [games]
+      operationId: deleteGame
+      summary: Delete a game the caller played in (or admin), with its results and log
+      parameters:
+        - $ref: '#/components/parameters/RequiredId'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /game-log.php:
+    post:
+      tags: [game-log]
+      operationId: uploadGameLog
+      summary: Replace a saved game's durable event log (action=upload)
+      description: |
+        For clients that played offline and saved the game without its log, or
+        need to re-send it. Replaces the whole `game_logs` row. The caller must
+        have played in the game or be admin.
+
+        The same path also serves the web app's live buffer actions
+        (`action=start|append|cancel`, body `{ code, events }`, and `GET ?code=`),
+        which are authenticated by the live session code rather than a token.
+        Native-hosted games do not use them.
+      parameters:
+        - name: action
+          in: query
+          required: true
+          schema: { type: string, enum: [upload] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [game_id, events]
+              properties:
+                game_id: { $ref: '#/components/schemas/Uuid' }
+                events:
+                  type: array
+                  minItems: 1
+                  items: { $ref: '#/components/schemas/GameLogEvent' }
+      responses:
+        '200':
+          description: Log replaced
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, count]
+                properties:
+                  ok: { type: boolean, const: true }
+                  count: { type: integer, description: Events stored }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    OptionalId:
+      name: id
+      in: query
+      required: false
+      schema: { $ref: '#/components/schemas/Uuid' }
+    RequiredId:
+      name: id
+      in: query
+      required: true
+      schema: { $ref: '#/components/schemas/Uuid' }
+
+  responses:
+    Success:
+      description: Done
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [success]
+            properties:
+              success: { type: boolean, const: true }
+    BadRequest:
+      description: Validation failed; `error` says why
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Missing, invalid or expired token
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Signed in, but not allowed to act on this record
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: No record with that id
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Uuid:
+      type: string
+      format: uuid
+      description: Lower-case 8-4-4-4-12 hex.
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    GameType:
+      type: string
+      enum: [standard, 2hg]
+    AuthUser:
+      type: object
+      required: [id, username, display_name, role]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        username: { type: string }
+        display_name: { type: string }
+        role: { type: string, enum: [admin, user] }
+    Player:
+      type: object
+      required: [id, name, user_id, created_at]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        user_id:
+          type: [string, 'null']
+          description: Account that owns this seat, or null for an unclaimed player.
+        created_at: { type: string }
+    PlayerWithStats:
+      allOf:
+        - $ref: '#/components/schemas/Player'
+        - type: object
+          properties:
+            total_games: { type: integer }
+            wins: { type: integer }
+            win_rate: { type: number, description: Percentage, 0 to 100. }
+    Deck:
+      type: object
+      required: [id, player_id, name, commander, partner, colors, has_w, has_u, has_b, has_r, has_g, created_at]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        player_id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        commander: { type: string }
+        partner: { type: [string, 'null'] }
+        colors: { type: string, description: Canonical WUBRG letters, or C. }
+        has_w: { type: integer, enum: [0, 1] }
+        has_u: { type: integer, enum: [0, 1] }
+        has_b: { type: integer, enum: [0, 1] }
+        has_r: { type: integer, enum: [0, 1] }
+        has_g: { type: integer, enum: [0, 1] }
+        created_at: { type: string }
+    DeckWithPlayer:
+      allOf:
+        - $ref: '#/components/schemas/Deck'
+        - type: object
+          required: [player_name]
+          properties:
+            player_name: { type: string }
+            total_games: { type: integer }
+            wins: { type: integer }
+            win_rate: { type: number }
+            avg_finish: { type: [number, 'null'] }
+            card_count: { type: integer, description: Main-list card count (list endpoint only). }
+    GameSettings:
+      type: object
+      required: [sound_enabled, highlight_mode, turn_timer_enabled, turn_timer_seconds]
+      properties:
+        sound_enabled: { type: boolean }
+        highlight_mode: { type: boolean }
+        turn_timer_enabled: { type: boolean }
+        turn_timer_seconds: { type: integer, minimum: 0, maximum: 3600 }
+    GameSettingsInput:
+      type: object
+      properties:
+        sound_enabled: { type: boolean }
+        highlight_mode: { type: boolean }
+        turn_timer_enabled: { type: boolean }
+        turn_timer_seconds: { type: integer, minimum: 0, maximum: 3600 }
+    Game:
+      type: object
+      required: [id, played_at, winning_turn, notes, game_type, created_at]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        client_game_id:
+          type: [string, 'null']
+          description: The client-generated id the game was saved with, if any (v5.25.0).
+        played_at: { type: string, format: date }
+        winning_turn: { type: [integer, 'null'] }
+        notes: { type: [string, 'null'] }
+        game_type: { $ref: '#/components/schemas/GameType' }
+        created_at: { type: string }
+    GameResult:
+      type: object
+      required: [id, game_id, deck_id, player_id, finish_position, eliminated_turn, team_number]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        game_id: { $ref: '#/components/schemas/Uuid' }
+        deck_id: { $ref: '#/components/schemas/Uuid' }
+        player_id: { type: [string, 'null'], description: Who piloted the deck; may differ from its owner. }
+        finish_position: { type: integer, minimum: 1, description: 1 is the winner; 2+ is elimination order. }
+        eliminated_turn: { type: [integer, 'null'] }
+        team_number: { type: [integer, 'null'], description: 1 or 2 for 2HG, null otherwise. }
+        cardlist_snapshot: { type: [object, 'null'] }
+    GameResultWithDeck:
+      allOf:
+        - $ref: '#/components/schemas/GameResult'
+        - type: object
+          required: [deck_name, commander, player_name, colors]
+          properties:
+            deck_name: { type: string }
+            commander: { type: string }
+            partner: { type: [string, 'null'] }
+            colors: { type: string }
+            player_name: { type: string }
+    GameSummary:
+      allOf:
+        - $ref: '#/components/schemas/Game'
+        - type: object
+          required: [results]
+          properties:
+            winning_deck: { type: [string, 'null'], description: Winning deck name(s), joined with " & " for 2HG. }
+            winning_commander: { type: [string, 'null'] }
+            winner: { type: [string, 'null'], description: Winning player name(s). }
+            results:
+              type: array
+              items: { $ref: '#/components/schemas/GameResultWithDeck' }
+    GameWithResults:
+      allOf:
+        - $ref: '#/components/schemas/Game'
+        - type: object
+          required: [results, log]
+          properties:
+            results:
+              type: array
+              items: { $ref: '#/components/schemas/GameResultWithDeck' }
+            log:
+              type: [array, 'null']
+              items: { $ref: '#/components/schemas/GameLogEntry' }
+    GameResultInput:
+      type: object
+      required: [deck_id, finish_position]
+      properties:
+        deck_id: { $ref: '#/components/schemas/Uuid' }
+        player_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Defaults to the deck's owner when omitted.
+        finish_position: { type: integer, minimum: 1 }
+        eliminated_turn: { type: [integer, 'null'] }
+        team_number: { type: [integer, 'null'] }
+    CreateGameInput:
+      type: object
+      required: [played_at, results]
+      properties:
+        played_at: { type: string, format: date }
+        notes: { type: [string, 'null'] }
+        game_type:
+          $ref: '#/components/schemas/GameType'
+          default: standard
+        results:
+          type: array
+          minItems: 2
+          maxItems: 8
+          items: { $ref: '#/components/schemas/GameResultInput' }
+        client_game_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Client-generated id for idempotent saves. Case-insensitive; stored lower-case.
+        events:
+          type: array
+          description: The finished game's whole event log (offline clients). Non-object entries are dropped.
+          items: { $ref: '#/components/schemas/GameLogEvent' }
+        session_code:
+          type: [string, 'null']
+          description: Web live-session code whose buffered log should be promoted. Ignored when `events` is non-empty.
+    CreateGameResult:
+      type: object
+      required: [id, created]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        created:
+          type: boolean
+          description: true when this call inserted the game; false when it was already saved under the same client_game_id.
+    GameLogEvent:
+      type: object
+      required: [type]
+      description: |
+        One game manager action as the client records it. Known `type` values
+        today: game_started, roll_for_first, die_roll, turn_order, turn_change,
+        pass_turn, turn_revert, life_change, poison_change, energy_change,
+        experience_change, commander_damage, commander_tax, monarch, initiative,
+        citys_blessing, eliminate, kill_attribution, concede, manual_entry.
+        Unknown types are stored as-is and shown raw by the web log viewer.
+      properties:
+        type: { type: string }
+        payload:
+          type: object
+          additionalProperties: true
+          description: Action details, by type. Defaults to {}.
+        ts:
+          type: string
+          format: date-time
+          description: ISO 8601 UTC. Filled with the server time when omitted.
+    GameLogEntry:
+      type: object
+      required: [ts, type, payload]
+      description: A stored event; `ts` and `payload` are always present.
+      properties:
+        ts: { type: string, format: date-time }
+        type: { type: string }
+        payload:
+          type: object
+          additionalProperties: true

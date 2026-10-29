@@ -8,6 +8,14 @@ $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
 $id = isset($_GET['id']) ? (string)$_GET['id'] : null;
 
+// The game previously saved under a client-generated id, or null.
+function findGameByClientId(PDO $pdo, string $clientGameId): ?string {
+    $stmt = $pdo->prepare('SELECT id FROM games WHERE client_game_id = ?');
+    $stmt->execute([$clientGameId]);
+    $found = $stmt->fetchColumn();
+    return $found === false ? null : (string)$found;
+}
+
 switch ($method) {
     case 'GET':
         // Per-seat results shape, shared by the by-id and all-games branches.
@@ -95,6 +103,27 @@ switch ($method) {
     case 'POST':
         $data = getJSONInput();
 
+        // Idempotent create: a client that plays offline (the native app) sends
+        // its own game UUID. A repeat with the same id, e.g. a retry after the
+        // response was lost, returns the game already saved instead of a second
+        // row. Checked before validation so a retry can never be rejected for a
+        // reason the original was not.
+        $clientGameId = isset($data['client_game_id']) ? strtolower(trim((string)$data['client_game_id'])) : '';
+        if ($clientGameId !== '') {
+            if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $clientGameId)) {
+                sendError('client_game_id must be a UUID');
+            }
+            $existingId = findGameByClientId($pdo, $clientGameId);
+            if ($existingId !== null) {
+                sendJSON(['id' => $existingId, 'created' => false], 200);
+            }
+        }
+
+        // A finished game's whole event log may arrive with the save (offline
+        // clients have no live session to buffer into). Takes precedence over
+        // session_code promotion below.
+        $uploadedEvents = isset($data['events']) ? glbNormalizeEvents($data['events']) : [];
+
         if (empty($data['played_at'])) {
             sendError('Game date is required');
         }
@@ -151,11 +180,12 @@ switch ($method) {
             // Insert game
             $gameId = $pdo->query("SELECT UUID()")->fetchColumn();
             $stmt = $pdo->prepare('
-                INSERT INTO games (id, played_at, winning_turn, notes, game_type)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO games (id, client_game_id, played_at, winning_turn, notes, game_type)
+                VALUES (?, ?, ?, ?, ?, ?)
             ');
             $stmt->execute([
                 $gameId,
+                $clientGameId !== '' ? $clientGameId : null,
                 $data['played_at'],
                 $winningTurn,
                 $data['notes'] ?? null,
@@ -208,7 +238,10 @@ switch ($method) {
             $sessionCode = isset($data['session_code']) ? trim((string)$data['session_code']) : '';
             $logWritten = false;
             try {
-                if ($sessionCode !== '') {
+                if ($uploadedEvents) {
+                    // Offline client: the log came whole with the save.
+                    $events = $uploadedEvents;
+                } elseif ($sessionCode !== '') {
                     // Live game: promote its buffered event log.
                     $events = [];
                     try {
@@ -248,10 +281,20 @@ switch ($method) {
                 }
             }
 
-            sendJSON(['id' => $gameId], 201);
+            sendJSON(['id' => $gameId, 'created' => true], 201);
 
         } catch (Exception $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            // Two retries raced: the other insert won the unique client_game_id
+            // index, so answer with that game rather than a 500.
+            if ($clientGameId !== '' && $e instanceof PDOException && $e->getCode() === '23000') {
+                $existingId = findGameByClientId($pdo, $clientGameId);
+                if ($existingId !== null) {
+                    sendJSON(['id' => $existingId, 'created' => false], 200);
+                }
+            }
             sendError('Failed to create game', 500);
         }
         break;
@@ -261,16 +304,7 @@ switch ($method) {
             sendError('Game ID is required');
         }
 
-        // Ownership: must have played in the game (own one of its result seats'
-        // players) or be admin.
-        $exists = $pdo->prepare('SELECT id FROM games WHERE id = ?');
-        $exists->execute([$id]);
-        if (!$exists->fetch()) {
-            sendError('Game not found', 404);
-        }
-        if (!isAdmin($currentUser) && !userInGame($pdo, $id, $currentUser['sub'])) {
-            sendError('You can only edit games you played in', 403);
-        }
+        requireGameAccess($pdo, $id, $currentUser, 'You can only edit games you played in');
 
         $data = getJSONInput();
 
@@ -368,15 +402,7 @@ switch ($method) {
             sendError('Game ID is required');
         }
 
-        // Ownership: participant or admin.
-        $exists = $pdo->prepare('SELECT id FROM games WHERE id = ?');
-        $exists->execute([$id]);
-        if (!$exists->fetch()) {
-            sendError('Game not found', 404);
-        }
-        if (!isAdmin($currentUser) && !userInGame($pdo, $id, $currentUser['sub'])) {
-            sendError('You can only delete games you played in', 403);
-        }
+        requireGameAccess($pdo, $id, $currentUser, 'You can only delete games you played in');
 
         try {
             $pdo->beginTransaction();

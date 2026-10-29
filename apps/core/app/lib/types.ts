@@ -788,6 +788,18 @@ export interface CreateGameInput {
   // Live session code, so the server can promote that game's buffered event log
   // (see php-api/game-log.php) into the durable game_logs table on completion.
   session_code?: string | null;
+  // Client-generated UUID for idempotent saves: a repeat POST with the same id
+  // returns the already-saved game (`created: false`) instead of a duplicate.
+  client_game_id?: string;
+  // A finished game's whole event log, for clients with no live session to
+  // buffer into. Takes precedence over session_code promotion on the server.
+  events?: GameLogEvent[];
+}
+
+/** Response of POST games.php: the saved game's id, and whether this call created it. */
+export interface CreateGameResult {
+  id: string;
+  created: boolean;
 }
 
 /**

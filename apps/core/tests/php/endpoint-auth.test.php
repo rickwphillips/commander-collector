@@ -39,7 +39,7 @@ $allowed = [
     'rules/seed.php'         => 'CLI guard',
 
     // Seat code is the credential, same model as live-game.php.
-    'game-log.php'           => 'live session code is the credential',
+    'game-log.php'           => 'buffer actions: live session code is the credential (action=upload calls requireAuth)',
     'live-game-stream.php'   => 'live session code is the credential',
 
     // Deliberately public.

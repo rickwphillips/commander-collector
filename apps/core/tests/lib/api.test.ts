@@ -142,6 +142,23 @@ describe('api methods', () => {
     expect(JSON.parse(options.body)).toEqual(data);
   });
 
+  it('api.createGame(data) forwards client_game_id and events and returns the created flag', async () => {
+    const fetchMock = mockFetch(200, { id: '00000000-0000-0000-0000-000000000002', created: false });
+    vi.stubGlobal('fetch', fetchMock);
+    const data = {
+      played_at: '2026-10-29',
+      notes: null,
+      game_type: 'standard' as const,
+      results: [],
+      client_game_id: '11111111-2222-4333-8444-555555555555',
+      events: [{ type: 'game_started' }, { type: 'life_change', payload: { delta: -3 } }],
+    };
+    const result = await api.createGame(data);
+    const [, options] = fetchMock.mock.calls[0];
+    expect(JSON.parse(options.body)).toEqual(data);
+    expect(result).toEqual({ id: '00000000-0000-0000-0000-000000000002', created: false });
+  });
+
   it('api.getPlayerStats(id) includes player_id in query string', async () => {
     const fetchMock = mockFetch(200, {});
     vi.stubGlobal('fetch', fetchMock);

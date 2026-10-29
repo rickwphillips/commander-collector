@@ -126,6 +126,6 @@ not supported in this mode.
 
 - [x] Web stream reconnect: exponential backoff with jitter, 1 s base, 30 s cap,
       reset on first message; server fallback `retry:` raised from 100 ms to 3 s.
-- [ ] Idempotent `POST games.php` via `client_game_id`.
-- [ ] Event-log upload endpoint for native games.
-- [ ] OpenAPI spec for auth, players, decks, game-settings, games, game-log.
+- [x] Idempotent `POST games.php` via `client_game_id` (v5.25.0; repeat returns `{id, created: false}`).
+- [x] Event-log upload: `events` on `POST games.php`, or `POST game-log.php?action=upload` (v5.25.0).
+- [x] OpenAPI spec for auth, players, decks, game-settings, games, game-log: `docs/openapi.yaml` (v5.25.0).

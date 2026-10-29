@@ -65,6 +65,31 @@ function glbNormalizeEvent($event) {
     return [$ts, $type, json_encode($payload)];
 }
 
+// Normalize a client-supplied event array into the durable game_logs shape:
+// a list of ['ts' => ..., 'type' => ..., 'payload' => ...] with non-array
+// entries dropped. Used when a finished game's log arrives whole from a client
+// (POST games.php `events`, or POST game-log.php?action=upload) rather than
+// through the live buffer.
+function glbNormalizeEvents($events) {
+    $out = [];
+    if (!is_array($events)) {
+        return $out;
+    }
+    foreach ($events as $event) {
+        if (!is_array($event)) {
+            continue;
+        }
+        [$ts, $type, $payloadJson] = glbNormalizeEvent($event);
+        $payload = json_decode($payloadJson, true);
+        $out[] = [
+            'ts'      => $ts,
+            'type'    => $type,
+            'payload' => is_array($payload) ? $payload : [],
+        ];
+    }
+    return $out;
+}
+
 // Append events for a session. Silent no-op if SQLite is unavailable.
 function glbAppend($sessionId, $events) {
     $db = glbGetDB();

@@ -7,7 +7,15 @@
 // POST ?action=start   body { code, events } — clear this session's buffer and seed initial events
 // POST ?action=append  body { code, events } — append events to this session's buffer
 // POST ?action=cancel  body { code }         — discard this session's buffer (no MySQL write)
+//
+// One action is different: `upload` writes a finished game's whole log straight
+// into the durable game_logs table, for clients that played offline (the native
+// app) and have no live session. There is no session code to act as the
+// credential, so it requires a signed-in user who played in the game, or admin.
+//
+// POST ?action=upload  body { game_id, events } — replace the game's durable log (auth required)
 require_once 'config.php';
+require_once __DIR__ . '/auth/middleware.php';
 require_once __DIR__ . '/lib/game-log-buffer.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -32,6 +40,24 @@ if ($method !== 'POST') {
 
 $action = isset($_GET['action']) ? $_GET['action'] : null;
 $data = getJSONInput();
+
+if ($action === 'upload') {
+    $currentUser = requireAuth();
+    $gameId = isset($data['game_id']) ? trim((string)$data['game_id']) : '';
+    if ($gameId === '') {
+        sendError('game_id is required');
+    }
+    $events = isset($data['events']) ? glbNormalizeEvents($data['events']) : [];
+    if (!$events) {
+        sendError('events must be a non-empty array of {type, payload?, ts?}');
+    }
+    $pdo = getDB();
+    requireGameAccess($pdo, $gameId, $currentUser, 'You can only upload logs for games you played in');
+    $pdo->prepare('INSERT INTO game_logs (game_id, events) VALUES (?, ?) ON DUPLICATE KEY UPDATE events = VALUES(events)')
+        ->execute([$gameId, json_encode($events)]);
+    sendJSON(['ok' => true, 'count' => count($events)]);
+}
+
 $code = isset($data['code']) ? trim((string)$data['code']) : '';
 
 if ($code === '') {

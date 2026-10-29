@@ -213,7 +213,7 @@ export const api = {
   getMostRecentGame: () =>
     apiFetch<import('./types').GameWithResults | null>('/games', { params: { recent: '1' } }),
   createGame: (data: import('./types').CreateGameInput) =>
-    apiFetch<{ id: string }>('/games', {
+    apiFetch<import('./types').CreateGameResult>('/games', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
