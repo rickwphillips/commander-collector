@@ -1,0 +1,56 @@
+[
+  {
+    "id": "00000000-0000-0000-0000-000000000001",
+    "name": "Player 1",
+    "created_at": "2026-02-02 18:11:53",
+    "user_id": null,
+    "total_games": 18,
+    "wins": 8,
+    "win_rate": 44.4
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000002",
+    "name": "Player 2",
+    "created_at": "2026-02-02 18:11:48",
+    "user_id": null,
+    "total_games": 35,
+    "wins": 16,
+    "win_rate": 45.7
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000003",
+    "name": "Player 3",
+    "created_at": "2026-06-09 16:45:03",
+    "user_id": null,
+    "total_games": 4,
+    "wins": 2,
+    "win_rate": 50
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000004",
+    "name": "Player 4",
+    "created_at": "2026-02-02 18:11:58",
+    "user_id": null,
+    "total_games": 17,
+    "wins": 3,
+    "win_rate": 17.6
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000005",
+    "name": "Player 5",
+    "created_at": "2026-02-02 18:11:42",
+    "user_id": null,
+    "total_games": 35,
+    "wins": 9,
+    "win_rate": 25.7
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000006",
+    "name": "Player 6",
+    "created_at": "2026-02-02 19:15:19",
+    "user_id": null,
+    "total_games": 2,
+    "wins": 0,
+    "win_rate": 0
+  }
+]

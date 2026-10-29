@@ -1,18 +1,32 @@
 import SwiftUI
+import SwiftData
 import CommanderGameKit
 
-/// Placeholder for the iPad board. Phase 1 fills this in: seating, first-player
-/// roll, life / commander damage / poison, turns and timer, elimination, winner
-/// and the end summary, all driven by GameReducer and GameLog.
+/// The game screen. Seating and play share the table layout; the end summary
+/// replaces it once the host ends the game.
 struct BoardView: View {
-    let setup: GameSetupInput
+    @State private var session: GameSession
+    @Environment(\.dismiss) private var dismiss
+
+    init(setup: GameSetupInput) {
+        _session = State(initialValue: GameSession(setup: setup))
+    }
+
+    init(resuming game: ActiveGame) {
+        _session = State(initialValue: GameSession(resuming: game))
+    }
 
     var body: some View {
-        ContentUnavailableView(
-            "Board coming next",
-            systemImage: "rectangle.3.group",
-            description: Text("\(setup.playerCount) players, \(setup.startingLife) life, \(setup.gameType == .twoHeadedGiant ? "Two-Headed Giant" : "standard").")
-        )
-        .navigationTitle("Game")
+        Group {
+            if session.hasEnded {
+                EndSummaryView(session: session, onDone: { dismiss() })
+            } else {
+                TableView(session: session)
+            }
+        }
+        .navigationBarBackButtonHidden(session.isPlaying)
+        .toolbar(.hidden, for: .navigationBar)
+        .statusBarHidden(true)
+        .persistentSystemOverlays(.hidden)
     }
 }

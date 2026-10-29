@@ -59,6 +59,7 @@ final class OutboxGame {
     var statusRaw: String
     var attempts: Int
     var lastError: String?
+    var lastAttemptAt: Date?
     var serverGameId: String?
     var createdAt: Date
 

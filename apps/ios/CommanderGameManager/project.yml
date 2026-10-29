@@ -15,11 +15,10 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
-    # Free Apple ID signing: Xcode manages the profile for the connected iPad.
-    # Set DEVELOPMENT_TEAM in Xcode > Signing & Capabilities (or export
-    # XCODEGEN_DEVELOPMENT_TEAM before generating).
+    # Free Apple ID signing (Rick's personal team): Xcode manages the profile
+    # for the connected iPad and re-signs every 7 days until the paid program.
     CODE_SIGN_STYLE: Automatic
-    DEVELOPMENT_TEAM: ${XCODEGEN_DEVELOPMENT_TEAM}
+    DEVELOPMENT_TEAM: F9P9BNLGZU
 packages:
   CommanderGameKit:
     path: ../CommanderGameKit

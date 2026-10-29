@@ -19,10 +19,20 @@ struct HomeView: View {
     @State private var gameType: GameType = .standard
     @State private var refreshing = false
     @State private var refreshMessage: String?
+    @State private var activeGame: ActiveGame? = ActiveGameStore.load()
+    @State private var resume = false
 
     var body: some View {
         NavigationStack {
             Form {
+                if let game = activeGame {
+                    Section("Game in progress") {
+                        LabeledContent("Started", value: game.startedAt.formatted(date: .abbreviated, time: .shortened))
+                        LabeledContent("Turn", value: "\(game.state.turnNumber)")
+                        Button { resume = true } label: { Label("Resume game", systemImage: "play.circle.fill") }
+                        Button("Discard it", role: .destructive) { ActiveGameStore.clear(); activeGame = nil }
+                    }
+                }
                 Section("Table") {
                     Picker("Game type", selection: $gameType) {
                         Text("Standard").tag(GameType.standard)
@@ -61,7 +71,17 @@ struct HomeView: View {
                 if !outbox.isEmpty {
                     Section("Finished games") {
                         ForEach(outbox) { game in
-                            LabeledContent(game.playedAt.formatted(date: .abbreviated, time: .shortened), value: game.status.rawValue.capitalized)
+                            VStack(alignment: .leading, spacing: 2) {
+                                LabeledContent(game.playedAt.formatted(date: .abbreviated, time: .shortened), value: game.status.rawValue.capitalized)
+                                if let err = game.lastError, game.status == .failed {
+                                    Text(err).font(.caption).foregroundStyle(.red)
+                                }
+                            }
+                        }
+                        if outbox.contains(where: { $0.status != .uploaded }) {
+                            Button { Task { await UploadService.flush(client: session.client, context: context) } } label: {
+                                Label("Upload now", systemImage: "icloud.and.arrow.up")
+                            }
                         }
                     }
                 }
@@ -84,7 +104,15 @@ struct HomeView: View {
                     .disabled(players.isEmpty || decks.isEmpty)
                 }
             }
-            .task { if players.isEmpty { refresh() } }
+            .task {
+                if DemoMode.wantsBoard && activeGame != nil { resume = true; return }
+                if players.isEmpty && !DemoMode.isEnabled { refresh() }
+                if !DemoMode.isEnabled { await UploadService.flush(client: session.client, context: context) }
+            }
+            .onAppear { activeGame = ActiveGameStore.load() }
+            .navigationDestination(isPresented: $resume) {
+                if let game = activeGame { BoardView(resuming: game) }
+            }
         }
     }
 

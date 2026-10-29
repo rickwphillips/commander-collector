@@ -16,6 +16,12 @@ final class Session {
     var server: URL
 
     init() {
+        if DemoMode.isEnabled {
+            token = "demo"
+            username = "demo"
+            server = CommanderServer.local
+            return
+        }
         token = KeychainStore.read(Self.tokenAccount)
         username = UserDefaults.standard.string(forKey: "username")
         server = UserDefaults.standard.url(forKey: Self.serverKey) ?? CommanderServer.production
