@@ -1,0 +1,7 @@
+# swift-openapi-generator configuration for the CommanderAPI target.
+# The spec is a symlink to commander-collector/docs/openapi.yaml.
+generate:
+  - types
+  - client
+accessModifier: public
+namingStrategy: idiomatic

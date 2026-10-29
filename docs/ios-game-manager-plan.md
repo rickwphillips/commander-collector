@@ -164,3 +164,20 @@ Lottie or other animation package.
 - [x] Idempotent `POST games.php` via `client_game_id` (v5.25.0; repeat returns `{id, created: false}`).
 - [x] Event-log upload: `events` on `POST games.php`, or `POST game-log.php?action=upload` (v5.25.0).
 - [x] OpenAPI spec for auth, players, decks, game-settings, games, game-log: `docs/openapi.yaml` (v5.25.0).
+
+## Phase 1 status
+
+- [x] `apps/ios/CommanderGameKit`: game state, reducer and event log ported; 102 shared
+      fixtures generated from the TypeScript and replayed by the Swift tests.
+- [x] `CommanderAPI` target: client generated at build time from `docs/openapi.yaml`
+      (swift-openapi-generator), with bearer-token and browser-header middleware.
+- [x] `apps/ios/CommanderGameManager`: XcodeGen project (`xcodegen generate`), iOS 18,
+      iPad + iPhone, SwiftData store (players, decks, finished-game outbox), Keychain
+      token, sign-in screen, table setup screen with reference-data refresh. Builds and
+      runs in the iPad simulator.
+- [ ] Board: seating from the cache, first-player roll, life / commander damage /
+      poison / counters, turns and timer, elimination, winner and end summary.
+- [ ] Status effects per the native mapping above.
+- [ ] Outbox upload worker (idempotent create + event log, backoff, retry UI).
+- [ ] Run on the physical iPad (needs an Apple ID in Xcode > Settings > Accounts for
+      free signing; the project uses automatic signing).

@@ -1,0 +1,71 @@
+# XcodeGen spec for the native game manager. Regenerate the project with
+#   xcodegen generate   (run in this directory)
+# The .xcodeproj is a build artifact of this file and is not committed.
+name: CommanderGameManager
+options:
+  bundleIdPrefix: com.rickwphillips
+  deploymentTarget:
+    iOS: "18.0"
+  xcodeVersion: "27.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # Free Apple ID signing: Xcode manages the profile for the connected iPad.
+    # Set DEVELOPMENT_TEAM in Xcode > Signing & Capabilities (or export
+    # XCODEGEN_DEVELOPMENT_TEAM before generating).
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ${XCODEGEN_DEVELOPMENT_TEAM}
+packages:
+  CommanderGameKit:
+    path: ../CommanderGameKit
+targets:
+  CommanderGameManager:
+    type: application
+    platform: iOS
+    supportedDestinations: [iOS, iPadOS]
+    sources:
+      - path: App/Sources
+      - path: App/Resources
+    dependencies:
+      - package: CommanderGameKit
+        product: CommanderGameKit
+      - package: CommanderGameKit
+        product: CommanderAPI
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Commander
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIRequiresFullScreen: false
+        ITSAppUsesNonExemptEncryption: false
+        NSAppTransportSecurity:
+          # Local PHP stack during development only (http://localhost:8081).
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.rickwphillips.commander
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: true
+        ENABLE_USER_SCRIPT_SANDBOXING: false
+schemes:
+  CommanderGameManager:
+    build:
+      targets:
+        CommanderGameManager: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets: []
