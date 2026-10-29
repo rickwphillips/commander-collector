@@ -1,7 +1,11 @@
 /**
  * Auth setup — runs once before all tests.
- * Mints a JWT locally using the known secret + Rick's user UUID,
+ * Mints a JWT locally with the signing secret + Rick's user UUID,
  * injects it into localStorage, verifies auth works, saves storage state.
+ *
+ * The secret comes from E2E_JWT_SECRET (local stack runs) or, when unset,
+ * from the macOS keychain entry the mcp-skills Playwright targets use
+ * (prod runs). It is never written into this public repo.
  *
  * NO SSH, NO PHP CLI — all local Python, no shell escaping issues.
  */
@@ -12,7 +16,25 @@ import fs from 'fs';
 import path from 'path';
 
 const AUTH_FILE = path.join(__dirname, '.auth/state.json');
-const JWT_SECRET = process.env.E2E_JWT_SECRET ?? '***REMOVED-ROTATED-2026-10-29***';
+const KEYCHAIN_SERVICE = 'freddyrhetorick-prod-secrets';
+const KEYCHAIN_ACCOUNT = 'JWT_SECRET';
+
+function resolveSecret(): string {
+  const fromEnv = process.env.E2E_JWT_SECRET;
+  if (fromEnv) return fromEnv;
+  const fromKeychain = execSync(
+    `security find-generic-password -w -s ${KEYCHAIN_SERVICE} -a ${KEYCHAIN_ACCOUNT}`,
+    { stdio: ['ignore', 'pipe', 'ignore'] },
+  ).toString().trim();
+  if (!fromKeychain) {
+    throw new Error(
+      `E2E_JWT_SECRET is not set and keychain entry ${KEYCHAIN_SERVICE}/${KEYCHAIN_ACCOUNT} is empty`,
+    );
+  }
+  return fromKeychain;
+}
+
+const JWT_SECRET = resolveSecret();
 const USER_ID    = 'b0059aba-0dd1-11f1-92ad-a0981cc1760c';
 const USERNAME   = 'rick';
 const BASE       = process.env.E2E_BASE ?? 'https://rickwphillips.com/app/projects/commander';
