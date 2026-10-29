@@ -175,9 +175,16 @@ Lottie or other animation package.
       iPad + iPhone, SwiftData store (players, decks, finished-game outbox), Keychain
       token, sign-in screen, table setup screen with reference-data refresh. Builds and
       runs in the iPad simulator.
-- [ ] Board: seating from the cache, first-player roll, life / commander damage /
-      poison / counters, turns and timer, elimination, winner and end summary.
-- [ ] Status effects per the native mapping above.
-- [ ] Outbox upload worker (idempotent create + event log, backoff, retry UI).
-- [ ] Run on the physical iPad (needs an Apple ID in Xcode > Settings > Accounts for
-      free signing; the project uses automatic signing).
+- [x] Board: seating from the cache, first-player roll or pick, life / commander damage /
+      poison / counters, turns and timer, elimination with kill attribution, winner
+      countdown, end summary with placements (drag-to-order when ended early). Each seat's
+      panel faces its player. In-progress game saved to the iPad after every action and
+      resumable from the setup screen.
+- [x] Outbox upload worker: idempotent create + event log, backoff, rejected-on-400,
+      manual retry and swipe-to-delete. Verified end to end from the iPad against
+      production by `CommanderGameManagerUITests` (2026-10-29); test game deleted after.
+- [x] Runs on the physical iPad (free Apple ID signing, re-signed weekly).
+- [ ] Status effects per the native mapping above (damage flash and symbol pulses exist;
+      poison/XP/energy/City's Blessing scenes, eliminated tears, commander art not yet).
+- [ ] UI polish pass from Rick's first-play notes (to be listed).
+- [ ] Game settings sync (sound, highlight mode, timer defaults from game-settings.php).
