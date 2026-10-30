@@ -56,7 +56,7 @@ struct SeatPanel: View {
 
     var body: some View {
         GeometryReader { geo in
-            let sz = Sizes(panelHeight: geo.size.height)
+            let sz = Sizes(panelHeight: geo.size.height, panelWidth: geo.size.width)
             ZStack {
                 Theme.panelBackground(scheme)
                 if isWarning { (scheme == .dark ? Color(red: 180/255, green: 40/255, blue: 40/255).opacity(0.18) : Color(red: 220/255, green: 80/255, blue: 80/255).opacity(0.08)) }
@@ -379,20 +379,22 @@ struct SeatPanel: View {
     /// Font and control sizes derived from the panel height (the web uses
     /// viewport-relative clamps).
     /// Gap between rows in the commander damage and counters drawers.
-    static let drawerRowSpacing: CGFloat = 8
+    static let drawerRowSpacing: CGFloat = 14
     /// Used when the full gap would push the rows into a scroll view.
-    static let compactDrawerRowSpacing: CGFloat = 3
+    static let compactDrawerRowSpacing: CGFloat = 6
 
     struct Sizes {
         let name, deck, pass, icon, menu, art, life, lifeBtn, crown, label, source, badge, value, kill: CGFloat
         let stepper: StepperSize
-        init(panelHeight h: CGFloat) {
-            let k = min(max(h / 360, 0.75), 1.1)
+        /// `panelWidth` is the long edge: a side seat is thin but long, and its
+        /// drawers have the room of a top or bottom seat.
+        init(panelHeight h: CGFloat, panelWidth w: CGFloat = 0) {
+            let k = min(max(max(h, w * 0.4) / 360, 0.75), 1.1)
             // The player name and commander line read the same in every seat:
             // the side seats are narrow, not small.
             name = 15; deck = 11.5; pass = 12 * k; icon = 22 * k; menu = 18 * k; art = 36 * k
             life = max(34, min(h * 0.28, 112)); lifeBtn = 40 * k; crown = 52 * k
-            label = 12 * k; source = 15 * k; badge = 11 * k; value = 20 * k; kill = 13 * k
+            label = 13.5 * k; source = 16 * k; badge = 11.5 * k; value = 20 * k; kill = 13 * k
             stepper = StepperSize(buttonFont: 20 * k, valueFont: 20 * k, buttonWidth: 30 * k, buttonHeight: 32 * k, valueWidth: 26 * k, labelFont: 11 * k)
         }
     }

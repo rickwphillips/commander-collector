@@ -49,7 +49,7 @@ struct TeamPanel: View {
 
     var body: some View {
         GeometryReader { geo in
-            let sz = SeatPanel.Sizes(panelHeight: geo.size.height)
+            let sz = SeatPanel.Sizes(panelHeight: geo.size.height, panelWidth: geo.size.width)
             ZStack {
                 Theme.panelBackground(scheme)
                 if settings.animationsEnabled {
