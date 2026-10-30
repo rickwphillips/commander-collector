@@ -74,8 +74,7 @@ struct SeatPanel: View {
                     columns(sz)
                 }
                 .shadow(color: Theme.energyCyan.opacity(energyGlow * 0.9), radius: 4 + energyGlow * 14)
-                .opacity(introduced ? 1 : 0.18)
-                .scaleEffect(introduced ? 1 : 0.97)
+                .opacity(introduced ? 1 : 0.35)
 
                 if cityBlessingVisible && motion { CityBlessing(exiting: cityBlessingExiting, commanders: [player.commander.name] + (player.partner.map { [$0.name] } ?? []), threat: threat).transition(.opacity) }
                 if player.isEliminated { EliminatedOverlay(conceded: player.isConceded, poisoned: isPoisoned).accessibilityIdentifier("s\(idx)-eliminated") }

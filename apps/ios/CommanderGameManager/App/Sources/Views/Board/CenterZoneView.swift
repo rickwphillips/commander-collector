@@ -27,7 +27,7 @@ struct CenterZoneView: View {
     @State private var lpFired = false
     @State private var rollOff = RollOffModel()
     @State private var dice = DiceModel()
-    @State private var showRules = false
+    @State private var rules = RulesGuruChat()
 
     enum Panel { case dice, settings, notes, pick }
 
@@ -52,7 +52,14 @@ struct CenterZoneView: View {
             if let w = session.winnerIdx, !session.isSeating { winnerBanner(w) }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .sheet(isPresented: $showRules) { RulesGuruSheet(state: state, elapsedSeconds: elapsedSeconds) }
+        .sheet(isPresented: Binding(get: { rules.isPresented }, set: { if !$0 { rules.minimize() } })) { RulesGuruSheet(chat: rules) }
+        .onChange(of: elapsedSeconds) { _, secs in rules.push(state: state, elapsedSeconds: secs) }
+        .onAppear {
+            rules.onSaveNotes = { content in
+                let notes = state.notes
+                session.setNotes(notes.isEmpty ? content : "\(notes)\n\n---\n\n\(content)")
+            }
+        }
         .confirmationDialog("End the game?", isPresented: $confirmEnd, titleVisibility: .visible) {
             Button("End game", role: .destructive) { session.endGame() }
         }
@@ -181,12 +188,30 @@ struct CenterZoneView: View {
             }
             Spacer()
             HStack {
-                cornerButton("bubble.left.and.text.bubble.right") { showRules = true }.accessibilityIdentifier("openRules")
+                rulesButton.accessibilityIdentifier("openRules")
                 Spacer()
                 cornerButton("dice") { panel = .dice }.accessibilityIdentifier("openDice")
             }
         }
         .padding(6)
+    }
+
+    /// Ask / restore the Rules Guru: tinted while a chat is minimised,
+    /// pulsing while it searches, with a dot once a new answer waits.
+    private var rulesButton: some View {
+        Button {
+            rules.open(url: RulesGuruContext.url(for: state, elapsedSeconds: elapsedSeconds, server: account.server), token: account.token)
+        } label: {
+            Image(systemName: rules.isActive ? "bubble.left.and.text.bubble.right.fill" : "bubble.left.and.text.bubble.right")
+                .font(.system(size: 20))
+                .foregroundStyle(rules.isActive ? Color.accentColor : .secondary)
+                .frame(width: 36, height: 36).contentShape(Rectangle())
+                .overlay(alignment: .topTrailing) {
+                    if rules.hasNewContent { Circle().fill(Theme.danger).frame(width: 9, height: 9).offset(x: -4, y: 4) }
+                }
+                .modifier(SearchPulse(on: rules.searching))
+        }
+        .buttonStyle(.plain)
     }
 
     private func cornerButton(_ symbol: String, action: @escaping () -> Void) -> some View {
@@ -741,5 +766,17 @@ struct DiceResultView: View {
     private func face(_ n: Int, kind: DiceModel.Kind) -> String { kind == .coin ? (n == 1 ? "Heads" : "Tails") : String(n) }
     private func big(_ n: Int, kind: DiceModel.Kind, color: Color) -> some View {
         Text(face(n, kind: kind)).font(.system(size: 52, weight: .black)).foregroundStyle(color)
+    }
+}
+
+/// The web's `chatGlow`: a slow opacity pulse while the Guru is searching.
+struct SearchPulse: ViewModifier {
+    @Environment(\.motionEnabled) private var motion
+    let on: Bool
+    func body(content: Content) -> some View {
+        TimelineView(.animation(minimumInterval: 1 / 20, paused: !on || !motion)) { ctx in
+            let t = ctx.date.timeIntervalSinceReferenceDate
+            content.opacity(on ? 0.55 + 0.45 * (sin(t / 1.5 * 2 * .pi) + 1) / 2 : 1)
+        }
     }
 }

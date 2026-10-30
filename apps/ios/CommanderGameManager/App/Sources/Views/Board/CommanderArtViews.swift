@@ -86,7 +86,7 @@ struct CommanderBackdrop: View {
                 }
                 if flash {
                     RadialGradient(colors: [Color(hex: 0xFFF1D6), Color(hex: 0xFFE6BC).opacity(0)], center: .init(x: 0.5, y: 0.45), startRadius: 0, endRadius: max(geo.size.width, geo.size.height) * 0.6)
-                        .opacity(flashing ? 0.32 : 0)
+                        .opacity(flashing ? 0.42 : 0)
                 }
             }
             .opacity(shown ? 1 : 0)
@@ -100,12 +100,11 @@ struct CommanderBackdrop: View {
             try? await Task.sleep(for: .milliseconds(Int(delay * 1000)))
             withAnimation(.easeInOut(duration: 0.8)) { shown = true }
             guard flash else { return }
-            // The flash (0.21 s up, 0.39 s down) ends with the fade, so the
-            // art lands at full strength on the flash's last frame.
-            try? await Task.sleep(for: .milliseconds(200))
-            withAnimation(.easeOut(duration: 0.21)) { flashing = true }
-            try? await Task.sleep(for: .milliseconds(210))
-            withAnimation(.easeOut(duration: 0.39)) { flashing = false }
+            // One slow swell of light across the whole fade: up for the first
+            // half, back down for the second, gone as the art lands.
+            withAnimation(.easeInOut(duration: 0.4)) { flashing = true }
+            try? await Task.sleep(for: .milliseconds(400))
+            withAnimation(.easeInOut(duration: 0.4)) { flashing = false }
         }
     }
 }

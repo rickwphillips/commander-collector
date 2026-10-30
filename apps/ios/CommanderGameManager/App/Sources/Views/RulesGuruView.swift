@@ -2,24 +2,135 @@ import SwiftUI
 import WebKit
 import CommanderGameKit
 
-/// Rules Guru chat (web `CenterZone` chat dialog): the hosted rules-guru app
-/// in a web view, handed the live game as the same `?ctx=` payload the web
-/// board sends, and signed in with this app's token so it needs no login.
+/// The Rules Guru chat (web `CenterZone` chat dialog) kept alive behind the
+/// board: minimising hides the sheet but keeps the conversation, the board
+/// streams the live game into it every second, and the Guru's "save to
+/// notes" lands in the game notes. Closing ends the conversation.
+@MainActor
+@Observable
+final class RulesGuruChat {
+    private(set) var webView: WKWebView?
+    /// The sheet is on screen.
+    var isPresented = false
+    /// A conversation exists (on screen or minimised).
+    private(set) var isActive = false
+    /// An answer arrived while minimised.
+    private(set) var hasNewContent = false
+    /// The Guru is searching or answering.
+    private(set) var searching = false
+    var onSaveNotes: ((String) -> Void)?
+    private let bridge = Bridge()
+
+    init() { bridge.chat = self }
+
+    func open(url: URL, token: String?) {
+        if webView == nil {
+            let config = WKWebViewConfiguration()
+            if let token, token != "demo" {
+                // The rules guru reads its bearer token from localStorage, as
+                // the web app sets it after login. Same origin as our API.
+                let escaped = token.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
+                config.userContentController.addUserScript(WKUserScript(source: "try { localStorage.setItem('auth_token', '\(escaped)'); } catch (e) {}", injectionTime: .atDocumentStart, forMainFrameOnly: true))
+            }
+            // The page talks to its host with window.parent.postMessage; here
+            // the page is the main frame, so its own window hears it.
+            config.userContentController.addUserScript(WKUserScript(source: "window.addEventListener('message', function (e) { try { window.webkit.messageHandlers.rules.postMessage(e.data); } catch (err) {} });", injectionTime: .atDocumentStart, forMainFrameOnly: true))
+            config.userContentController.add(bridge, name: "rules")
+            let view = WKWebView(frame: .zero, configuration: config)
+            view.load(URLRequest(url: url))
+            webView = view
+        }
+        isActive = true
+        hasNewContent = false
+        isPresented = true
+    }
+
+    func minimize() { isPresented = false }
+
+    func close() {
+        isPresented = false
+        isActive = false
+        hasNewContent = false
+        searching = false
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "rules")
+        webView = nil
+    }
+
+    /// The web's per-second `rules_timer_update` + `rules_game_state_update`.
+    func push(state: GameState, elapsedSeconds: Int) {
+        guard isActive, let webView else { return }
+        let firstSet = state.firstPlayerIdx != nil
+        let timer: [String: Any] = [
+            "type": "rules_timer_update",
+            "timerSeconds": state.turnTimerSeconds, "elapsedSeconds": elapsedSeconds,
+            "remaining": max(0, state.turnTimerSeconds - elapsedSeconds),
+            "currentPlayer": firstSet ? state.players[state.currentPlayerIdx].playerName : NSNull(),
+            "turnNumber": firstSet ? state.turnNumber : NSNull(),
+        ]
+        var game = RulesGuruContext.payload(state, elapsedSeconds: elapsedSeconds)
+        game["type"] = "rules_game_state_update"
+        for message in [timer, game] {
+            guard let data = try? JSONSerialization.data(withJSONObject: message), let json = String(data: data, encoding: .utf8) else { continue }
+            webView.evaluateJavaScript("window.postMessage(\(json), '*'); undefined") { _, _ in }
+        }
+    }
+
+    fileprivate func received(_ body: Any) {
+        guard let dict = body as? [String: Any], let type = dict["type"] as? String else { return }
+        switch type {
+        case "rules_save_notes":
+            if let content = dict["content"] as? String { onSaveNotes?(content) }
+        case "rules_new_content":
+            if !isPresented { hasNewContent = true }
+        case "rules_loading":
+            let on = (dict["value"] as? Bool) ?? ((dict["value"] as? Int).map { $0 != 0 } ?? false)
+            searching = on
+            if !on && !isPresented { hasNewContent = true }
+        default:
+            break   // our own pushes echo back through the same listener
+        }
+    }
+
+    /// WebKit's handler object; kept outside the observable so WebKit holds
+    /// a plain NSObject.
+    private final class Bridge: NSObject, WKScriptMessageHandler {
+        weak var chat: RulesGuruChat?
+        nonisolated func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            MainActor.assumeIsolated {
+                let body = message.body
+                chat?.received(body)
+            }
+        }
+    }
+}
+
 struct RulesGuruSheet: View {
-    let state: GameState
-    let elapsedSeconds: Int
-    @Environment(Session.self) private var account
-    @Environment(\.dismiss) private var dismiss
+    let chat: RulesGuruChat
 
     var body: some View {
         NavigationStack {
-            RulesGuruWebView(url: RulesGuruContext.url(for: state, elapsedSeconds: elapsedSeconds, server: account.server), token: account.token)
-                .ignoresSafeArea(edges: .bottom)
-                .navigationTitle("Rules Guru — Game Context")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            Group {
+                if let webView = chat.webView { ExistingWebView(webView: webView).ignoresSafeArea(edges: .bottom) }
+            }
+            .navigationTitle("Rules Guru — Game Context")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close", role: .destructive) { chat.close() }.accessibilityIdentifier("rulesClose")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button { chat.minimize() } label: { Label("Minimise", systemImage: "arrow.down.right.and.arrow.up.left") }.accessibilityIdentifier("rulesMinimize")
+                }
+            }
         }
     }
+}
+
+/// Hosts a web view that outlives the sheet.
+struct ExistingWebView: UIViewRepresentable {
+    let webView: WKWebView
+    func makeUIView(context: Context) -> WKWebView { webView }
+    func updateUIView(_ uiView: WKWebView, context: Context) {}
 }
 
 /// Builds the game context the rules guru reads (web `buildRulesGuruContext`
@@ -76,25 +187,4 @@ enum RulesGuruContext {
             "elapsedSeconds": state.turnTimerSeconds > 0 ? elapsedSeconds : NSNull(),
         ]
     }
-}
-
-struct RulesGuruWebView: UIViewRepresentable {
-    let url: URL
-    let token: String?
-
-    func makeUIView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        if let token, token != "demo" {
-            // The rules guru reads its bearer token from localStorage, as the web
-            // app sets it after login. Same origin as our API, our own session.
-            let escaped = token.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
-            let script = WKUserScript(source: "try { localStorage.setItem('auth_token', '\(escaped)'); } catch (e) {}", injectionTime: .atDocumentStart, forMainFrameOnly: true)
-            config.userContentController.addUserScript(script)
-        }
-        let view = WKWebView(frame: .zero, configuration: config)
-        view.load(URLRequest(url: url))
-        return view
-    }
-
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
 }
