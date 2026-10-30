@@ -50,7 +50,7 @@ public enum GameSetup {
     }
 
     /// Who sits where, chosen from the registry.
-    public struct Seat: Hashable, Sendable {
+    public struct Seat: Hashable, Sendable, Codable {
         public var playerId: String
         public var playerName: String
         public var deckId: String

@@ -17,6 +17,13 @@ actor CardArtService {
     struct CardImages: Codable, Sendable {
         var artCrop: URL?
         var normal: URL?
+        /// WUBRG letters of the card's colour identity (empty for colourless).
+        var colorIdentity: String?
+    }
+
+    /// Colour identity for a commander, as WUBRG letters, for a new deck.
+    func colorIdentity(for name: String) async -> String? {
+        await record(for: name)?.colorIdentity
     }
 
     private let session: URLSession
@@ -80,9 +87,10 @@ actor CardArtService {
         struct Face: Decodable { var image_uris: Uris? }
         var image_uris: Uris?
         var card_faces: [Face]?
+        var color_identity: [String]?
         var images: CardImages {
             let u = image_uris ?? card_faces?.first?.image_uris
-            return CardImages(artCrop: u?.art_crop, normal: u?.normal)
+            return CardImages(artCrop: u?.art_crop, normal: u?.normal, colorIdentity: color_identity?.joined())
         }
     }
 

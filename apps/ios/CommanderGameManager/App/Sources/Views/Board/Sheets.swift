@@ -2,68 +2,6 @@ import SwiftUI
 import SwiftData
 import CommanderGameKit
 
-/// Pick who sits at a seat: a player from the cache, then one of their decks
-/// (any deck is allowed; the owner's are listed first).
-struct SeatPickerSheet: View {
-    @Bindable var session: GameSession
-    let idx: Int
-    let taken: Set<String>
-    @Environment(\.dismiss) private var dismiss
-    @Query(sort: \CachedPlayer.name) private var players: [CachedPlayer]
-    @Query(sort: \CachedDeck.name) private var decks: [CachedDeck]
-    @State private var chosenPlayer: CachedPlayer?
-    @State private var showAllDecks = false
-
-    var body: some View {
-        NavigationStack {
-            List {
-                if let p = chosenPlayer {
-                    Section("Deck for \(p.name)") {
-                        let own = decks.filter { $0.playerId == p.id }
-                        ForEach(showAllDecks || own.isEmpty ? decks : own) { d in
-                            Button {
-                                session.seat(idx, GameSetup.Seat(
-                                    playerId: p.id, playerName: p.name, deckId: d.id, deckName: d.name,
-                                    commander: CommanderInfo(name: d.commander),
-                                    partner: d.partner.map { CommanderInfo(name: $0) }))
-                                dismiss()
-                            } label: {
-                                VStack(alignment: .leading) {
-                                    Text(d.name).font(.headline)
-                                    Text(d.partner.map { "\(d.commander) / \($0)" } ?? d.commander).font(.subheadline).foregroundStyle(.secondary)
-                                    if d.playerId != p.id { Text("owned by \(d.playerName)").font(.caption).foregroundStyle(.tertiary) }
-                                }
-                            }
-                        }
-                        if !own.isEmpty && !showAllDecks {
-                            Button("Show every deck") { showAllDecks = true }
-                        }
-                    }
-                } else {
-                    Section("Player") {
-                        ForEach(players) { p in
-                            Button { chosenPlayer = p } label: {
-                                HStack {
-                                    Text(p.name)
-                                    if taken.contains(p.id) { Spacer(); Text("seated").font(.caption).foregroundStyle(.secondary) }
-                                }
-                            }
-                            .disabled(taken.contains(p.id) && p.id != session.state.players[idx].playerId)
-                        }
-                    }
-                }
-            }
-            .navigationTitle(chosenPlayer == nil ? "Who sits here?" : "Which deck?")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                if chosenPlayer != nil {
-                    ToolbarItem(placement: .navigation) { Button("Back") { chosenPlayer = nil } }
-                }
-            }
-        }
-    }
-}
-
 /// The derived game log, newest last.
 struct GameLogSheet: View {
     let log: [GameLogEvent]

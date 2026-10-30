@@ -44,9 +44,13 @@ final class GameSession {
     }
 
     init(setup: GameSetupInput) {
-        state = GameSetup.seatingState(
+        var s = GameSetup.seatingState(
             playerCount: setup.playerCount, startingLife: setup.startingLife,
             turnTimerSeconds: setup.turnTimerSeconds, gameType: setup.gameType)
+        for (i, seat) in setup.prefill.enumerated() where i < s.players.count {
+            if let seat { s = GameSetup.seating(s, idx: i, seat: seat) }
+        }
+        state = s
         clientGameId = UUID().uuidString.lowercased()
         startedAt = .now
     }
