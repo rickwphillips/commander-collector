@@ -50,11 +50,67 @@ final class SoundService {
         } else {
             stopLoop("poison_bubbles")
         }
+        if poison >= 9 { startStabs() } else { stabTask?.cancel(); stabTask = nil }
     }
 
     func stopPoison() {
         stopLoop("poison_bubbles")
         stopDrone()
+        stabTask?.cancel(); stabTask = nil
+    }
+
+    // MARK: Violin stabs (poison 9+): a thin high sawtooth with a slow bow
+    // attack, every 4 to 11 seconds, like the web's soprano stabs.
+
+    private var stabTask: Task<Void, Never>?
+
+    private func startStabs() {
+        guard stabTask == nil else { return }
+        stabTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3 + Double.random(in: 0...4)))
+            while !Task.isCancelled {
+                playStab()
+                try? await Task.sleep(for: .seconds(4 + Double.random(in: 0...7)))
+            }
+        }
+    }
+
+    private func playStab() {
+        let sampleRate = 44_100.0
+        let freq = 1100 + Double.random(in: 0...600)
+        let duration = 1.2 + Double.random(in: 0...0.8)
+        let frames = Int(sampleRate * (duration + 0.05))
+        guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1),
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)) else { return }
+        buffer.frameLength = AVAudioFrameCount(frames)
+        let data = buffer.floatChannelData![0]
+        let trem = 7.5 + Double.random(in: 0...2)
+        var phase = 0.0
+        var bp = 0.0, lp = 0.0
+        for i in 0..<frames {
+            let t = Double(i) / sampleRate
+            phase += freq / sampleRate; if phase > 1 { phase -= 1 }
+            let saw = 2 * phase - 1
+            // Crude band-pass around 1.4× the pitch: a low-pass minus a lower low-pass.
+            let a1 = min(1, freq * 1.4 * 1.6 / sampleRate * 2 * .pi)
+            let a2 = min(1, freq * 1.4 * 0.6 / sampleRate * 2 * .pi)
+            lp += a1 * (saw - lp)
+            bp += a2 * (saw - bp)
+            let band = lp - bp
+            let env = t < 0.45 ? t / 0.45 : t < duration - 0.5 ? 1 : max(0, (duration - t) / 0.5)
+            let tremolo = 1 + 0.25 * sin(t * trem * 2 * .pi)
+            data[i] = Float(band * env * tremolo * 0.07)
+        }
+        let engine = self.engine ?? AVAudioEngine()
+        let player = AVAudioPlayerNode()
+        engine.attach(player)
+        engine.connect(player, to: engine.mainMixerNode, format: format)
+        if !engine.isRunning { try? engine.start() }
+        self.engine = engine
+        player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { _ in
+            Task { @MainActor in engine.detach(player) }
+        }
+        player.play()
     }
 
     private func startLoop(_ name: String, volume: Float) {

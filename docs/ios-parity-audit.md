@@ -62,7 +62,7 @@ seat**, never as a system sheet facing one side of the table.
       opacity rises with the share of starting life lost (20/35/50/70/85 %).
 - [x] B3 Energy > 5: blue pulse + jitter on the life number, cyan glow on all
       panel text scaling to 8 energy.
-- [~] B4 Poison: green wash, drips from top and bottom edges scaling with
+- [x] B4 Poison: green wash, drips from top and bottom edges scaling with
       progress to lethal, rising bubbles from 5, boiling bubbles at 9+, large
       Phyrexian symbols at the edges growing with progress, three drifting
       symbols at 9+, panel saturation, counter blur, poison pulse at 9, life
@@ -132,7 +132,7 @@ seat**, never as a system sheet facing one side of the table.
 - [ ] D7 Remote seats: QR / seat code per seat and the "being viewed" eye
       (Phase 2, Multipeer).
 
-Legend: [x] landed, [~] landed without the violin stabs (poison 9+ sound) yet.
+Legend: [x] landed. Open: D7 (remote seats, Phase 2).
 
 ## Order of work
 
