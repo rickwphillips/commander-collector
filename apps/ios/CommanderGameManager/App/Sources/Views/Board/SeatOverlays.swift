@@ -177,7 +177,6 @@ struct CommanderSnapshotOverlay: View {
                     Text("\(src.life)").font(.system(size: sizes.value * 2, weight: .black).monospacedDigit())
                         .foregroundStyle(Theme.lifeColor(src.life, startingLife: state.startingLife) ?? .accentColor)
                         .strikethrough(src.isEliminated)
-                    Button { overlay = nil } label: { Image(systemName: "xmark").font(.system(size: sizes.source)) }.buttonStyle(.plain).foregroundStyle(.secondary)
                 }
                 Divider()
                 HStack {
@@ -226,6 +225,12 @@ struct CommanderSnapshotOverlay: View {
             .onTapGesture { overlay = .preview(name: shownCommander) }
             }
             .padding(10)
+            .padding(.trailing, 22)
+        }
+        .overlay(alignment: .topTrailing) {
+            Button { overlay = nil } label: { Image(systemName: "xmark").font(.system(size: sizes.source, weight: .semibold)).padding(6) }
+                .buttonStyle(.plain).foregroundStyle(.secondary).padding(4)
+                .accessibilityIdentifier("snapshotClose")
         }
         .task(id: "\(sourceIdx)-\(partner)") { art.load(shownCommander); card.load(shownCommander, full: true) }
         .transition(.opacity)

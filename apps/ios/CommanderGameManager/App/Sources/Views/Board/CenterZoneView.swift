@@ -11,6 +11,8 @@ struct CenterZoneView: View {
     @Binding var showLog: Bool
     let elapsedSeconds: Int
     let onRestart: () -> Void
+    /// Leaves an unstarted table for the New Game screen.
+    let onBack: () -> Void
     @Environment(GameSettingsStore.self) private var settings
     @Environment(Session.self) private var account
     @Environment(\.colorScheme) private var scheme
@@ -76,6 +78,11 @@ struct CenterZoneView: View {
 
     private var seatingControls: some View {
         HStack(spacing: 16) {
+            Button { onBack() } label: {
+                VStack(spacing: 2) { Image(systemName: "chevron.left").font(.system(size: 22, weight: .semibold)); Text("Back").font(.caption.bold()) }.frame(width: 44, height: 70)
+            }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("backToSetup")
             VStack(spacing: 6) {
                 Button { startRoll() } label: {
                     VStack(spacing: 2) { D20Icon(size: 34); Text("Roll").font(.caption.bold()) }.frame(width: 70, height: 70)
@@ -226,21 +233,19 @@ struct CenterZoneView: View {
     private var settingsOverlay: some View {
         overlayFrame(title: "Settings") {
             VStack(spacing: 8) {
-                HStack(spacing: 14) {
-                    Toggle("Timer", isOn: Binding(get: { state.turnTimerSeconds > 0 }, set: { on in
+                HStack(spacing: 16) {
+                    SettingSwitch("Timer", id: "timerToggle", isOn: Binding(get: { state.turnTimerSeconds > 0 }, set: { on in
                         let secs = on ? (settings.turnTimerSeconds > 0 ? settings.turnTimerSeconds : 300) : 0
                         session.setTurnTimer(seconds: secs)
                         settings.turnTimerEnabled = on
                         settings.push(using: account.client)
                     }))
-                    Toggle("Highlight", isOn: Binding(get: { settings.highlightMode }, set: { settings.highlightMode = $0; settings.push(using: account.client) }))
-                    Toggle("Sound", isOn: Binding(get: { settings.soundEnabled }, set: { settings.soundEnabled = $0; settings.push(using: account.client) }))
-                    Toggle("Dark", isOn: Binding(get: { settings.darkMode }, set: { settings.darkMode = $0 }))
-                    Toggle("Motion", isOn: Binding(get: { settings.animationsEnabled }, set: { settings.animationsEnabled = $0 })).accessibilityIdentifier("motionToggle")
+                    SettingSwitch("Highlight", id: "highlightToggle", isOn: Binding(get: { settings.highlightMode }, set: { settings.highlightMode = $0; settings.push(using: account.client) }))
+                    SettingSwitch("Sound", id: "soundToggle", isOn: Binding(get: { settings.soundEnabled }, set: { settings.soundEnabled = $0; settings.push(using: account.client) }))
+                    SettingSwitch("Dark", id: "darkToggle", isOn: Binding(get: { settings.darkMode }, set: { settings.darkMode = $0 }))
+                    SettingSwitch("Motion", id: "motionToggle", isOn: Binding(get: { settings.animationsEnabled }, set: { settings.setAnimations($0) }))
+                        .disabled(settings.motionSettling)
                 }
-                .font(.system(size: 12))
-                .toggleStyle(.switch)
-                .controlSize(.mini)
                 HStack(spacing: 8) {
                     Button { notesDraft = state.notes; panel = .notes } label: { Label("Notes", systemImage: "note.text").frame(maxWidth: .infinity) }
                         .tint(state.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : .accentColor)
@@ -395,6 +400,23 @@ struct D20Icon: View {
             for p in [hex, up, down] { ctx.stroke(p, with: .color(.primary), style: style) }
         }
         .frame(width: size, height: size)
+    }
+}
+
+/// A settings switch with its label hugging the switch (label, then knob),
+/// so a row of them reads as label–switch pairs instead of a line of words
+/// over a line of switches.
+struct SettingSwitch: View {
+    let label: String
+    let id: String
+    let isOn: Binding<Bool>
+    init(_ label: String, id: String, isOn: Binding<Bool>) { self.label = label; self.id = id; self.isOn = isOn }
+    var body: some View {
+        HStack(spacing: 5) {
+            Text(label).font(.system(size: 12))
+            Toggle(label, isOn: isOn).labelsHidden().toggleStyle(.switch).controlSize(.mini).accessibilityIdentifier(id)
+        }
+        .fixedSize()
     }
 }
 
@@ -618,13 +640,13 @@ struct RollOffView: View {
     }
 }
 
+/// A die mid-roll. Dice keep spinning with Motion off: the roll is the
+/// feedback that something happened, not decoration.
 struct SpinningDie: View {
-
-    @Environment(\.motionEnabled) private var motion
     let kind: DiceModel.Kind
     var size: CGFloat = 30
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30, paused: !motion)) { ctx in
+        TimelineView(.animation(minimumInterval: 1 / 30)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             Group {
                 switch kind {

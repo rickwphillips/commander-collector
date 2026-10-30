@@ -25,6 +25,7 @@ struct HomeView: View {
     @State private var resume = false
     @State private var setup: GameSetupInput?
     @State private var showJoin = false
+    @State private var showNewDeck = false
 
     private static let lifePresets = [20, 30, 40]
     private var seatCount: Int { gameType == .twoHeadedGiant ? 4 : playerCount }
@@ -115,6 +116,9 @@ struct HomeView: View {
                         }
                     }
                     .disabled(refreshing)
+                    Button { showNewDeck = true } label: { Label("New deck", systemImage: "plus.rectangle.on.rectangle") }
+                        .disabled(players.isEmpty)
+                        .accessibilityIdentifier("newDeck")
                     if let refreshMessage { Text(refreshMessage).font(.footnote).foregroundStyle(.secondary) }
                 } header: {
                     Text("Reference data")
@@ -149,7 +153,7 @@ struct HomeView: View {
             .navigationTitle("New game")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Menu(session.username ?? "Account") {
+                    Menu(accountLabel) {
                         Button("Sign out", role: .destructive) { session.signOut() }
                     }
                 }
@@ -172,6 +176,12 @@ struct HomeView: View {
             }
             .onAppear { activeGame = ActiveGameStore.load() }
             .fullScreenCover(isPresented: $showJoin) { JoinTableView() }
+            // The same editor the seat picker uses; a deck created here is
+            // saved to the web app, then the cache is pulled fresh.
+            .sheet(isPresented: $showNewDeck) {
+                DeckEditorSheet(playerId: defaultDeckOwner, onDone: { showNewDeck = false }, onCreated: { _ in refresh() })
+                    .presentationDetents([.large])
+            }
             .navigationDestination(isPresented: $resume) {
                 if let game = activeGame { BoardView(resuming: game) }
             }
@@ -179,6 +189,19 @@ struct HomeView: View {
                 BoardView(setup: input)
             }
         }
+    }
+
+    /// The signed-in user's player name when a player row is linked to the
+    /// account, else the login name.
+    private var accountLabel: String {
+        if let uid = session.userId, let me = players.first(where: { $0.userId == uid }) { return me.name }
+        return session.username ?? "Account"
+    }
+
+    /// The signed-in user's own player when linked, else the first player.
+    private var defaultDeckOwner: String {
+        if let uid = session.userId, let me = players.first(where: { $0.userId == uid }) { return me.id }
+        return players.first?.id ?? ""
     }
 
     private func start(prefill: [GameSetup.Seat?]) {

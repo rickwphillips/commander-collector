@@ -27,6 +27,9 @@ struct SeatPanel: View {
     @State private var cityBlessingVisible = false
     @State private var cityBlessingExiting = false
     @State private var concedeTurn = ""
+    /// Intro: the seat sits dimmed until its turn in the reveal order, then
+    /// brightens with the backdrop so each player is introduced in turn.
+    @State private var introduced = false
 
     private var state: GameState { session.state }
     private var player: PlayerState { state.players[idx] }
@@ -58,9 +61,11 @@ struct SeatPanel: View {
                 Theme.panelBackground(scheme)
                 if isWarning { (scheme == .dark ? Color(red: 180/255, green: 40/255, blue: 40/255).opacity(0.18) : Color(red: 220/255, green: 80/255, blue: 80/255).opacity(0.08)) }
                 CommanderBackdrop(name: player.commander.name, revealDelay: backdropDelay, flash: backdropFlash)
+                // Motion off fades the effects out and leaves the icons;
+                // Motion on inserts them fresh, so each starts over.
                 if motion {
                     if player.hasInitiative { InitiativeTorch().transition(.opacity) }
-                    PoisonOverlay(poison: player.poison, progress: poisonProgress)
+                    PoisonOverlay(poison: player.poison, progress: poisonProgress).transition(.opacity)
                 }
 
                 VStack(spacing: 0) {
@@ -69,8 +74,10 @@ struct SeatPanel: View {
                     columns(sz)
                 }
                 .shadow(color: Theme.energyCyan.opacity(energyGlow * 0.9), radius: 4 + energyGlow * 14)
+                .opacity(introduced ? 1 : 0.18)
+                .scaleEffect(introduced ? 1 : 0.97)
 
-                if cityBlessingVisible && motion { CityBlessing(exiting: cityBlessingExiting, commanders: [player.commander.name] + (player.partner.map { [$0.name] } ?? []), threat: threat) }
+                if cityBlessingVisible && motion { CityBlessing(exiting: cityBlessingExiting, commanders: [player.commander.name] + (player.partner.map { [$0.name] } ?? []), threat: threat).transition(.opacity) }
                 if player.isEliminated { EliminatedOverlay(conceded: player.isConceded, poisoned: isPoisoned).accessibilityIdentifier("s\(idx)-eliminated") }
                 if overlay == .concedeConfirm {
                     Theme.gold.opacity(0.12).allowsHitTesting(false)
@@ -86,6 +93,7 @@ struct SeatPanel: View {
             .overlay(border)
             .animation(.easeInOut(duration: 0.3), value: isActive)
         }
+        .animation(.easeInOut(duration: GameSettingsStore.motionFadeSeconds), value: motion)
         .onChange(of: player.life) { old, new in
             guard new < old else { return }
             damageFlash = old - new
@@ -95,9 +103,9 @@ struct SeatPanel: View {
         .onChange(of: player.hasCitysBlessing, initial: true) { _, has in
             if has {
                 cityBlessingExiting = false
-                if !cityBlessingVisible { SoundService.shared.playCitysBlessingIntro() }
+                if !cityBlessingVisible && motion { SoundService.shared.playCitysBlessingIntro() }
                 cityBlessingVisible = true
-                SoundService.shared.setCitysBlessingActive(true)
+                SoundService.shared.setCitysBlessingActive(motion)
             } else if cityBlessingVisible {
                 cityBlessingExiting = true
                 SoundService.shared.setCitysBlessingActive(false)
@@ -105,6 +113,14 @@ struct SeatPanel: View {
             }
         }
         .onChange(of: player.isEliminated) { _, _ in overlay = nil }
+        .task(id: backdropDelay) {
+            // Only the intro sequence (first player chosen at this table) dims
+            // the seats; a resume or a remote view shows everything at once.
+            guard backdropFlash, motion, let delay = backdropDelay else { introduced = true; return }
+            introduced = false
+            try? await Task.sleep(for: .milliseconds(Int(delay * 1000)))
+            withAnimation(.easeInOut(duration: 0.8)) { introduced = true }
+        }
     }
 
     // MARK: Header
@@ -365,6 +381,8 @@ struct SeatPanel: View {
     /// viewport-relative clamps).
     /// Gap between rows in the commander damage and counters drawers.
     static let drawerRowSpacing: CGFloat = 8
+    /// Used when the full gap would push the rows into a scroll view.
+    static let compactDrawerRowSpacing: CGFloat = 3
 
     struct Sizes {
         let name, deck, pass, icon, menu, art, life, lifeBtn, crown, label, source, badge, value, kill: CGFloat

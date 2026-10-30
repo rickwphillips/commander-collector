@@ -40,8 +40,8 @@ struct CommanderDamageColumn: View {
                                     .font(.system(size: 9, weight: .semibold)).buttonStyle(.bordered).controlSize(.mini)
                             }
                             .padding(.horizontal, 4).padding(.top, 3)
-                        CenteredOrScrolling {
-                            VStack(spacing: SeatPanel.drawerRowSpacing) {
+                        CenteredOrScrolling { compact in
+                            VStack(spacing: compact ? SeatPanel.compactDrawerRowSpacing : SeatPanel.drawerRowSpacing) {
                                 ForEach(state.players.indices.filter { $0 != targetIdx }, id: \.self) { src in
                                     CommanderDamageRow(session: session, targetIdx: targetIdx, sourceIdx: src, showPlayer: showPlayer, glass: glass, overlay: $overlay, sizes: sizes)
                                 }
@@ -180,8 +180,8 @@ struct CountersColumn: View {
             if open {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("COUNTERS").font(.system(size: sizes.label, weight: .semibold)).kerning(0.5).foregroundStyle(.secondary).padding(.horizontal, 6).padding(.top, 3)
-                    CenteredOrScrolling {
-                        VStack(spacing: SeatPanel.drawerRowSpacing) {
+                    CenteredOrScrolling { compact in
+                        VStack(spacing: compact ? SeatPanel.compactDrawerRowSpacing : SeatPanel.drawerRowSpacing) {
                             row("Commander Tax", glyph: CounterGlyph(kind: .tax, size: sizes.source, taxValue: p.commanderTax), value: p.commanderTax, color: p.commanderTax > 0 ? .orange : .secondary, focus: .tax(partner: false)) {
                                 session.dispatch(.commanderTaxChange(playerIdx: idx, delta: $0, isPartner: false))
                             }
@@ -301,12 +301,18 @@ struct FlowLayout: Layout {
 /// Drawer rows sit vertically centred when they fit the drawer, and scroll
 /// when the panel is too short for them.
 struct CenteredOrScrolling<Content: View>: View {
-    @ViewBuilder let content: () -> Content
+    /// Builds the rows; `compact` asks for the tighter row gap, tried before
+    /// giving up on centring and scrolling instead.
+    @ViewBuilder let content: (_ compact: Bool) -> Content
 
     var body: some View {
+        // The candidates are measured bare (a flexible frame would always
+        // "fit"); the outer frame centres whichever one is chosen.
         ViewThatFits(in: .vertical) {
-            content().frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-            ScrollView(.vertical) { content() }.scrollBounceBehavior(.basedOnSize)
+            content(false)
+            content(true)
+            ScrollView(.vertical) { content(true) }.scrollBounceBehavior(.basedOnSize)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 }

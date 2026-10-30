@@ -53,8 +53,8 @@ struct TeamPanel: View {
             ZStack {
                 Theme.panelBackground(scheme)
                 if settings.animationsEnabled {
-                    if members.contains(where: { state.players[$0].hasInitiative }) { InitiativeTorch() }
-                    PoisonOverlay(poison: poison, progress: poisonProgress)
+                    if members.contains(where: { state.players[$0].hasInitiative }) { InitiativeTorch().transition(.opacity) }
+                    PoisonOverlay(poison: poison, progress: poisonProgress).transition(.opacity)
                 }
                 VStack(spacing: 0) {
                     header(sz)
@@ -67,7 +67,7 @@ struct TeamPanel: View {
                     .padding(10)
                 }
                 .shadow(color: Theme.energyCyan.opacity(min(Double(teamEnergy) / 8, 1) * 0.9), radius: 4 + min(Double(teamEnergy) / 8, 1) * 14)
-                if cityBlessingVisible && settings.animationsEnabled { CityBlessing(exiting: cityBlessingExiting, commanders: members.flatMap { [state.players[$0].commander.name] + (state.players[$0].partner.map { [$0.name] } ?? []) }, threat: threat) }
+                if cityBlessingVisible && settings.animationsEnabled { CityBlessing(exiting: cityBlessingExiting, commanders: members.flatMap { [state.players[$0].commander.name] + (state.players[$0].partner.map { [$0.name] } ?? []) }, threat: threat).transition(.opacity) }
                 if eliminated { EliminatedOverlay(conceded: conceded, poisoned: poison >= 15) }
                 if overlay == .concedeConfirm {
                     Theme.gold.opacity(0.12).allowsHitTesting(false)
@@ -81,6 +81,7 @@ struct TeamPanel: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(border)
         }
+        .animation(.easeInOut(duration: GameSettingsStore.motionFadeSeconds), value: settings.animationsEnabled)
         .onChange(of: life) { old, new in
             guard new < old else { return }
             damageFlash = old - new
@@ -90,9 +91,9 @@ struct TeamPanel: View {
         .onChange(of: members.contains { state.players[$0].hasCitysBlessing }, initial: true) { _, has in
             if has {
                 cityBlessingExiting = false
-                if !cityBlessingVisible { SoundService.shared.playCitysBlessingIntro() }
+                if !cityBlessingVisible && settings.animationsEnabled { SoundService.shared.playCitysBlessingIntro() }
                 cityBlessingVisible = true
-                SoundService.shared.setCitysBlessingActive(true)
+                SoundService.shared.setCitysBlessingActive(settings.animationsEnabled)
             } else if cityBlessingVisible {
                 cityBlessingExiting = true
                 SoundService.shared.setCitysBlessingActive(false)

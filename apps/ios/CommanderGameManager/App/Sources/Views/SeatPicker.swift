@@ -37,13 +37,7 @@ struct SeatPickerSheet: View {
             OverlayHeader(title: "Choose player & deck", cancelId: "seatPickerCancel", confirmId: "seatPickerSave", confirmLabel: "Save seat", onCancel: onDone, onConfirm: confirm)
             Form {
                 Section {
-                    Picker("Player", selection: $playerId) {
-                        Text("Select a player").tag("")
-                        ForEach(players) { p in
-                            Text(p.name + (taken.contains(p.id) && p.id != seat.playerId ? " (seated)" : "")).tag(p.id)
-                                .selectionDisabled(taken.contains(p.id) && p.id != seat.playerId)
-                        }
-                    }
+                    PlayerChips(players: players, selection: $playerId, seated: taken.subtracting([seat.playerId]))
                 } header: {
                     Text("\(seat.position.rawValue.capitalized) seat")
                 }
@@ -125,6 +119,42 @@ struct SeatPickerSheet: View {
     }
 }
 
+/// The player choice as a row of chips, so it draws inside the seat and
+/// turns with it (a system popover would not). Seated players are shown but
+/// cannot be chosen twice.
+struct PlayerChips: View {
+    let players: [CachedPlayer]
+    @Binding var selection: String
+    let seated: Set<String>
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(selection.isEmpty ? "Select a player" : "Player").font(.caption).foregroundStyle(.secondary)
+            FlowLayout(spacing: 6, rowSpacing: 6) {
+                ForEach(players) { p in
+                    let isSeated = seated.contains(p.id)
+                    let chosen = p.id == selection
+                    Button { selection = chosen ? "" : p.id } label: {
+                        HStack(spacing: 4) {
+                            if chosen { Image(systemName: "checkmark").font(.caption.bold()) }
+                            Text(p.name)
+                            if isSeated { Text("seated").font(.caption2).foregroundStyle(.secondary) }
+                        }
+                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .background(Capsule().fill(chosen ? Color.accentColor : Color.primary.opacity(0.08)))
+                        .foregroundStyle(chosen ? Color.white : isSeated ? Color.secondary : Color.primary)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSeated)
+                    .accessibilityIdentifier("player-\(p.id)")
+                    .accessibilityAddTraits(chosen ? .isSelected : [])
+                }
+            }
+        }
+        .padding(.vertical, 2)
+    }
+}
+
 /// A commander name with Scryfall autocomplete and an art preview.
 struct CommanderField: Equatable {
     var name = ""
@@ -133,6 +163,7 @@ struct CommanderField: Equatable {
 struct CommanderSearchField: View {
     let label: String
     @Binding var field: CommanderField
+    var mode: CardArtService.SearchMode = .commander
     @State private var suggestions: [String] = []
     @State private var searchTask: Task<Void, Never>?
     @State private var editing = false
@@ -159,7 +190,7 @@ struct CommanderSearchField: View {
         searchTask = Task {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
-            let list = await CardArtService.shared.autocomplete(q)
+            let list = await CardArtService.shared.searchNames(q, mode: mode)
             if !Task.isCancelled && list != [q] { suggestions = list.filter { $0 != q } }
         }
     }
@@ -186,13 +217,18 @@ struct DeckEditorSheet: View {
             OverlayHeader(title: "New deck", cancelId: "deckEditorCancel", confirmId: "deckEditorCreate", confirmLabel: "Create", busy: saving,
                           confirmDisabled: saving || name.isEmpty || commander.name.isEmpty || playerId.isEmpty, onCancel: onDone, onConfirm: save)
             Form {
-                Picker("Owner", selection: $playerId) {
-                    ForEach(players) { Text($0.name).tag($0.id) }
-                }
-                TextField("Deck name", text: $name)
+                PlayerChips(players: players, selection: $playerId, seated: [])
+                TextField("Deck name", text: $name, prompt: Text("e.g., Omnath Lands"))
                 CommanderSearchField(label: "Commander", field: $commander)
-                Toggle("Partner commander?", isOn: $hasPartner)
-                if hasPartner { CommanderSearchField(label: "Partner commander", field: $partner) }
+                    .onChange(of: commander.name) { old, new in
+                        // Web: suggest "<Commander> deck" until the name is typed by hand.
+                        guard !new.isEmpty else { return }
+                        let trimmed = name.trimmingCharacters(in: .whitespaces)
+                        if trimmed.isEmpty || (!old.isEmpty && trimmed == "\(old) deck") { name = "\(new) deck" }
+                    }
+                Toggle("Add a partner / background", isOn: $hasPartner)
+                    .onChange(of: hasPartner) { _, on in if !on { partner = CommanderField() } }
+                if hasPartner { CommanderSearchField(label: "Partner", field: $partner, mode: .partner) }
                 if let error { Text(error).foregroundStyle(.red) }
             }
         }

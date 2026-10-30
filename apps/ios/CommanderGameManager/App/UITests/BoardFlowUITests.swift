@@ -311,3 +311,58 @@ final class BoardFlowUITests: XCTestCase {
         XCTAssertTrue(text(containing: "Turn 2").waitForExistence(timeout: 5))
     }
 }
+
+/// Screenshots of the effects board before, during and after a Motion
+/// toggle, written to `/tmp/commander-motion-shots` when that folder exists
+/// (the simulator shares the Mac's filesystem); skipped otherwise. A visual
+/// check, not an assertion.
+final class MotionShotsUITests: XCTestCase {
+    func testMotionToggleShots() throws {
+        let dir = "/tmp/commander-motion-shots"
+        guard FileManager.default.fileExists(atPath: dir) else { throw XCTSkip("\(dir) does not exist") }
+        XCUIDevice.shared.orientation = .landscapeRight
+        let app = XCUIApplication()
+        app.launchArguments = ["-demoBoard", "-demoEffects"]
+        app.launch()
+        func shot(_ name: String) {
+            let png = XCUIScreen.main.screenshot().pngRepresentation
+            try? png.write(to: URL(fileURLWithPath: dir).appendingPathComponent(name + ".png"))
+        }
+        XCTAssertTrue(app.buttons["openSettings"].firstMatch.waitForExistence(timeout: 15))
+        sleep(6)
+        shot("1-motion-on")
+        app.buttons["openSettings"].firstMatch.tap()
+        let sw = app.switches["motionToggle"].firstMatch
+        XCTAssertTrue(sw.waitForExistence(timeout: 5))
+        sw.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        usleep(300_000); shot("2-fading-out")
+        sleep(2); shot("3-motion-off")
+        XCTAssertTrue(sw.isEnabled, "switch should be enabled again after settling")
+        sw.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        usleep(300_000); shot("4-fading-in")
+        sleep(3); shot("5-motion-on-again")
+        app.buttons["closeOverlay"].firstMatch.tap()
+        sleep(1); shot("6-board")
+        app.descendants(matching: .any)["s0-cmd-1-name"].firstMatch.tap()
+        sleep(3); shot("7-snapshot")
+    }
+
+    func testNewDeckSheetShot() throws {
+        let dir = "/tmp/commander-motion-shots"
+        guard FileManager.default.fileExists(atPath: dir) else { throw XCTSkip("\(dir) does not exist") }
+        XCUIDevice.shared.orientation = .landscapeRight
+        let app = XCUIApplication()
+        app.launchArguments = ["-demo"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["New game"].firstMatch.waitForExistence(timeout: 15))
+        let button = app.descendants(matching: .any)["newDeck"].firstMatch
+        for _ in 0..<4 where !button.exists { app.swipeUp() }
+        XCTAssertTrue(button.waitForExistence(timeout: 5))
+        button.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["deckEditorCreate"].firstMatch.waitForExistence(timeout: 5))
+        app.textFields.element(boundBy: 0).tap()
+        app.typeText("Atraxa")
+        sleep(3)
+        try? XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent("9-new-deck.png"))
+    }
+}

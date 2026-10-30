@@ -9,6 +9,7 @@ import CommanderGameKit
 struct TableView: View {
     @Bindable var session: GameSession
     let onRestart: () -> Void
+    let onBack: () -> Void
     @Environment(GameSettingsStore.self) private var settings
     @Environment(\.colorScheme) private var scheme
     @State private var seatingIdx: Int?
@@ -41,7 +42,7 @@ struct TableView: View {
                     // team turned to face its players), the centre strip between.
                     VStack(spacing: gap) {
                         teamPanel(2, elapsed: elapsed).rotationEffect(.degrees(180))
-                        CenterZoneView(session: session, showLog: $showLog, elapsedSeconds: elapsed, onRestart: onRestart)
+                        CenterZoneView(session: session, showLog: $showLog, elapsedSeconds: elapsed, onRestart: onRestart, onBack: onBack)
                             .frame(maxWidth: 520).frame(height: centerH)
                         teamPanel(1, elapsed: elapsed)
                     }
@@ -57,7 +58,7 @@ struct TableView: View {
                         if let i = idx(.top) {
                             panel(i, elapsed: elapsed).rotationEffect(.degrees(180))
                         }
-                        CenterZoneView(session: session, showLog: $showLog, elapsedSeconds: elapsed, onRestart: onRestart)
+                        CenterZoneView(session: session, showLog: $showLog, elapsedSeconds: elapsed, onRestart: onRestart, onBack: onBack)
                             .frame(height: centerH)
                         if let i = idx(.bottom) {
                             panel(i, elapsed: elapsed)
@@ -78,7 +79,8 @@ struct TableView: View {
         .background(Theme.tableBackground(scheme))
         .preferredColorScheme(settings.darkMode ? .dark : .light)
         .environment(\.motionEnabled, settings.animationsEnabled)
-        .transaction { t in if !settings.animationsEnabled { t.animation = nil } }
+        // Motion off stops every transition, once the effects have faded out.
+        .transaction { t in if !settings.animationsEnabled && !settings.motionSettling { t.animation = nil } }
         .sheet(isPresented: $showLog) {
             GameLogSheet(log: session.log)
         }
@@ -93,14 +95,12 @@ struct TableView: View {
             }
         }
         .onChange(of: session.highestLivingPoison, initial: true) { _, poison in
-            SoundService.shared.setPoisonLevel(session.isPlaying ? poison : 0)
+            SoundService.shared.setPoisonLevel(session.isPlaying && settings.animationsEnabled ? poison : 0)
         }
-        .onChange(of: settings.soundEnabled) { _, on in
-            // The service silences itself when switched off; switching back on
-            // re-applies whatever the table is doing right now.
-            SoundService.shared.setPoisonLevel(on && session.isPlaying ? session.highestLivingPoison : 0)
-            SoundService.shared.setCitysBlessingActive(on && session.isPlaying && session.state.players.contains { $0.hasCitysBlessing })
-        }
+        .onChange(of: settings.soundEnabled) { _, _ in applyEffectSounds() }
+        // The effect sounds belong to the effects: Motion off silences them
+        // with the visuals, Motion on brings them back.
+        .onChange(of: settings.animationsEnabled) { _, _ in applyEffectSounds() }
         .onDisappear {
             SoundService.shared.stopPoison()
             host?.end(); host = nil
@@ -124,6 +124,14 @@ struct TableView: View {
             w.broadcast(session.state, log: session.log)
         }
         .task { await CardArtService.shared.prewarm(session.state.players.flatMap { [$0.commander.name, $0.partner?.name ?? ""] }) }
+    }
+
+    /// Re-applies the poison drone and the blessing loop to what the table is
+    /// doing right now (the service silences itself while sound is off).
+    private func applyEffectSounds() {
+        let on = settings.soundEnabled && settings.animationsEnabled && session.isPlaying
+        SoundService.shared.setPoisonLevel(on ? session.highestLivingPoison : 0)
+        SoundService.shared.setCitysBlessingActive(on && session.state.players.contains { $0.hasCitysBlessing })
     }
 
     /// Seat reveal delay: nil until a first player exists; 0 for every seat on

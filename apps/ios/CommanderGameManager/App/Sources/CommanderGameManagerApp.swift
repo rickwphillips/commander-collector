@@ -1,8 +1,30 @@
 import SwiftUI
+import UIKit
 import SwiftData
+
+/// Orientation is decided per screen: the board locks to landscape (either
+/// way up, so the iPad can be turned 180° on the table) and every other
+/// screen turns freely.
+final class OrientationDelegate: NSObject, UIApplicationDelegate {
+    nonisolated(unsafe) static var mask: UIInterfaceOrientationMask = .all
+
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        Self.mask
+    }
+
+    /// Sets the mask and turns the current scene to match it right away.
+    @MainActor
+    static func lock(_ newMask: UIInterfaceOrientationMask) {
+        mask = newMask
+        guard let scene = UIApplication.shared.connectedScenes.first(where: { $0 is UIWindowScene }) as? UIWindowScene else { return }
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: newMask)) { _ in }
+        scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+    }
+}
 
 @main
 struct CommanderGameManagerApp: App {
+    @UIApplicationDelegateAdaptor(OrientationDelegate.self) private var orientation
     /// Reference data (players, decks) and the finished-game outbox live in one
     /// SwiftData store so the game can be set up and finished with no network.
     let container: ModelContainer = {

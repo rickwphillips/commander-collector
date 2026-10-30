@@ -17,6 +17,24 @@ final class GameSettingsStore {
     var darkMode: Bool { didSet { save() } }
     /// Local only: turn every board animation off (still frames, no transitions).
     var animationsEnabled: Bool { didSet { save() } }
+    /// True while the effects fade out (Motion off) or come back in (Motion
+    /// on); the switch is held until the board has fully settled either way.
+    private(set) var motionSettling = false
+    private var settleTask: Task<Void, Never>?
+    /// How long the effects take to fade out or to re-enter.
+    static let motionFadeSeconds = 1.0
+
+    func setAnimations(_ on: Bool) {
+        guard on != animationsEnabled else { return }
+        animationsEnabled = on
+        motionSettling = true
+        settleTask?.cancel()
+        settleTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(Int(Self.motionFadeSeconds * 1000) + 250))
+            guard !Task.isCancelled else { return }
+            self?.motionSettling = false
+        }
+    }
     /// Persisted per player on the web (`cmdDmgShowPlayer:<id>`); one switch
     /// per seat here too.
     var showPlayerNamesInCmdDamage: Set<String> { didSet { save() } }

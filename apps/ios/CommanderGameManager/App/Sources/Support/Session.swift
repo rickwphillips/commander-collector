@@ -13,17 +13,21 @@ final class Session {
 
     private(set) var token: String?
     private(set) var username: String?
+    /// The account's id, which a player row carries as `userId` when linked.
+    private(set) var userId: String?
     var server: URL
 
     init() {
         if DemoMode.usesFakeAccount {
             token = "demo"
             username = "demo"
+            userId = nil
             server = CommanderServer.local
             return
         }
         token = KeychainStore.read(Self.tokenAccount)
         username = UserDefaults.standard.string(forKey: "username")
+        userId = UserDefaults.standard.string(forKey: "userId")
         server = UserDefaults.standard.url(forKey: Self.serverKey) ?? CommanderServer.production
     }
 
@@ -43,8 +47,10 @@ final class Session {
             let body = try ok.body.json
             KeychainStore.write(body.token, account: Self.tokenAccount)
             UserDefaults.standard.set(body.user.username, forKey: "username")
+            UserDefaults.standard.set(body.user.id, forKey: "userId")
             self.token = body.token
             self.username = body.user.username
+            self.userId = body.user.id
         case .unauthorized:
             throw SessionError.badCredentials
         case .badRequest(let bad):
@@ -56,8 +62,10 @@ final class Session {
 
     func signOut() {
         KeychainStore.delete(Self.tokenAccount)
+        UserDefaults.standard.removeObject(forKey: "userId")
         token = nil
         username = nil
+        userId = nil
     }
 
     func useServer(_ url: URL) {

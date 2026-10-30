@@ -100,7 +100,9 @@ struct CommanderBackdrop: View {
             try? await Task.sleep(for: .milliseconds(Int(delay * 1000)))
             withAnimation(.easeInOut(duration: 0.8)) { shown = true }
             guard flash else { return }
-            try? await Task.sleep(for: .milliseconds(800))
+            // The flash (0.21 s up, 0.39 s down) ends with the fade, so the
+            // art lands at full strength on the flash's last frame.
+            try? await Task.sleep(for: .milliseconds(200))
             withAnimation(.easeOut(duration: 0.21)) { flashing = true }
             try? await Task.sleep(for: .milliseconds(210))
             withAnimation(.easeOut(duration: 0.39)) { flashing = false }

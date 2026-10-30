@@ -86,6 +86,34 @@ actor CardArtService {
         return body.data
     }
 
+    /// What a name search may return: anything a deck can be led by (the web's
+    /// `scryfall-cache.php` commander / partner typeahead rules).
+    enum SearchMode {
+        case commander, partner
+        fileprivate func query(_ name: String) -> String {
+            let q = "name:\"\(name.replacingOccurrences(of: "\"", with: ""))\""
+            switch self {
+            case .commander: return "\(q) (t:legendary pow>=0 OR o:\"can be your commander\")"
+            case .partner: return "\(q) (t:legendary (kw:partner OR kw:friends-forever OR kw:doctor's-companion) OR o:\"can be your commander\" OR t:background)"
+            }
+        }
+    }
+
+    /// Card names matching `query` under `mode`'s rule, alphabetical, first page.
+    func searchNames(_ query: String, mode: SearchMode) async -> [String] {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard trimmed.count >= 2 else { return [] }
+        var comps = URLComponents(string: "https://api.scryfall.com/cards/search")!
+        comps.queryItems = [URLQueryItem(name: "q", value: mode.query(trimmed)), URLQueryItem(name: "unique", value: "cards"), URLQueryItem(name: "order", value: "name")]
+        await throttle()
+        guard let (data, response) = try? await session.data(from: comps.url!),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let body = try? JSONDecoder().decode(SearchPage.self, from: data) else { return [] }
+        return body.data.map(\.name)
+    }
+
+    private struct SearchPage: Decodable { struct Card: Decodable { let name: String }; let data: [Card] }
+
     /// Fetch and cache art for every name so the board never waits on the
     /// network once play starts.
     func prewarm(_ names: [String]) async {
