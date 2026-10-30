@@ -64,6 +64,7 @@ struct StateMenuOverlay: View {
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
             .contentShape(Rectangle())
+            .accessibilityIdentifier("menu-\(label)")
             .onTapGesture { toggle(); overlay = nil }
             if rulesOpen == label {
                 Text(rules).font(.system(size: 12)).foregroundStyle(.secondary).padding(.horizontal, 12).padding(.bottom, 8)
@@ -78,6 +79,7 @@ struct StateMenuOverlay: View {
             }
             .foregroundStyle(Theme.danger).padding(.horizontal, 12).padding(.vertical, 10).frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
+            .accessibilityIdentifier("menu-UndoConcede")
             .onTapGesture { session.dispatch(.undoEliminate(playerIdx: idx)); overlay = nil }
         } else if confirming {
             VStack(alignment: .leading, spacing: 6) {
@@ -85,7 +87,7 @@ struct StateMenuOverlay: View {
                 HStack(spacing: 6) {
                     TextField("Turn #", text: $concedeTurn).keyboardType(.numberPad).textFieldStyle(.roundedBorder).frame(width: 72)
                     Button("✓") { session.dispatch(.eliminate(playerIdx: idx)); concedeTurn = ""; overlay = nil }
-                        .buttonStyle(.borderedProminent).tint(Theme.gold).controlSize(.small)
+                        .buttonStyle(.borderedProminent).tint(Theme.gold).controlSize(.small).accessibilityIdentifier("concedeConfirm")
                     Button("✕") { overlay = .stateMenu }.buttonStyle(.bordered).tint(Theme.gold).controlSize(.small)
                 }
             }
@@ -96,6 +98,7 @@ struct StateMenuOverlay: View {
             }
             .foregroundStyle(.secondary).padding(.horizontal, 12).padding(.vertical, 10).frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
+            .accessibilityIdentifier("menu-Concede")
             .onTapGesture { overlay = .concedeConfirm }
         }
     }

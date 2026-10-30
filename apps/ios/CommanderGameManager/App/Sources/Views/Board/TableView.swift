@@ -76,9 +76,8 @@ struct TableView: View {
         }
         .background(Theme.tableBackground(scheme))
         .preferredColorScheme(settings.darkMode ? .dark : .light)
-        .sheet(item: $seatingIdx) { i in
-            SeatPickerSheet(session: session, idx: i, taken: Set(session.state.players.map(\.playerId)))
-        }
+        .environment(\.motionEnabled, settings.animationsEnabled)
+        .transaction { t in if !settings.animationsEnabled { t.animation = nil } }
         .sheet(isPresented: $showLog) {
             GameLogSheet(log: session.log)
         }
@@ -94,6 +93,12 @@ struct TableView: View {
         }
         .onChange(of: session.highestLivingPoison, initial: true) { _, poison in
             SoundService.shared.setPoisonLevel(session.isPlaying ? poison : 0)
+        }
+        .onChange(of: settings.soundEnabled) { _, on in
+            // The service silences itself when switched off; switching back on
+            // re-applies whatever the table is doing right now.
+            SoundService.shared.setPoisonLevel(on && session.isPlaying ? session.highestLivingPoison : 0)
+            SoundService.shared.setCitysBlessingActive(on && session.isPlaying && session.state.players.contains { $0.hasCitysBlessing })
         }
         .onDisappear { SoundService.shared.stopPoison(); host?.end(); host = nil; session.onStateChanged = nil }
         .onChange(of: session.isPlaying, initial: true) { _, playing in
@@ -128,7 +133,7 @@ struct TableView: View {
         if session.isSeating {
             HStack(spacing: 4) {
                 ForEach(session.state.players.indices.filter { session.state.players[$0].teamNumber == team }, id: \.self) { i in
-                    SeatingPanel(player: session.state.players[i], teamNumber: team) { seatingIdx = i }
+                    seatingCard(i)
                 }
             }
         } else {
@@ -139,13 +144,28 @@ struct TableView: View {
     @ViewBuilder
     private func panel(_ i: Int, elapsed: Int) -> some View {
         if session.isSeating {
-            SeatingPanel(player: session.state.players[i], teamNumber: session.state.players[i].teamNumber) {
-                seatingIdx = i
-            }
+            seatingCard(i)
         } else {
             SeatPanel(session: session, idx: i, elapsedSeconds: elapsed, backdropDelay: backdropDelay(i),
                       backdropFlash: session.firstPlayerChosenThisSession, turnIndicatorOn: turnIndicatorOn)
         }
+    }
+}
+
+extension TableView {
+    /// A seating card with its picker rendered inside it, so the picker turns
+    /// with the seat and faces the player who opened it.
+    @ViewBuilder
+    fileprivate func seatingCard(_ i: Int) -> some View {
+        ZStack {
+            SeatingPanel(player: session.state.players[i], teamNumber: session.state.players[i].teamNumber) { seatingIdx = i }
+            if seatingIdx == i {
+                SeatPickerSheet(session: session, idx: i, taken: Set(session.state.players.map(\.playerId))) { seatingIdx = nil }
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: seatingIdx)
     }
 }
 
@@ -192,5 +212,6 @@ struct SeatingPanel: View {
             .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [8, 6])).foregroundStyle(filled ? Color.accentColor : Color.primary.opacity(0.2)))
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("seat-\(player.position.rawValue)")
     }
 }

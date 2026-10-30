@@ -11,7 +11,7 @@ struct SeatPickerSheet: View {
     @Bindable var session: GameSession
     let idx: Int
     let taken: Set<String>
-    @Environment(\.dismiss) private var dismiss
+    let onDone: () -> Void
     @Query(sort: \CachedPlayer.name) private var players: [CachedPlayer]
     @Query(sort: \CachedDeck.name) private var decks: [CachedDeck]
 
@@ -32,7 +32,9 @@ struct SeatPickerSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        ZStack {
+        VStack(spacing: 0) {
+            OverlayHeader(title: "Choose player & deck", cancelId: "seatPickerCancel", confirmId: "seatPickerSave", confirmLabel: "Save seat", onCancel: onDone, onConfirm: confirm)
             Form {
                 Section {
                     Picker("Player", selection: $playerId) {
@@ -63,17 +65,6 @@ struct SeatPickerSheet: View {
                 }
                 if let error { Section { Text(error).foregroundStyle(.red) } }
             }
-            .navigationTitle("Choose player & deck")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Save seat") { confirm() }.bold() }
-            }
-            .sheet(isPresented: $showNewDeck) {
-                DeckEditorSheet(playerId: playerId.isEmpty ? (players.first?.id ?? "") : playerId) { deck in
-                    choose(deck)
-                }
-            }
             .onAppear {
                 if GameSetup.isSeatFilled(seat) {
                     playerId = seat.playerId
@@ -83,6 +74,13 @@ struct SeatPickerSheet: View {
                     partner = CommanderField(name: seat.partner?.name ?? "")
                 }
             }
+        }
+        if showNewDeck {
+            DeckEditorSheet(playerId: playerId.isEmpty ? (players.first?.id ?? "") : playerId, onDone: { showNewDeck = false }) { deck in
+                choose(deck)
+            }
+            .transition(.opacity)
+        }
         }
     }
 
@@ -123,7 +121,7 @@ struct SeatPickerSheet: View {
         session.seat(idx, GameSetup.Seat(
             playerId: playerId, playerName: player?.name ?? "Player", deckId: deckId, deckName: deck?.name ?? "",
             commander: CommanderInfo(name: commander.name), partner: hasPartner ? CommanderInfo(name: partner.name) : nil))
-        dismiss()
+        onDone()
     }
 }
 
@@ -171,8 +169,8 @@ struct CommanderSearchField: View {
 /// adds it to the local cache; colours come from the commander's identity.
 struct DeckEditorSheet: View {
     @State var playerId: String
+    let onDone: () -> Void
     let onCreated: (CachedDeck) -> Void
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Environment(Session.self) private var account
     @Query(sort: \CachedPlayer.name) private var players: [CachedPlayer]
@@ -184,7 +182,9 @@ struct DeckEditorSheet: View {
     @State private var error: String?
 
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            OverlayHeader(title: "New deck", cancelId: "deckEditorCancel", confirmId: "deckEditorCreate", confirmLabel: "Create", busy: saving,
+                          confirmDisabled: saving || name.isEmpty || commander.name.isEmpty || playerId.isEmpty, onCancel: onDone, onConfirm: save)
             Form {
                 Picker("Owner", selection: $playerId) {
                     ForEach(players) { Text($0.name).tag($0.id) }
@@ -195,16 +195,8 @@ struct DeckEditorSheet: View {
                 if hasPartner { CommanderSearchField(label: "Partner commander", field: $partner) }
                 if let error { Text(error).foregroundStyle(.red) }
             }
-            .navigationTitle("New deck")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button { save() } label: { if saving { ProgressView() } else { Text("Create").bold() } }
-                        .disabled(saving || name.isEmpty || commander.name.isEmpty || playerId.isEmpty)
-                }
-            }
         }
+        .background(Color(.systemGroupedBackground))
     }
 
     private func save() {
@@ -228,7 +220,7 @@ struct DeckEditorSheet: View {
                     context.insert(cached)
                     try? context.save()
                     onCreated(cached)
-                    dismiss()
+                    onDone()
                 case .badRequest(let bad): error = (try? bad.body.json.error) ?? "Bad request"
                 case .forbidden: error = "You can only create decks for your own player."
                 case .unauthorized: error = "Sign in again to create a deck."
@@ -238,5 +230,32 @@ struct DeckEditorSheet: View {
                 self.error = "Could not reach the web app: \(error.localizedDescription)"
             }
         }
+    }
+}
+
+/// Cancel · title · confirm bar for the in-seat pickers (they render inside a
+/// seat card, where the board keeps navigation bars hidden).
+struct OverlayHeader: View {
+    let title: String
+    let cancelId: String
+    let confirmId: String
+    let confirmLabel: String
+    var busy = false
+    var confirmDisabled = false
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        HStack {
+            Button("Cancel", action: onCancel).accessibilityIdentifier(cancelId)
+            Spacer()
+            Text(title).font(.headline)
+            Spacer()
+            Button(action: onConfirm) { if busy { ProgressView() } else { Text(confirmLabel).bold() } }
+                .disabled(confirmDisabled)
+                .accessibilityIdentifier(confirmId)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 10)
+        .background(Color(.secondarySystemGroupedBackground))
     }
 }

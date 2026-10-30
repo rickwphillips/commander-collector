@@ -68,6 +68,7 @@ struct EndSummaryView: View {
                         Label("Discard game", systemImage: "trash").frame(maxWidth: .infinity)
                     }
                     .disabled(queued)
+                    .accessibilityIdentifier("discardGame")
                 } footer: {
                     Text("Saving stores the game on this iPad and uploads it with its log the next time the server is reachable. The table never waits on the network.")
                 }

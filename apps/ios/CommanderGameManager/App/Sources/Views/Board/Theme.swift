@@ -97,3 +97,17 @@ enum RulesText {
         "\(name) tax: cast \(tax)× (+\(tax * 2) generic mana)"
     }
 }
+
+
+/// Whether the board runs its status animations (Settings → Motion). Off
+/// freezes every effect at a still frame and drops implicit animations.
+private struct MotionEnabledKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+extension EnvironmentValues {
+    var motionEnabled: Bool {
+        get { self[MotionEnabledKey.self] }
+        set { self[MotionEnabledKey.self] = newValue }
+    }
+}

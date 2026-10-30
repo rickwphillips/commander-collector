@@ -52,8 +52,10 @@ struct TeamPanel: View {
             let sz = SeatPanel.Sizes(panelHeight: geo.size.height)
             ZStack {
                 Theme.panelBackground(scheme)
-                if members.contains(where: { state.players[$0].hasInitiative }) { InitiativeTorch() }
-                PoisonOverlay(poison: poison, progress: poisonProgress)
+                if settings.animationsEnabled {
+                    if members.contains(where: { state.players[$0].hasInitiative }) { InitiativeTorch() }
+                    PoisonOverlay(poison: poison, progress: poisonProgress)
+                }
                 VStack(spacing: 0) {
                     header(sz)
                     Divider()
@@ -65,7 +67,7 @@ struct TeamPanel: View {
                     .padding(10)
                 }
                 .shadow(color: Theme.energyCyan.opacity(min(Double(teamEnergy) / 8, 1) * 0.9), radius: 4 + min(Double(teamEnergy) / 8, 1) * 14)
-                if cityBlessingVisible { CityBlessing(exiting: cityBlessingExiting, commanders: members.flatMap { [state.players[$0].commander.name] + (state.players[$0].partner.map { [$0.name] } ?? []) }, threat: threat) }
+                if cityBlessingVisible && settings.animationsEnabled { CityBlessing(exiting: cityBlessingExiting, commanders: members.flatMap { [state.players[$0].commander.name] + (state.players[$0].partner.map { [$0.name] } ?? []) }, threat: threat) }
                 if eliminated { EliminatedOverlay(conceded: conceded, poisoned: poison >= 15) }
                 if overlay == .concedeConfirm {
                     Theme.gold.opacity(0.12).allowsHitTesting(false)
@@ -227,7 +229,7 @@ struct TeamPanel: View {
         return VStack(spacing: 4) {
             ZStack {
                 LifeCracks(fingerprint: teamNumber, lostRatio: lost)
-                if let threat, threat.intensity > 0 { ThreatNames(name: threat.commanderName, intensity: threat.intensity, fingerprint: teamNumber) }
+                if let threat, threat.intensity > 0, settings.animationsEnabled { ThreatNames(name: threat.commanderName, intensity: threat.intensity, fingerprint: teamNumber) }
                 HStack(spacing: 12) {
                     StepButton(symbol: "minus", size: StepperSize(buttonFont: sz.lifeBtn, buttonWidth: 48, buttonHeight: 44)) { session.dispatch(.lifeChange(playerIdx: primary, delta: $0 ? -5 : -1)) }
                     LifeNumber(value: life, fontSize: sz.life, color: lifeColor, damageFlash: damageFlash, energy: teamEnergy, poison: poison, poisonLethal: 15)
@@ -240,7 +242,7 @@ struct TeamPanel: View {
                 }
                 .padding(6)
                 .background(GlassBacking(active: glassActive))
-                if damageFlash > 0 { DamageSwipes(magnitude: damageFlash, trigger: flashTrigger) }
+                if damageFlash > 0 && settings.animationsEnabled { DamageSwipes(magnitude: damageFlash, trigger: flashTrigger) }
             }
             .frame(minHeight: sz.life * 1.3)
             .clipped()

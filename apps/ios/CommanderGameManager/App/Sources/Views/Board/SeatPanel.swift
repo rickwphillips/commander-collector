@@ -17,6 +17,7 @@ struct SeatPanel: View {
     let turnIndicatorOn: Bool
     @Environment(GameSettingsStore.self) private var settings
     @Environment(\.colorScheme) private var scheme
+    private var motion: Bool { settings.animationsEnabled }
 
     @State private var overlay: SeatOverlay?
     @State private var cmdDmgOpen = true
@@ -57,8 +58,10 @@ struct SeatPanel: View {
                 Theme.panelBackground(scheme)
                 if isWarning { (scheme == .dark ? Color(red: 180/255, green: 40/255, blue: 40/255).opacity(0.18) : Color(red: 220/255, green: 80/255, blue: 80/255).opacity(0.08)) }
                 CommanderBackdrop(name: player.commander.name, revealDelay: backdropDelay, flash: backdropFlash)
-                if player.hasInitiative { InitiativeTorch().transition(.opacity) }
-                PoisonOverlay(poison: player.poison, progress: poisonProgress)
+                if motion {
+                    if player.hasInitiative { InitiativeTorch().transition(.opacity) }
+                    PoisonOverlay(poison: player.poison, progress: poisonProgress)
+                }
 
                 VStack(spacing: 0) {
                     header(sz)
@@ -67,8 +70,8 @@ struct SeatPanel: View {
                 }
                 .shadow(color: Theme.energyCyan.opacity(energyGlow * 0.9), radius: 4 + energyGlow * 14)
 
-                if cityBlessingVisible { CityBlessing(exiting: cityBlessingExiting, commanders: [player.commander.name] + (player.partner.map { [$0.name] } ?? []), threat: threat) }
-                if player.isEliminated { EliminatedOverlay(conceded: player.isConceded, poisoned: isPoisoned) }
+                if cityBlessingVisible && motion { CityBlessing(exiting: cityBlessingExiting, commanders: [player.commander.name] + (player.partner.map { [$0.name] } ?? []), threat: threat) }
+                if player.isEliminated { EliminatedOverlay(conceded: player.isConceded, poisoned: isPoisoned).accessibilityIdentifier("s\(idx)-eliminated") }
                 if overlay == .concedeConfirm {
                     Theme.gold.opacity(0.12).allowsHitTesting(false)
                     Text("CONCEDE?").font(.system(size: 22, weight: .black)).kerning(2).foregroundStyle(Theme.gold)
@@ -139,6 +142,7 @@ struct SeatPanel: View {
                         .frame(width: 30, height: 30).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("s\(idx)-menu")
             }
             VStack(spacing: 0) {
                 Text(player.playerName).font(.system(size: sz.name, weight: .bold)).lineLimit(1)
@@ -197,10 +201,15 @@ struct SeatPanel: View {
     private func statusIcon<G: View>(active: Bool, size: CGFloat, rules: (String, String), toggle: LiveGameEvent.Kind, @ViewBuilder glyph: () -> G) -> some View {
         glyph()
             .frame(width: size, height: size)
-            .contentShape(Rectangle())
-            .onTapGesture { overlay = .rules(title: rules.0, text: rules.1) }
-            .onLongPressGesture(minimumDuration: 0.5) { session.dispatch(toggle) }
             .opacity(active ? 1 : 0.6)
+            .overlay {
+                // The glyph redraws every frame while it shimmers; the gestures
+                // live on this still layer so a hold is never interrupted.
+                HoldOrTap(onTap: { overlay = .rules(title: rules.0, text: rules.1) }, onHold: { session.dispatch(toggle) })
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityIdentifier("s\(idx)-status-\(rules.0)")
+            .accessibilityValue(active ? "on" : "off")
     }
 
     // MARK: Columns
@@ -232,23 +241,25 @@ struct SeatPanel: View {
         let lost = Theme.lostRatio(player.life, startingLife: state.startingLife)
         return ZStack {
             LifeCracks(fingerprint: idx, lostRatio: lost)
-            if let threat, threat.intensity > 0 { ThreatNames(name: threat.commanderName, intensity: threat.intensity, fingerprint: idx) }
+            if let threat, threat.intensity > 0, motion { ThreatNames(name: threat.commanderName, intensity: threat.intensity, fingerprint: idx) }
             VStack(spacing: 2) {
                 LifeNumber(value: player.life, fontSize: fontSize, color: lifeColor, damageFlash: damageFlash, energy: player.energy, poison: player.poison, poisonLethal: poisonLethal)
+                    .accessibilityIdentifier("s\(idx)-life")
+                    .accessibilityValue("\(player.life)")
                     .onTapGesture { overlay = .focus(.life) }
                     .overlay(alignment: .topLeading) {
                         MonarchCrown(isMonarch: player.isMonarch, transferHint: session.monarchTransferRecent, size: fontSize * 0.55)
                             .offset(x: -fontSize * 0.3, y: -fontSize * 0.3)
                     }
                 HStack(spacing: 10) {
-                    StepButton(symbol: "minus", size: StepperSize(buttonFont: sz.lifeBtn, buttonWidth: 52, buttonHeight: 44)) { session.dispatch(.lifeChange(playerIdx: idx, delta: $0 ? -5 : -1)) }
-                    StepButton(symbol: "plus", size: StepperSize(buttonFont: sz.lifeBtn, buttonWidth: 52, buttonHeight: 44)) { session.dispatch(.lifeChange(playerIdx: idx, delta: $0 ? 5 : 1)) }
+                    StepButton(symbol: "minus", size: StepperSize(buttonFont: sz.lifeBtn, buttonWidth: 52, buttonHeight: 44), id: "s\(idx)-life-dec") { session.dispatch(.lifeChange(playerIdx: idx, delta: $0 ? -5 : -1)) }
+                    StepButton(symbol: "plus", size: StepperSize(buttonFont: sz.lifeBtn, buttonWidth: 52, buttonHeight: 44), id: "s\(idx)-life-inc") { session.dispatch(.lifeChange(playerIdx: idx, delta: $0 ? 5 : 1)) }
                 }
             }
             .padding(6)
             .background(GlassBacking(active: glassActive))
             .fixedSize(horizontal: false, vertical: true)
-            if damageFlash > 0 { DamageSwipes(magnitude: damageFlash, trigger: flashTrigger) }
+            if damageFlash > 0 && motion { DamageSwipes(magnitude: damageFlash, trigger: flashTrigger) }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
@@ -369,6 +380,7 @@ struct SeatPanel: View {
 /// a hit, blue pulse + sizzle above 5 energy, green boil at 8+ poison. A flash
 /// overrides the idle animations; energy outranks poison.
 struct LifeNumber: View {
+    @Environment(\.motionEnabled) private var motion
     let value: Int
     let fontSize: CGFloat
     let color: Color?
@@ -378,7 +390,7 @@ struct LifeNumber: View {
     let poisonLethal: Int
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30, paused: damageFlash == 0 && energy <= 5 && poison < 8)) { ctx in
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: (damageFlash == 0 && energy <= 5 && poison < 8) || !motion)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             let energetic = damageFlash == 0 && energy > 5
             let boiling = damageFlash == 0 && !energetic && poison >= 8
@@ -403,10 +415,11 @@ struct LifeNumber: View {
 
 /// Header crown that shimmers while held and reads dim when another seat holds it.
 struct ShimmerCrown: View {
+    @Environment(\.motionEnabled) private var motion
     let size: CGFloat
     let active: Bool
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 20, paused: !active)) { ctx in
+        TimelineView(.animation(minimumInterval: 1 / 20, paused: (!active) || !motion)) { ctx in
             let g = (sin(ctx.date.timeIntervalSinceReferenceDate / 2 * 2 * .pi) + 1) / 2
             Image(systemName: "crown.fill").resizable().scaledToFit()
                 .foregroundStyle(active ? Theme.gold : Color.secondary.opacity(0.4))
@@ -417,19 +430,27 @@ struct ShimmerCrown: View {
 }
 
 struct BlinkingFill: View {
+
+    @Environment(\.motionEnabled) private var motion
     let on: Color, off: Color
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
-            (Int(ctx.date.timeIntervalSinceReferenceDate * 4) % 2 == 0 ? on : off)
+        if !motion {
+            on
+        } else {
+            TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
+                (Int(ctx.date.timeIntervalSinceReferenceDate * 4) % 2 == 0 ? on : off)
+            }
         }
     }
 }
 
 struct BlinkingStroke<S: InsettableShape>: View {
+
+    @Environment(\.motionEnabled) private var motion
     let shape: S
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
-            let on = Int(ctx.date.timeIntervalSinceReferenceDate * 4) % 2 == 0
+            let on = !motion || Int(ctx.date.timeIntervalSinceReferenceDate * 4) % 2 == 0
             shape.strokeBorder(on ? Theme.danger : .clear, lineWidth: 3).shadow(color: on ? Theme.danger.opacity(0.6) : .clear, radius: 12)
         }
     }

@@ -231,6 +231,7 @@ final class SoundService {
         loops.keys.forEach(stopLoop)
         stopDrone()
         fireworkTask?.cancel(); fireworkTask = nil
+        stabTask?.cancel(); stabTask = nil
     }
 }
 

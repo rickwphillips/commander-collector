@@ -192,7 +192,6 @@ struct RemoteTurnControl: View {
     let isYourTurn: Bool
     let onNext: () -> Void
     let onPrev: () -> Void
-    @State private var fired = false
     @State private var tip = false
 
     var body: some View {
@@ -204,11 +203,12 @@ struct RemoteTurnControl: View {
             .foregroundStyle(isYourTurn ? .white : Color.accentColor)
             .overlay(alignment: .top) { if tip { Text("Previous Turn").font(.caption2.bold()).padding(6).background(Capsule().fill(Color(.systemGray))).foregroundStyle(.white).offset(y: -30) } }
             .contentShape(Rectangle())
-            .onTapGesture { if fired { fired = false; return }; onNext() }
-            .onLongPressGesture(minimumDuration: 0.5) {
-                fired = true; onPrev()
-                withAnimation { tip = true }
-                Task { try? await Task.sleep(for: .milliseconds(700)); withAnimation { tip = false } }
+            .overlay {
+                HoldOrTap(onTap: onNext) {
+                    onPrev()
+                    withAnimation { tip = true }
+                    Task { try? await Task.sleep(for: .milliseconds(700)); withAnimation { tip = false } }
+                }
             }
     }
 }

@@ -80,6 +80,8 @@ struct StepperControl<Label: View>: View {
     var size: StepperSize = .init()
     var valueBlur: CGFloat = 0
     var focus: FocusTarget? = nil
+    /// Accessibility prefix for UI tests: `<id>-dec`, `<id>-value`, `<id>-inc`.
+    var identifier: String? = nil
     @Binding var overlay: SeatOverlay?
     let onChange: (Int) -> Void
     @ViewBuilder let label: () -> Label
@@ -88,7 +90,7 @@ struct StepperControl<Label: View>: View {
         HStack(spacing: 4) {
             label()
                 .frame(maxWidth: .infinity, alignment: .leading)
-            StepButton(symbol: "minus", size: size, disabled: disableDec) { onChange($0 ? -5 : -1) }
+            StepButton(symbol: "minus", size: size, disabled: disableDec, id: identifier.map { "\($0)-dec" }) { onChange($0 ? -5 : -1) }
             Text("\(value)")
                 .font(.system(size: size.valueFont, weight: .bold).monospacedDigit())
                 .foregroundStyle(color)
@@ -97,8 +99,9 @@ struct StepperControl<Label: View>: View {
                 .contentTransition(.numericText(value: Double(value)))
                 .animation(.snappy(duration: 0.25), value: value)
                 .contentShape(Rectangle())
+                .accessibilityIdentifier(identifier.map { "\($0)-value" } ?? "")
                 .onTapGesture { if let focus { overlay = .focus(focus) } }
-            StepButton(symbol: "plus", size: size, disabled: false) { onChange($0 ? 5 : 1) }
+            StepButton(symbol: "plus", size: size, disabled: false, id: identifier.map { "\($0)-inc" }) { onChange($0 ? 5 : 1) }
             if let max {
                 Text("/\(max)").font(.system(size: size.labelFont)).foregroundStyle(.secondary).fixedSize().layoutPriority(1)
             } else if reserveMax {
@@ -117,6 +120,7 @@ struct StepButton: View {
     let symbol: String
     var size: StepperSize = .init()
     var disabled = false
+    var id: String? = nil
     /// true when the hold fired (±5), false for a tap (±1).
     let action: (Bool) -> Void
     @State private var tip = false
@@ -129,6 +133,7 @@ struct StepButton: View {
             .frame(width: size.buttonWidth, height: size.buttonHeight)
             .foregroundStyle(disabled ? Color.secondary.opacity(0.4) : Color.primary)
             .contentShape(Rectangle())
+            .accessibilityIdentifier(id ?? "")
             .overlay(alignment: .top) {
                 if tip {
                     Text(symbol == "minus" ? "−5" : "+5")
@@ -174,22 +179,23 @@ struct FocusModal: View {
                 HStack {
                     Text(title).font(.system(size: 15, weight: .bold))
                     Spacer()
-                    Button(action: onClose) { Image(systemName: "xmark").font(.footnote.bold()) }.foregroundStyle(.secondary)
+                    Button(action: onClose) { Image(systemName: "xmark").font(.footnote.bold()) }.foregroundStyle(.secondary).accessibilityIdentifier("focus-close")
                 }
                 HStack(spacing: 14) {
-                    bigButton("minus", disabled: disableDec) { onChange(-1) }
+                    bigButton("minus", disabled: disableDec) { onChange(-1) }.accessibilityIdentifier("focus-dec")
                     Text("\(value)")
                         .font(.system(size: 64, weight: .black).monospacedDigit())
                         .foregroundStyle(color)
                         .frame(minWidth: 90)
                         .contentTransition(.numericText(value: Double(value)))
                         .animation(.snappy, value: value)
-                    bigButton("plus", disabled: false) { onChange(1) }
+                        .accessibilityIdentifier("focus-value")
+                    bigButton("plus", disabled: false) { onChange(1) }.accessibilityIdentifier("focus-inc")
                 }
                 HStack(spacing: 14) {
-                    Button("−5") { onChange(-5) }.disabled(disableDec).frame(width: 56, height: 36)
+                    Button("−5") { onChange(-5) }.disabled(disableDec).frame(width: 56, height: 36).accessibilityIdentifier("focus-dec5")
                     Text("±5").font(.caption).foregroundStyle(.secondary).frame(minWidth: 90)
-                    Button("+5") { onChange(5) }.frame(width: 56, height: 36)
+                    Button("+5") { onChange(5) }.frame(width: 56, height: 36).accessibilityIdentifier("focus-inc5")
                 }
                 .font(.footnote.bold())
             }
@@ -225,5 +231,41 @@ struct GlassBacking: View {
             .opacity(active ? 1 : 0)
             .animation(active ? .easeInOut(duration: 1.5) : .easeInOut(duration: 0.4), value: active)
             .allowsHitTesting(false)
+    }
+}
+
+
+/// A transparent gesture layer: tap for one action, hold 0.5 s for another;
+/// a completed hold swallows the trailing tap.
+struct HoldOrTap: UIViewRepresentable {
+    let onTap: () -> Void
+    let onHold: () -> Void
+
+    func makeUIView(context: Context) -> UIView {
+        let v = UIView()
+        v.backgroundColor = .clear
+        v.isAccessibilityElement = false
+        let hold = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.held(_:)))
+        hold.minimumPressDuration = 0.5
+        let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tapped))
+        tap.require(toFail: hold)
+        v.addGestureRecognizer(hold)
+        v.addGestureRecognizer(tap)
+        return v
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.onTap = onTap
+        context.coordinator.onHold = onHold
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(onTap: onTap, onHold: onHold) }
+
+    final class Coordinator: NSObject {
+        var onTap: () -> Void
+        var onHold: () -> Void
+        init(onTap: @escaping () -> Void, onHold: @escaping () -> Void) { self.onTap = onTap; self.onHold = onHold }
+        @objc func tapped() { onTap() }
+        @objc func held(_ g: UILongPressGestureRecognizer) { if g.state == .began { onHold() } }
     }
 }

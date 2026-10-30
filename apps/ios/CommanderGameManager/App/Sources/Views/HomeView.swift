@@ -82,6 +82,7 @@ struct HomeView: View {
                             Text("Each seat gets a different player and one of their own decks. You can still change any seat before starting.").font(.footnote).foregroundStyle(.secondary)
                         }
                     }
+                    .accessibilityIdentifier("randomToggle")
                 }
                 Section {
                     Button { showJoin = true } label: { Label("Join a table nearby", systemImage: "qrcode.viewfinder") }
@@ -155,6 +156,7 @@ struct HomeView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Continue to seating") { start(prefill: random ? randomPrefill() : []) }
                         .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("continueToSeating")
                         .disabled(players.isEmpty || decks.isEmpty)
                 }
             }

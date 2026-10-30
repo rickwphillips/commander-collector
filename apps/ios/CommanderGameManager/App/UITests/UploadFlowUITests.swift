@@ -5,13 +5,17 @@ import XCTest
 /// Uploaded. Uses whatever account is signed in on the device, so the game lands
 /// in that account's history; delete it afterwards if it was a test.
 final class UploadFlowUITests: XCTestCase {
-    func testEndGameSaveAndUpload() {
+    func testEndGameSaveAndUpload() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["REAL_DEVICE"] == "1", "needs a signed-in iPad; set REAL_DEVICE=1")
         let app = XCUIApplication()
         app.launchArguments = ["-demoBoard"]
         app.launch()
 
-        let end = app.buttons["endGame"]
-        XCTAssertTrue(end.waitForExistence(timeout: 20), "board did not show the End button")
+        let settings = app.descendants(matching: .any)["openSettings"].firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 20), "board did not show the settings button")
+        settings.tap()
+        let end = app.descendants(matching: .any)["endGame"].firstMatch
+        XCTAssertTrue(end.waitForExistence(timeout: 5), "settings did not show End Game")
         end.tap()
         let confirm = app.buttons["End game"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "end confirmation did not appear")

@@ -165,6 +165,8 @@ struct ThreatNames: View {
     }
 
     private struct PulsingName: View {
+
+        @Environment(\.motionEnabled) private var motion
         let text: String
         let size: CGFloat
         let rotate: Double
@@ -172,7 +174,7 @@ struct ThreatNames: View {
         let period: Double
         let glow: Double
         var body: some View {
-            TimelineView(.animation(minimumInterval: 1 / 20)) { ctx in
+            TimelineView(.animation(minimumInterval: 1 / 20, paused: !motion)) { ctx in
                 let t = ctx.date.timeIntervalSinceReferenceDate
                 let phase = (sin(t / period * 2 * .pi) + 1) / 2
                 Text(text)

@@ -88,7 +88,7 @@ struct CommanderDamageRow: View {
         VStack(spacing: 0) {
             StepperControl(value: damage.fromCommander, color: damage.fromCommander >= 21 ? Theme.danger : source.isEliminated ? .secondary : .primary,
                            max: 21, disableDec: source.isEliminated, glass: glass, size: sizes.stepper,
-                           focus: .commanderDamage(sourceIdx: sourceIdx, partner: false), overlay: $overlay,
+                           focus: .commanderDamage(sourceIdx: sourceIdx, partner: false), identifier: "s\(targetIdx)-cmd-\(sourceIdx)", overlay: $overlay,
                            onChange: { session.dispatch(.commanderDamageChange(targetIdx: targetIdx, sourceIdx: sourceIdx, isPartner: false, delta: $0)) }) {
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 4) {
@@ -111,7 +111,7 @@ struct CommanderDamageRow: View {
             if let partner = source.partner {
                 StepperControl(value: damage.fromPartner, color: damage.fromPartner >= 21 ? Theme.danger : source.isEliminated ? .secondary : .primary,
                                max: 21, disableDec: source.isEliminated, glass: glass, size: sizes.stepper,
-                               focus: .commanderDamage(sourceIdx: sourceIdx, partner: true), overlay: $overlay,
+                               focus: .commanderDamage(sourceIdx: sourceIdx, partner: true), identifier: "s\(targetIdx)-cmd-\(sourceIdx)-partner", overlay: $overlay,
                                onChange: { session.dispatch(.commanderDamageChange(targetIdx: targetIdx, sourceIdx: sourceIdx, isPartner: true, delta: $0)) }) {
                     Text(partner.name).font(.system(size: sizes.source)).foregroundStyle(.secondary).strikethrough(source.isEliminated).lineLimit(1)
                         .contentShape(Rectangle())
@@ -208,7 +208,7 @@ struct CountersColumn: View {
     }
 
     private func row(_ label: String, glyph: CounterGlyph, value: Int, color: Color, focus: FocusTarget, max: Int? = nil, pulse: Bool = false, xpGlow: Bool = false, onChange: @escaping (Int) -> Void) -> some View {
-        StepperControl(value: value, color: color, max: max, reserveMax: max == nil, glass: glass, size: sizes.stepper, valueBlur: blur, focus: focus, overlay: $overlay, onChange: onChange) {
+        StepperControl(value: value, color: color, max: max, reserveMax: max == nil, glass: glass, size: sizes.stepper, valueBlur: blur, focus: focus, identifier: "s\(idx)-\(focus.id)", overlay: $overlay, onChange: onChange) {
             HStack(spacing: 4) {
                 glyph
                 Text(label).font(.system(size: sizes.label)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.6)
@@ -251,10 +251,11 @@ struct CountersColumn: View {
 
 /// Green flare in/out when poison sits one below lethal.
 struct PoisonPulse: ViewModifier {
+    @Environment(\.motionEnabled) private var motion
     let active: Bool
     func body(content: Content) -> some View {
         if active {
-            TimelineView(.animation(minimumInterval: 1 / 20)) { ctx in
+            TimelineView(.animation(minimumInterval: 1 / 20, paused: !motion)) { ctx in
                 let p = (sin(ctx.date.timeIntervalSinceReferenceDate / 2.5 * 2 * .pi) + 1) / 2
                 content.opacity(1 - 0.7 * p).scaleEffect(1 - 0.15 * p)
                     .shadow(color: Color(red: 0, green: 200/255, blue: 60/255).opacity(0.9 * (1 - p)), radius: 8 * (1 - p) + 2)

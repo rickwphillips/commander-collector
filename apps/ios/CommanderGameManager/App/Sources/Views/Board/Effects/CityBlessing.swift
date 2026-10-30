@@ -32,6 +32,8 @@ struct CityBlessing: View {
     }
 
     private struct SceneCanvas: View {
+
+        @Environment(\.motionEnabled) private var motion
         let start: Date
         let exitStart: Date?
         let dark: Bool
@@ -39,8 +41,8 @@ struct CityBlessing: View {
         let threat: (image: UIImage?, name: String, count: Int)?
 
         var body: some View {
-            TimelineView(.animation(minimumInterval: 1 / 30)) { ctx in
-                let age = ctx.date.timeIntervalSince(start)
+            TimelineView(.animation(minimumInterval: 1 / 30, paused: !motion)) { ctx in
+                let age = motion ? ctx.date.timeIntervalSince(start) : 12
                 let exitAge = exitStart.map { ctx.date.timeIntervalSince($0) }
                 Canvas { gc, size in
                     let scene = Scene(size: size, age: age, exitAge: exitAge, dark: dark)
@@ -338,7 +340,8 @@ struct CityBlessing: View {
                     // Flag: a 72×50 panel of art clipped to the waving quad, skewed by the gust.
                     var f = layer
                     f.translateBy(x: -3, y: -140)
-                    f.transform = f.transform.concatenating(CGAffineTransform(a: 1, b: 0, c: tan(skew * .pi / 180), d: 1, tx: 0, ty: 0))
+                    // Skew in the flag's own space (about the pole top), so the cloth stays on the pole.
+                    f.transform = CGAffineTransform(a: 1, b: 0, c: tan(skew * .pi / 180), d: 1, tx: 0, ty: 0).concatenating(f.transform)
                     var quad = Path()
                     quad.move(to: .zero); quad.addLine(to: CGPoint(x: -flagW, y: (42 - flagH) * 0.5)); quad.addLine(to: CGPoint(x: -flagW, y: flagH)); quad.addLine(to: CGPoint(x: 0, y: 42)); quad.closeSubpath()
                     f.addFilter(.shadow(color: .black.opacity(0.65), radius: 4, x: -2, y: 2))

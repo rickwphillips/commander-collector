@@ -7,6 +7,7 @@ import SwiftUI
 /// transfer from another seat takes longer and starts later), slides out on
 /// loss.
 struct MonarchCrown: View {
+    @Environment(\.motionEnabled) private var motion
     let isMonarch: Bool
     /// Changes when a crown transfer between seats happened recently.
     let transferHint: Bool
@@ -15,7 +16,7 @@ struct MonarchCrown: View {
     @State private var offset: CGFloat = -80
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 20, paused: !shown)) { ctx in
+        TimelineView(.animation(minimumInterval: 1 / 20, paused: (!shown) || !motion)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             let glow = (sin(t / 2 * 2 * .pi) + 1) / 2
             Image(systemName: "crown.fill")
@@ -43,6 +44,7 @@ struct MonarchCrown: View {
 
 /// Dungeon wall and a drifting, flickering torch (web `InitiativeTorch`).
 struct InitiativeTorch: View {
+    @Environment(\.motionEnabled) private var motion
     @State private var shown = false
 
     var body: some View {
@@ -51,7 +53,7 @@ struct InitiativeTorch: View {
                 Image("dungeon").resizable().scaledToFill()
                     .frame(width: geo.size.width, height: geo.size.height)
                     .opacity(0.3)
-                TimelineView(.animation(minimumInterval: 1 / 24)) { ctx in
+                TimelineView(.animation(minimumInterval: 1 / 24, paused: !motion)) { ctx in
                     let t = ctx.date.timeIntervalSinceReferenceDate
                     let drift = Self.drift(at: (t / 42).truncatingRemainder(dividingBy: 1))
                     let flicker = 0.11 + 0.08 * Self.noise(t * 1.7)
@@ -125,6 +127,7 @@ struct InitiativeTorch: View {
 /// `EliminatedOverlay`): gold with falling tears for a concede, green with a
 /// black outline for poison, red otherwise.
 struct EliminatedOverlay: View {
+    @Environment(\.motionEnabled) private var motion
     let conceded: Bool
     let poisoned: Bool
 
@@ -137,7 +140,7 @@ struct EliminatedOverlay: View {
             ZStack {
                 if conceded && !poisoned {
                     Theme.gold.opacity(0.12)
-                    TimelineView(.animation(minimumInterval: 1 / 30)) { ctx in
+                    TimelineView(.animation(minimumInterval: 1 / 30, paused: !motion)) { ctx in
                         let t = ctx.date.timeIntervalSinceReferenceDate
                         ForEach(Array(Self.tears.enumerated()), id: \.offset) { _, tear in
                             let p = ((t - tear.delay) / tear.dur).truncatingRemainder(dividingBy: 1)
@@ -175,6 +178,7 @@ struct EliminatedOverlay: View {
 /// glow, a shimmer sweep, and a level-up flash + ripple on each increment.
 /// Hidden at 0 XP.
 struct XpBadge: View {
+    @Environment(\.motionEnabled) private var motion
     let experience: Int
     @State private var rippleKey = 0
     @State private var flashing = false
@@ -183,7 +187,7 @@ struct XpBadge: View {
 
     var body: some View {
         if experience > 0 {
-            TimelineView(.animation(minimumInterval: 1 / 24)) { ctx in
+            TimelineView(.animation(minimumInterval: 1 / 24, paused: !motion)) { ctx in
                 let t = ctx.date.timeIntervalSinceReferenceDate
                 let rune = (sin(t / 2.5 * 2 * .pi) + 1) / 2
                 let sweep = (t / 7.5).truncatingRemainder(dividingBy: 1)

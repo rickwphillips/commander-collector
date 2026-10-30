@@ -97,11 +97,13 @@ struct PoisonOverlay: View {
     ]
 
     private struct Bubbles: View {
+
+        @Environment(\.motionEnabled) private var motion
         let poison: Int
         let progress: Double
         let fast: Bool
         var body: some View {
-            TimelineView(.animation(minimumInterval: 1 / 30)) { ctx in
+            TimelineView(.animation(minimumInterval: 1 / 30, paused: !motion)) { ctx in
                 Canvas { gc, size in
                     let t = ctx.date.timeIntervalSinceReferenceDate
                     let list = fast ? PoisonOverlay.fastBubbles : PoisonOverlay.slowBubbles
@@ -135,6 +137,8 @@ struct PoisonOverlay: View {
     // MARK: Phyrexian symbols
 
     private struct EdgeSymbol: View {
+
+        @Environment(\.motionEnabled) private var motion
         enum Side { case left, right }
         let progress: Double
         let poison: Int
@@ -145,7 +149,7 @@ struct PoisonOverlay: View {
             let dim = 140 + progress * 200
             let inset = -(30 + progress * 20)
             let tilt = progress * 12 * (side == .left ? -1 : 1)
-            TimelineView(.animation(minimumInterval: 1 / 15, paused: poison < 9)) { ctx in
+            TimelineView(.animation(minimumInterval: 1 / 15, paused: (poison < 9) || !motion)) { ctx in
                 let t = ctx.date.timeIntervalSinceReferenceDate
                 let orbit = poison >= 9 ? (side == .left ? (t / 20).truncatingRemainder(dividingBy: 1) : (t / 27).truncatingRemainder(dividingBy: 1)) : 0
                 let wobble = poison >= 9 ? sin(orbit * 2 * .pi) : 0
@@ -163,13 +167,15 @@ struct PoisonOverlay: View {
     }
 
     private struct RisingSymbols: View {
+
+        @Environment(\.motionEnabled) private var motion
         let size: CGSize
         private static let specs: [(left: Double, size: Double, dur: Double, delay: Double, rotate: Double)] = [
             (0.42, 120, 18, 0), (0.54, 90, 22, 9), (0.35, 140, 25, 14),
         ].map { ($0.0, $0.1, $0.2, $0.3, [-15.0, 20, -8][Int($0.1) % 3]) }
 
         var body: some View {
-            TimelineView(.animation(minimumInterval: 1 / 15)) { ctx in
+            TimelineView(.animation(minimumInterval: 1 / 15, paused: !motion)) { ctx in
                 let t = ctx.date.timeIntervalSinceReferenceDate
                 ForEach(Array(Self.specs.enumerated()), id: \.offset) { i, s in
                     let phase = ((t - s.delay) / s.dur).truncatingRemainder(dividingBy: 1)

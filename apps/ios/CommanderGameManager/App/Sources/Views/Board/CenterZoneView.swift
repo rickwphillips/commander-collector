@@ -82,8 +82,10 @@ struct CenterZoneView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!session.allSeatsFilled || rollOff.phase == .rolling || rollOff.phase == .tie)
+                .accessibilityIdentifier("rollForFirst")
                 Button("Pick") { panel = .pick }.buttonStyle(.bordered).frame(width: 70)
                     .disabled(!session.allSeatsFilled || rollOff.phase == .rolling || rollOff.phase == .tie)
+                    .accessibilityIdentifier("pickFirst")
             }
             if !is2hg {
                 VStack(alignment: .leading, spacing: 2) {
@@ -102,6 +104,7 @@ struct CenterZoneView: View {
                 }
                 .buttonStyle(.borderedProminent).controlSize(.large)
                 .disabled(!session.allSeatsFilled || !firstPlayerSet)
+                .accessibilityIdentifier("startGame")
                 Text(!session.allSeatsFilled ? "Seat every player to start" : !firstPlayerSet ? "Roll or pick who goes first" : "")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -154,7 +157,7 @@ struct CenterZoneView: View {
 
     private var turnTracker: some View {
         VStack(spacing: 2) {
-            Text("Turn \(state.turnNumber)").font(.system(size: 26, weight: .black)).foregroundStyle(Color.accentColor)
+            Text("Turn \(state.turnNumber)").font(.system(size: 26, weight: .black)).foregroundStyle(Color.accentColor).accessibilityIdentifier("turnLabel")
             Text(turnCommanderLabel).font(.system(size: 12, weight: .semibold)).lineLimit(2).multilineTextAlignment(.center)
             Text(turnPlayerLabel).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
         }
@@ -165,15 +168,15 @@ struct CenterZoneView: View {
     private var cornerButtons: some View {
         VStack {
             HStack {
-                cornerButton("list.bullet.rectangle") { showLog = true }
+                cornerButton("list.bullet.rectangle") { showLog = true }.accessibilityIdentifier("openLog")
                 Spacer()
-                cornerButton("gearshape") { panel = .settings }
+                cornerButton("gearshape") { panel = .settings }.accessibilityIdentifier("openSettings")
             }
             Spacer()
             HStack {
-                cornerButton("bubble.left.and.text.bubble.right") { showRules = true }
+                cornerButton("bubble.left.and.text.bubble.right") { showRules = true }.accessibilityIdentifier("openRules")
                 Spacer()
-                cornerButton("dice") { panel = .dice }
+                cornerButton("dice") { panel = .dice }.accessibilityIdentifier("openDice")
             }
         }
         .padding(6)
@@ -211,7 +214,7 @@ struct CenterZoneView: View {
                 HStack {
                     Text(title.uppercased()).font(.system(size: 11, weight: .bold)).kerning(0.5).foregroundStyle(.secondary)
                     Spacer()
-                    Button { onClose?(); panel = nil } label: { Image(systemName: "xmark").font(.system(size: 14)) }.buttonStyle(.plain).foregroundStyle(.secondary)
+                    Button { onClose?(); panel = nil } label: { Image(systemName: "xmark").font(.system(size: 14)) }.buttonStyle(.plain).foregroundStyle(.secondary).accessibilityIdentifier("closeOverlay")
                 }
                 content()
             }
@@ -233,6 +236,7 @@ struct CenterZoneView: View {
                     Toggle("Highlight", isOn: Binding(get: { settings.highlightMode }, set: { settings.highlightMode = $0; settings.push(using: account.client) }))
                     Toggle("Sound", isOn: Binding(get: { settings.soundEnabled }, set: { settings.soundEnabled = $0; settings.push(using: account.client) }))
                     Toggle("Dark", isOn: Binding(get: { settings.darkMode }, set: { settings.darkMode = $0 }))
+                    Toggle("Motion", isOn: Binding(get: { settings.animationsEnabled }, set: { settings.animationsEnabled = $0 })).accessibilityIdentifier("motionToggle")
                 }
                 .font(.system(size: 12))
                 .toggleStyle(.switch)
@@ -241,8 +245,8 @@ struct CenterZoneView: View {
                     Button { notesDraft = state.notes; panel = .notes } label: { Label("Notes", systemImage: "note.text").frame(maxWidth: .infinity) }
                         .tint(state.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : .accentColor)
                     Button { panel = nil; showLog = true } label: { Label("Game Log", systemImage: "list.bullet").frame(maxWidth: .infinity) }
-                    Button { panel = nil; confirmRestart = true } label: { Label("Restart", systemImage: "arrow.counterclockwise").frame(maxWidth: .infinity) }
-                    Button(role: .destructive) { panel = nil; confirmEnd = true } label: { Label("End Game", systemImage: "flag.fill").frame(maxWidth: .infinity) }
+                    Button { panel = nil; confirmRestart = true } label: { Label("Restart", systemImage: "arrow.counterclockwise").frame(maxWidth: .infinity) }.accessibilityIdentifier("restartGame")
+                    Button(role: .destructive) { panel = nil; confirmEnd = true } label: { Label("End Game", systemImage: "flag.fill").frame(maxWidth: .infinity) }.accessibilityIdentifier("endGame")
                 }
                 .buttonStyle(.bordered).controlSize(.small).font(.system(size: 11))
             }
@@ -299,6 +303,7 @@ struct CenterZoneView: View {
                     }
                     .buttonStyle(.borderedProminent).frame(maxWidth: .infinity)
                     .disabled(rollOff.phase != .result)
+                    .accessibilityIdentifier("acceptFirst")
                     Button("Roll Again") { startRoll() }.buttonStyle(.bordered).frame(maxWidth: .infinity).disabled(rollOff.phase != .result)
                 }
                 .controlSize(.small)
@@ -328,6 +333,7 @@ struct CenterZoneView: View {
         } label: {
             Text(display.map { sides == nil ? $0 : "total \($0)" } ?? label).fontWeight(isLast ? .black : .regular).frame(maxWidth: .infinity)
         }
+        .accessibilityIdentifier("dice-\(label)")
         .buttonStyle(.bordered)
         .tint(isLast ? .orange : nil)
     }
@@ -338,10 +344,10 @@ struct CenterZoneView: View {
 /// Big square Next Turn: tap advances, hold 0.5 s steps back (with a tip).
 /// Pulses faster as the turn timer runs down (≤30 s, ≤20 s, ≤10 s).
 struct NextTurnButton: View {
+    @Environment(\.motionEnabled) private var motion
     let remaining: Int?
     let onNext: () -> Void
     let onPrev: () -> Void
-    @State private var fired = false
     @State private var tip = false
 
     private var pulse: Double? {
@@ -350,7 +356,7 @@ struct NextTurnButton: View {
     }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 20, paused: pulse == nil)) { ctx in
+        TimelineView(.animation(minimumInterval: 1 / 20, paused: (pulse == nil) || !motion)) { ctx in
             let p = pulse.map { (sin(ctx.date.timeIntervalSinceReferenceDate / $0 * 2 * .pi) + 1) / 2 } ?? 0
             Text("Next\nTurn")
                 .font(.system(size: 22, weight: .bold)).multilineTextAlignment(.center)
@@ -359,15 +365,17 @@ struct NextTurnButton: View {
                 .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(p > 0.5 ? Theme.danger : Color.accentColor, lineWidth: 2))
                 .shadow(color: Color(red: 1, green: 80/255, blue: 30/255).opacity(p * (remaining.map { $0 <= 10 } ?? false ? 0.9 : 0.5)), radius: 12)
                 .contentShape(Rectangle())
+                .accessibilityIdentifier("nextTurn")
                 .overlay(alignment: .top) {
                     if tip { Text("Previous Turn").font(.caption2.bold()).padding(6).background(Capsule().fill(Color(.systemGray))).foregroundStyle(.white).offset(y: -30) }
                 }
         }
-        .onTapGesture { if fired { fired = false; return }; onNext() }
-        .onLongPressGesture(minimumDuration: 0.5) {
-            fired = true; onPrev()
-            withAnimation { tip = true }
-            Task { try? await Task.sleep(for: .milliseconds(700)); withAnimation { tip = false } }
+        .overlay {
+            HoldOrTap(onTap: onNext) {
+                onPrev()
+                withAnimation { tip = true }
+                Task { try? await Task.sleep(for: .milliseconds(700)); withAnimation { tip = false } }
+            }
         }
         .sensoryFeedback(.impact, trigger: remaining == nil ? 0 : 1)
     }
@@ -611,10 +619,12 @@ struct RollOffView: View {
 }
 
 struct SpinningDie: View {
+
+    @Environment(\.motionEnabled) private var motion
     let kind: DiceModel.Kind
     var size: CGFloat = 30
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30)) { ctx in
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: !motion)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             Group {
                 switch kind {
