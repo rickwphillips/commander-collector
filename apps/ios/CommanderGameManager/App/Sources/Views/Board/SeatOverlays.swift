@@ -141,9 +141,11 @@ struct CommanderSnapshotOverlay: View {
     let sizes: SeatPanel.Sizes
     @Environment(\.colorScheme) private var scheme
     @State private var art = CommanderArtLoader()
+    @State private var card = CommanderArtLoader()
 
     private var state: GameState { session.state }
     private var src: PlayerState { state.players[sourceIdx] }
+    private var shownCommander: String { partner ? (src.partner?.name ?? src.commander.name) : src.commander.name }
     private var dealtRows: [(idx: Int, dmg: CommanderDamage)] {
         state.players.indices.filter { $0 != sourceIdx }
             .map { ($0, state.commanderDamage[$0, sourceIdx]) }
@@ -155,6 +157,7 @@ struct CommanderSnapshotOverlay: View {
             (scheme == .dark ? Color(red: 20/255, green: 12/255, blue: 4/255).opacity(0.96) : Color(red: 1, green: 248/255, blue: 240/255).opacity(0.97))
                 .onTapGesture { overlay = nil }
             if let img = art.image { Color.clear.overlay(Image(uiImage: img).resizable().scaledToFill()).clipped().opacity(0.15).allowsHitTesting(false) }
+            HStack(alignment: .top, spacing: 10) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .top, spacing: 8) {
                     VStack(alignment: .leading, spacing: 1) {
@@ -207,9 +210,22 @@ struct CommanderSnapshotOverlay: View {
                 }
                 Spacer(minLength: 0)
             }
+            // The commander's card on the right; tap it for the zoomable preview.
+            ZStack {
+                if let img = card.image {
+                    Image(uiImage: img).resizable().scaledToFit().clipShape(RoundedRectangle(cornerRadius: 10))
+                        .shadow(color: .black.opacity(0.4), radius: 6, y: 2)
+                } else {
+                    RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.08)).aspectRatio(63 / 88, contentMode: .fit).overlay(ProgressView())
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .onTapGesture { overlay = .preview(name: shownCommander) }
+            }
             .padding(10)
         }
-        .task(id: sourceIdx) { art.load(partner ? (src.partner?.name ?? src.commander.name) : src.commander.name) }
+        .task(id: "\(sourceIdx)-\(partner)") { art.load(shownCommander); card.load(shownCommander, full: true) }
         .transition(.opacity)
     }
 }

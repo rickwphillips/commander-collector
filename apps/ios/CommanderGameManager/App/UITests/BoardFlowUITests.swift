@@ -172,6 +172,23 @@ final class BoardFlowUITests: XCTestCase {
         XCTAssertEqual(value("s0-cmd-3-partner"), "1")
     }
 
+    func testCommanderSnapshot() {
+        launch(["-demoBoard"])
+        // Tap an opponent's name in the commander damage drawer: their snapshot
+        // opens in the panel, stats and dealt-damage table left, card right.
+        waitFor("s0-cmd-1-name").tap()
+        XCTAssertTrue(app.staticTexts["CMD DEALT"].waitForExistence(timeout: 5), "snapshot did not open")
+        XCTAssertTrue(app.staticTexts["Thraximundar"].firstMatch.exists)
+        sleep(3)
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "commander-snapshot"; shot.lifetime = .keepAlways
+        add(shot)
+        // Hop to another seat's snapshot from its row, then close.
+        app.staticTexts["Amy"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Atraxa, Praetors' Voice"].firstMatch.waitForExistence(timeout: 5))
+        app.buttons.matching(NSPredicate(format: "label == 'Close' OR label == 'xmark'")).firstMatch.tap()
+    }
+
     func testStateMenuMonarchInitiativeBlessing() {
         launch(["-demoBoard"])
         waitFor("s0-menu").tap()

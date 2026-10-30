@@ -98,6 +98,7 @@ struct CommanderDamageRow: View {
                             .foregroundStyle(source.isEliminated ? .secondary : isActive ? Color.accentColor : .secondary)
                             .strikethrough(source.isEliminated).lineLimit(1).truncationMode(.tail)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .accessibilityIdentifier("s\(targetIdx)-cmd-\(sourceIdx)-name")
                         Text("\u{2694}\u{FE0E}\(source.partner != nil ? "\(dealt.fromCommander)/\(dealt.fromPartner)" : "\(dealt.total)")")
                             .font(.system(size: sizes.source, weight: .black))
                             .foregroundStyle(dealt.total >= 21 ? Theme.danger : dealt.total > 0 ? Theme.dealtOrange : Color.secondary.opacity(0.5))
