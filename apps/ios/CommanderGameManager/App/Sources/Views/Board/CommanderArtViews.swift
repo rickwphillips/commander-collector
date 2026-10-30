@@ -43,6 +43,8 @@ struct CommanderArt: View {
                     .resizable()
                     .scaledToFill()
                     .transition(.opacity.animation(.easeIn(duration: 0.7).delay(delay)))
+            } else if loader.settled, revealDelay != nil {
+                CardImageUnavailable(compact: true)
             }
         }
         .frame(width: height * 626 / 457, height: height)
@@ -133,6 +135,8 @@ struct CardPreviewOverlay: View {
                         .padding(18)
                         .onTapGesture { zoomed = true }
                 }
+            } else if loader.settled {
+                CardImageUnavailable(name: name).frame(maxWidth: 320).aspectRatio(63 / 88, contentMode: .fit).padding(18)
             } else {
                 ProgressView().tint(.white.opacity(0.6))
             }
@@ -150,5 +154,31 @@ struct CardPreviewOverlay: View {
             }
         }
         .task(id: name) { loader.load(name, full: true) }
+    }
+}
+
+/// What stands in for a card image Scryfall could not supply (web
+/// `card-not-found.webp`): a card-shaped frame with the name, or just the
+/// frame and a symbol in the compact thumbnail size.
+struct CardImageUnavailable: View {
+    var name: String? = nil
+    var compact = false
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: compact ? 3 : 12)
+                .fill(Color(red: 0.16, green: 0.14, blue: 0.12))
+            RoundedRectangle(cornerRadius: compact ? 3 : 12)
+                .strokeBorder(Color.white.opacity(0.18), style: StrokeStyle(lineWidth: compact ? 1 : 2, dash: compact ? [] : [8, 6]))
+            if compact {
+                Image(systemName: "photo").font(.system(size: 12)).foregroundStyle(.white.opacity(0.45))
+            } else {
+                VStack(spacing: 10) {
+                    Image(systemName: "photo.on.rectangle.angled").font(.system(size: 40)).foregroundStyle(.white.opacity(0.4))
+                    if let name { Text(name).font(.headline).foregroundStyle(.white.opacity(0.85)).multilineTextAlignment(.center).padding(.horizontal, 12) }
+                    Text("No card image available").font(.caption).foregroundStyle(.white.opacity(0.5))
+                }
+            }
+        }
     }
 }

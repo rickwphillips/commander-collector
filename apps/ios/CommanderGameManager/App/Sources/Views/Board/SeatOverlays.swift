@@ -215,6 +215,8 @@ struct CommanderSnapshotOverlay: View {
                 if let img = card.image {
                     Image(uiImage: img).resizable().scaledToFit().clipShape(RoundedRectangle(cornerRadius: 10))
                         .shadow(color: .black.opacity(0.4), radius: 6, y: 2)
+                } else if card.settled {
+                    CardImageUnavailable(name: shownCommander).aspectRatio(63 / 88, contentMode: .fit)
                 } else {
                     RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.08)).aspectRatio(63 / 88, contentMode: .fit).overlay(ProgressView())
                 }
