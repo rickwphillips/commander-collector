@@ -25,8 +25,8 @@ final class SoundService {
     // MARK: One-shots
 
     /// The iPhone keyboard's key click, for every plus and minus on the board.
+    /// Plays regardless of the Sound setting, which covers the effect audio.
     func playClick() {
-        guard enabled else { return }
         AudioServicesPlaySystemSound(1104)
     }
 
