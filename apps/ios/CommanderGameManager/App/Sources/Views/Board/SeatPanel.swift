@@ -363,6 +363,9 @@ struct SeatPanel: View {
 
     /// Font and control sizes derived from the panel height (the web uses
     /// viewport-relative clamps).
+    /// Gap between rows in the commander damage and counters drawers.
+    static let drawerRowSpacing: CGFloat = 8
+
     struct Sizes {
         let name, deck, pass, icon, menu, art, life, lifeBtn, crown, label, source, badge, value, kill: CGFloat
         let stepper: StepperSize
@@ -370,8 +373,8 @@ struct SeatPanel: View {
             let k = min(max(h / 360, 0.75), 1.1)
             name = 15 * k; deck = 11 * k; pass = 12 * k; icon = 22 * k; menu = 18 * k; art = 36 * k
             life = max(34, min(h * 0.28, 112)); lifeBtn = 36 * k; crown = 52 * k
-            label = 11 * k; source = 13 * k; badge = 10 * k; value = 20 * k; kill = 13 * k
-            stepper = StepperSize(buttonFont: 17 * k, valueFont: 17 * k, buttonWidth: 26 * k, buttonHeight: 28 * k, valueWidth: 22 * k, labelFont: 10 * k)
+            label = 12 * k; source = 15 * k; badge = 11 * k; value = 20 * k; kill = 13 * k
+            stepper = StepperSize(buttonFont: 20 * k, valueFont: 20 * k, buttonWidth: 30 * k, buttonHeight: 32 * k, valueWidth: 26 * k, labelFont: 11 * k)
         }
     }
 }

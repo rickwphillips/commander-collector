@@ -31,8 +31,7 @@ struct CommanderDamageColumn: View {
                         Rectangle().fill(.clear).shadow(color: Color(red: 160/255, green: 0, blue: 0).opacity(threat.intensity * 0.65), radius: 12).allowsHitTesting(false)
                             .mask(Rectangle().stroke(lineWidth: 40))
                     }
-                    ScrollView(.vertical) {
-                        VStack(spacing: 2) {
+                    VStack(spacing: 0) {
                             HStack(spacing: 4) {
                                 Text("CMD DAMAGE").font(.system(size: sizes.label, weight: .semibold)).kerning(0.5).foregroundStyle(.secondary)
                                 if high { Text("⚠").font(.system(size: sizes.label)).foregroundStyle(Theme.danger) }
@@ -40,14 +39,16 @@ struct CommanderDamageColumn: View {
                                 Button(showPlayer ? "Player" : "CMD") { settings.toggleShowPlayerName(me.playerId) }
                                     .font(.system(size: 9, weight: .semibold)).buttonStyle(.bordered).controlSize(.mini)
                             }
-                            .padding(.horizontal, 4)
-                            ForEach(state.players.indices.filter { $0 != targetIdx }, id: \.self) { src in
-                                CommanderDamageRow(session: session, targetIdx: targetIdx, sourceIdx: src, showPlayer: showPlayer, glass: glass, overlay: $overlay, sizes: sizes)
+                            .padding(.horizontal, 4).padding(.top, 3)
+                        CenteredOrScrolling {
+                            VStack(spacing: SeatPanel.drawerRowSpacing) {
+                                ForEach(state.players.indices.filter { $0 != targetIdx }, id: \.self) { src in
+                                    CommanderDamageRow(session: session, targetIdx: targetIdx, sourceIdx: src, showPlayer: showPlayer, glass: glass, overlay: $overlay, sizes: sizes)
+                                }
                             }
+                            .padding(.bottom, 3)
                         }
-                        .padding(.vertical, 3)
                     }
-                    .scrollBounceBehavior(.basedOnSize)
                 }
                 .clipped()
                 .task(id: threat?.commanderName) { if let n = threat?.commanderName { threatArt.load(n) } }
@@ -179,8 +180,8 @@ struct CountersColumn: View {
             if open {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("COUNTERS").font(.system(size: sizes.label, weight: .semibold)).kerning(0.5).foregroundStyle(.secondary).padding(.horizontal, 6).padding(.top, 3)
-                    ScrollView(.vertical) {
-                        VStack(spacing: 2) {
+                    CenteredOrScrolling {
+                        VStack(spacing: SeatPanel.drawerRowSpacing) {
                             row("Commander Tax", glyph: CounterGlyph(kind: .tax, size: sizes.source, taxValue: p.commanderTax), value: p.commanderTax, color: p.commanderTax > 0 ? .orange : .secondary, focus: .tax(partner: false)) {
                                 session.dispatch(.commanderTaxChange(playerIdx: idx, delta: $0, isPartner: false))
                             }
@@ -202,7 +203,6 @@ struct CountersColumn: View {
                         }
                         .padding(.horizontal, 2).padding(.bottom, 3)
                     }
-                    .scrollBounceBehavior(.basedOnSize)
                 }
             }
         }
@@ -294,6 +294,19 @@ struct FlowLayout: Layout {
             v.place(at: CGPoint(x: bounds.minX + x, y: bounds.minY + y), proposal: ProposedViewSize(s))
             x += s.width + spacing
             rowH = max(rowH, s.height)
+        }
+    }
+}
+
+/// Drawer rows sit vertically centred when they fit the drawer, and scroll
+/// when the panel is too short for them.
+struct CenteredOrScrolling<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        ViewThatFits(in: .vertical) {
+            content().frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            ScrollView(.vertical) { content() }.scrollBounceBehavior(.basedOnSize)
         }
     }
 }
