@@ -109,7 +109,7 @@ seat**, never as a system sheet facing one side of the table.
 - [x] C5 Game log viewer formatted like the web's `GameLogList`; Notes editor.
 - [x] C6 Winner banner along the bottom edge: "🏆 X wins — saving in 15s",
       Save Now, bounded retry on failure.
-- [ ] C7 Rules Guru chat + quick rules lookup (web iframe today; WKWebView or
+- [x] C7 Rules Guru chat + quick rules lookup (web iframe today; WKWebView or
       Phase 2).
 
 ## D. Flow (setup, seating, end)

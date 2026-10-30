@@ -25,6 +25,7 @@ struct CenterZoneView: View {
     @State private var lpFired = false
     @State private var rollOff = RollOffModel()
     @State private var dice = DiceModel()
+    @State private var showRules = false
 
     enum Panel { case dice, settings, notes, pick }
 
@@ -49,6 +50,7 @@ struct CenterZoneView: View {
             if let w = session.winnerIdx, !session.isSeating { winnerBanner(w) }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .sheet(isPresented: $showRules) { RulesGuruSheet(state: state, elapsedSeconds: elapsedSeconds) }
         .confirmationDialog("End the game?", isPresented: $confirmEnd, titleVisibility: .visible) {
             Button("End game", role: .destructive) { session.endGame() }
         }
@@ -163,12 +165,13 @@ struct CenterZoneView: View {
     private var cornerButtons: some View {
         VStack {
             HStack {
+                cornerButton("list.bullet.rectangle") { showLog = true }
                 Spacer()
                 cornerButton("gearshape") { panel = .settings }
             }
             Spacer()
             HStack {
-                cornerButton("list.bullet.rectangle") { showLog = true }
+                cornerButton("bubble.left.and.text.bubble.right") { showRules = true }
                 Spacer()
                 cornerButton("dice") { panel = .dice }
             }
