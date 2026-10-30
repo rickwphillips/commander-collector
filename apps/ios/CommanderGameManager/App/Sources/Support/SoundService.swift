@@ -107,7 +107,7 @@ final class SoundService {
         engine.connect(player, to: engine.mainMixerNode, format: format)
         if !engine.isRunning { try? engine.start() }
         self.engine = engine
-        player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { _ in
+        player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { @Sendable _ in
             Task { @MainActor in engine.detach(player) }
         }
         player.play()
@@ -135,27 +135,12 @@ final class SoundService {
         }
         let engine = AVAudioEngine()
         let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
-        let sampleRate = Float(format.sampleRate)
-        var phase: Float = 0
-        var lfoPhase: Float = 0
-        var lp: Float = 0
-        let source = AVAudioSourceNode { _, _, frameCount, audioBufferList -> OSStatus in
-            let buffers = UnsafeMutableAudioBufferListPointer(audioBufferList)
-            guard let out = buffers[0].mData?.assumingMemoryBound(to: Float.self) else { return noErr }
-            for i in 0..<Int(frameCount) {
-                // Sawtooth at 58 Hz (Bb1), one-pole low-pass near 180 Hz, 0.12 Hz tremolo.
-                phase += 58 / sampleRate
-                if phase > 1 { phase -= 1 }
-                let saw = 2 * phase - 1
-                let alpha: Float = 180 / sampleRate * 2 * .pi
-                lp += alpha * (saw - lp)
-                lfoPhase += 0.12 / sampleRate
-                if lfoPhase > 1 { lfoPhase -= 1 }
-                let trem = 0.75 + 0.25 * sin(lfoPhase * 2 * .pi)
-                out[i] = lp * trem
-            }
-            return noErr
+        let synth = DroneSynth(sampleRate: Float(format.sampleRate))
+        // Rendered on the audio thread: the block must not be main-actor isolated.
+        let render: AVAudioSourceNodeRenderBlock = { @Sendable _, _, frameCount, audioBufferList in
+            synth.render(frameCount, audioBufferList)
         }
+        let source = AVAudioSourceNode(renderBlock: render)
         let mixer = AVAudioMixerNode()
         engine.attach(source)
         engine.attach(mixer)
@@ -235,7 +220,7 @@ final class SoundService {
         engine.connect(player, to: engine.mainMixerNode, format: format)
         if !engine.isRunning { try? engine.start() }
         self.engine = engine
-        player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { _ in
+        player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { @Sendable _ in
             Task { @MainActor in engine.detach(player) }
         }
         player.play()
@@ -246,5 +231,34 @@ final class SoundService {
         loops.keys.forEach(stopLoop)
         stopDrone()
         fireworkTask?.cancel(); fireworkTask = nil
+    }
+}
+
+/// Low filtered sawtooth with a slow tremolo (the web's "ominous drone"),
+/// generated on the audio render thread.
+private final class DroneSynth: @unchecked Sendable {
+    private var phase: Float = 0
+    private var lfoPhase: Float = 0
+    private var lp: Float = 0
+    private let sampleRate: Float
+
+    init(sampleRate: Float) { self.sampleRate = sampleRate }
+
+    nonisolated func render(_ frameCount: AVAudioFrameCount, _ audioBufferList: UnsafeMutablePointer<AudioBufferList>) -> OSStatus {
+        let buffers = UnsafeMutableAudioBufferListPointer(audioBufferList)
+        guard let out = buffers[0].mData?.assumingMemoryBound(to: Float.self) else { return noErr }
+        for i in 0..<Int(frameCount) {
+            // Sawtooth at 58 Hz (Bb1), one-pole low-pass near 180 Hz, 0.12 Hz tremolo.
+            phase += 58 / sampleRate
+            if phase > 1 { phase -= 1 }
+            let saw = 2 * phase - 1
+            let alpha: Float = 180 / sampleRate * 2 * .pi
+            lp += alpha * (saw - lp)
+            lfoPhase += 0.12 / sampleRate
+            if lfoPhase > 1 { lfoPhase -= 1 }
+            let trem = 0.75 + 0.25 * sin(lfoPhase * 2 * .pi)
+            out[i] = lp * trem
+        }
+        return noErr
     }
 }

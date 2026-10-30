@@ -151,7 +151,7 @@ struct CommanderSnapshotOverlay: View {
         ZStack {
             (scheme == .dark ? Color(red: 20/255, green: 12/255, blue: 4/255).opacity(0.96) : Color(red: 1, green: 248/255, blue: 240/255).opacity(0.97))
                 .onTapGesture { overlay = nil }
-            if let img = art.image { Image(uiImage: img).resizable().scaledToFill().opacity(0.15).allowsHitTesting(false).clipped() }
+            if let img = art.image { Color.clear.overlay(Image(uiImage: img).resizable().scaledToFill()).clipped().opacity(0.15).allowsHitTesting(false) }
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .top, spacing: 8) {
                     VStack(alignment: .leading, spacing: 1) {

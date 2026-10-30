@@ -37,6 +37,28 @@ enum DemoMode {
         return nil
         #endif
     }
+    /// `-demoEffects` (with `-demoBoard`): every status effect at once, for
+    /// side-by-side screenshots against the web board.
+    static var wantsEffects: Bool {
+        #if DEBUG
+        CommandLine.arguments.contains("-demoEffects")
+        #else
+        false
+        #endif
+    }
+    private static var effectEvents: [LiveGameEvent] {
+        var ts: Double = 10
+        func e(_ k: LiveGameEvent.Kind) -> LiveGameEvent { ts += 1; return LiveGameEvent(seat: "host", ts: ts, kind: k) }
+        var out: [LiveGameEvent] = [e(.toggleMonarch(playerIdx: 2)), e(.toggleMonarch(playerIdx: 0))]
+        out += (0..<12).map { _ in e(.lifeChange(playerIdx: 0, delta: -1)) }
+        out += (0..<18).map { _ in e(.commanderDamageChange(targetIdx: 0, sourceIdx: 1, isPartner: false, delta: 1)) }
+        out += (0..<9).map { _ in e(.poisonChange(playerIdx: 1, delta: 1)) }
+        out += (0..<7).map { _ in e(.energyChange(playerIdx: 1, delta: 1)) }
+        out += [e(.toggleInitiative(playerIdx: 2)), e(.toggleCitysBlessing(playerIdx: 2))]
+        out += (0..<3).map { _ in e(.experienceChange(playerIdx: 2, delta: 1)) }
+        out += (0..<2).map { _ in e(.commanderTaxChange(playerIdx: 3, delta: 1, isPartner: false)) }
+        return out
+    }
     static var wantsTwoHeadedGiant: Bool {
         #if DEBUG
         CommandLine.arguments.contains("-demo2hg")
@@ -99,7 +121,7 @@ enum DemoMode {
             LiveGameEvent(seat: "host", ts: 3, kind: .commanderDamageChange(targetIdx: 3, sourceIdx: 0, isPartner: false, delta: 7)),
             LiveGameEvent(seat: "host", ts: 4, kind: .toggleMonarch(playerIdx: 2)),
             LiveGameEvent(seat: "host", ts: 5, kind: .passTurn),
-        ]
+        ] + (wantsEffects ? effectEvents : [])
         var log = [GameLog.gameStartedEvent(s)]
         for e in events {
             let next = GameReducer.applyEvent(s, e)

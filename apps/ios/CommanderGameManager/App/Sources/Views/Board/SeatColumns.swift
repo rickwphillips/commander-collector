@@ -26,7 +26,7 @@ struct CommanderDamageColumn: View {
                 ZStack {
                     if let threat, threat.intensity > 0 {
                         if let img = threatArt.image {
-                            Image(uiImage: img).resizable().scaledToFill().opacity(threat.intensity * 0.28).clipped().allowsHitTesting(false)
+                            Color.clear.overlay(Image(uiImage: img).resizable().scaledToFill()).clipped().opacity(threat.intensity * 0.28).allowsHitTesting(false)
                         }
                         Rectangle().fill(.clear).shadow(color: Color(red: 160/255, green: 0, blue: 0).opacity(threat.intensity * 0.65), radius: 12).allowsHitTesting(false)
                             .mask(Rectangle().stroke(lineWidth: 40))
@@ -49,6 +49,7 @@ struct CommanderDamageColumn: View {
                     }
                     .scrollBounceBehavior(.basedOnSize)
                 }
+                .clipped()
                 .task(id: threat?.commanderName) { if let n = threat?.commanderName { threatArt.load(n) } }
             }
             rail
@@ -133,7 +134,7 @@ struct PlayerStatusBadges: View {
     var poisonDanger = 10
 
     var body: some View {
-        HStack(spacing: 5) {
+        FlowLayout(spacing: 5, rowSpacing: 1) {
             if player.isMonarch { ShimmerCrown(size: size, active: true).frame(width: size, height: size) }
             if player.hasCitysBlessing { CityGlyph(active: true).frame(width: size, height: size) }
             if player.hasInitiative { InitiativeGlyph().foregroundStyle(Theme.initiativeBlue).frame(width: size, height: size) }
@@ -260,6 +261,37 @@ struct PoisonPulse: ViewModifier {
             }
         } else {
             content
+        }
+    }
+}
+
+/// Badges wrap onto further lines inside their column, like the web's
+/// `flex-wrap`, instead of forcing the column wider.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 4
+    var rowSpacing: CGFloat = 2
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? .infinity
+        var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0, maxX: CGFloat = 0
+        for v in subviews {
+            let s = v.sizeThatFits(.unspecified)
+            if x > 0 && x + s.width > width { x = 0; y += rowH + rowSpacing; rowH = 0 }
+            x += s.width + spacing
+            rowH = max(rowH, s.height)
+            maxX = max(maxX, x - spacing)
+        }
+        return CGSize(width: width == .infinity ? maxX : min(maxX, width), height: y + rowH)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0
+        for v in subviews {
+            let s = v.sizeThatFits(.unspecified)
+            if x > 0 && x + s.width > bounds.width { x = 0; y += rowH + rowSpacing; rowH = 0 }
+            v.place(at: CGPoint(x: bounds.minX + x, y: bounds.minY + y), proposal: ProposedViewSize(s))
+            x += s.width + spacing
+            rowH = max(rowH, s.height)
         }
     }
 }

@@ -7,7 +7,7 @@ import SwiftUI
 final class CommanderArtLoader {
     private(set) var image: UIImage?
     private(set) var settled = false
-    private var name: String?
+    private(set) var name: String?
     private var full = false
 
     func load(_ name: String, full: Bool = false) {

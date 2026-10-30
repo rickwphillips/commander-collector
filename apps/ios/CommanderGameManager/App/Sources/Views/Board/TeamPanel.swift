@@ -65,7 +65,7 @@ struct TeamPanel: View {
                     .padding(10)
                 }
                 .shadow(color: Theme.energyCyan.opacity(min(Double(teamEnergy) / 8, 1) * 0.9), radius: 4 + min(Double(teamEnergy) / 8, 1) * 14)
-                if cityBlessingVisible { CityBlessing(exiting: cityBlessingExiting) }
+                if cityBlessingVisible { CityBlessing(exiting: cityBlessingExiting, commanders: members.flatMap { [state.players[$0].commander.name] + (state.players[$0].partner.map { [$0.name] } ?? []) }, threat: threat) }
                 if eliminated { EliminatedOverlay(conceded: conceded, poisoned: poison >= 15) }
                 if overlay == .concedeConfirm {
                     Theme.gold.opacity(0.12).allowsHitTesting(false)

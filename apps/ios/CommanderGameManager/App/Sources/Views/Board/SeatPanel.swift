@@ -67,7 +67,7 @@ struct SeatPanel: View {
                 }
                 .shadow(color: Theme.energyCyan.opacity(energyGlow * 0.9), radius: 4 + energyGlow * 14)
 
-                if cityBlessingVisible { CityBlessing(exiting: cityBlessingExiting) }
+                if cityBlessingVisible { CityBlessing(exiting: cityBlessingExiting, commanders: [player.commander.name] + (player.partner.map { [$0.name] } ?? []), threat: threat) }
                 if player.isEliminated { EliminatedOverlay(conceded: player.isConceded, poisoned: isPoisoned) }
                 if overlay == .concedeConfirm {
                     Theme.gold.opacity(0.12).allowsHitTesting(false)
@@ -205,18 +205,25 @@ struct SeatPanel: View {
 
     // MARK: Columns
 
+    /// Web: every open drawer and the life column are `flex: 1`, so the three
+    /// share the width equally and a closed drawer is a 24 pt rail.
     private func columns(_ sz: Sizes) -> some View {
-        HStack(spacing: 0) {
-            CommanderDamageColumn(session: session, targetIdx: idx, open: $cmdDmgOpen, overlay: $overlay, glass: glassActive, threat: threat, sizes: sz)
-                .frame(maxWidth: cmdDmgOpen ? .infinity : 24)
-            Divider()
-            lifeColumn(sz)
-            Divider()
-            CountersColumn(session: session, idx: idx, open: $countersOpen, overlay: $overlay, glass: glassActive, poisonLethal: poisonLethal, sizes: sz)
-                .frame(maxWidth: countersOpen ? .infinity : 24)
+        GeometryReader { geo in
+            let rail: CGFloat = 24
+            let open = (cmdDmgOpen ? 1 : 0) + (countersOpen ? 1 : 0)
+            let share = (geo.size.width - CGFloat(2 - open) * rail) / CGFloat(open + 1)
+            HStack(spacing: 0) {
+                CommanderDamageColumn(session: session, targetIdx: idx, open: $cmdDmgOpen, overlay: $overlay, glass: glassActive, threat: threat, sizes: sz)
+                    .frame(width: cmdDmgOpen ? share : rail).clipped()
+                Divider()
+                lifeColumn(sz)
+                Divider()
+                CountersColumn(session: session, idx: idx, open: $countersOpen, overlay: $overlay, glass: glassActive, poisonLethal: poisonLethal, sizes: sz)
+                    .frame(width: countersOpen ? share : rail).clipped()
+            }
+            .animation(.easeInOut(duration: 0.2), value: cmdDmgOpen)
+            .animation(.easeInOut(duration: 0.2), value: countersOpen)
         }
-        .animation(.easeInOut(duration: 0.2), value: cmdDmgOpen)
-        .animation(.easeInOut(duration: 0.2), value: countersOpen)
     }
 
     private func lifeColumn(_ sz: Sizes) -> some View {

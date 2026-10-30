@@ -59,13 +59,13 @@ struct InitiativeTorch: View {
                         RadialGradient(colors: [Color(hex: 0xFF8C00), Color(hex: 0xFF4500), .clear], center: .center, startRadius: 0, endRadius: 250)
                             .frame(width: 500, height: 500)
                             .opacity(flicker)
-                            .offset(y: -150)
+                            .offset(y: -105)
                         Torch(t: t)
                             .frame(width: 90, height: 270)
                             .opacity(0.35)
                     }
                     .rotationEffect(.degrees(drift.angle))
-                    .position(x: geo.size.width / 2 + drift.x * 90, y: geo.size.height + 45)
+                    .position(x: geo.size.width / 2 + drift.x * 90, y: geo.size.height - 45)
                 }
             }
             .clipped()
