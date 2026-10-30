@@ -34,6 +34,16 @@ final class GameSession {
     /// game fades them all in together.
     private(set) var firstPlayerChosenThisSession = false
 
+    /// Remote mode (a phone at a seat): events go to the table over the local
+    /// link instead of the reducer, and the state arrives back from the host.
+    private var remoteTransport: ((LiveGameEvent.Kind) -> Void)?
+    private(set) var remoteSeat: String?
+    var isRemote: Bool { remoteTransport != nil }
+
+    /// Host side: called after every change so the table can push the state
+    /// to connected phones.
+    var onStateChanged: ((GameState, [GameLogEvent]) -> Void)?
+
     /// Highest poison among living seats, for the shared poison ambience.
     var highestLivingPoison: Int { state.players.filter { !$0.isEliminated }.map(\.poison).max() ?? 0 }
     struct PendingKill: Identifiable, Equatable {
@@ -53,6 +63,23 @@ final class GameSession {
         state = s
         clientGameId = UUID().uuidString.lowercased()
         startedAt = .now
+    }
+
+    /// A phone's mirror of the table's game.
+    init(remote state: GameState, seat: String, send: @escaping (LiveGameEvent.Kind) -> Void) {
+        self.state = state
+        remoteTransport = send
+        remoteSeat = seat
+        clientGameId = ""
+        startedAt = .now
+    }
+
+    /// Replace the mirrored state with what the host sent.
+    func applyRemoteState(_ next: GameState, log newLog: [GameLogEvent]) {
+        let prev = state
+        state = next
+        log = newLog
+        noteMonarchTransfer(prev: prev, next: next)
     }
 
     /// A fresh game seated like a previous one (Restart).
@@ -132,6 +159,7 @@ final class GameSession {
 
     func dispatch(_ kind: LiveGameEvent.Kind, seat: String = "host") {
         guard isPlaying else { return }
+        if let remoteTransport { remoteTransport(kind); return }
         let event = LiveGameEvent(seat: seat, ts: GameReducer.nowMillis(), kind: kind)
         let prev = state
         state = GameReducer.applyEvent(prev, event)
@@ -219,6 +247,8 @@ final class GameSession {
     }
 
     private func persist() {
+        guard !isRemote else { return }
+        onStateChanged?(state, log)
         guard let initialState else { return }   // nothing to resume until play starts
         ActiveGameStore.save(ActiveGame(
             clientGameId: clientGameId, startedAt: startedAt, initialState: initialState,

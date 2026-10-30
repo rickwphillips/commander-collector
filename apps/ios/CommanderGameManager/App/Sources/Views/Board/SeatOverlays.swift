@@ -33,6 +33,13 @@ struct StateMenuOverlay: View {
                     }
                     Divider()
                     concedeRow
+                    if !session.isRemote {
+                        Divider()
+                        HStack(spacing: 10) { Image(systemName: "qrcode"); Text("Pair a phone").font(.system(size: 13)) }
+                            .foregroundStyle(.secondary).padding(.horizontal, 12).padding(.vertical, 10).frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                            .onTapGesture { overlay = .qr }
+                    }
                 }
                 .frame(maxWidth: 240)
                 .background(RoundedRectangle(cornerRadius: 10).fill(Theme.menuBackground(scheme)))

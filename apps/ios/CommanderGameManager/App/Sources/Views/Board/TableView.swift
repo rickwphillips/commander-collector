@@ -15,6 +15,7 @@ struct TableView: View {
     @State private var showLog = false
     @State private var turnIndicatorOn = false
     @State private var introStarted = false
+    @State private var host: TableHost?
 
     private static let revealStep = 0.9
     private static let fadeSeconds = 0.8
@@ -94,7 +95,15 @@ struct TableView: View {
         .onChange(of: session.highestLivingPoison, initial: true) { _, poison in
             SoundService.shared.setPoisonLevel(session.isPlaying ? poison : 0)
         }
-        .onDisappear { SoundService.shared.stopPoison() }
+        .onDisappear { SoundService.shared.stopPoison(); host?.end(); host = nil; session.onStateChanged = nil }
+        .onChange(of: session.isPlaying, initial: true) { _, playing in
+            guard playing, host == nil, !session.isRemote else { return }
+            let h = TableHost(gameId: session.clientGameId)
+            h.onEvent = { e in session.dispatch(e.kind, seat: e.seat) }
+            session.onStateChanged = { s, l in h.broadcast(s, log: l) }
+            host = h
+            h.broadcast(session.state, log: session.log)
+        }
         .task { await CardArtService.shared.prewarm(session.state.players.flatMap { [$0.commander.name, $0.partner?.name ?? ""] }) }
     }
 

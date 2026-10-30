@@ -37,7 +37,9 @@ struct RootView: View {
     @Environment(Session.self) private var session
 
     var body: some View {
-        if session.isSignedIn {
+        if DemoMode.joinSeat != nil {
+            JoinTableView()
+        } else if session.isSignedIn {
             HomeView()
         } else {
             LoginView()

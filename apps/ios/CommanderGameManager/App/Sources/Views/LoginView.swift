@@ -8,6 +8,7 @@ struct LoginView: View {
     @State private var error: String?
     @State private var busy = false
     @State private var useLocalServer = false
+    @State private var showJoin = false
 
     var body: some View {
         NavigationStack {
@@ -33,6 +34,11 @@ struct LoginView: View {
                     Section { Text(error).foregroundStyle(.red) }
                 }
                 Section {
+                    Button { showJoin = true } label: { Label("Join a table nearby", systemImage: "qrcode.viewfinder") }
+                } footer: {
+                    Text("Sitting at an iPad running the game? Scan your seat's QR code; no sign-in needed.")
+                }
+                Section {
                     Button(action: signIn) {
                         HStack {
                             Text("Sign in")
@@ -43,6 +49,7 @@ struct LoginView: View {
                 }
             }
             .navigationTitle("Commander")
+            .fullScreenCover(isPresented: $showJoin) { JoinTableView() }
             .onAppear { useLocalServer = session.server == CommanderServer.local }
         }
     }

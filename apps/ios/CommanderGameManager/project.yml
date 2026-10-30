@@ -47,8 +47,13 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         UIRequiresFullScreen: true
         ITSAppUsesNonExemptEncryption: false
+        NSLocalNetworkUsageDescription: Phones at the table join a seat over the local network.
+        NSBonjourServices: [_cmdr-game._tcp, _cmdr-game._udp]
+        NSCameraUsageDescription: Scan a seat's QR code to join a table.
         NSAppTransportSecurity:
           # Local PHP stack during development only (http://localhost:8081).
           NSAllowsLocalNetworking: true

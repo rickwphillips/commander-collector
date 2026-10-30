@@ -24,6 +24,7 @@ struct HomeView: View {
     @State private var activeGame: ActiveGame? = ActiveGameStore.load()
     @State private var resume = false
     @State private var setup: GameSetupInput?
+    @State private var showJoin = false
 
     private static let lifePresets = [20, 30, 40]
     private var seatCount: Int { gameType == .twoHeadedGiant ? 4 : playerCount }
@@ -81,6 +82,11 @@ struct HomeView: View {
                             Text("Each seat gets a different player and one of their own decks. You can still change any seat before starting.").font(.footnote).foregroundStyle(.secondary)
                         }
                     }
+                }
+                Section {
+                    Button { showJoin = true } label: { Label("Join a table nearby", systemImage: "qrcode.viewfinder") }
+                } footer: {
+                    Text("Use this device as a remote for one seat at another iPad's table.")
                 }
                 if let last = lastGame {
                     Section("Rematch") {
@@ -163,6 +169,7 @@ struct HomeView: View {
                 }
             }
             .onAppear { activeGame = ActiveGameStore.load() }
+            .fullScreenCover(isPresented: $showJoin) { JoinTableView() }
             .navigationDestination(isPresented: $resume) {
                 if let game = activeGame { BoardView(resuming: game) }
             }

@@ -11,6 +11,7 @@ enum SeatOverlay: Equatable, Identifiable {
     case snapshot(sourceIdx: Int, partner: Bool)
     case preview(name: String)
     case concedeConfirm
+    case qr
 
     var id: String {
         switch self {
@@ -20,6 +21,7 @@ enum SeatOverlay: Equatable, Identifiable {
         case .snapshot(let s, let p): "snap-\(s)-\(p)"
         case .preview(let n): "preview-\(n)"
         case .concedeConfirm: "concede"
+        case .qr: "qr"
         }
     }
 }

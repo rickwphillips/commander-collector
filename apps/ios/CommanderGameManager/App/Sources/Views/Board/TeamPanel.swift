@@ -345,6 +345,7 @@ struct TeamPanel: View {
         case .focus(let target): focusModal(target)
         case .snapshot(let src, let partner): CommanderSnapshotOverlay(session: session, viewerIdx: primary, sourceIdx: src, partner: partner, overlay: $overlay, sizes: sz)
         case .preview(let name): CardPreviewOverlay(name: name) { overlay = nil }
+        case .qr: SeatQROverlay(gameId: session.clientGameId, seat: state.players[primary].position, connected: false) { overlay = nil }
         }
     }
 
@@ -366,6 +367,10 @@ struct TeamPanel: View {
                     .padding(12).background(Theme.gold.opacity(0.12))
                 } else {
                     menuRow("Concede", symbol: "person.fill.xmark", color: .secondary) { overlay = .concedeConfirm }
+                }
+                if !session.isRemote {
+                    Divider()
+                    menuRow("Pair a phone", symbol: "qrcode", color: .secondary) { overlay = .qr }
                 }
             }
             .frame(maxWidth: 260)

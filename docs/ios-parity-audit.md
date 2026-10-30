@@ -129,10 +129,10 @@ seat**, never as a system sheet facing one side of the table.
 - [x] D6 Two-Headed Giant team panels (shared life/poison, team names, both
       pilots' counters, opposing team's commander damage) along the top and
       bottom edges. The iPad shows four single-seat panels today.
-- [ ] D7 Remote seats: QR / seat code per seat and the "being viewed" eye
+- [x] D7 Remote seats: QR / seat code per seat and the "being viewed" eye
       (Phase 2, Multipeer).
 
-Legend: [x] landed. Open: D7 (remote seats, Phase 2).
+Legend: [x] landed. Remote seats use Multipeer over the local network (no server); the phone runs this same app and scans the seat QR.
 
 ## Order of work
 

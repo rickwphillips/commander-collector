@@ -27,6 +27,15 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_cmdr-game._tcp</string>
+		<string>_cmdr-game._udp</string>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Scan a seat's QR code to join a table.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Phones at the table join a seat over the local network.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiresFullScreen</key>
@@ -34,6 +43,8 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>

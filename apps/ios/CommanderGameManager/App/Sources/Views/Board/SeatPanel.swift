@@ -119,7 +119,7 @@ struct SeatPanel: View {
                     .onTapGesture { overlay = .rules(title: "Commander tax", text: RulesText.commanderTax(name: m.name, tax: m.tax)) }
                 }
                 XpBadge(experience: player.experience)
-                if isActive && !state.isTwoHeadedGiant {
+                if isActive && !state.isTwoHeadedGiant && !session.isRemote {
                     Button { session.dispatch(.passTurn) } label: {
                         Text("PASS").font(.system(size: sz.pass, weight: .bold))
                             .padding(.horizontal, 10).padding(.vertical, 3)
@@ -129,6 +129,9 @@ struct SeatPanel: View {
                 }
                 Spacer()
                 statusIcons(sz)
+                if remoteConnected && !session.isRemote {
+                    Image(systemName: "iphone").font(.system(size: sz.icon * 0.7)).foregroundStyle(.green).symbolEffect(.pulse)
+                }
                 Button { withAnimation(.easeOut(duration: 0.15)) { overlay = overlay == .stateMenu ? nil : .stateMenu } } label: {
                     Image(systemName: "plus").font(.system(size: sz.menu, weight: .semibold))
                         .rotationEffect(.degrees(overlay == .stateMenu ? 45 : 0))
@@ -280,7 +283,15 @@ struct SeatPanel: View {
             CommanderSnapshotOverlay(session: session, viewerIdx: idx, sourceIdx: src, partner: partner, overlay: $overlay, sizes: sz)
         case .preview(let name):
             CardPreviewOverlay(name: name) { overlay = nil }
+        case .qr:
+            SeatQROverlay(gameId: session.clientGameId, seat: player.position, connected: remoteConnected) { overlay = nil }
         }
+    }
+
+    /// A phone has checked in for this seat within the last 15 s (web rule).
+    private var remoteConnected: Bool {
+        guard let ts = state.remoteCheckins?[player.position.rawValue] else { return false }
+        return GameReducer.nowMillis() - ts < 15_000
     }
 
     @ViewBuilder private func focusModal(_ target: FocusTarget) -> some View {

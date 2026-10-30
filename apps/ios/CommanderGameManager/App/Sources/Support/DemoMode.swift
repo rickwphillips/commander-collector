@@ -27,6 +27,16 @@ enum DemoMode {
         false
         #endif
     }
+    /// `-join <seat>`: open the Join screen and take that seat at the first
+    /// table found (two simulators on one Mac test the remote link).
+    static var joinSeat: SeatPosition? {
+        #if DEBUG
+        guard let i = CommandLine.arguments.firstIndex(of: "-join"), i + 1 < CommandLine.arguments.count else { return nil }
+        return SeatPosition(rawValue: CommandLine.arguments[i + 1])
+        #else
+        return nil
+        #endif
+    }
     static var wantsTwoHeadedGiant: Bool {
         #if DEBUG
         CommandLine.arguments.contains("-demo2hg")
