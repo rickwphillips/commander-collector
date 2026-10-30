@@ -15,14 +15,21 @@ enum DemoMode {
 
     static var isEnabled: Bool {
         #if DEBUG
-        CommandLine.arguments.contains("-demo") || CommandLine.arguments.contains("-demoBoard")
+        CommandLine.arguments.contains("-demo") || CommandLine.arguments.contains("-demoBoard") || CommandLine.arguments.contains("-demo2hg")
         #else
         false
         #endif
     }
     static var wantsBoard: Bool {
         #if DEBUG
-        CommandLine.arguments.contains("-demoBoard")
+        CommandLine.arguments.contains("-demoBoard") || CommandLine.arguments.contains("-demo2hg")
+        #else
+        false
+        #endif
+    }
+    static var wantsTwoHeadedGiant: Bool {
+        #if DEBUG
+        CommandLine.arguments.contains("-demo2hg")
         #else
         false
         #endif
@@ -57,7 +64,7 @@ enum DemoMode {
     /// real cache when it holds enough distinct players with decks.
     @MainActor
     static func board(from context: ModelContext) -> ActiveGame {
-        var s = GameSetup.seatingState(playerCount: 4, startingLife: 40, turnTimerSeconds: 300, gameType: .standard)
+        var s = GameSetup.seatingState(playerCount: 4, startingLife: wantsTwoHeadedGiant ? 30 : 40, turnTimerSeconds: 300, gameType: wantsTwoHeadedGiant ? .twoHeadedGiant : .standard)
         var seats: [GameSetup.Seat] = []
         let cached = (try? context.fetch(FetchDescriptor<CachedDeck>(sortBy: [SortDescriptor(\.name)]))) ?? []
         var usedPlayers = Set<String>()

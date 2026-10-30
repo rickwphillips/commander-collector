@@ -32,6 +32,10 @@ enum FocusTarget: Equatable {
     case experience
     case tax(partner: Bool)
     case commanderDamage(sourceIdx: Int, partner: Bool)
+    /// Two-Headed Giant: a named pilot's own counter.
+    case memberEnergy(idx: Int)
+    case memberExperience(idx: Int)
+    case memberTax(idx: Int, partner: Bool)
 
     var id: String {
         switch self {
@@ -41,6 +45,9 @@ enum FocusTarget: Equatable {
         case .experience: "xp"
         case .tax(let p): "tax-\(p)"
         case .commanderDamage(let s, let p): "cmd-\(s)-\(p)"
+        case .memberEnergy(let i): "m-energy-\(i)"
+        case .memberExperience(let i): "m-xp-\(i)"
+        case .memberTax(let i, let p): "m-tax-\(i)-\(p)"
         }
     }
 }

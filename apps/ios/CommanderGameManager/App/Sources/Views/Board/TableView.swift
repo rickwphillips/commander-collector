@@ -34,6 +34,16 @@ struct TableView: View {
             let gap: CGFloat = 4
             TimelineView(.periodic(from: .now, by: 1)) { ctx in
                 let elapsed = session.elapsedSeconds(now: ctx.date)
+                if session.state.isTwoHeadedGiant {
+                    // Web 2HG grid: one team panel along each long edge (the top
+                    // team turned to face its players), the centre strip between.
+                    VStack(spacing: gap) {
+                        teamPanel(2, elapsed: elapsed).rotationEffect(.degrees(180))
+                        CenterZoneView(session: session, showLog: $showLog, elapsedSeconds: elapsed, onRestart: onRestart)
+                            .frame(maxWidth: 520).frame(height: centerH)
+                        teamPanel(1, elapsed: elapsed)
+                    }
+                } else {
                 HStack(spacing: gap) {
                     if let i = idx(.left) {
                         panel(i, elapsed: elapsed)
@@ -58,6 +68,7 @@ struct TableView: View {
                             .rotationEffect(.degrees(-90))
                             .frame(width: rightW, height: h)
                     }
+                }
                 }
             }
             .padding(gap)
@@ -99,6 +110,21 @@ struct TableView: View {
         guard let start = cw.firstIndex(of: first) else { return 0 }
         let rotated = Array(cw[start...] + cw[..<start])
         return Double(rotated.firstIndex(of: i) ?? 0) * Self.revealStep
+    }
+
+    /// 2HG: both seats of a team in one panel while playing; two seating
+    /// cards side by side while seating.
+    @ViewBuilder
+    private func teamPanel(_ team: Int, elapsed: Int) -> some View {
+        if session.isSeating {
+            HStack(spacing: 4) {
+                ForEach(session.state.players.indices.filter { session.state.players[$0].teamNumber == team }, id: \.self) { i in
+                    SeatingPanel(player: session.state.players[i], teamNumber: team) { seatingIdx = i }
+                }
+            }
+        } else {
+            TeamPanel(session: session, teamNumber: team, elapsedSeconds: elapsed, turnIndicatorOn: turnIndicatorOn)
+        }
     }
 
     @ViewBuilder

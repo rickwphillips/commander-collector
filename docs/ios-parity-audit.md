@@ -126,7 +126,7 @@ seat**, never as a system sheet facing one side of the table.
       rematch of the last saved game pre-fills the seats.
 - [x] D5 End summary: per player card with art, final life, poison, commander
       damage taken, place and eliminated turn; Log Game / New Game / Discard.
-- [ ] D6 Two-Headed Giant team panels (shared life/poison, team names, both
+- [x] D6 Two-Headed Giant team panels (shared life/poison, team names, both
       pilots' counters, opposing team's commander damage) along the top and
       bottom edges. The iPad shows four single-seat panels today.
 - [ ] D7 Remote seats: QR / seat code per seat and the "being viewed" eye

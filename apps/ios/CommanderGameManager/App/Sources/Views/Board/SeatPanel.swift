@@ -303,6 +303,8 @@ struct SeatPanel: View {
             FocusModal(title: "CMD Dmg — \(partner ? (source.partner?.name ?? "") : source.commander.name)", value: partner ? dmg.fromPartner : dmg.fromCommander,
                        color: (partner ? dmg.fromPartner : dmg.fromCommander) >= 21 ? Theme.danger : .primary, disableDec: source.isEliminated,
                        onChange: { session.dispatch(.commanderDamageChange(targetIdx: idx, sourceIdx: src, isPartner: partner, delta: $0)) }, onClose: close)
+        case .memberEnergy, .memberExperience, .memberTax:
+            EmptyView()
         }
     }
 
