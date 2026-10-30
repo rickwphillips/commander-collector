@@ -257,7 +257,7 @@ struct SeatPanel: View {
         return ZStack {
             LifeCracks(fingerprint: idx, lostRatio: lost)
             if let threat, threat.intensity > 0, motion { ThreatNames(name: threat.commanderName, intensity: threat.intensity, fingerprint: idx) }
-            VStack(spacing: 2) {
+            VStack(spacing: 10) {
                 LifeNumber(value: player.life, fontSize: fontSize, color: lifeColor, damageFlash: damageFlash, energy: player.energy, poison: player.poison, poisonLethal: poisonLethal)
                     .accessibilityIdentifier("s\(idx)-life")
                     .accessibilityValue("\(player.life)")
@@ -266,9 +266,9 @@ struct SeatPanel: View {
                         MonarchCrown(isMonarch: player.isMonarch, transferHint: session.monarchTransferRecent, size: fontSize * 0.55)
                             .offset(x: -fontSize * 0.3, y: -fontSize * 0.3)
                     }
-                HStack(spacing: 10) {
-                    StepButton(symbol: "minus", size: StepperSize(buttonFont: sz.lifeBtn, buttonWidth: 52, buttonHeight: 44), id: "s\(idx)-life-dec") { session.dispatch(.lifeChange(playerIdx: idx, delta: $0 ? -5 : -1)) }
-                    StepButton(symbol: "plus", size: StepperSize(buttonFont: sz.lifeBtn, buttonWidth: 52, buttonHeight: 44), id: "s\(idx)-life-inc") { session.dispatch(.lifeChange(playerIdx: idx, delta: $0 ? 5 : 1)) }
+                HStack(spacing: 22) {
+                    StepButton(symbol: "minus", size: StepperSize(buttonFont: sz.lifeBtn, buttonWidth: 60, buttonHeight: 50), id: "s\(idx)-life-dec") { session.dispatch(.lifeChange(playerIdx: idx, delta: $0 ? -5 : -1)) }
+                    StepButton(symbol: "plus", size: StepperSize(buttonFont: sz.lifeBtn, buttonWidth: 60, buttonHeight: 50), id: "s\(idx)-life-inc") { session.dispatch(.lifeChange(playerIdx: idx, delta: $0 ? 5 : 1)) }
                 }
             }
             .padding(6)
@@ -391,7 +391,7 @@ struct SeatPanel: View {
             // The player name and commander line read the same in every seat:
             // the side seats are narrow, not small.
             name = 15; deck = 11.5; pass = 12 * k; icon = 22 * k; menu = 18 * k; art = 36 * k
-            life = max(34, min(h * 0.28, 112)); lifeBtn = 36 * k; crown = 52 * k
+            life = max(34, min(h * 0.28, 112)); lifeBtn = 40 * k; crown = 52 * k
             label = 12 * k; source = 15 * k; badge = 11 * k; value = 20 * k; kill = 13 * k
             stepper = StepperSize(buttonFont: 20 * k, valueFont: 20 * k, buttonWidth: 30 * k, buttonHeight: 32 * k, valueWidth: 26 * k, labelFont: 11 * k)
         }

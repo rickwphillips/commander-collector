@@ -231,15 +231,15 @@ struct TeamPanel: View {
             ZStack {
                 LifeCracks(fingerprint: teamNumber, lostRatio: lost)
                 if let threat, threat.intensity > 0, settings.animationsEnabled { ThreatNames(name: threat.commanderName, intensity: threat.intensity, fingerprint: teamNumber) }
-                HStack(spacing: 12) {
-                    StepButton(symbol: "minus", size: StepperSize(buttonFont: sz.lifeBtn, buttonWidth: 48, buttonHeight: 44)) { session.dispatch(.lifeChange(playerIdx: primary, delta: $0 ? -5 : -1)) }
+                HStack(spacing: 20) {
+                    StepButton(symbol: "minus", size: StepperSize(buttonFont: sz.lifeBtn, buttonWidth: 56, buttonHeight: 50)) { session.dispatch(.lifeChange(playerIdx: primary, delta: $0 ? -5 : -1)) }
                     LifeNumber(value: life, fontSize: sz.life, color: lifeColor, damageFlash: damageFlash, energy: teamEnergy, poison: poison, poisonLethal: 15)
                         .onTapGesture { overlay = .focus(.life) }
                         .overlay(alignment: .topLeading) {
                             MonarchCrown(isMonarch: members.contains { state.players[$0].isMonarch }, transferHint: session.monarchTransferRecent, size: sz.life * 0.5)
                                 .offset(x: -sz.life * 0.3, y: -sz.life * 0.3)
                         }
-                    StepButton(symbol: "plus", size: StepperSize(buttonFont: sz.lifeBtn, buttonWidth: 48, buttonHeight: 44)) { session.dispatch(.lifeChange(playerIdx: primary, delta: $0 ? 5 : 1)) }
+                    StepButton(symbol: "plus", size: StepperSize(buttonFont: sz.lifeBtn, buttonWidth: 56, buttonHeight: 50)) { session.dispatch(.lifeChange(playerIdx: primary, delta: $0 ? 5 : 1)) }
                 }
                 .padding(6)
                 .background(GlassBacking(active: glassActive))
