@@ -30,6 +30,7 @@ final class WebTableHost {
     private var streams: [SSEStream] = []
     private var latest: (state: GameState, log: [GameLogEvent])?
     private var keepalive: Task<Void, Never>?
+    private var settle: Task<Void, Never>?
     private var artIds: [String: String] = [:]
     private let encoder: JSONEncoder = { let e = JSONEncoder(); return e }()
 
@@ -58,6 +59,7 @@ final class WebTableHost {
 
     isolated deinit {
         keepalive?.cancel()
+        settle?.cancel()
         streams.forEach { $0.close() }
         server?.stop()
     }
@@ -73,6 +75,25 @@ final class WebTableHost {
 
     func broadcast(_ state: GameState, log: [GameLogEvent]) {
         latest = (state, log)
+        push(state)
+        // The web panel ignores pushes for a short grace period after it
+        // sends an event (its optimistic update is ahead of the table), so a
+        // change from another seat in that window would be missed until the
+        // next push. Send the authoritative state again once every phone's
+        // grace period has passed; the table is the source of truth.
+        guard settle == nil else { return }
+        settle = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(Self.settleDelayMs))
+            guard !Task.isCancelled, let self else { return }
+            self.settle = nil
+            if let latest = self.latest { self.push(latest.state) }
+        }
+    }
+
+    /// Just past the web panel's POST_EVENT_GRACE_MS (1500 ms).
+    private static let settleDelayMs = 2000
+
+    private func push(_ state: GameState) {
         guard let json = stateMessage(state) else { return }
         streams.removeAll { !$0.isOpen }
         streams.forEach { $0.send(json: json) }

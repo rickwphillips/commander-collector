@@ -160,9 +160,15 @@ final class GameSession {
     func dispatch(_ kind: LiveGameEvent.Kind, seat: String = "host") {
         guard isPlaying else { return }
         if let remoteTransport { remoteTransport(kind); return }
+        // Phone bookkeeping (view_open and the like) is not a game event: it
+        // neither changes state nor belongs in the saved event list.
+        if case .unknown = kind { return }
         let event = LiveGameEvent(seat: seat, ts: GameReducer.nowMillis(), kind: kind)
         let prev = state
         state = GameReducer.applyEvent(prev, event)
+        // A checkin only refreshes the "phone connected" timestamp; keep it out
+        // of the replayable event list but still push the state to every phone.
+        if case .checkin = kind { persist(); return }
         events.append(event)
         appendLog(GameLog.diff(prev, state, reverse: { if case .prevTurn = kind { true } else { false } }()))
         noteKillsNeedingAttribution(prev: prev, next: state, kind: kind)
