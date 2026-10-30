@@ -30,6 +30,12 @@ targets:
     sources:
       - path: App/Sources
       - path: App/Resources
+        excludes:
+          - "RemoteWeb/**"
+      # The web app's static export, served to phones by the table (see
+      # scripts/bundle-remote-web.sh); a folder reference keeps its paths.
+      - path: App/Resources/RemoteWeb
+        type: folder
     dependencies:
       - package: CommanderGameKit
         product: CommanderGameKit

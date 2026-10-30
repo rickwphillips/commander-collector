@@ -24,7 +24,7 @@ import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import { QRCodeSVG } from 'qrcode.react';
 import { useCommanderPreview } from './useCommanderPreview';
 import { ASSET_BASE, remoteQrOrigin } from '@/lib/api';
-import { CommanderArt, CommanderArtBg, CommanderBackdrop, BACKDROP_FADE_MS } from './CommanderArt';
+import { CommanderArt, CommanderArtBg, CommanderBackdrop, CommanderCardImage, BACKDROP_FADE_MS } from './CommanderArt';
 import { ControlFocusModal } from './ControlFocusModal';
 import { StepperControl, StepperOverlayHost } from './StepperControl';
 import { isControlGlassActive } from './controlGlass';
@@ -776,7 +776,9 @@ function PlayerCardImpl(props: PlayerCardProps) {
                   name={src.commander.name}
                   sx={{ position: 'absolute', inset: 0, backgroundSize: 'cover', backgroundPosition: 'center top', opacity: 0.15, pointerEvents: 'none' }}
                 />
-                <Box onClick={(e) => e.stopPropagation()} sx={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', p: 1, gap: 0.5, overflowY: 'auto' }}>
+                {/* Stats and the dealt-damage table on the left, the commander's card on the right. */}
+                <Box onClick={(e) => e.stopPropagation()} sx={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'row', p: 1, gap: 1, minHeight: 0 }}>
+                <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.5, overflowY: 'auto' }}>
                   <Stack direction="row" alignItems="center" spacing={0.75}>
                     <Box sx={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                       <Stack direction="row" alignItems="center" spacing={0.5}>
@@ -839,6 +841,12 @@ function PlayerCardImpl(props: PlayerCardProps) {
                       );
                     })}
                   </Stack>
+                </Box>
+                <CommanderCardImage
+                  name={match[2] === 'psnap' && src.partner ? src.partner.name : src.commander.name}
+                  onClick={(e) => { e.stopPropagation(); setCmdPreviewName(match[2] === 'psnap' && src.partner ? src.partner.name : src.commander.name); }}
+                  sx={{ flex: '0 0 42%', maxWidth: 300, minHeight: 0 }}
+                />
                 </Box>
               </Box>
             );

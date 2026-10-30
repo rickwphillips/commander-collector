@@ -39,10 +39,21 @@ struct SeatQROverlay: View {
         ZStack {
             Theme.overlayBackground(scheme).onTapGesture(perform: onClose)
             VStack(spacing: 10) {
-                QRCodeView(text: TableLink.joinURL(gameId: gameId, seat: seat).absoluteString, size: 140)
-                Text(connected ? "Phone connected" : "Scan to join this seat").font(.caption).foregroundStyle(connected ? .green : .secondary)
-                Text("Open Commander on the phone, tap Join a table, and scan. Same Wi-Fi or Bluetooth range; no server needed.")
-                    .font(.caption2).foregroundStyle(.tertiary).multilineTextAlignment(.center).frame(maxWidth: 240)
+                if let url = WebTableHost.current?.seatURL(seat) {
+                    // The phone's camera opens this in its browser: the web player
+                    // panel, served by this iPad. The same link keeps working after
+                    // a reconnect, a resume or a relaunch.
+                    QRCodeView(text: url.absoluteString, size: 140)
+                    Text(connected ? "Phone connected" : "Scan with the phone camera").font(.caption).foregroundStyle(connected ? .green : .secondary)
+                    Text(url.absoluteString).font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary).multilineTextAlignment(.center).frame(maxWidth: 240)
+                    Text("Same Wi-Fi as this iPad. Opens the player panel in the browser; nothing to install.")
+                        .font(.caption2).foregroundStyle(.tertiary).multilineTextAlignment(.center).frame(maxWidth: 240)
+                } else {
+                    Image(systemName: "wifi.slash").font(.largeTitle).foregroundStyle(.secondary)
+                    Text("Join this iPad to Wi-Fi (or turn on its hotspot) to pair a phone.").font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 240)
+                    QRCodeView(text: TableLink.joinURL(gameId: gameId, seat: seat).absoluteString, size: 100)
+                    Text("Or scan from the Commander app's Join a table screen.").font(.caption2).foregroundStyle(.tertiary).multilineTextAlignment(.center).frame(maxWidth: 240)
+                }
                 Text("tap to close").font(.caption2).foregroundStyle(.tertiary)
             }
             .padding(12)

@@ -57,3 +57,4 @@ data/
 # Claude Code local config + graphify knowledge graph (local-only)
 .claude/
 graphify-out/
+apps/ios/CommanderGameManager/App/Resources/RemoteWeb/

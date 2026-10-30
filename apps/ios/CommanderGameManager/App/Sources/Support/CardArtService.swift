@@ -57,6 +57,21 @@ actor CardArtService {
         return await image(at: url, key: "card-\(name)")
     }
 
+    /// The cached Scryfall record (URLs and colour identity) for a name.
+    func cardRecord(for name: String) async -> CardImages? { await record(for: name) }
+
+    /// The art crop's JPEG bytes, for phones served by the table's web server.
+    func artCropData(for name: String) async -> Data? {
+        guard let record = await record(for: name), let url = record.artCrop, await image(at: url, key: "art-\(name)") != nil else { return nil }
+        return try? Data(contentsOf: file(for: "art-\(name)", ext: "jpg"))
+    }
+
+    /// The full card's JPEG bytes, for phones served by the table's web server.
+    func cardImageData(for name: String) async -> Data? {
+        guard let record = await record(for: name), let url = record.normal, await image(at: url, key: "card-\(name)") != nil else { return nil }
+        return try? Data(contentsOf: file(for: "card-\(name)", ext: "jpg"))
+    }
+
     /// Scryfall autocomplete for the commander search in the seat picker and
     /// the deck editor. Empty on any failure.
     func autocomplete(_ query: String) async -> [String] {

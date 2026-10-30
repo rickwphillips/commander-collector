@@ -16,6 +16,7 @@ struct TableView: View {
     @State private var turnIndicatorOn = false
     @State private var introStarted = false
     @State private var host: TableHost?
+    @State private var webHost: WebTableHost?
 
     private static let revealStep = 0.9
     private static let fadeSeconds = 0.8
@@ -100,14 +101,27 @@ struct TableView: View {
             SoundService.shared.setPoisonLevel(on && session.isPlaying ? session.highestLivingPoison : 0)
             SoundService.shared.setCitysBlessingActive(on && session.isPlaying && session.state.players.contains { $0.hasCitysBlessing })
         }
-        .onDisappear { SoundService.shared.stopPoison(); host?.end(); host = nil; session.onStateChanged = nil }
+        .onDisappear {
+            SoundService.shared.stopPoison()
+            host?.end(); host = nil
+            webHost?.end(); webHost = nil; WebTableHost.current = nil
+            session.onStateChanged = nil
+        }
         .onChange(of: session.isPlaying, initial: true) { _, playing in
             guard playing, host == nil, !session.isRemote else { return }
+            // Phones with this app join over Multipeer; any phone's browser
+            // joins through the table's own web server.
             let h = TableHost(gameId: session.clientGameId)
-            h.onEvent = { e in session.dispatch(e.kind, seat: e.seat) }
-            session.onStateChanged = { s, l in h.broadcast(s, log: l) }
+            let w = WebTableHost(gameId: session.clientGameId)
+            let apply: (LiveGameEvent) -> Void = { e in session.dispatch(e.kind, seat: e.seat) }
+            h.onEvent = apply
+            w.onEvent = apply
+            session.onStateChanged = { s, l in h.broadcast(s, log: l); w.broadcast(s, log: l) }
             host = h
+            webHost = w
+            WebTableHost.current = w
             h.broadcast(session.state, log: session.log)
+            w.broadcast(session.state, log: session.log)
         }
         .task { await CardArtService.shared.prewarm(session.state.players.flatMap { [$0.commander.name, $0.partner?.name ?? ""] }) }
     }

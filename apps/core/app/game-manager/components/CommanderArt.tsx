@@ -14,7 +14,7 @@
  */
 import { useEffect, useState, type MouseEvent } from 'react';
 import { Box, Typography, type SxProps, type Theme } from '@mui/material';
-import { getArtCropByName } from '@commander/shared/lib/cardImageCache';
+import { getArtCropByName, getCardImageByName } from '@commander/shared/lib/cardImageCache';
 
 /**
  * Resolve a commander name to a phone-safe art_crop src: the proxied data URI
@@ -213,6 +213,30 @@ export function CommanderBackdrop({ name, revealDelayMs, flashOnReveal = false, 
         </Box>
       )}
       {flash}
+    </Box>
+  );
+}
+
+/**
+ * The full card image for a commander, beside the stats in the commander
+ * snapshot (the iPad app shows the same layout). Tap for the zoomable preview.
+ */
+export function CommanderCardImage({ name, onClick, sx }: { name: string; onClick?: (e: MouseEvent) => void; sx?: SxProps<Theme> }) {
+  // Keyed by name so a stale image never shows for the next commander.
+  const [loaded, setLoaded] = useState<{ name: string; url: string | null } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    getCardImageByName(name).then((url) => { if (alive) setLoaded({ name, url }); }).catch(() => {});
+    return () => { alive = false; };
+  }, [name]);
+  const src = loaded?.name === name ? loaded.url : null;
+  return (
+    <Box onClick={onClick} sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', cursor: onClick ? 'pointer' : 'default', ...sx }}>
+      {src ? (
+        <Box component="img" src={src} alt={name} sx={{ width: '100%', height: 'auto', maxHeight: '100%', objectFit: 'contain', borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }} />
+      ) : (
+        <Box sx={{ width: '100%', aspectRatio: '63 / 88', borderRadius: 2, bgcolor: 'action.hover' }} />
+      )}
     </Box>
   );
 }
