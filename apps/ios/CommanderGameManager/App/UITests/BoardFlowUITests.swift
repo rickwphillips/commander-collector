@@ -329,10 +329,20 @@ final class MotionShotsUITests: XCTestCase {
             try? png.write(to: URL(fileURLWithPath: dir).appendingPathComponent(name + ".png"))
         }
         XCTAssertTrue(app.buttons["openSettings"].firstMatch.waitForExistence(timeout: 15))
-        sleep(6)
-        shot("1-motion-on")
+        // Motion persists between launches: start from on.
         app.buttons["openSettings"].firstMatch.tap()
         let sw = app.switches["motionToggle"].firstMatch
+        XCTAssertTrue(sw.waitForExistence(timeout: 5))
+        if (sw.value as? String) == "0" { sw.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap(); sleep(2) }
+        app.buttons["closeOverlay"].firstMatch.tap()
+        sleep(6)
+        shot("1-motion-on")
+        // Torch alone on Rick's seat (no blessing there) so the dungeon shows.
+        app.descendants(matching: .any)["s0-menu"].firstMatch.tap()
+        app.descendants(matching: .any)["menu-Initiative"].firstMatch.tap()
+        sleep(5)
+        shot("1b-torch-only")
+        app.buttons["openSettings"].firstMatch.tap()
         XCTAssertTrue(sw.waitForExistence(timeout: 5))
         sw.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
         usleep(300_000); shot("2-fading-out")

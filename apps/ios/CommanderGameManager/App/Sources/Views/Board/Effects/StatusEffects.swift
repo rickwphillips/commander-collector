@@ -50,9 +50,12 @@ struct InitiativeTorch: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                Image("dungeon").resizable().scaledToFill()
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .opacity(0.3)
+                // The web's dungeon.jpg behind the whole seat at 30%.
+                if let dungeon = Self.dungeon {
+                    Image(uiImage: dungeon).resizable().scaledToFill()
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .opacity(0.3)
+                }
                 TimelineView(.animation(minimumInterval: 1 / 24, paused: !motion)) { ctx in
                     let t = ctx.date.timeIntervalSinceReferenceDate
                     let phase = (t / 42).truncatingRemainder(dividingBy: 1)
@@ -83,6 +86,8 @@ struct InitiativeTorch: View {
         .allowsHitTesting(false)
         .onAppear { withAnimation(.easeIn(duration: 3)) { shown = true } }
     }
+
+    private static let dungeon: UIImage? = Bundle.main.path(forResource: "dungeon", ofType: "jpg").flatMap { UIImage(contentsOfFile: $0) }
 
     /// The web's torchDrift keyframes (x in torch widths, rotation).
     private static let keyframes: [(p: Double, x: Double, a: Double)] = [
