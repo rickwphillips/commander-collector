@@ -64,107 +64,6 @@ struct SeatPickerSheet: View {
     }
 }
 
-/// Commander damage taken by one seat, per opposing commander (and partner).
-struct CommanderDamageSheet: View {
-    @Bindable var session: GameSession
-    let targetIdx: Int
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            List {
-                ForEach(session.state.players.indices.filter { $0 != targetIdx }, id: \.self) { s in
-                    let source = session.state.players[s]
-                    let dmg = session.state.commanderDamage[targetIdx, s]
-                    Section(source.playerName) {
-                        row(label: source.commander.name, value: dmg.fromCommander, lethal: dmg.fromCommander >= 21) { d in
-                            session.dispatch(.commanderDamageChange(targetIdx: targetIdx, sourceIdx: s, isPartner: false, delta: d))
-                        }
-                        if let partner = source.partner {
-                            row(label: partner.name, value: dmg.fromPartner, lethal: dmg.fromPartner >= 21) { d in
-                                session.dispatch(.commanderDamageChange(targetIdx: targetIdx, sourceIdx: s, isPartner: true, delta: d))
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Commander damage to \(session.state.players[targetIdx].playerName)")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-        }
-    }
-
-    private func row(label: String, value: Int, lethal: Bool, change: @escaping (Int) -> Void) -> some View {
-        HStack {
-            Text(label)
-            Spacer()
-            RepeatButton(symbol: "minus", size: 34) { change(-1) }
-            Text("\(value)").font(.title2.monospacedDigit().bold()).frame(width: 44)
-                .foregroundStyle(lethal ? .red : .primary)
-            RepeatButton(symbol: "plus", size: 34) { change(1) }
-        }
-    }
-}
-
-/// Energy, experience and commander tax for one seat.
-struct CountersSheet: View {
-    @Bindable var session: GameSession
-    let idx: Int
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        let p = session.state.players[idx]
-        NavigationStack {
-            List {
-                counter("Commander tax", p.commanderTax) { session.dispatch(.commanderTaxChange(playerIdx: idx, delta: $0, isPartner: false)) }
-                if p.partner != nil {
-                    counter("Partner tax", p.partnerCommanderTax) { session.dispatch(.commanderTaxChange(playerIdx: idx, delta: $0, isPartner: true)) }
-                }
-                counter("Energy", p.energy) { session.dispatch(.energyChange(playerIdx: idx, delta: $0)) }
-                counter("Experience", p.experience) { session.dispatch(.experienceChange(playerIdx: idx, delta: $0)) }
-            }
-            .navigationTitle("\(p.playerName): counters")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-        }
-    }
-
-    private func counter(_ label: String, _ value: Int, change: @escaping (Int) -> Void) -> some View {
-        HStack {
-            Text(label)
-            Spacer()
-            RepeatButton(symbol: "minus", size: 34) { change(-1) }
-            Text("\(value)").font(.title2.monospacedDigit().bold()).frame(width: 44)
-            RepeatButton(symbol: "plus", size: 34) { change(1) }
-        }
-    }
-}
-
-/// "Who dealt the final blow?" after a life or poison kill.
-struct KillAttributionSheet: View {
-    @Bindable var session: GameSession
-    let pending: GameSession.PendingKill
-
-    var body: some View {
-        let target = session.state.players[pending.targetIdx]
-        NavigationStack {
-            List {
-                Section {
-                    ForEach(session.state.players.indices.filter { $0 != pending.targetIdx && session.state.players[$0].teamNumber.map { $0 != target.teamNumber } ?? true }, id: \.self) { s in
-                        Button(session.state.players[s].playerName) { session.attributeKill(pending, sourceIdx: s) }
-                    }
-                    Button("Nobody / unknown") { session.attributeKill(pending, sourceIdx: nil) }
-                } header: {
-                    Text(pending.cause == .life ? "Who brought \(target.playerName) to 0 life?" : "Whose poison finished \(target.playerName)?")
-                }
-            }
-            .navigationTitle("Elimination")
-            .navigationBarTitleDisplayMode(.inline)
-        }
-        .interactiveDismissDisabled()
-    }
-}
-
 /// The derived game log, newest last.
 struct GameLogSheet: View {
     let log: [GameLogEvent]
@@ -216,7 +115,19 @@ struct GameLogSheet: View {
         case "experience_change": return "\(str(p["player"])) experience → \(str(p["to"]))"
         case "commander_tax": return "\(str(p["player"])) commander tax → \(str(p["to"]))"
         case "first_player_roll": return str(p["note"])
-        case "dice_roll": return "\(str(p["label"])): \(str(p["rolls"])) = \(str(p["total"]))"
+        case "roll_for_first":
+            if case .array(let rs)? = p["rolls"] {
+                let parts = rs.map { r -> String in
+                    if case .object(let o) = r { return "\(str(o["player"])) \(str(o["roll"]))" }
+                    return ""
+                }
+                return "Roll for first: \(parts.joined(separator: ", "))"
+            }
+            return "Roll for first"
+        case "die_roll":
+            let total = p["total"].map { str($0) } ?? ""
+            return "Rolled \(str(p["die"])): \(str(p["rolls"]))" + (total.isEmpty ? "" : " (total \(total))")
+        case "kill_attribution": return "\(str(p["player"]))'s \(str(p["cause"])) kill credited to \(str(p["source"]).isEmpty ? "unknown" : str(p["source"]))"
         case "game_ended": return "Game ended on turn \(str(p["turn"]))"
         default: return e.type
         }

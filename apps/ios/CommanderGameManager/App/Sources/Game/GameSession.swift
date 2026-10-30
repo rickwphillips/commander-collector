@@ -19,6 +19,23 @@ final class GameSession {
     /// A kill that needs the host to say who dealt it (life or poison, no
     /// commander-damage source). The board shows a prompt while this is set.
     var pendingKillAttribution: PendingKill?
+
+    /// Set when the crown moved from one seat to another (not gained from
+    /// nobody), so the new holder's crown plays the longer transfer entry.
+    private(set) var monarchTransferAt: Date?
+    var monarchTransferRecent: Bool { monarchTransferAt.map { Date().timeIntervalSince($0) < 1.8 } ?? false }
+
+    /// Last commander-damage source tapped per target seat: the tiebreak for
+    /// which commander's art shows as the threat vignette.
+    private(set) var lastCmdDmgSource: [Int: Int] = [:]
+
+    /// True when the first player was rolled or picked in this session (fresh
+    /// game), which stagger-reveals the seat backdrops in turn order. A resumed
+    /// game fades them all in together.
+    private(set) var firstPlayerChosenThisSession = false
+
+    /// Highest poison among living seats, for the shared poison ambience.
+    var highestLivingPoison: Int { state.players.filter { !$0.isEliminated }.map(\.poison).max() ?? 0 }
     struct PendingKill: Identifiable, Equatable {
         enum Cause { case life, poison }
         var targetIdx: Int
@@ -30,6 +47,13 @@ final class GameSession {
         state = GameSetup.seatingState(
             playerCount: setup.playerCount, startingLife: setup.startingLife,
             turnTimerSeconds: setup.turnTimerSeconds, gameType: setup.gameType)
+        clientGameId = UUID().uuidString.lowercased()
+        startedAt = .now
+    }
+
+    /// A fresh game seated like a previous one (Restart).
+    init(seating state: GameState) {
+        self.state = state
         clientGameId = UUID().uuidString.lowercased()
         startedAt = .now
     }
@@ -58,9 +82,29 @@ final class GameSession {
     func chooseFirstPlayer(_ idx: Int, note: String?) {
         let prev = state
         state = GameSetup.chooseFirstPlayer(state, idx: idx)
+        firstPlayerChosenThisSession = true
         if isPlaying { appendLog(GameLog.diff(prev, state)) }
         if let note { appendLog([GameLogEvent(type: "first_player_roll", payload: ["note": .string(note)])]) }
         persist()
+    }
+
+    /// Each round of the roll for first player, as the web logs it.
+    func logRollForFirst(_ rolls: [(String, Int)], tiebreak: Bool) {
+        appendLog([GameLogEvent(type: "roll_for_first", payload: [
+            "sides": .int(20), "tiebreak": .bool(tiebreak),
+            "rolls": .array(rolls.map { .object(["player": .string($0.0), "roll": .int($0.1)]) }),
+        ])])
+    }
+
+    /// Back to seating with the same players (web Restart).
+    func restartKeepingSeats() -> GameState {
+        var fresh = GameSetup.seatingState(playerCount: state.players.count, startingLife: state.startingLife,
+                                           turnTimerSeconds: state.turnTimerSeconds, gameType: state.gameType ?? .standard)
+        for (i, p) in state.players.enumerated() where GameSetup.isSeatFilled(p) {
+            fresh = GameSetup.seating(fresh, idx: i, seat: GameSetup.Seat(playerId: p.playerId, playerName: p.playerName, deckId: p.deckId, deckName: p.deckName, commander: p.commander, partner: p.partner))
+        }
+        ActiveGameStore.clear()
+        return fresh
     }
 
     /// Seating → playing. Records game_started and, if the first player is
@@ -90,7 +134,15 @@ final class GameSession {
         events.append(event)
         appendLog(GameLog.diff(prev, state, reverse: { if case .prevTurn = kind { true } else { false } }()))
         noteKillsNeedingAttribution(prev: prev, next: state, kind: kind)
+        noteMonarchTransfer(prev: prev, next: state)
+        if case .commanderDamageChange(let target, let source, _, _) = kind { lastCmdDmgSource[target] = source }
         persist()
+    }
+
+    private func noteMonarchTransfer(prev: GameState, next: GameState) {
+        let was = prev.players.firstIndex(where: \.isMonarch)
+        let now = next.players.firstIndex(where: \.isMonarch)
+        if let was, let now, was != now { monarchTransferAt = .now }
     }
 
     /// Life and poison kills happen before anyone says who dealt them. A
@@ -119,10 +171,12 @@ final class GameSession {
         }
     }
 
-    /// Die rolls never touch the state; they are logged directly.
-    func logDiceRoll(label: String, rolls: [Int]) {
-        appendLog([GameLogEvent(type: "dice_roll", payload: [
-            "label": .string(label), "rolls": .array(rolls.map { .int($0) }), "total": .int(rolls.reduce(0, +)),
+    /// Die rolls never touch the state; they are logged directly (web `die_roll`).
+    func logDiceRoll(die: String, sides: Int?, count: Int, rolls: [Int], total: Int?) {
+        let faces: [JSONValue] = sides == nil ? rolls.map { .string($0 == 1 ? "Heads" : "Tails") } : rolls.map { .int($0) }
+        appendLog([GameLogEvent(type: "die_roll", payload: [
+            "die": .string(die), "sides": sides.map { .int($0) } ?? .null, "count": .int(count),
+            "rolls": .array(faces), "total": total.map { .int($0) } ?? .null,
         ])])
         persist()
     }

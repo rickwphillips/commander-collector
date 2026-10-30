@@ -1,194 +1,416 @@
 import SwiftUI
 import CommanderGameKit
 
-/// One player's panel during play: life, poison, commander damage, counters,
-/// status toggles, concede. Every control dispatches an event to the session.
+/// One seat during play, the web `PlayerCard` on the iPad: header bar with
+/// commander thumbnail, tax medallions, XP badge, PASS, name, status icons
+/// and the `+` menu; then three columns: commander damage (collapsible), the
+/// hero life, counters (collapsible). Every overlay (menu, counters focus,
+/// commander snapshot, card preview, rules text, kill prompts) is rendered
+/// inside this view so it faces the seat's player.
 struct SeatPanel: View {
     @Bindable var session: GameSession
     let idx: Int
-    @State private var showDamage = false
-    @State private var showCounters = false
-    @State private var confirmConcede = false
-    @State private var lifeFlash = 0
+    let elapsedSeconds: Int
+    /// Delay (s) before the backdrop reveals; nil keeps it hidden.
+    let backdropDelay: Double?
+    let backdropFlash: Bool
+    let turnIndicatorOn: Bool
+    @Environment(GameSettingsStore.self) private var settings
+    @Environment(\.colorScheme) private var scheme
 
-    private var player: PlayerState { session.state.players[idx] }
+    @State private var overlay: SeatOverlay?
+    @State private var cmdDmgOpen = true
+    @State private var countersOpen = true
+    @State private var damageFlash = 0
+    @State private var flashTrigger = 0
+    @State private var cityBlessingVisible = false
+    @State private var cityBlessingExiting = false
+    @State private var concedeTurn = ""
+
+    private var state: GameState { session.state }
+    private var player: PlayerState { state.players[idx] }
     private var isActive: Bool {
-        guard session.state.firstPlayerIdx != nil else { return false }
-        if session.state.isTwoHeadedGiant {
-            return session.state.players[session.state.currentPlayerIdx].teamNumber == player.teamNumber
-        }
-        return session.state.currentPlayerIdx == idx
+        guard state.firstPlayerIdx != nil else { return false }
+        if state.isTwoHeadedGiant { return state.players[state.currentPlayerIdx].teamNumber == player.teamNumber }
+        return state.currentPlayerIdx == idx
     }
-    private var poisonLethal: Int { session.state.isTwoHeadedGiant ? GameReducer.twoHeadedGiantPoisonThreshold : 10 }
+    private var poisonLethal: Int { state.isTwoHeadedGiant ? GameReducer.twoHeadedGiantPoisonThreshold : 10 }
+    private var poisonProgress: Double { min(Double(player.poison) / Double(poisonLethal), 1) }
+    private var isPoisoned: Bool { player.poison >= poisonLethal }
+    private var isCmdDmgHigh: Bool { (state.commanderDamage[idx] ?? [:]).values.contains { $0.fromCommander >= 21 || $0.fromPartner >= 21 } }
+    private var isWarning: Bool { player.life <= 0 || isPoisoned || isCmdDmgHigh }
+    private var lifeColor: Color? { Theme.lifeColor(player.life, startingLife: state.startingLife) }
+    private var threat: ThreatSource? { ThreatSource.compute(targetIdx: idx, state: state, tiebreakSource: session.lastCmdDmgSource[idx]) }
+    private var glassActive: Bool { cityBlessingVisible || player.hasInitiative || poisonProgress >= 0.6 }
+    private var timer: TimerTokens { TimerTokens(elapsed: isActive ? elapsedSeconds : 0, total: state.turnTimerSeconds, isActive: isActive && turnIndicatorOn) }
+    private var energyGlow: Double { player.energy > 0 ? min(Double(player.energy) / 8, 1) : 0 }
+    private var opponents: [Int] { state.players.indices.filter { $0 != idx } }
+    private var killPrompt: GameSession.PendingKill? {
+        guard let p = session.pendingKillAttribution, p.targetIdx == idx else { return nil }
+        return p
+    }
 
     var body: some View {
+        GeometryReader { geo in
+            let sz = Sizes(panelHeight: geo.size.height)
+            ZStack {
+                Theme.panelBackground(scheme)
+                if isWarning { (scheme == .dark ? Color(red: 180/255, green: 40/255, blue: 40/255).opacity(0.18) : Color(red: 220/255, green: 80/255, blue: 80/255).opacity(0.08)) }
+                CommanderBackdrop(name: player.commander.name, revealDelay: backdropDelay, flash: backdropFlash)
+                if player.hasInitiative { InitiativeTorch().transition(.opacity) }
+                PoisonOverlay(poison: player.poison, progress: poisonProgress)
+
+                VStack(spacing: 0) {
+                    header(sz)
+                    Divider()
+                    columns(sz)
+                }
+                .shadow(color: Theme.energyCyan.opacity(energyGlow * 0.9), radius: 4 + energyGlow * 14)
+
+                if cityBlessingVisible { CityBlessing(exiting: cityBlessingExiting) }
+                if player.isEliminated { EliminatedOverlay(conceded: player.isConceded, poisoned: isPoisoned) }
+                if overlay == .concedeConfirm {
+                    Theme.gold.opacity(0.12).allowsHitTesting(false)
+                    Text("CONCEDE?").font(.system(size: 22, weight: .black)).kerning(2).foregroundStyle(Theme.gold)
+                        .shadow(color: .black.opacity(0.5), radius: 8, y: 2).rotationEffect(.degrees(-10)).allowsHitTesting(false)
+                }
+                if let killPrompt { killPromptOverlay(killPrompt, sz) }
+                overlayView(sz)
+            }
+            .saturation(1 + poisonProgress * 0.5)
+            .opacity(player.isEliminated ? 0.5 : 1)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(border)
+            .animation(.easeInOut(duration: 0.3), value: isActive)
+        }
+        .onChange(of: player.life) { old, new in
+            guard new < old else { return }
+            damageFlash = old - new
+            flashTrigger += 1
+            Task { try? await Task.sleep(for: .seconds(1)); if flashTrigger >= 0 { damageFlash = 0 } }
+        }
+        .onChange(of: player.hasCitysBlessing, initial: true) { _, has in
+            if has {
+                cityBlessingExiting = false
+                if !cityBlessingVisible { SoundService.shared.playCitysBlessingIntro() }
+                cityBlessingVisible = true
+                SoundService.shared.setCitysBlessingActive(true)
+            } else if cityBlessingVisible {
+                cityBlessingExiting = true
+                SoundService.shared.setCitysBlessingActive(false)
+                Task { try? await Task.sleep(for: .milliseconds(3800)); if !player.hasCitysBlessing { cityBlessingVisible = false; cityBlessingExiting = false } }
+            }
+        }
+        .onChange(of: player.isEliminated) { _, _ in overlay = nil }
+    }
+
+    // MARK: Header
+
+    private func header(_ sz: Sizes) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color(.secondarySystemGroupedBackground))
-                .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(isActive ? Color.accentColor : .clear, lineWidth: 4))
-            VStack(spacing: 4) {
-                header
-                lifeRow
-                statusRow
-            }
-            .padding(10)
-            if player.isEliminated {
-                eliminatedOverlay
-            }
-        }
-        .sheet(isPresented: $showDamage) { CommanderDamageSheet(session: session, targetIdx: idx) }
-        .sheet(isPresented: $showCounters) { CountersSheet(session: session, idx: idx) }
-        .confirmationDialog("\(player.playerName) concedes?", isPresented: $confirmConcede, titleVisibility: .visible) {
-            Button("Concede", role: .destructive) { session.dispatch(.eliminate(playerIdx: idx)) }
-        }
-    }
-
-    private var header: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 0) {
-                Text(player.playerName).font(.headline)
-                Text(player.partner.map { "\(player.commander.name) / \($0.name)" } ?? player.commander.name)
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            }
-            Spacer()
-            if player.isMonarch { Image(systemName: "crown.fill").foregroundStyle(.yellow).symbolEffect(.pulse) }
-            if player.hasInitiative { Image(systemName: "flame.fill").foregroundStyle(.orange).symbolEffect(.pulse) }
-            if player.hasCitysBlessing { Image(systemName: "building.2.fill").foregroundStyle(.teal) }
-            if isActive { Image(systemName: "arrowtriangle.right.fill").foregroundStyle(Color.accentColor) }
-        }
-    }
-
-    private var lifeRow: some View {
-        HStack(spacing: 12) {
-            lifeButton("minus", -1) { session.dispatch(.lifeChange(playerIdx: idx, delta: -1)); lifeFlash += 1 }
-            VStack(spacing: 0) {
-                Text("\(player.life)")
-                    .font(.system(size: 56, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .frame(minWidth: 96)
-                    .contentTransition(.numericText(value: Double(player.life)))
-                    .animation(.snappy, value: player.life)
-                    .phaseAnimator([false, true], trigger: lifeFlash) { view, flashing in
-                        view.foregroundStyle(flashing ? Color.red : Color.primary)
-                            .shadow(color: flashing ? .red.opacity(0.8) : .clear, radius: flashing ? 18 : 0)
-                    } animation: { _ in .easeOut(duration: 0.35) }
-                Text("life").font(.caption2).foregroundStyle(.secondary)
-            }
-            lifeButton("plus", 1) { session.dispatch(.lifeChange(playerIdx: idx, delta: 1)) }
-            Divider().frame(height: 50)
-            VStack(spacing: 2) {
-                HStack(spacing: 6) {
-                    smallButton("minus") { session.dispatch(.poisonChange(playerIdx: idx, delta: -1)) }
-                    Text("\(player.poison)")
-                        .font(.system(size: 28, weight: .semibold, design: .rounded)).monospacedDigit()
-                        .foregroundStyle(player.poison >= poisonLethal - 2 ? Color.green : Color.primary)
-                        .frame(minWidth: 40)
-                        .contentTransition(.numericText(value: Double(player.poison)))
-                        .animation(.snappy, value: player.poison)
-                    smallButton("plus") { session.dispatch(.poisonChange(playerIdx: idx, delta: 1)) }
-                }
-                Text("poison").font(.caption2).foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxHeight: .infinity)
-    }
-
-    private var statusRow: some View {
-        HStack(spacing: 8) {
-            Button { showDamage = true } label: { Label("Cmd dmg", systemImage: "shield.lefthalf.filled") }
-            Button { showCounters = true } label: {
-                Label(countersLabel, systemImage: "number.circle")
-            }
-            Spacer()
-            toggle("crown", player.isMonarch) { session.dispatch(.toggleMonarch(playerIdx: idx)) }
-            toggle("flame", player.hasInitiative) { session.dispatch(.toggleInitiative(playerIdx: idx)) }
-            toggle("building.2", player.hasCitysBlessing) { session.dispatch(.toggleCitysBlessing(playerIdx: idx)) }
-            Button(role: .destructive) { confirmConcede = true } label: { Image(systemName: "flag.fill") }
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-        .font(.caption)
-    }
-
-    private var countersLabel: String {
-        var parts: [String] = []
-        if player.commanderTax > 0 { parts.append("tax \(player.commanderTax)") }
-        if player.partnerCommanderTax > 0 { parts.append("ptax \(player.partnerCommanderTax)") }
-        if player.energy > 0 { parts.append("⚡︎\(player.energy)") }
-        if player.experience > 0 { parts.append("xp \(player.experience)") }
-        return parts.isEmpty ? "Counters" : parts.joined(separator: " ")
-    }
-
-    private var eliminatedOverlay: some View {
-        RoundedRectangle(cornerRadius: 20)
-            .fill(.black.opacity(0.72))
-            .overlay {
-                VStack(spacing: 8) {
-                    Text(player.isConceded ? "CONCEDED" : (player.poison >= poisonLethal ? "POISONED" : "ELIMINATED"))
-                        .font(.system(size: 34, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                    if let t = player.eliminatedTurn { Text("turn \(t)").foregroundStyle(.white.opacity(0.8)) }
-                    if player.isConceded {
-                        Button("Undo") { session.dispatch(.undoEliminate(playerIdx: idx)) }
-                            .buttonStyle(.borderedProminent).controlSize(.small)
-                    } else {
-                        Text("Adjust life, poison or commander damage to undo").font(.caption2).foregroundStyle(.white.opacity(0.7))
-                        HStack {
-                            Button("+1 life") { session.dispatch(.lifeChange(playerIdx: idx, delta: 1)) }
-                            Button("−1 poison") { session.dispatch(.poisonChange(playerIdx: idx, delta: -1)) }
-                            Button("Cmd dmg") { showDamage = true }
-                        }
-                        .buttonStyle(.bordered).controlSize(.small).tint(.white)
+            HStack(spacing: 6) {
+                CommanderArt(name: player.commander.name, height: sz.art, revealDelay: backdropDelay.map { $0 + 0.8 })
+                    .onTapGesture { overlay = .preview(name: player.commander.name) }
+                ForEach(taxMedallions, id: \.name) { m in
+                    HStack(spacing: 2) {
+                        Text("+").font(.system(size: 11, weight: .bold)).foregroundStyle(.secondary)
+                        TaxMedallion(tax: m.tax, size: 22)
                     }
+                    .onTapGesture { overlay = .rules(title: "Commander tax", text: RulesText.commanderTax(name: m.name, tax: m.tax)) }
+                }
+                XpBadge(experience: player.experience)
+                if isActive && !state.isTwoHeadedGiant {
+                    Button { session.dispatch(.passTurn) } label: {
+                        Text("PASS").font(.system(size: sz.pass, weight: .bold))
+                            .padding(.horizontal, 10).padding(.vertical, 3)
+                            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.accentColor, lineWidth: 2))
+                    }
+                    .buttonStyle(.plain).foregroundStyle(Color.accentColor)
+                }
+                Spacer()
+                statusIcons(sz)
+                Button { withAnimation(.easeOut(duration: 0.15)) { overlay = overlay == .stateMenu ? nil : .stateMenu } } label: {
+                    Image(systemName: "plus").font(.system(size: sz.menu, weight: .semibold))
+                        .rotationEffect(.degrees(overlay == .stateMenu ? 45 : 0))
+                        .foregroundStyle(overlay == .stateMenu ? Color.accentColor : .secondary)
+                        .frame(width: 30, height: 30).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            VStack(spacing: 0) {
+                Text(player.playerName).font(.system(size: sz.name, weight: .bold)).lineLimit(1)
+                Text("\(player.deckName) · \(player.commander.name)\(player.partner.map { " / \($0.name)" } ?? "")")
+                    .font(.system(size: sz.deck)).foregroundStyle(.secondary).lineLimit(1)
+            }
+            .frame(maxWidth: 0.55 * UIScreen.main.bounds.width)
+            .allowsHitTesting(false)
+        }
+        .padding(.horizontal, 8).padding(.vertical, 4)
+        .background(headerBackground)
+    }
+
+    private struct Medallion { let name: String; let tax: Int }
+    private var taxMedallions: [Medallion] {
+        var m = [Medallion(name: player.commander.name, tax: player.commanderTax)]
+        if let p = player.partner { m.append(Medallion(name: p.name, tax: player.partnerCommanderTax)) }
+        return m.filter { $0.tax > 0 }
+    }
+
+    @ViewBuilder private var headerBackground: some View {
+        if isActive && settings.highlightMode && turnIndicatorOn {
+            if timer.isExpired {
+                BlinkingFill(on: Color(hex: 0xE93535).opacity(0.25), off: .black.opacity(0.08))
+            } else {
+                LinearGradient(colors: [timer.color.opacity(0.3), timer.color.opacity(0.7), timer.color.opacity(0.3)], startPoint: .leading, endPoint: .trailing)
+            }
+        } else {
+            Color.black.opacity(0.08)
+        }
+    }
+
+    private func statusIcons(_ sz: Sizes) -> some View {
+        HStack(spacing: 8) {
+            let anyMonarch = state.players.contains(where: \.isMonarch)
+            let anyInitiative = state.players.contains(where: \.hasInitiative)
+            if player.isMonarch || anyMonarch {
+                statusIcon(active: player.isMonarch, size: sz.icon, rules: ("Monarch", RulesText.monarch), toggle: .toggleMonarch(playerIdx: idx)) {
+                    ShimmerCrown(size: sz.icon, active: player.isMonarch)
                 }
             }
-            .transition(.opacity)
+            if player.hasInitiative || anyInitiative {
+                statusIcon(active: player.hasInitiative, size: sz.icon, rules: ("Initiative", RulesText.initiative), toggle: .toggleInitiative(playerIdx: idx)) {
+                    InitiativeGlyph().foregroundStyle(player.hasInitiative ? Theme.initiativeBlue : Color.secondary.opacity(0.4))
+                }
+            }
+            if player.hasCitysBlessing {
+                statusIcon(active: true, size: sz.icon, rules: ("City's Blessing", RulesText.citysBlessing), toggle: .toggleCitysBlessing(playerIdx: idx)) {
+                    CityGlyph(active: true)
+                }
+            }
+        }
     }
 
-    private func lifeButton(_ symbol: String, _ delta: Int, action: @escaping () -> Void) -> some View {
-        RepeatButton(symbol: symbol, size: 44, action: action)
+    /// Tap shows the reminder text; hold toggles the status (take it, or give it up).
+    private func statusIcon<G: View>(active: Bool, size: CGFloat, rules: (String, String), toggle: LiveGameEvent.Kind, @ViewBuilder glyph: () -> G) -> some View {
+        glyph()
+            .frame(width: size, height: size)
+            .contentShape(Rectangle())
+            .onTapGesture { overlay = .rules(title: rules.0, text: rules.1) }
+            .onLongPressGesture(minimumDuration: 0.5) { session.dispatch(toggle) }
+            .opacity(active ? 1 : 0.6)
     }
 
-    private func smallButton(_ symbol: String, action: @escaping () -> Void) -> some View {
-        RepeatButton(symbol: symbol, size: 30, action: action)
+    // MARK: Columns
+
+    private func columns(_ sz: Sizes) -> some View {
+        HStack(spacing: 0) {
+            CommanderDamageColumn(session: session, targetIdx: idx, open: $cmdDmgOpen, overlay: $overlay, glass: glassActive, threat: threat, sizes: sz)
+                .frame(maxWidth: cmdDmgOpen ? .infinity : 24)
+            Divider()
+            lifeColumn(sz)
+            Divider()
+            CountersColumn(session: session, idx: idx, open: $countersOpen, overlay: $overlay, glass: glassActive, poisonLethal: poisonLethal, sizes: sz)
+                .frame(maxWidth: countersOpen ? .infinity : 24)
+        }
+        .animation(.easeInOut(duration: 0.2), value: cmdDmgOpen)
+        .animation(.easeInOut(duration: 0.2), value: countersOpen)
     }
 
-    private func toggle(_ symbol: String, _ on: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Image(systemName: on ? "\(symbol).fill" : symbol) }
-            .tint(on ? .accentColor : .secondary)
+    private func lifeColumn(_ sz: Sizes) -> some View {
+        let closed = (cmdDmgOpen ? 0 : 1) + (countersOpen ? 0 : 1)
+        let fontSize = closed == 0 ? sz.life : closed == 1 ? sz.life * 1.5 : sz.life * 2
+        let lost = Theme.lostRatio(player.life, startingLife: state.startingLife)
+        return ZStack {
+            LifeCracks(fingerprint: idx, lostRatio: lost)
+            if let threat, threat.intensity > 0 { ThreatNames(name: threat.commanderName, intensity: threat.intensity, fingerprint: idx) }
+            VStack(spacing: 2) {
+                LifeNumber(value: player.life, fontSize: fontSize, color: lifeColor, damageFlash: damageFlash, energy: player.energy, poison: player.poison, poisonLethal: poisonLethal)
+                    .onTapGesture { overlay = .focus(.life) }
+                    .overlay(alignment: .topLeading) {
+                        MonarchCrown(isMonarch: player.isMonarch, transferHint: session.monarchTransferRecent, size: fontSize * 0.55)
+                            .offset(x: -fontSize * 0.3, y: -fontSize * 0.3)
+                    }
+                HStack(spacing: 10) {
+                    StepButton(symbol: "minus", size: StepperSize(buttonFont: sz.lifeBtn, buttonWidth: 52, buttonHeight: 44)) { session.dispatch(.lifeChange(playerIdx: idx, delta: $0 ? -5 : -1)) }
+                    StepButton(symbol: "plus", size: StepperSize(buttonFont: sz.lifeBtn, buttonWidth: 52, buttonHeight: 44)) { session.dispatch(.lifeChange(playerIdx: idx, delta: $0 ? 5 : 1)) }
+                }
+            }
+            .padding(6)
+            .background(GlassBacking(active: glassActive))
+            .fixedSize(horizontal: false, vertical: true)
+            if damageFlash > 0 { DamageSwipes(magnitude: damageFlash, trigger: flashTrigger) }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
+    }
+
+    // MARK: Border
+
+    @ViewBuilder private var border: some View {
+        let shape = RoundedRectangle(cornerRadius: 12)
+        if overlay == .concedeConfirm {
+            shape.strokeBorder(Theme.gold, lineWidth: 3).shadow(color: Theme.gold.opacity(0.6), radius: 12)
+        } else if isActive && turnIndicatorOn && !settings.highlightMode {
+            if timer.isExpired {
+                BlinkingStroke(shape: shape)
+            } else {
+                shape.strokeBorder(timer.color, lineWidth: 3).shadow(color: timer.color.opacity(0.53), radius: 8)
+            }
+        } else if isWarning {
+            shape.strokeBorder(Theme.danger, lineWidth: 2)
+        } else {
+            shape.strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+        }
+    }
+
+    // MARK: Overlays
+
+    @ViewBuilder private func overlayView(_ sz: Sizes) -> some View {
+        switch overlay {
+        case .none:
+            EmptyView()
+        case .stateMenu, .concedeConfirm:
+            StateMenuOverlay(session: session, idx: idx, overlay: $overlay, concedeTurn: $concedeTurn)
+                .transition(.opacity)
+        case .rules(let title, let text):
+            RulesTipOverlay(title: title, text: text) { overlay = nil }
+        case .focus(let target):
+            focusModal(target)
+        case .snapshot(let src, let partner):
+            CommanderSnapshotOverlay(session: session, viewerIdx: idx, sourceIdx: src, partner: partner, overlay: $overlay, sizes: sz)
+        case .preview(let name):
+            CardPreviewOverlay(name: name) { overlay = nil }
+        }
+    }
+
+    @ViewBuilder private func focusModal(_ target: FocusTarget) -> some View {
+        let close = { overlay = nil }
+        switch target {
+        case .life:
+            FocusModal(title: "Life Total", value: player.life, color: lifeColor ?? .accentColor, onChange: { session.dispatch(.lifeChange(playerIdx: idx, delta: $0)) }, onClose: close)
+        case .poison:
+            FocusModal(title: "Poison", value: player.poison, color: isPoisoned ? Theme.danger : player.poison > 0 ? Theme.poisonGreen : .primary, onChange: { session.dispatch(.poisonChange(playerIdx: idx, delta: $0)) }, onClose: close)
+        case .energy:
+            FocusModal(title: "Energy", value: player.energy, color: player.energy > 0 ? Theme.energyCyan : .primary, onChange: { session.dispatch(.energyChange(playerIdx: idx, delta: $0)) }, onClose: close)
+        case .experience:
+            FocusModal(title: "Experience", value: player.experience, color: player.experience > 0 ? Theme.gold : .primary, onChange: { session.dispatch(.experienceChange(playerIdx: idx, delta: $0)) }, onClose: close)
+        case .tax(let partner):
+            FocusModal(title: partner ? (player.partner?.name ?? "Partner") : "Commander Tax", value: partner ? player.partnerCommanderTax : player.commanderTax, color: .orange,
+                       onChange: { session.dispatch(.commanderTaxChange(playerIdx: idx, delta: $0, isPartner: partner)) }, onClose: close)
+        case .commanderDamage(let src, let partner):
+            let source = state.players[src]
+            let dmg = state.commanderDamage[idx, src]
+            FocusModal(title: "CMD Dmg — \(partner ? (source.partner?.name ?? "") : source.commander.name)", value: partner ? dmg.fromPartner : dmg.fromCommander,
+                       color: (partner ? dmg.fromPartner : dmg.fromCommander) >= 21 ? Theme.danger : .primary, disableDec: source.isEliminated,
+                       onChange: { session.dispatch(.commanderDamageChange(targetIdx: idx, sourceIdx: src, isPartner: partner, delta: $0)) }, onClose: close)
+        }
+    }
+
+    private func killPromptOverlay(_ kill: GameSession.PendingKill, _ sz: Sizes) -> some View {
+        let poison = kill.cause == .poison
+        let tint: Color = poison ? Color(hex: 0x7FFF7F) : .white
+        let living = opponents.filter { !state.players[$0].isEliminated && (state.players[$0].teamNumber == nil || state.players[$0].teamNumber != player.teamNumber) }
+        return ZStack {
+            (poison ? Color(red: 0, green: 40/255, blue: 0).opacity(0.78) : Color.black.opacity(0.72))
+            VStack(spacing: 8) {
+                Text(poison ? "Who poisoned \(player.playerName)?" : "Who brought \(player.playerName) to 0?")
+                    .font(.system(size: sz.kill, weight: .bold)).foregroundStyle(tint).multilineTextAlignment(.center)
+                ForEach(living, id: \.self) { s in
+                    Button(state.players[s].playerName) { session.attributeKill(kill, sourceIdx: s) }
+                        .frame(maxWidth: .infinity).padding(.vertical, 6)
+                        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(tint.opacity(0.5)))
+                }
+                Button("Skip") { session.attributeKill(kill, sourceIdx: nil) }.foregroundStyle(tint.opacity(0.5)).font(.system(size: sz.kill))
+            }
+            .foregroundStyle(tint)
+            .padding(16)
+        }
+        .transition(.opacity)
+    }
+
+    // MARK: Sizes
+
+    /// Font and control sizes derived from the panel height (the web uses
+    /// viewport-relative clamps).
+    struct Sizes {
+        let name, deck, pass, icon, menu, art, life, lifeBtn, crown, label, source, badge, value, kill: CGFloat
+        let stepper: StepperSize
+        init(panelHeight h: CGFloat) {
+            let k = min(max(h / 360, 0.75), 1.1)
+            name = 15 * k; deck = 11 * k; pass = 12 * k; icon = 22 * k; menu = 18 * k; art = 36 * k
+            life = max(34, min(h * 0.28, 112)); lifeBtn = 36 * k; crown = 52 * k
+            label = 11 * k; source = 13 * k; badge = 10 * k; value = 20 * k; kill = 13 * k
+            stepper = StepperSize(buttonFont: 17 * k, valueFont: 17 * k, buttonWidth: 26 * k, buttonHeight: 28 * k, valueWidth: 22 * k, labelFont: 10 * k)
+        }
     }
 }
 
-/// A round +/− button that fires once on tap and repeats while held, like the
-/// web's long-press steppers.
-struct RepeatButton: View {
-    let symbol: String
-    let size: CGFloat
-    let action: () -> Void
-    @State private var repeating: Task<Void, Never>?
+/// The hero life number with its reaction stack (web `LifeTotal`): red flash on
+/// a hit, blue pulse + sizzle above 5 energy, green boil at 8+ poison. A flash
+/// overrides the idle animations; energy outranks poison.
+struct LifeNumber: View {
+    let value: Int
+    let fontSize: CGFloat
+    let color: Color?
+    let damageFlash: Int
+    let energy: Int
+    let poison: Int
+    let poisonLethal: Int
 
     var body: some View {
-        Image(systemName: symbol)
-            .font(.system(size: size * 0.45, weight: .bold))
-            .frame(width: size, height: size)
-            .background(Circle().fill(Color(.tertiarySystemFill)))
-            .contentShape(Circle())
-            .onTapGesture { action(); haptic() }
-            .onLongPressGesture(minimumDuration: 0.4, perform: {}, onPressingChanged: { pressing in
-                if pressing {
-                    repeating = Task { @MainActor in
-                        try? await Task.sleep(for: .milliseconds(400))
-                        while !Task.isCancelled {
-                            action(); haptic()
-                            try? await Task.sleep(for: .milliseconds(120))
-                        }
-                    }
-                } else {
-                    repeating?.cancel(); repeating = nil
-                }
-            })
-            .sensoryFeedback(.increase, trigger: tick)
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: damageFlash == 0 && energy <= 5 && poison < 8)) { ctx in
+            let t = ctx.date.timeIntervalSinceReferenceDate
+            let energetic = damageFlash == 0 && energy > 5
+            let boiling = damageFlash == 0 && !energetic && poison >= 8
+            let boilAmp: Double = poison >= poisonLethal ? 5 : poison >= poisonLethal - 1 ? 3.8 : 1.5
+            let sizzle = Double(min(energy - 5, 10)) * 0.2
+            Text("\(value)")
+                .font(.system(size: fontSize, weight: .black).monospacedDigit())
+                .foregroundStyle(damageFlash > 0 ? Color(red: 0.9, green: 0, blue: 0) : (color ?? .accentColor))
+                .shadow(color: damageFlash > 0 ? Color(red: 0.86, green: 0, blue: 0).opacity(0.9) : energetic ? Theme.energyCyan.opacity(0.6 + 0.4 * sin(t * 3)) : .clear,
+                        radius: damageFlash > 0 ? 24 : energetic ? 10 + 10 * (sin(t * 3) + 1) : 0)
+                .offset(x: energetic ? sizzle * sin(t * 51) : boiling ? boilAmp * 0.6 * sin(t * 2.4) : 0,
+                        y: energetic ? sizzle * cos(t * 37) : boiling ? boilAmp * 0.5 * sin(t * 3.1 + 1) : 0)
+                .rotationEffect(.degrees(boiling ? sin(t * 2.0) * min(boilAmp * 0.6, 2.5) * 0.4 : 0))
+                .contentTransition(.numericText(value: Double(value)))
+                .animation(.snappy(duration: 0.25), value: value)
+                .animation(.easeOut(duration: 0.4), value: color)
+                .animation(.easeOut(duration: 0.6), value: damageFlash)
+        }
+        .fixedSize()
     }
-    @State private var tick = 0
-    private func haptic() { tick += 1 }
+}
+
+/// Header crown that shimmers while held and reads dim when another seat holds it.
+struct ShimmerCrown: View {
+    let size: CGFloat
+    let active: Bool
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 20, paused: !active)) { ctx in
+            let g = (sin(ctx.date.timeIntervalSinceReferenceDate / 2 * 2 * .pi) + 1) / 2
+            Image(systemName: "crown.fill").resizable().scaledToFit()
+                .foregroundStyle(active ? Theme.gold : Color.secondary.opacity(0.4))
+                .brightness(active ? 0.5 * g : 0)
+                .shadow(color: active ? Theme.brightGold.opacity(0.3 + 0.7 * g) : .clear, radius: 2 + 5 * g)
+        }
+    }
+}
+
+struct BlinkingFill: View {
+    let on: Color, off: Color
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
+            (Int(ctx.date.timeIntervalSinceReferenceDate * 4) % 2 == 0 ? on : off)
+        }
+    }
+}
+
+struct BlinkingStroke<S: InsettableShape>: View {
+    let shape: S
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
+            let on = Int(ctx.date.timeIntervalSinceReferenceDate * 4) % 2 == 0
+            shape.strokeBorder(on ? Theme.danger : .clear, lineWidth: 3).shadow(color: on ? Theme.danger.opacity(0.6) : .clear, radius: 12)
+        }
+    }
 }

@@ -19,11 +19,13 @@ struct CommanderGameManagerApp: App {
     }()
 
     @State private var session = Session()
+    @State private var settings = GameSettingsStore()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(session)
+                .environment(settings)
         }
         .modelContainer(container)
     }
