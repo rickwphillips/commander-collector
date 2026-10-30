@@ -55,7 +55,13 @@ struct InitiativeTorch: View {
                     .opacity(0.3)
                 TimelineView(.animation(minimumInterval: 1 / 24, paused: !motion)) { ctx in
                     let t = ctx.date.timeIntervalSinceReferenceDate
-                    let drift = Self.drift(at: (t / 42).truncatingRemainder(dividingBy: 1))
+                    let phase = (t / 42).truncatingRemainder(dividingBy: 1)
+                    let drift = Self.drift(at: phase)
+                    // Walking speed (torch widths per second) sets the step bob:
+                    // a small lift twice a second, only while the hunter moves.
+                    let ahead = Self.drift(at: (phase + 0.001).truncatingRemainder(dividingBy: 1))
+                    let speed = min(abs(ahead.x - drift.x) / (0.001 * 42), 1)
+                    let bob = -abs(sin(t * .pi * 2)) * 5 * speed
                     let flicker = 0.11 + 0.08 * Self.noise(t * 1.7)
                     ZStack {
                         RadialGradient(colors: [Color(hex: 0xFF8C00), Color(hex: 0xFF4500), .clear], center: .center, startRadius: 0, endRadius: 250)
@@ -66,8 +72,9 @@ struct InitiativeTorch: View {
                             .frame(width: 90, height: 270)
                             .opacity(0.35)
                     }
-                    .rotationEffect(.degrees(drift.angle))
-                    .position(x: geo.size.width / 2 + drift.x * 90, y: geo.size.height - 45)
+                    // The torch leans back against the direction of travel.
+                    .rotationEffect(.degrees(-drift.angle))
+                    .position(x: geo.size.width / 2 + drift.x * 90, y: geo.size.height - 45 + bob)
                 }
             }
             .clipped()

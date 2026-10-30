@@ -118,7 +118,7 @@ struct SeatPanel: View {
             guard backdropFlash, motion, let delay = backdropDelay else { introduced = true; return }
             introduced = false
             try? await Task.sleep(for: .milliseconds(Int(delay * 1000)))
-            withAnimation(.easeInOut(duration: 0.8)) { introduced = true }
+            withAnimation(.easeInOut(duration: CommanderBackdrop.fadeSeconds)) { introduced = true }
         }
     }
 
@@ -127,7 +127,7 @@ struct SeatPanel: View {
     private func header(_ sz: Sizes) -> some View {
         ZStack {
             HStack(spacing: 6) {
-                CommanderArt(name: player.commander.name, height: sz.art, revealDelay: backdropDelay.map { $0 + 0.8 })
+                CommanderArt(name: player.commander.name, height: sz.art, revealDelay: backdropDelay.map { $0 + CommanderBackdrop.fadeSeconds })
                     .onTapGesture { overlay = .preview(name: player.commander.name) }
                 ForEach(taxMedallions, id: \.name) { m in
                     HStack(spacing: 2) {

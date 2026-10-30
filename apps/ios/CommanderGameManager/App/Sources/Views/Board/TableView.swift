@@ -20,7 +20,7 @@ struct TableView: View {
     @State private var webHost: WebTableHost?
 
     private static let revealStep = 0.9
-    private static let fadeSeconds = 0.8
+    private static let fadeSeconds = CommanderBackdrop.fadeSeconds
 
     private func idx(_ position: SeatPosition) -> Int? {
         session.state.players.firstIndex { $0.position == position }

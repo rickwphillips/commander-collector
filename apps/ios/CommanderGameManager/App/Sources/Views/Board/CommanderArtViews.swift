@@ -59,6 +59,8 @@ struct CommanderArt: View {
 /// (no first player yet); a number reveals it after that delay with the web's
 /// fade + slight scale-down, and `flash` punctuates the end of the fade.
 struct CommanderBackdrop: View {
+    /// The intro fade; the flash crests slowly across it and dies with it.
+    static let fadeSeconds = 1.2
     let name: String
     let revealDelay: Double?
     var flash = false
@@ -98,13 +100,14 @@ struct CommanderBackdrop: View {
         .task(id: revealDelay) {
             guard let delay = revealDelay else { shown = false; return }
             try? await Task.sleep(for: .milliseconds(Int(delay * 1000)))
-            withAnimation(.easeInOut(duration: 0.8)) { shown = true }
+            withAnimation(.easeInOut(duration: Self.fadeSeconds)) { shown = true }
             guard flash else { return }
-            // One slow swell of light across the whole fade: up for the first
-            // half, back down for the second, gone as the art lands.
-            withAnimation(.easeInOut(duration: 0.4)) { flashing = true }
-            try? await Task.sleep(for: .milliseconds(400))
-            withAnimation(.easeInOut(duration: 0.4)) { flashing = false }
+            // One slow swell of light across the whole fade: a long rise to
+            // the crest, then a shorter fall that ends as the art lands.
+            let rise = Self.fadeSeconds * 0.65
+            withAnimation(.easeInOut(duration: rise)) { flashing = true }
+            try? await Task.sleep(for: .milliseconds(Int(rise * 1000)))
+            withAnimation(.easeOut(duration: Self.fadeSeconds - rise)) { flashing = false }
         }
     }
 }
