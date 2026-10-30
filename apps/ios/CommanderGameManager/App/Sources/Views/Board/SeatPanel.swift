@@ -388,7 +388,9 @@ struct SeatPanel: View {
         let stepper: StepperSize
         init(panelHeight h: CGFloat) {
             let k = min(max(h / 360, 0.75), 1.1)
-            name = 15 * k; deck = 11 * k; pass = 12 * k; icon = 22 * k; menu = 18 * k; art = 36 * k
+            // The player name and commander line read the same in every seat:
+            // the side seats are narrow, not small.
+            name = 15; deck = 11.5; pass = 12 * k; icon = 22 * k; menu = 18 * k; art = 36 * k
             life = max(34, min(h * 0.28, 112)); lifeBtn = 36 * k; crown = 52 * k
             label = 12 * k; source = 15 * k; badge = 11 * k; value = 20 * k; kill = 13 * k
             stepper = StepperSize(buttonFont: 20 * k, valueFont: 20 * k, buttonWidth: 30 * k, buttonHeight: 32 * k, valueWidth: 26 * k, labelFont: 11 * k)
