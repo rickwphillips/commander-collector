@@ -1,4 +1,5 @@
 import AVFoundation
+import AudioToolbox
 import Foundation
 
 /// The board's sounds. The four web mp3s ship in the bundle; the poison
@@ -22,6 +23,12 @@ final class SoundService {
     }
 
     // MARK: One-shots
+
+    /// The iPhone keyboard's key click, for every plus and minus on the board.
+    func playClick() {
+        guard enabled else { return }
+        AudioServicesPlaySystemSound(1104)
+    }
 
     func playD20() { play("d-20") }
     func playD6() { play("d-6") }

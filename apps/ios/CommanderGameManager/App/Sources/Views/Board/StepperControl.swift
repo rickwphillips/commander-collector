@@ -147,11 +147,13 @@ struct StepButton: View {
             .onTapGesture {
                 guard !disabled else { return }
                 if fired { fired = false; return }
+                SoundService.shared.playClick()
                 action(false); tick += 1
             }
             .onLongPressGesture(minimumDuration: 0.5) {
                 guard !disabled else { return }
                 fired = true
+                SoundService.shared.playClick()
                 action(true); tick += 1
                 withAnimation { tip = true }
                 Task { try? await Task.sleep(for: .milliseconds(700)); withAnimation { tip = false } }
@@ -182,7 +184,7 @@ struct FocusModal: View {
                     Button(action: onClose) { Image(systemName: "xmark").font(.footnote.bold()) }.foregroundStyle(.secondary).accessibilityIdentifier("focus-close")
                 }
                 HStack(spacing: 14) {
-                    bigButton("minus", disabled: disableDec) { onChange(-1) }.accessibilityIdentifier("focus-dec")
+                    bigButton("minus", disabled: disableDec) { SoundService.shared.playClick(); onChange(-1) }.accessibilityIdentifier("focus-dec")
                     Text("\(value)")
                         .font(.system(size: 64, weight: .black).monospacedDigit())
                         .foregroundStyle(color)
@@ -190,12 +192,12 @@ struct FocusModal: View {
                         .contentTransition(.numericText(value: Double(value)))
                         .animation(.snappy, value: value)
                         .accessibilityIdentifier("focus-value")
-                    bigButton("plus", disabled: false) { onChange(1) }.accessibilityIdentifier("focus-inc")
+                    bigButton("plus", disabled: false) { SoundService.shared.playClick(); onChange(1) }.accessibilityIdentifier("focus-inc")
                 }
                 HStack(spacing: 14) {
-                    Button("−5") { onChange(-5) }.disabled(disableDec).frame(width: 56, height: 36).accessibilityIdentifier("focus-dec5")
+                    Button("−5") { SoundService.shared.playClick(); onChange(-5) }.disabled(disableDec).frame(width: 56, height: 36).accessibilityIdentifier("focus-dec5")
                     Text("±5").font(.caption).foregroundStyle(.secondary).frame(minWidth: 90)
-                    Button("+5") { onChange(5) }.frame(width: 56, height: 36).accessibilityIdentifier("focus-inc5")
+                    Button("+5") { SoundService.shared.playClick(); onChange(5) }.frame(width: 56, height: 36).accessibilityIdentifier("focus-inc5")
                 }
                 .font(.footnote.bold())
             }
