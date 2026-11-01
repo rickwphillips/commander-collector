@@ -47,7 +47,7 @@ import styles from './page.module.scss';
  * transitions actually run on first paint instead of starting mid-flight.
  */
 export default function Dashboard() {
-  const { user } = useAuth();
+  useAuth();
   const { mode } = useThemeMode();
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<StatsResponse | null>(null);
