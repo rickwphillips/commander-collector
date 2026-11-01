@@ -119,7 +119,6 @@ function TrashRow({ item, onRestore }: TrashRowProps) {
     }
   };
 
-  const kindLabel = item.kind === 'deck' ? 'Deck' : 'List';
   const ariaLabel = `Restore ${item.kind} ${item.name}`;
 
   const kindChip =
