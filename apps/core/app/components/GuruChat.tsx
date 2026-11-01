@@ -208,7 +208,7 @@ interface GuruChatProps {
   onListUpdated?: () => void;
 }
 
-export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruChat({ notes: initialNotes, open, onToggle, autoGreet, onListUpdated }, ref) {
+export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruChat({ open, onToggle, autoGreet, onListUpdated }, ref) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -217,7 +217,6 @@ export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruC
   const [loading, setLoading] = useState(false);
   const [partialResponse, setPartialResponse] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [notes, setNotes] = useState<CoachNote[]>(initialNotes);
   const [activeDeck, setActiveDeck] = useState<ActiveDeckContext | null>(null);
   const [activeList, setActiveList] = useState<ActiveListContext | null>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -469,7 +468,7 @@ export const GuruChat = forwardRef<GuruChatHandle, GuruChatProps>(function GuruC
               <AddCommentIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <IconButton size="small" onClick={() => onToggle(false)}>
+          <IconButton size="small" onClick={() => onToggle(false)} aria-label="Close chat">
             <CloseIcon fontSize="small" />
           </IconButton>
         </Stack>
