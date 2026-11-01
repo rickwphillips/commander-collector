@@ -101,7 +101,6 @@ function StatsPageInner() {
     showAll,
     hideAll,
     hiddenPanelIds,
-    togglePanelVisibility,
     loaded: hiddenLoaded,
   } = useHiddenStats();
 
