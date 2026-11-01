@@ -64,8 +64,6 @@ function extractPoints(content: string, msgIdx: number): Point[] {
   return [makePoint(clean, 0)];
 }
 
-const EMPTY_STATE = { rating: 0, selected: new Set<string>(), notes: '' };
-
 // Cycle: undefined → 'helpful' (green) → 'incorrect' (red) → undefined
 type PointState = 'helpful' | 'incorrect';
 

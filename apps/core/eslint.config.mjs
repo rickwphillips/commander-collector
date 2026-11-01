@@ -7,6 +7,20 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   prettier,
+  {
+    // An `_`-prefixed name is this repo's marker for a binding that exists only
+    // to hold a position (an unused callback arg, a deliberately discarded
+    // destructured value). Flagging those buried the genuinely-unused ones in
+    // ~15 lines of noise, so the convention is encoded here instead.
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['warn', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+        destructuredArrayIgnorePattern: '^_',
+      }],
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
