@@ -62,7 +62,7 @@ struct CommanderBackdrop: View {
     /// The intro fade; the flash swells in its last stretch and dies with it.
     static let fadeSeconds = 2.2
     /// How long before the fade ends the flash begins (rise + fall).
-    static let flashSeconds = 0.8
+    static let flashSeconds = 1.2
     let name: String
     let revealDelay: Double?
     var flash = false
