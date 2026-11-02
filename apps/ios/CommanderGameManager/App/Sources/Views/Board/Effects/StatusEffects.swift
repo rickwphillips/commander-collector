@@ -61,10 +61,11 @@ struct InitiativeTorch: View {
                     let phase = (t / 42).truncatingRemainder(dividingBy: 1)
                     let drift = Self.drift(at: phase)
                     // Walking speed (torch widths per second) sets the step bob:
-                    // a small lift twice a second, only while the hunter moves.
+                    // a lift twice a second with a slight sway, only while the hunter moves.
                     let ahead = Self.drift(at: (phase + 0.001).truncatingRemainder(dividingBy: 1))
                     let speed = min(abs(ahead.x - drift.x) / (0.001 * 42), 1)
-                    let bob = -abs(sin(t * .pi * 2)) * 5 * speed
+                    let bob = -abs(sin(t * .pi * 2)) * 9 * speed
+                    let sway = sin(t * .pi) * 2.5 * speed
                     let flicker = 0.11 + 0.08 * Self.noise(t * 1.7)
                     ZStack {
                         RadialGradient(colors: [Color(hex: 0xFF8C00), Color(hex: 0xFF4500), .clear], center: .center, startRadius: 0, endRadius: 250)
@@ -76,7 +77,7 @@ struct InitiativeTorch: View {
                             .opacity(0.35)
                     }
                     // The torch leans back against the direction of travel.
-                    .rotationEffect(.degrees(-drift.angle))
+                    .rotationEffect(.degrees(-drift.angle + sway))
                     .position(x: geo.size.width / 2 + drift.x * 90, y: geo.size.height - 45 + bob)
                 }
             }
