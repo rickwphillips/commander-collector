@@ -56,16 +56,19 @@ final class SoundService {
         let duration = rise + fall
         let frames = Int(sampleRate * duration)
         guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1),
-              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)) else { return }
-        buffer.frameLength = AVAudioFrameCount(frames)
-        let data = buffer.floatChannelData![0]
+              let whoosh = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)),
+              let twinkle = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)) else { return }
+        whoosh.frameLength = AVAudioFrameCount(frames)
+        twinkle.frameLength = AVAudioFrameCount(frames)
+        let wd = whoosh.floatChannelData![0]
+        let td = twinkle.floatChannelData![0]
         var lp: Float = 0, lp2: Float = 0
         // Sparkles begin just before the crest and trail into the fall.
         let grains = (0..<18).map { _ in
             Grain(at: rise - 0.08 + Double.random(in: 0...min(0.45, fall)),
                   hz: Double.random(in: 4200...8200),
                   length: Double.random(in: 0.18...0.4),
-                  gain: Double.random(in: 0.012...0.028))
+                  gain: Double.random(in: 0.009...0.021))
         }
         for i in 0..<frames {
             let t = Double(i) / sampleRate
@@ -79,18 +82,21 @@ final class SoundService {
             lp2 += a2 * (noise - lp2)
             let band = lp - lp2
             let env = t < rise ? pow(t / rise, 2) : pow(max(0, 1 - (t - rise) / fall), 1.6)
-            var sample = band * Float(env) * 0.12
+            wd[i] = band * Float(env) * 0.12
             // Twinkle: a scatter of tiny high sparkles around the crest, each
             // a soft-attacked sine grain, so it glitters instead of striking.
+            var sparkle = 0.0
             for g in grains {
                 let gt = t - g.at
                 guard gt >= 0, gt < g.length else { continue }
-                let env = gt < 0.03 ? gt / 0.03 : exp(-(gt - 0.03) * (4 / g.length))
-                sample += Float(sin(gt * g.hz * 2 * .pi) * env * g.gain)
+                let genv = gt < 0.03 ? gt / 0.03 : exp(-(gt - 0.03) * (4 / g.length))
+                sparkle += sin(gt * g.hz * 2 * .pi) * genv * g.gain
             }
-            data[i] = sample
+            td[i] = Float(sparkle)
         }
-        playBuffer(buffer, format: format, reverb: 0.55)
+        // Two sends: the whoosh sits further back in the hall than the sparkle.
+        playBuffer(whoosh, format: format, reverb: 0.75)
+        playBuffer(twinkle, format: format, reverb: 0.55)
     }
 
     private struct Grain { let at: Double; let hz: Double; let length: Double; let gain: Double }
