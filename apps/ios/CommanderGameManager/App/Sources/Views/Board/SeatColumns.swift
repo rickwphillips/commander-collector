@@ -101,13 +101,15 @@ struct CommanderDamageRow: View {
                            focus: .commanderDamage(sourceIdx: sourceIdx, partner: false), identifier: "s\(targetIdx)-cmd-\(sourceIdx)", overlay: $overlay,
                            onChange: { session.dispatch(.commanderDamageChange(targetIdx: targetIdx, sourceIdx: sourceIdx, isPartner: false, delta: $0)) }) {
                 HStack(spacing: 6) {
-                    PlayerStatusBadges(player: source, size: sizes.badge, startingLife: state.startingLife, showPoison: !state.isTwoHeadedGiant, poisonDanger: state.isTwoHeadedGiant ? GameReducer.twoHeadedGiantPoisonThreshold : 10)
-                    // Damage this seat has dealt them: one number, or
-                    // "commander/partner" when this seat runs partners.
-                    Text("\u{2694}\u{FE0E}\(viewer.partner != nil ? "\(dealt.fromCommander)/\(dealt.fromPartner)" : "\(dealt.total)")")
-                        .font(.system(size: sizes.source, weight: .black))
-                        .foregroundStyle(dealt.total >= 21 ? Theme.danger : dealt.total > 0 ? Theme.dealtOrange : Color.secondary.opacity(0.5))
-                        .fixedSize()
+                    PlayerStatusBadges(player: source, size: sizes.badge, startingLife: state.startingLife, showTax: false, showPoison: !state.isTwoHeadedGiant, poisonDanger: state.isTwoHeadedGiant ? GameReducer.twoHeadedGiantPoisonThreshold : 10, singleLine: true)
+                    // Damage this seat has dealt them (once there is any):
+                    // one number, or "commander/partner" when this seat runs partners.
+                    if dealt.total > 0 {
+                        Text("\u{2694}\u{FE0E}\(viewer.partner != nil ? "\(dealt.fromCommander)/\(dealt.fromPartner)" : "\(dealt.total)")")
+                            .font(.system(size: sizes.source, weight: .black))
+                            .foregroundStyle(dealt.total >= 21 ? Theme.danger : Theme.dealtOrange)
+                            .fixedSize()
+                    }
                 }
                 .contentShape(Rectangle())
                 .onTapGesture { overlay = .snapshot(sourceIdx: sourceIdx, partner: false) }
@@ -132,8 +134,11 @@ struct CommanderDamageRow: View {
                 .font(.system(size: sizes.source, weight: isActive && !partner ? .bold : .regular))
                 .foregroundStyle(source.isEliminated ? .secondary : isActive && !partner ? Color.accentColor : .secondary)
                 .strikethrough(source.isEliminated).lineLimit(1).truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier(partner ? "s\(targetIdx)-cmd-\(sourceIdx)-partner-name" : "s\(targetIdx)-cmd-\(sourceIdx)-name")
+            // That commander's tax medallion sits right after its name.
+            let tax = partner ? source.partnerCommanderTax : source.commanderTax
+            if tax > 0 { CounterGlyph(kind: .tax, size: sizes.badge, taxValue: tax) }
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 8)
         .padding(.top, 3)
@@ -152,16 +157,24 @@ struct PlayerStatusBadges: View {
     var showTax = true
     var showPoison = true
     var poisonDanger = 10
+    /// One line that shrinks to fit (damage rows) instead of wrapping.
+    var singleLine = false
 
     var body: some View {
-        FlowLayout(spacing: 5, rowSpacing: 1) {
+        if singleLine {
+            HStack(spacing: 5) { badges }.lineLimit(1).minimumScaleFactor(0.7)
+        } else {
+            FlowLayout(spacing: 5, rowSpacing: 1) { badges }.lineLimit(1)
+        }
+    }
+
+    @ViewBuilder private var badges: some View {
             if showLife { Text("♥\(player.life)").font(.system(size: size, weight: .heavy)).foregroundStyle(Theme.lifeColor(player.life, startingLife: startingLife) ?? .accentColor) }
             if player.isMonarch { ShimmerCrown(size: size, active: true).frame(width: size, height: size) }
             if player.hasCitysBlessing { CityGlyph(active: true).frame(width: size, height: size) }
             if player.hasInitiative { InitiativeGlyph().foregroundStyle(Theme.initiativeBlue).frame(width: size, height: size) }
-            if showTax && player.commanderTax > 0 {
-                HStack(spacing: 2) { CounterGlyph(kind: .tax, size: size, taxValue: player.commanderTax); Text("\(player.commanderTax)").font(.system(size: size, weight: .heavy)).foregroundStyle(.orange) }
-            }
+            // The tax medallion already reads "+N"; no count beside it.
+            if showTax && player.commanderTax > 0 { CounterGlyph(kind: .tax, size: size, taxValue: player.commanderTax) }
             if showPoison && player.poison > 0 {
                 HStack(spacing: 2) { CounterGlyph(kind: .poison, size: size, poison: player.poison, poisonDanger: poisonDanger); Text("\(player.poison)").font(.system(size: size, weight: .heavy)).foregroundStyle(player.poison >= poisonDanger ? Theme.danger : Theme.poisonGreen) }
             }
@@ -171,8 +184,6 @@ struct PlayerStatusBadges: View {
             if player.experience > 0 {
                 HStack(spacing: 2) { CounterGlyph(kind: .xp, size: size); Text("\(player.experience)").font(.system(size: size, weight: .heavy)).foregroundStyle(Theme.gold) }
             }
-        }
-        .lineLimit(1)
     }
 }
 
