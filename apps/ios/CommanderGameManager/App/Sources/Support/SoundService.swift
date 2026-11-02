@@ -44,6 +44,38 @@ final class SoundService {
         player.play()
     }
 
+    // MARK: Intro reveal
+
+    /// A soft whoosh under each seat's intro flash: band-passed noise that
+    /// sweeps up and swells over `rise`, then sinks and darkens over `fall`,
+    /// so it peaks with the light and goes quiet as the art lands.
+    func playRevealWhoosh(rise: Double, fall: Double) {
+        guard enabled else { return }
+        let sampleRate = 44_100.0
+        let duration = rise + fall
+        let frames = Int(sampleRate * duration)
+        guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1),
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)) else { return }
+        buffer.frameLength = AVAudioFrameCount(frames)
+        let data = buffer.floatChannelData![0]
+        var lp: Float = 0, lp2: Float = 0
+        for i in 0..<frames {
+            let t = Double(i) / sampleRate
+            let noise = Float.random(in: -1...1)
+            // Centre frequency climbs 300 → 2200 Hz to the crest, then eases back down.
+            let u = t < rise ? t / rise : 1 - (t - rise) / fall
+            let cutoff = Float(300 * pow(2200 / 300, u))
+            let a1 = min(1, cutoff * 1.5 / Float(sampleRate) * 2 * .pi)
+            let a2 = min(1, cutoff * 0.6 / Float(sampleRate) * 2 * .pi)
+            lp += a1 * (noise - lp)
+            lp2 += a2 * (noise - lp2)
+            let band = lp - lp2
+            let env = t < rise ? pow(t / rise, 2) : pow(max(0, 1 - (t - rise) / fall), 1.6)
+            data[i] = band * Float(env) * 0.22
+        }
+        playBuffer(buffer, format: format)
+    }
+
     // MARK: Poison ambience (web usePoisonSound)
 
     /// Called with the highest poison on the board (eliminated seats excluded).
@@ -108,16 +140,7 @@ final class SoundService {
             let tremolo = 1 + 0.25 * sin(t * trem * 2 * .pi)
             data[i] = Float(band * env * tremolo * 0.07)
         }
-        let engine = self.engine ?? AVAudioEngine()
-        let player = AVAudioPlayerNode()
-        engine.attach(player)
-        engine.connect(player, to: engine.mainMixerNode, format: format)
-        if !engine.isRunning { try? engine.start() }
-        self.engine = engine
-        player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { @Sendable _ in
-            Task { @MainActor in engine.detach(player) }
-        }
-        player.play()
+        playBuffer(buffer, format: format)
     }
 
     private func startLoop(_ name: String, volume: Float) {
@@ -221,6 +244,12 @@ final class SoundService {
             }
             data[i] = sample * 0.5
         }
+        playBuffer(buffer, format: format)
+    }
+
+    /// Plays one synthesised buffer through the shared engine and detaches
+    /// its player when it has finished.
+    private func playBuffer(_ buffer: AVAudioPCMBuffer, format: AVAudioFormat) {
         let engine = self.engine ?? AVAudioEngine()
         let player = AVAudioPlayerNode()
         engine.attach(player)

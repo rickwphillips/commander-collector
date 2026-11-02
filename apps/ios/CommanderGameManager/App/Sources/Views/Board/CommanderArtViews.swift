@@ -113,6 +113,7 @@ struct CommanderBackdrop: View {
             let rise = Self.flashSeconds * 0.4
             let fall = Self.flashSeconds - rise
             try? await Task.sleep(for: .milliseconds(Int((Self.fadeSeconds - Self.flashSeconds) * 1000)))
+            SoundService.shared.playRevealWhoosh(rise: rise, fall: fall)
             withAnimation(.easeIn(duration: rise)) { flashing = true }
             try? await Task.sleep(for: .milliseconds(Int(rise * 1000)))
             withAnimation(.easeOut(duration: fall)) { flashing = false }
