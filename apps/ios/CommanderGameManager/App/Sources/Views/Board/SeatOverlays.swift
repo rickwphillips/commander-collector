@@ -188,7 +188,9 @@ struct CommanderSnapshotOverlay: View {
                     Spacer()
                     Text("XP \(src.experience)").foregroundStyle(src.experience > 0 ? Theme.gold : .secondary)
                     Spacer()
-                    Text("Tax +\(max(src.commanderTax, src.partnerCommanderTax) * 2)").foregroundStyle(.secondary)
+                    // One tax per commander: "Tax +2 / +4" for a partner pair.
+                    Text(src.partner == nil ? "Tax +\(src.commanderTax * 2)" : "Tax +\(src.commanderTax * 2) / +\(src.partnerCommanderTax * 2)")
+                        .foregroundStyle(.secondary)
                 }
                 .font(.system(size: sizes.source, weight: .bold))
                 .padding(.horizontal, 8).padding(.vertical, 4)
