@@ -182,6 +182,9 @@ struct CommanderSnapshotOverlay: View {
                 .onTapGesture { overlay = nil }
             if let img = art.image { Color.clear.overlay(Image(uiImage: img).resizable().scaledToFill()).clipped().opacity(0.15).allowsHitTesting(false) }
             HStack(alignment: .top, spacing: 10) {
+            // The stats column scrolls when the seat is too short for it
+            // (side seats), instead of being clipped.
+            ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .top, spacing: 8) {
                     VStack(alignment: .leading, spacing: 5) {
@@ -269,7 +272,10 @@ struct CommanderSnapshotOverlay: View {
                     .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.danger.opacity(lethal ? 0.7 : 0)))
                 }
             }
-            // The commander's card on the right; tap it for the zoomable preview.
+            }
+            .frame(maxWidth: .infinity)
+            // The commander's card on the right, scaled to the panel height;
+            // tap it for the zoomable preview.
             ZStack {
                 if let img = card.image {
                     Image(uiImage: img).resizable().scaledToFit().clipShape(RoundedRectangle(cornerRadius: 10))
@@ -280,7 +286,8 @@ struct CommanderSnapshotOverlay: View {
                     RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.08)).aspectRatio(63 / 88, contentMode: .fit).overlay(ProgressView())
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .aspectRatio(63 / 88, contentMode: .fit)
+            .frame(maxHeight: .infinity)
             .contentShape(Rectangle())
             .onTapGesture { overlay = .preview(name: shownCommander, back: self.current) }
             .accessibilityIdentifier("snapshotCard")
