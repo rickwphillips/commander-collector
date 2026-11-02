@@ -78,6 +78,7 @@ struct CommanderDamageRow: View {
     let glass: Bool
     @Binding var overlay: SeatOverlay?
     let sizes: SeatPanel.Sizes
+    @Environment(\.colorScheme) private var scheme
 
     private var state: GameState { session.state }
     private var source: PlayerState { state.players[sourceIdx] }
@@ -86,44 +87,58 @@ struct CommanderDamageRow: View {
     private var damage: CommanderDamage { state.commanderDamage[targetIdx, sourceIdx] }
     private var dealt: CommanderDamage { state.commanderDamage[sourceIdx, targetIdx] }
 
+    private func valueColor(_ dmg: Int) -> Color {
+        source.isEliminated && dmg < 21 ? .secondary : Theme.commanderDamageValueColor(dmg, scheme: scheme)
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            StepperControl(value: damage.fromCommander, color: damage.fromCommander >= 21 ? Theme.danger : source.isEliminated ? .secondary : .primary,
+        VStack(alignment: .leading, spacing: 0) {
+            // The name has the whole row width so more of the title shows;
+            // the badges, dealt figure and stepper sit underneath.
+            nameLine(showPlayer ? source.playerName : source.commander.name, partner: false)
+            StepperControl(value: damage.fromCommander, color: valueColor(damage.fromCommander),
                            max: 21, disableDec: source.isEliminated, glass: glass, size: sizes.stepper,
                            focus: .commanderDamage(sourceIdx: sourceIdx, partner: false), identifier: "s\(targetIdx)-cmd-\(sourceIdx)", overlay: $overlay,
                            onChange: { session.dispatch(.commanderDamageChange(targetIdx: targetIdx, sourceIdx: sourceIdx, isPartner: false, delta: $0)) }) {
-                VStack(alignment: .leading, spacing: 1) {
-                    HStack(spacing: 4) {
-                        if isActive { Circle().fill(Color.accentColor).frame(width: 7, height: 7).shadow(color: .accentColor.opacity(0.7), radius: 2) }
-                        Text(showPlayer ? source.playerName : source.commander.name)
-                            .font(.system(size: sizes.source, weight: isActive ? .bold : .regular))
-                            .foregroundStyle(source.isEliminated ? .secondary : isActive ? Color.accentColor : .secondary)
-                            .strikethrough(source.isEliminated).lineLimit(1).truncationMode(.tail)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .accessibilityIdentifier("s\(targetIdx)-cmd-\(sourceIdx)-name")
-                        // Damage this seat has dealt them: one number, or
-                        // "commander/partner" when this seat runs partners.
-                        Text("\u{2694}\u{FE0E}\(viewer.partner != nil ? "\(dealt.fromCommander)/\(dealt.fromPartner)" : "\(dealt.total)")")
-                            .font(.system(size: sizes.source, weight: .black))
-                            .foregroundStyle(dealt.total >= 21 ? Theme.danger : dealt.total > 0 ? Theme.dealtOrange : Color.secondary.opacity(0.5))
-                            .fixedSize()
-                    }
-                    .contentShape(Rectangle())
-                    .onTapGesture { overlay = .snapshot(sourceIdx: sourceIdx, partner: false) }
+                HStack(spacing: 6) {
                     PlayerStatusBadges(player: source, size: sizes.badge, startingLife: state.startingLife, showPoison: !state.isTwoHeadedGiant, poisonDanger: state.isTwoHeadedGiant ? GameReducer.twoHeadedGiantPoisonThreshold : 10)
+                    // Damage this seat has dealt them: one number, or
+                    // "commander/partner" when this seat runs partners.
+                    Text("\u{2694}\u{FE0E}\(viewer.partner != nil ? "\(dealt.fromCommander)/\(dealt.fromPartner)" : "\(dealt.total)")")
+                        .font(.system(size: sizes.source, weight: .black))
+                        .foregroundStyle(dealt.total >= 21 ? Theme.danger : dealt.total > 0 ? Theme.dealtOrange : Color.secondary.opacity(0.5))
+                        .fixedSize()
                 }
+                .contentShape(Rectangle())
+                .onTapGesture { overlay = .snapshot(sourceIdx: sourceIdx, partner: false) }
             }
             if let partner = source.partner {
-                StepperControl(value: damage.fromPartner, color: damage.fromPartner >= 21 ? Theme.danger : source.isEliminated ? .secondary : .primary,
+                nameLine(partner.name, partner: true)
+                StepperControl(value: damage.fromPartner, color: valueColor(damage.fromPartner),
                                max: 21, disableDec: source.isEliminated, glass: glass, size: sizes.stepper,
                                focus: .commanderDamage(sourceIdx: sourceIdx, partner: true), identifier: "s\(targetIdx)-cmd-\(sourceIdx)-partner", overlay: $overlay,
                                onChange: { session.dispatch(.commanderDamageChange(targetIdx: targetIdx, sourceIdx: sourceIdx, isPartner: true, delta: $0)) }) {
-                    Text(partner.name).font(.system(size: sizes.source)).foregroundStyle(.secondary).strikethrough(source.isEliminated).lineLimit(1)
-                        .contentShape(Rectangle())
+                    Color.clear.frame(height: 1).contentShape(Rectangle())
                         .onTapGesture { overlay = .snapshot(sourceIdx: sourceIdx, partner: true) }
                 }
             }
         }
+    }
+
+    private func nameLine(_ name: String, partner: Bool) -> some View {
+        HStack(spacing: 4) {
+            if isActive && !partner { Circle().fill(Color.accentColor).frame(width: 7, height: 7).shadow(color: .accentColor.opacity(0.7), radius: 2) }
+            Text(name)
+                .font(.system(size: sizes.source, weight: isActive && !partner ? .bold : .regular))
+                .foregroundStyle(source.isEliminated ? .secondary : isActive && !partner ? Color.accentColor : .secondary)
+                .strikethrough(source.isEliminated).lineLimit(1).truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier(partner ? "s\(targetIdx)-cmd-\(sourceIdx)-partner-name" : "s\(targetIdx)-cmd-\(sourceIdx)-name")
+        }
+        .padding(.horizontal, 8)
+        .padding(.top, 3)
+        .contentShape(Rectangle())
+        .onTapGesture { overlay = .snapshot(sourceIdx: sourceIdx, partner: partner) }
     }
 }
 

@@ -58,6 +58,16 @@ enum Theme {
         return Color(r: 230 - 1 * u, g: 126 - 69 * u, b: 34 + 19 * u)
     }
 
+    /// A commander-damage stepper value: the plain text colour at 0, warming
+    /// toward red as it climbs, `danger` at 21 and above.
+    static func commanderDamageValueColor(_ dmg: Int, scheme: ColorScheme) -> Color {
+        if dmg >= 21 { return danger }
+        if dmg <= 0 { return .primary }
+        let t = Double(dmg) / 21
+        let base: (r: Double, g: Double, b: Double) = scheme == .dark ? (235, 235, 235) : (40, 40, 40)
+        return Color(r: base.r + (229 - base.r) * t, g: base.g + (57 - base.g) * t, b: base.b + (53 - base.b) * t)
+    }
+
     /// Share of starting life lost, 0...1 (1 at or below zero).
     static func lostRatio(_ life: Int, startingLife: Int) -> Double {
         if life <= 0 { return 1 }
