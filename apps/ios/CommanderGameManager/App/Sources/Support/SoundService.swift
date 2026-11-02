@@ -65,7 +65,7 @@ final class SoundService {
             Grain(at: rise - 0.08 + Double.random(in: 0...min(0.45, fall)),
                   hz: Double.random(in: 4200...8200),
                   length: Double.random(in: 0.18...0.4),
-                  gain: Double.random(in: 0.025...0.055))
+                  gain: Double.random(in: 0.012...0.028))
         }
         for i in 0..<frames {
             let t = Double(i) / sampleRate
@@ -79,7 +79,7 @@ final class SoundService {
             lp2 += a2 * (noise - lp2)
             let band = lp - lp2
             let env = t < rise ? pow(t / rise, 2) : pow(max(0, 1 - (t - rise) / fall), 1.6)
-            var sample = band * Float(env) * 0.22
+            var sample = band * Float(env) * 0.12
             // Twinkle: a scatter of tiny high sparkles around the crest, each
             // a soft-attacked sine grain, so it glitters instead of striking.
             for g in grains {
@@ -90,7 +90,7 @@ final class SoundService {
             }
             data[i] = sample
         }
-        playBuffer(buffer, format: format)
+        playBuffer(buffer, format: format, reverb: 0.55)
     }
 
     private struct Grain { let at: Double; let hz: Double; let length: Double; let gain: Double }
@@ -267,16 +267,33 @@ final class SoundService {
     }
 
     /// Plays one synthesised buffer through the shared engine and detaches
-    /// its player when it has finished.
-    private func playBuffer(_ buffer: AVAudioPCMBuffer, format: AVAudioFormat) {
+    /// its player when it has finished. `reverb` (0...1 wet mix) sends it
+    /// through a large hall; the nodes then linger long enough for the tail.
+    private func playBuffer(_ buffer: AVAudioPCMBuffer, format: AVAudioFormat, reverb: Float? = nil) {
         let engine = self.engine ?? AVAudioEngine()
         let player = AVAudioPlayerNode()
         engine.attach(player)
-        engine.connect(player, to: engine.mainMixerNode, format: format)
+        var nodes: [AVAudioNode] = [player]
+        if let reverb {
+            let hall = AVAudioUnitReverb()
+            hall.loadFactoryPreset(.largeHall2)
+            hall.wetDryMix = reverb * 100
+            engine.attach(hall)
+            engine.connect(player, to: hall, format: format)
+            engine.connect(hall, to: engine.mainMixerNode, format: format)
+            nodes.append(hall)
+        } else {
+            engine.connect(player, to: engine.mainMixerNode, format: format)
+        }
         if !engine.isRunning { try? engine.start() }
         self.engine = engine
+        let tail: Duration = reverb == nil ? .zero : .seconds(4)
+        let done = nodes
         player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { @Sendable _ in
-            Task { @MainActor in engine.detach(player) }
+            Task { @MainActor in
+                try? await Task.sleep(for: tail)
+                done.forEach { engine.detach($0) }
+            }
         }
         player.play()
     }
