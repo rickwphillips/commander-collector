@@ -163,10 +163,15 @@ struct CommanderSnapshotOverlay: View {
         .onTapGesture(perform: select)
         .accessibilityIdentifier(id)
     }
+    /// The other opponents; the viewer gets their own section underneath.
     private var dealtRows: [(idx: Int, dmg: CommanderDamage)] {
-        state.players.indices.filter { $0 != sourceIdx }
+        state.players.indices.filter { $0 != sourceIdx && $0 != viewerIdx }
             .map { ($0, state.commanderDamage[$0, sourceIdx]) }
-            .sorted { a, b in a.0 == viewerIdx && b.0 != viewerIdx }
+    }
+    /// Damage the shown commander (or partner) has dealt to the viewer.
+    private var dealtToViewer: Int {
+        let d = state.commanderDamage[viewerIdx, sourceIdx]
+        return partner ? d.fromPartner : d.fromCommander
     }
 
     var body: some View {
@@ -213,21 +218,41 @@ struct CommanderSnapshotOverlay: View {
                 Text("CMD DEALT").font(.system(size: sizes.label, weight: .semibold)).kerning(0.5).foregroundStyle(.tertiary)
                 ForEach(dealtRows, id: \.idx) { row in
                     let tgt = state.players[row.idx]
-                    let isMe = row.idx == viewerIdx
                     HStack(spacing: 10) {
-                        CommanderArt(name: tgt.commander.name, height: 30).opacity(isMe ? 1 : 0.75)
+                        CommanderArt(name: tgt.commander.name, height: 30).opacity(0.75)
                             .onTapGesture { overlay = .preview(name: tgt.commander.name, back: self.current) }
-                        Text(tgt.playerName).font(.system(size: sizes.source, weight: isMe ? .bold : .regular)).foregroundStyle(isMe ? Color.accentColor : .secondary).lineLimit(1)
+                        Text(tgt.playerName).font(.system(size: sizes.source)).foregroundStyle(.secondary).lineLimit(1)
                         Spacer()
                         Text(src.partner != nil ? "\(row.dmg.fromCommander)/\(row.dmg.fromPartner)" : "\(row.dmg.fromCommander)")
                             .font(.system(size: sizes.source, weight: .bold))
-                            .foregroundStyle(row.dmg.fromCommander >= 21 || row.dmg.fromPartner >= 21 ? Theme.danger : isMe ? Color.accentColor : .primary)
+                            .foregroundStyle(row.dmg.fromCommander >= 21 || row.dmg.fromPartner >= 21 ? Theme.danger : .primary)
                     }
                     .padding(.vertical, 5)
                     .contentShape(Rectangle())
-                    .onTapGesture { if !isMe { overlay = .snapshot(sourceIdx: row.idx, partner: false) } }
+                    .onTapGesture { overlay = .snapshot(sourceIdx: row.idx, partner: false) }
                 }
                 Spacer(minLength: 0)
+                if viewerIdx != sourceIdx {
+                    let me = state.players[viewerIdx]
+                    let lethal = dealtToViewer >= 21
+                    HStack(spacing: 10) {
+                        CommanderArt(name: me.commander.name, height: 34)
+                            .onTapGesture { overlay = .preview(name: me.commander.name, back: self.current) }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(me.playerName).font(.system(size: sizes.source, weight: .bold)).foregroundStyle(Color.accentColor).lineLimit(1)
+                            Text("Commander damage from \(shownCommander)").font(.system(size: sizes.label - 1)).foregroundStyle(.secondary).lineLimit(2)
+                        }
+                        Spacer()
+                        Text("\(dealtToViewer)")
+                            .font(.system(size: sizes.value * 1.5, weight: .black).monospacedDigit())
+                            .foregroundStyle(lethal ? Theme.danger : Color.accentColor)
+                            .accessibilityIdentifier("snapshotDealtToMe")
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 8)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.1)))
+                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.accentColor.opacity(lethal ? 0 : 0.35)))
+                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.danger.opacity(lethal ? 0.7 : 0)))
+                }
             }
             // The commander's card on the right; tap it for the zoomable preview.
             ZStack {
