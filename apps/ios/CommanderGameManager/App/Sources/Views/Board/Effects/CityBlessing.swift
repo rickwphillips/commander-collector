@@ -4,7 +4,7 @@ import SwiftUI
 /// same geometry and timings: god rays from the top-left corner, the castle
 /// and house row sliding in from the left, rolling hills, a distant castle on
 /// a mountain, a distant skyline, the cathedral sliding in from the right,
-/// fireworks, drifting clouds and a row of marching flags flying the
+/// fireworks, low drifting mist and a row of marching flags flying the
 /// commander's art (stolen by the biggest commander-damage threat as that
 /// damage climbs). `exiting` runs the fade-out tail.
 struct CityBlessing: View {
@@ -49,11 +49,11 @@ struct CityBlessing: View {
                     scene.godRays(&gc)
                     scene.hills(&gc)
                     scene.distantCastle(&gc)
+                    scene.mist(&gc)
                     scene.skyline(&gc)
                     scene.houseRow(&gc)
                     scene.cathedral(&gc)
                     scene.fireworks(&gc)
-                    scene.clouds(&gc)
                     scene.flags(&gc, home: home, threat: threat)
                 }
             }
@@ -283,23 +283,28 @@ struct CityBlessing: View {
             }
         }
 
-        // Clouds: three, drifting right to left across the top.
-        static let cloudConfigs: [(top: Double, scale: Double, delay: Double, dur: Double)] = [(0.04, 1.0, 4.5, 28), (0.12, 0.65, 13.5, 34), (0.02, 1.3, 23.5, 22)]
-        func clouds(_ gc: inout GraphicsContext) {
+        // Mist: low, wide, blurred wisps drifting right to left along the
+        // horizon, behind the skyline and the buildings.
+        static let mistConfigs: [(top: Double, scale: Double, delay: Double, dur: Double)] = [
+            (0.70, 2.2, 4.5, 30), (0.76, 1.6, 9.0, 38), (0.73, 2.6, 13.5, 26), (0.80, 1.9, 18.0, 34), (0.68, 1.4, 23.5, 42), (0.78, 2.4, 28.0, 31),
+        ]
+        func mist(_ gc: inout GraphicsContext) {
             let opacity = exitFade(delay: 0, dur: 1)
             guard opacity > 0.001 else { return }
-            for c in Self.cloudConfigs where age > c.delay {
-                let p = ((age - c.delay) / c.dur).truncatingRemainder(dividingBy: 1)
-                let x = Self.lerp(500, -280, p)
-                let a = Self.key(p, [(0, 0), (0.08, 0.3), (0.88, 0.25), (1, 0)]) * opacity
-                let rect = CGRect(x: x, y: h * c.top, width: 100 * c.scale, height: 40 * c.scale)
-                let vb = CGSize(width: 100, height: 40)
-                var cloud = Path()
-                cloud.addEllipse(in: CGRect(x: 6, y: 14, width: 44, height: 28))
-                cloud.addEllipse(in: CGRect(x: 30, y: 0, width: 40, height: 36))
-                cloud.addEllipse(in: CGRect(x: 56, y: 11, width: 36, height: 30))
-                cloud.addRect(CGRect(x: 6, y: 28, width: 86, height: 12))
-                gc.fill(cloud.fitted(viewBox: vb, in: rect), with: .color(Color(red: 1, green: 245/255, blue: 220/255).opacity(0.18 * a)))
+            gc.drawLayer { layer in
+                layer.addFilter(.blur(radius: 9))
+                for c in Self.mistConfigs where age > c.delay {
+                    let p = ((age - c.delay) / c.dur).truncatingRemainder(dividingBy: 1)
+                    let x = Self.lerp(w + 120, -320, p)
+                    let a = Self.key(p, [(0, 0), (0.1, 0.3), (0.9, 0.25), (1, 0)]) * opacity
+                    let rect = CGRect(x: x, y: h * c.top, width: 160 * c.scale, height: 26 * c.scale)
+                    let vb = CGSize(width: 160, height: 26)
+                    var wisp = Path()
+                    wisp.addEllipse(in: CGRect(x: 0, y: 8, width: 70, height: 18))
+                    wisp.addEllipse(in: CGRect(x: 40, y: 2, width: 80, height: 22))
+                    wisp.addEllipse(in: CGRect(x: 95, y: 7, width: 65, height: 17))
+                    layer.fill(wisp.fitted(viewBox: vb, in: rect), with: .color(Color(red: 1, green: 245/255, blue: 220/255).opacity(0.16 * a)))
+                }
             }
         }
 

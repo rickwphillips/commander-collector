@@ -66,6 +66,9 @@ struct SeatPanel: View {
                 if motion {
                     if player.hasInitiative { InitiativeTorch().transition(.opacity) }
                     PoisonOverlay(poison: player.poison, progress: poisonProgress).transition(.opacity)
+                    // The scene sits behind the controls, like the web, so no
+                    // flag or firework crosses a button.
+                    if cityBlessingVisible { CityBlessing(exiting: cityBlessingExiting, commanders: [player.commander.name] + (player.partner.map { [$0.name] } ?? []), threat: threat).transition(.opacity) }
                 }
 
                 VStack(spacing: 0) {
@@ -76,7 +79,6 @@ struct SeatPanel: View {
                 .shadow(color: Theme.energyCyan.opacity(energyGlow * 0.9), radius: 4 + energyGlow * 14)
                 .opacity(introduced ? 1 : 0.35)
 
-                if cityBlessingVisible && motion { CityBlessing(exiting: cityBlessingExiting, commanders: [player.commander.name] + (player.partner.map { [$0.name] } ?? []), threat: threat).transition(.opacity) }
                 if player.isEliminated { EliminatedOverlay(conceded: player.isConceded, poisoned: isPoisoned).accessibilityIdentifier("s\(idx)-eliminated") }
                 if overlay == .concedeConfirm {
                     Theme.gold.opacity(0.12).allowsHitTesting(false)

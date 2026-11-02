@@ -55,6 +55,7 @@ struct TeamPanel: View {
                 if settings.animationsEnabled {
                     if members.contains(where: { state.players[$0].hasInitiative }) { InitiativeTorch().transition(.opacity) }
                     PoisonOverlay(poison: poison, progress: poisonProgress).transition(.opacity)
+                    if cityBlessingVisible { CityBlessing(exiting: cityBlessingExiting, commanders: members.flatMap { [state.players[$0].commander.name] + (state.players[$0].partner.map { [$0.name] } ?? []) }, threat: threat).transition(.opacity) }
                 }
                 VStack(spacing: 0) {
                     header(sz)
@@ -67,7 +68,6 @@ struct TeamPanel: View {
                     .padding(10)
                 }
                 .shadow(color: Theme.energyCyan.opacity(min(Double(teamEnergy) / 8, 1) * 0.9), radius: 4 + min(Double(teamEnergy) / 8, 1) * 14)
-                if cityBlessingVisible && settings.animationsEnabled { CityBlessing(exiting: cityBlessingExiting, commanders: members.flatMap { [state.players[$0].commander.name] + (state.players[$0].partner.map { [$0.name] } ?? []) }, threat: threat).transition(.opacity) }
                 if eliminated { EliminatedOverlay(conceded: conceded, poisoned: poison >= 15) }
                 if overlay == .concedeConfirm {
                     Theme.gold.opacity(0.12).allowsHitTesting(false)
