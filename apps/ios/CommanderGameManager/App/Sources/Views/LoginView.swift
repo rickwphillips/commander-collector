@@ -28,7 +28,7 @@ struct LoginView: View {
                             session.useServer(local ? CommanderServer.local : CommanderServer.production)
                         }
                 } footer: {
-                    Text("Your sign-in is the same account as the web app. The token is kept in the Keychain; the game itself never needs the network.")
+                    Text("Your sign-in is the same account as the web app. It is kept in this iPad's Keychain and renewed automatically, so you stay signed in until you sign out. The game itself never needs the network.")
                 }
                 if let error {
                     Section { Text(error).foregroundStyle(.red) }

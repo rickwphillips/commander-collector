@@ -72,7 +72,7 @@ enum ReferenceDataService {
             case .Player(let single):
                 return [PlayerRow(id: single.id, name: single.name, userId: single.userId)]
             }
-        case .unauthorized: throw SessionError.badCredentials
+        case .unauthorized: throw SessionError.sessionExpired
         case .notFound: return []
         case .undocumented(let status, _): throw SessionError.server("players: unexpected response \(status)")
         }
@@ -90,7 +90,7 @@ enum ReferenceDataService {
             case .case1(let rows): return rows.map(row)
             case .DeckWithPlayer(let single): return [row(single)]
             }
-        case .unauthorized: throw SessionError.badCredentials
+        case .unauthorized: throw SessionError.sessionExpired
         case .notFound: return []
         case .undocumented(let status, _): throw SessionError.server("decks: unexpected response \(status)")
         }
