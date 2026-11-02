@@ -96,15 +96,8 @@ struct CommanderDamageRow: View {
             // The name has the whole row width so more of the title shows;
             // the badges, dealt figure and stepper sit underneath.
             nameLine(showPlayer ? source.playerName : source.commander.name, partner: false)
-            // Their statuses on a line of their own, then life and the
-            // damage this seat has dealt them on the stepper line.
-            PlayerStatusBadges(player: source, size: sizes.badge, startingLife: state.startingLife, showLife: false, showTax: false, showPoison: !state.isTwoHeadedGiant, poisonDanger: state.isTwoHeadedGiant ? GameReducer.twoHeadedGiantPoisonThreshold : 10)
-                .padding(.horizontal, 8).padding(.top, 2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture { overlay = .snapshot(sourceIdx: sourceIdx, partner: false) }
             StepperControl(value: damage.fromCommander, color: valueColor(damage.fromCommander),
-                           max: 21, disableDec: source.isEliminated, glass: glass, size: sizes.stepper,
+                           max: 21, disableDec: source.isEliminated, glass: glass, size: sizes.damageStepper,
                            focus: .commanderDamage(sourceIdx: sourceIdx, partner: false), identifier: "s\(targetIdx)-cmd-\(sourceIdx)", overlay: $overlay,
                            onChange: { session.dispatch(.commanderDamageChange(targetIdx: targetIdx, sourceIdx: sourceIdx, isPartner: false, delta: $0)) }) {
                 HStack(spacing: 8) {
@@ -120,10 +113,16 @@ struct CommanderDamageRow: View {
                 .contentShape(Rectangle())
                 .onTapGesture { overlay = .snapshot(sourceIdx: sourceIdx, partner: false) }
             }
+            // Their other statuses on a line beneath.
+            PlayerStatusBadges(player: source, size: sizes.badge, startingLife: state.startingLife, showLife: false, showTax: false, showPoison: !state.isTwoHeadedGiant, poisonDanger: state.isTwoHeadedGiant ? GameReducer.twoHeadedGiantPoisonThreshold : 10)
+                .padding(.horizontal, 8).padding(.bottom, 3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .onTapGesture { overlay = .snapshot(sourceIdx: sourceIdx, partner: false) }
             if let partner = source.partner {
                 nameLine(partner.name, partner: true)
                 StepperControl(value: damage.fromPartner, color: valueColor(damage.fromPartner),
-                               max: 21, disableDec: source.isEliminated, glass: glass, size: sizes.stepper,
+                               max: 21, disableDec: source.isEliminated, glass: glass, size: sizes.damageStepper,
                                focus: .commanderDamage(sourceIdx: sourceIdx, partner: true), identifier: "s\(targetIdx)-cmd-\(sourceIdx)-partner", overlay: $overlay,
                                onChange: { session.dispatch(.commanderDamageChange(targetIdx: targetIdx, sourceIdx: sourceIdx, isPartner: true, delta: $0)) }) {
                     Color.clear.frame(height: 1).contentShape(Rectangle())

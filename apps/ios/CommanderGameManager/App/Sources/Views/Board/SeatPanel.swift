@@ -388,6 +388,8 @@ struct SeatPanel: View {
     struct Sizes {
         let name, deck, pass, icon, menu, art, life, lifeBtn, crown, label, source, badge, value, kill: CGFloat
         let stepper: StepperSize
+        /// Commander damage rows have the room for larger buttons.
+        let damageStepper: StepperSize
         /// `panelWidth` is the long edge: a side seat is thin but long, and its
         /// drawers have the room of a top or bottom seat.
         init(panelHeight h: CGFloat, panelWidth w: CGFloat = 0) {
@@ -398,6 +400,7 @@ struct SeatPanel: View {
             life = max(34, min(h * 0.28, 112)); lifeBtn = 40 * k; crown = 52 * k
             label = 13.5 * k; source = 16 * k; badge = 11.5 * k; value = 20 * k; kill = 13 * k
             stepper = StepperSize(buttonFont: 20 * k, valueFont: 20 * k, buttonWidth: 30 * k, buttonHeight: 32 * k, valueWidth: 26 * k, labelFont: 11 * k)
+            damageStepper = StepperSize(buttonFont: 24 * k, valueFont: 22 * k, buttonWidth: 40 * k, buttonHeight: 38 * k, valueWidth: 30 * k, labelFont: 11 * k)
         }
     }
 }
