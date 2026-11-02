@@ -217,9 +217,8 @@ struct CommanderSnapshotOverlay: View {
                     CounterGlyph(kind: .xp, size: sizes.source)
                     Text("\(src.experience)").foregroundStyle(src.experience > 0 ? Theme.gold : .secondary)
                     Spacer()
-                    // One tax medallion per commander.
-                    CounterGlyph(kind: .tax, size: sizes.source, taxValue: src.commanderTax)
-                    if src.partner != nil { CounterGlyph(kind: .tax, size: sizes.source, taxValue: src.partnerCommanderTax) }
+                    // The tax of the commander currently shown (the chips pick it).
+                    CounterGlyph(kind: .tax, size: sizes.source, taxValue: partner ? src.partnerCommanderTax : src.commanderTax)
                 }
                 .font(.system(size: sizes.source, weight: .bold))
                 .padding(.horizontal, 8).padding(.vertical, 4)
