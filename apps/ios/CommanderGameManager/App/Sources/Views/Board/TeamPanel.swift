@@ -347,7 +347,7 @@ struct TeamPanel: View {
         case .rules(let title, let text): RulesTipOverlay(title: title, text: text) { overlay = nil }
         case .focus(let target): focusModal(target)
         case .snapshot(let src, let partner): CommanderSnapshotOverlay(session: session, viewerIdx: primary, sourceIdx: src, partner: partner, overlay: $overlay, sizes: sz)
-        case .preview(let name): CardPreviewOverlay(name: name) { overlay = nil }
+        case .preview(let name, let back): CardPreviewOverlay(name: name) { overlay = back }
         case .qr: SeatQROverlay(gameId: session.clientGameId, seat: state.players[primary].position, connected: false) { overlay = nil }
         }
     }

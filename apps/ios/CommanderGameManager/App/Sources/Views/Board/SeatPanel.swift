@@ -314,8 +314,8 @@ struct SeatPanel: View {
             focusModal(target)
         case .snapshot(let src, let partner):
             CommanderSnapshotOverlay(session: session, viewerIdx: idx, sourceIdx: src, partner: partner, overlay: $overlay, sizes: sz)
-        case .preview(let name):
-            CardPreviewOverlay(name: name) { overlay = nil }
+        case .preview(let name, let back):
+            CardPreviewOverlay(name: name) { overlay = back }
         case .qr:
             SeatQROverlay(gameId: session.clientGameId, seat: player.position, connected: remoteConnected) { overlay = nil }
         }

@@ -183,10 +183,15 @@ final class BoardFlowUITests: XCTestCase {
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = "commander-snapshot"; shot.lifetime = .keepAlways
         add(shot)
+        // The card opens the full preview; closing it returns to the snapshot.
+        waitFor("snapshotCard").tap()
+        waitFor("previewClose").tap()
+        XCTAssertTrue(app.staticTexts["CMD DEALT"].waitForExistence(timeout: 5), "closing the card did not return to the snapshot")
         // Hop to another seat's snapshot from its row, then close.
         app.staticTexts["Amy"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Atraxa, Praetors' Voice"].firstMatch.waitForExistence(timeout: 5))
-        app.buttons.matching(NSPredicate(format: "label == 'Close' OR label == 'xmark'")).firstMatch.tap()
+        waitFor("snapshotClose").tap()
+        XCTAssertFalse(app.staticTexts["CMD DEALT"].waitForExistence(timeout: 2), "snapshot did not close")
     }
 
     func testStateMenuMonarchInitiativeBlessing() {

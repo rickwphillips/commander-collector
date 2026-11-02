@@ -161,6 +161,7 @@ struct CardPreviewOverlay: View {
                             .background(Circle().fill(.black.opacity(0.5)))
                             .foregroundStyle(.white.opacity(0.85))
                     }
+                    .accessibilityIdentifier("previewClose")
                     .padding(8)
                 }
                 Spacer()

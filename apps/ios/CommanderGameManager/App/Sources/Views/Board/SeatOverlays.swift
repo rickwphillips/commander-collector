@@ -145,6 +145,8 @@ struct CommanderSnapshotOverlay: View {
 
     private var state: GameState { session.state }
     private var src: PlayerState { state.players[sourceIdx] }
+    /// This panel, so a card preview opened from it can come back to it.
+    private var current: SeatOverlay { .snapshot(sourceIdx: sourceIdx, partner: partner) }
     private var shownCommander: String { partner ? (src.partner?.name ?? src.commander.name) : src.commander.name }
     private var dealtRows: [(idx: Int, dmg: CommanderDamage)] {
         state.players.indices.filter { $0 != sourceIdx }
@@ -167,10 +169,10 @@ struct CommanderSnapshotOverlay: View {
                             if src.hasInitiative { InitiativeGlyph().foregroundStyle(Theme.initiativeBlue).frame(width: sizes.badge, height: sizes.badge) }
                         }
                         Text(src.commander.name).font(.system(size: sizes.label)).foregroundStyle(.secondary).lineLimit(1)
-                            .onTapGesture { overlay = .preview(name: src.commander.name) }
+                            .onTapGesture { overlay = .preview(name: src.commander.name, back: self.current) }
                         if let p = src.partner {
                             Text(p.name).font(.system(size: sizes.label)).foregroundStyle(.secondary).lineLimit(1)
-                                .onTapGesture { overlay = .preview(name: p.name) }
+                                .onTapGesture { overlay = .preview(name: p.name, back: self.current) }
                         }
                     }
                     Spacer()
@@ -197,7 +199,7 @@ struct CommanderSnapshotOverlay: View {
                     let isMe = row.idx == viewerIdx
                     HStack(spacing: 6) {
                         CommanderArt(name: tgt.commander.name, height: 22).opacity(isMe ? 1 : 0.75)
-                            .onTapGesture { overlay = .preview(name: tgt.commander.name) }
+                            .onTapGesture { overlay = .preview(name: tgt.commander.name, back: self.current) }
                         Text(tgt.playerName).font(.system(size: sizes.label, weight: isMe ? .bold : .regular)).foregroundStyle(isMe ? Color.accentColor : .secondary).lineLimit(1)
                         Spacer()
                         Text(src.partner != nil ? "\(row.dmg.fromCommander)/\(row.dmg.fromPartner)" : "\(row.dmg.fromCommander)")
@@ -222,7 +224,8 @@ struct CommanderSnapshotOverlay: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
-            .onTapGesture { overlay = .preview(name: shownCommander) }
+            .onTapGesture { overlay = .preview(name: shownCommander, back: self.current) }
+            .accessibilityIdentifier("snapshotCard")
             }
             .padding(10)
             .padding(.trailing, 22)

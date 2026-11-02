@@ -4,12 +4,14 @@ import SwiftUI
 /// every control in the panel asks for its overlay through this binding so
 /// the overlay renders at the panel root (rotated with the seat), never as a
 /// system sheet.
-enum SeatOverlay: Equatable, Identifiable {
+indirect enum SeatOverlay: Equatable, Identifiable {
     case stateMenu
     case rules(title: String, text: String)
     case focus(FocusTarget)
     case snapshot(sourceIdx: Int, partner: Bool)
-    case preview(name: String)
+    /// The zoomable card. `back` is the overlay to return to on close (the
+    /// snapshot panel it was opened from), or nil to close everything.
+    case preview(name: String, back: SeatOverlay? = nil)
     case concedeConfirm
     case qr
 
@@ -19,7 +21,7 @@ enum SeatOverlay: Equatable, Identifiable {
         case .rules(let t, _): "rules-\(t)"
         case .focus(let f): "focus-\(f.id)"
         case .snapshot(let s, let p): "snap-\(s)-\(p)"
-        case .preview(let n): "preview-\(n)"
+        case .preview(let n, _): "preview-\(n)"
         case .concedeConfirm: "concede"
         case .qr: "qr"
         }
