@@ -48,8 +48,8 @@ final class SoundService {
 
     /// A soft whoosh under each seat's intro flash: band-passed noise that
     /// sweeps up and swells over `rise`, then sinks and darkens over `fall`,
-    /// so it peaks with the light and goes quiet as the art lands. A bright
-    /// twinkle stab rings out at the crest and shimmers away through the fall.
+    /// so it peaks with the light and goes quiet as the art lands. A soft
+    /// high twinkle glitters around the crest and trails into the fall.
     func playRevealWhoosh(rise: Double, fall: Double) {
         guard enabled else { return }
         let sampleRate = 44_100.0
@@ -60,6 +60,13 @@ final class SoundService {
         buffer.frameLength = AVAudioFrameCount(frames)
         let data = buffer.floatChannelData![0]
         var lp: Float = 0, lp2: Float = 0
+        // Sparkles begin just before the crest and trail into the fall.
+        let grains = (0..<18).map { _ in
+            Grain(at: rise - 0.08 + Double.random(in: 0...min(0.45, fall)),
+                  hz: Double.random(in: 4200...8200),
+                  length: Double.random(in: 0.18...0.4),
+                  gain: Double.random(in: 0.025...0.055))
+        }
         for i in 0..<frames {
             let t = Double(i) / sampleRate
             let noise = Float.random(in: -1...1)
@@ -73,26 +80,20 @@ final class SoundService {
             let band = lp - lp2
             let env = t < rise ? pow(t / rise, 2) : pow(max(0, 1 - (t - rise) / fall), 1.6)
             var sample = band * Float(env) * 0.22
-            // Twinkle: a chord of high partials struck at the crest, each
-            // with its own slow tremolo so the tail glitters rather than rings.
-            let st = t - rise
-            if st >= 0 {
-                let attack = st < 0.012 ? st / 0.012 : 1
-                let decay = exp(-st * 3.2)
-                var tw = 0.0
-                for (k, f) in Self.twinkleHz.enumerated() {
-                    let shimmer = 0.7 + 0.3 * sin(st * (5.5 + Double(k) * 1.7) * 2 * .pi)
-                    tw += sin(st * f * 2 * .pi) * shimmer * exp(-st * Double(k) * 0.5)
-                }
-                sample += Float(tw / Double(Self.twinkleHz.count) * attack * decay) * 0.26
+            // Twinkle: a scatter of tiny high sparkles around the crest, each
+            // a soft-attacked sine grain, so it glitters instead of striking.
+            for g in grains {
+                let gt = t - g.at
+                guard gt >= 0, gt < g.length else { continue }
+                let env = gt < 0.03 ? gt / 0.03 : exp(-(gt - 0.03) * (4 / g.length))
+                sample += Float(sin(gt * g.hz * 2 * .pi) * env * g.gain)
             }
             data[i] = sample
         }
         playBuffer(buffer, format: format)
     }
 
-    /// E6, G#6, B6, E7, G#7: a bright major chord, high enough to sparkle.
-    private static let twinkleHz: [Double] = [1318.5, 1661.2, 1975.5, 2637.0, 3322.4]
+    private struct Grain { let at: Double; let hz: Double; let length: Double; let gain: Double }
 
     // MARK: Poison ambience (web usePoisonSound)
 
