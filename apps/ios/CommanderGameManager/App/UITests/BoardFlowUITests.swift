@@ -187,6 +187,12 @@ final class BoardFlowUITests: XCTestCase {
         waitFor("snapshotCard").tap()
         waitFor("previewClose").tap()
         XCTAssertTrue(app.staticTexts["CMD DEALT"].waitForExistence(timeout: 5), "closing the card did not return to the snapshot")
+        // Jo runs Tymna / Thrasios: the partner chip swaps the shown card.
+        waitFor("snapshotClose").tap()
+        waitFor("s0-cmd-3-name").tap()
+        waitFor("snapshotPartner").tap()
+        XCTAssertTrue(app.staticTexts["CMD DEALT"].waitForExistence(timeout: 5), "partner view did not open")
+        waitFor("snapshotCommander").tap()
         // Hop to another seat's snapshot from its row, then close.
         app.staticTexts["Amy"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Atraxa, Praetors' Voice"].firstMatch.waitForExistence(timeout: 5))
