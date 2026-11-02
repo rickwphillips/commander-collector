@@ -113,6 +113,23 @@ export interface Deck {
   has_r: number;
   has_g: number;
   created_at: string;
+  /** Set while the deck is in the trash (soft-deleted); absent or null otherwise. */
+  deleted_at?: string | null;
+}
+
+/** A soft-deleted deck as returned by GET /decks?trash=1. */
+export interface TrashedDeck {
+  id: string;
+  player_id: string;
+  player_name: string;
+  name: string;
+  commander: string;
+  partner: string | null;
+  colors: string;
+  deleted_at: string;
+  total_games: number;
+  card_count: number;
+  attached_list_count: number;
 }
 
 export interface Game {

@@ -38,9 +38,10 @@ import { ColorIdentityChips } from '@/components/ColorIdentityChips';
 import { ManaSymbol } from '@/components/ManaSymbol';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { EmptyState } from '@/components/EmptyState';
+import { Trash, type TrashItem } from '@/components/cards/Trash';
 import { api } from '@/lib/api';
 import { MTG_COLORS, MTG_COLORS_WITH_C } from '@/lib/utils';
-import type { DeckWithPlayer, MtgColorOrColorless, ColorFilterMode } from '@/lib/types';
+import type { DeckWithPlayer, TrashedDeck, MtgColorOrColorless, ColorFilterMode } from '@/lib/types';
 
 interface DeckWithStats extends DeckWithPlayer {
   total_games: number;
@@ -60,6 +61,7 @@ type SortOption =
 export default function DecksPage() {
   const router = useRouter();
   const [decks, setDecks] = useState<DeckWithStats[]>([]);
+  const [trashed, setTrashed] = useState<TrashedDeck[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,8 +76,9 @@ export default function DecksPage() {
   useEffect(() => {
     const fetchDecks = async () => {
       try {
-        const data = await api.getDecks();
+        const [data, trash] = await Promise.all([api.getDecks(), api.getTrashedDecks()]);
         setDecks(data as DeckWithStats[]);
+        setTrashed(trash);
       } catch {
         setError('Failed to load decks');
       } finally {
@@ -85,6 +88,30 @@ export default function DecksPage() {
 
     fetchDecks();
   }, []);
+
+  const trashItems = useMemo<TrashItem[]>(
+    () =>
+      trashed.map((d) => ({
+        kind: 'deck',
+        id: d.id,
+        name: `${d.name} · ${d.commander}`,
+        deletedAt: d.deleted_at,
+        cardCount: d.card_count,
+        attachedListCount: d.attached_list_count,
+      })),
+    [trashed],
+  );
+
+  const handleRestore = async (item: TrashItem) => {
+    try {
+      await api.restoreDeck(item.id);
+      const [data, trash] = await Promise.all([api.getDecks(), api.getTrashedDecks()]);
+      setDecks(data as DeckWithStats[]);
+      setTrashed(trash);
+    } catch {
+      setError('Failed to restore deck');
+    }
+  };
 
   const uniquePlayers = useMemo(() => {
     const names = [...new Set(decks.map((d) => d.player_name))];
@@ -436,6 +463,19 @@ export default function DecksPage() {
             </Grid>
           ))}
         </Grid>
+      )}
+
+      {trashItems.length > 0 && (
+        <Box sx={{ mt: 4 }}>
+          <Typography variant="h6" sx={{ mb: 1 }}>
+            Recently deleted
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Deleted decks stay out of pickers but keep their place in game history and stats.
+            Decks that were never played are removed for good after 30 days.
+          </Typography>
+          <Trash items={trashItems} onRestore={handleRestore} />
+        </Box>
       )}
     </PageContainer>
   );

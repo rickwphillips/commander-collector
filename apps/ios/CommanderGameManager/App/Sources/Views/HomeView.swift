@@ -8,6 +8,7 @@ import CommanderGameKit
 struct HomeView: View {
     @Environment(Session.self) private var session
     @Environment(GameSettingsStore.self) private var settings
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var context
     @Query(sort: \CachedPlayer.name) private var players: [CachedPlayer]
     @Query(sort: \CachedDeck.name) private var decks: [CachedDeck]
@@ -21,6 +22,10 @@ struct HomeView: View {
     @State private var random = false
     @State private var refreshing = false
     @State private var refreshMessage: String?
+    @State private var confirmClear = false
+    @State private var lastRefreshAt = Date.distantPast
+    /// Minimum gap between automatic foreground refreshes.
+    private static let foregroundRefreshInterval: TimeInterval = 5 * 60
     @State private var activeGame: ActiveGame? = ActiveGameStore.load()
     @State private var resume = false
     @State private var setup: GameSetupInput?
@@ -120,10 +125,20 @@ struct HomeView: View {
                         .disabled(players.isEmpty)
                         .accessibilityIdentifier("newDeck")
                     if let refreshMessage { Text(refreshMessage).font(.footnote).foregroundStyle(.secondary) }
+                    Button(role: .destructive) { confirmClear = true } label: { Label("Clear cached data", systemImage: "trash") }
+                        .disabled(refreshing || (players.isEmpty && decks.isEmpty))
+                        .accessibilityIdentifier("clearCache")
+                        .confirmationDialog("Clear cached players and decks?", isPresented: $confirmClear, titleVisibility: .visible) {
+                            Button("Clear and refresh", role: .destructive) { clearCache(thenRefresh: true) }
+                            Button("Clear only", role: .destructive) { clearCache(thenRefresh: false) }
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text("Finished games waiting to upload and a game in progress are kept.")
+                        }
                 } header: {
                     Text("Reference data")
                 } footer: {
-                    Text("Seating uses the cached players and decks, so the game works with no network.")
+                    Text("Seating uses the cached players and decks, so the game works with no network. The cache refreshes when the app returns to the foreground.")
                 }
                 Section {
                     Link(destination: CommanderWeb.games) { Label("Games", systemImage: "list.bullet.rectangle") }
@@ -185,6 +200,13 @@ struct HomeView: View {
                 }
             }
             .onAppear { activeGame = ActiveGameStore.load() }
+            // Decks deleted or added on the website should show up without a
+            // manual refresh: pull again whenever the app comes back to the front,
+            // throttled so flipping between apps does not hammer the API.
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active, !DemoMode.usesFakeAccount, !players.isEmpty else { return }
+                if Date.now.timeIntervalSince(lastRefreshAt) > Self.foregroundRefreshInterval { refresh() }
+            }
             .fullScreenCover(isPresented: $showJoin) { JoinTableView() }
             // The same editor the seat picker uses; a deck created here is
             // saved to the web app, then the cache is pulled fresh.
@@ -231,6 +253,17 @@ struct HomeView: View {
         }
     }
 
+    private func clearCache(thenRefresh: Bool) {
+        do {
+            try ReferenceDataService.clearCache(in: context)
+            refreshMessage = "Cache cleared."
+        } catch {
+            refreshMessage = "Could not clear the cache: \(error.localizedDescription)"
+            return
+        }
+        if thenRefresh { refresh() }
+    }
+
     private func refresh() {
         guard !refreshing else { return }
         refreshing = true
@@ -239,6 +272,7 @@ struct HomeView: View {
             defer { refreshing = false }
             do {
                 let summary = try await ReferenceDataService.refresh(using: session.client, into: context)
+                lastRefreshAt = .now
                 refreshMessage = "Updated \(summary.players) players and \(summary.decks) decks."
             } catch {
                 refreshMessage = "Could not refresh: \(error.localizedDescription). Using cached data."

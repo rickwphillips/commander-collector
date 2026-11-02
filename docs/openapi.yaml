@@ -173,6 +173,15 @@ paths:
           in: query
           required: false
           schema: { $ref: '#/components/schemas/Uuid' }
+        - name: trash
+          in: query
+          required: false
+          description: |
+            `1` lists the caller's soft-deleted decks (every user's for admins)
+            instead, newest deletion first, each with `deleted_at`, `total_games`,
+            `card_count` and `attached_list_count`. Collection reads without this
+            flag never include trashed decks; the by-id read still returns one.
+          schema: { type: string, enum: ['1'] }
       responses:
         '200':
           description: Decks
@@ -188,6 +197,16 @@ paths:
     post:
       tags: [decks]
       operationId: createDeck
+      parameters:
+        - $ref: '#/components/parameters/OptionalId'
+        - name: action
+          in: query
+          required: false
+          description: |
+            `restore` with `id`: takes a soft-deleted deck out of the trash and
+            returns `{success}` (409 when it is not in the trash). Without
+            `action` this creates a deck from the body.
+          schema: { type: string, enum: [restore] }
       summary: Create a deck for a player the caller owns
       requestBody:
         required: true
@@ -240,7 +259,13 @@ paths:
     delete:
       tags: [decks]
       operationId: deleteDeck
-      summary: Delete a deck the caller owns
+      summary: Move a deck the caller owns to the trash
+      description: |
+        Soft delete: sets `deleted_at`. The deck's game results are kept, so games
+        and stats keep every seat. Trashed decks leave the list and player reads
+        and the iPad cache on its next refresh. cleanup-trash.php purges trashed
+        decks after 30 days only when they have no game results; a deck that was
+        ever played is never hard-deleted. 409 when already in the trash.
       parameters:
         - $ref: '#/components/parameters/RequiredId'
       responses:
@@ -548,6 +573,7 @@ components:
         has_r: { type: integer, enum: [0, 1] }
         has_g: { type: integer, enum: [0, 1] }
         created_at: { type: string }
+        deleted_at: { type: [string, 'null'], description: Set while the deck is in the trash. }
     DeckWithPlayer:
       allOf:
         - $ref: '#/components/schemas/Deck'

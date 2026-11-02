@@ -203,8 +203,15 @@ export const api = {
       params: { id },
       body: JSON.stringify(data),
     }),
+  /** Soft delete: the deck moves to the trash; its game results are kept. */
   deleteDeck: (id: string) =>
     apiFetch<{ success: boolean }>('/decks', { method: 'DELETE', params: { id } }),
+  /** The caller's trashed decks, newest deletion first. */
+  getTrashedDecks: () =>
+    apiFetch<import('./types').TrashedDeck[]>('/decks', { params: { trash: '1' } }),
+  /** Take a deck out of the trash. */
+  restoreDeck: (id: string) =>
+    apiFetch<{ success: boolean }>('/decks', { method: 'POST', params: { id, action: 'restore' } }),
 
   // Games
   getGames: () => apiFetch<import('./types').GameWithResults[]>('/games'),

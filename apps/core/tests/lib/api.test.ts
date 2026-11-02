@@ -264,6 +264,23 @@ describe('api — decks CRUD', () => {
     expect(url).toContain('decks.php?id=5');
     expect(opts.method).toBe('DELETE');
   });
+
+  it('api.getTrashedDecks() asks for the trash listing', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, []));
+    await api.getTrashedDecks();
+    const url = lastCalls()[0][0] as string;
+    expect(url).toContain('/decks');
+    expect(url).toContain('trash=1');
+  });
+
+  it('api.restoreDeck(id) POSTs the restore action', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, { success: true }));
+    await api.restoreDeck('5');
+    const [url, opts] = lastCalls()[0];
+    expect(url).toContain('id=5');
+    expect(url).toContain('action=restore');
+    expect(opts.method).toBe('POST');
+  });
 });
 
 describe('api — games CRUD', () => {

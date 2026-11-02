@@ -174,6 +174,20 @@ export default function DeckDetailPage() {
     }
   };
 
+  const [restoring, setRestoring] = useState(false);
+  const handleRestore = async () => {
+    if (!deck) return;
+    setRestoring(true);
+    try {
+      await api.restoreDeck(deck.id);
+      setDeck({ ...deck, deleted_at: null });
+    } catch {
+      setError('Failed to restore deck');
+    } finally {
+      setRestoring(false);
+    }
+  };
+
   const handleDelete = async () => {
     setDeleting(true);
     try {
@@ -276,6 +290,21 @@ export default function DeckDetailPage() {
       {error && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
           {error}
+        </Alert>
+      )}
+
+      {deck.deleted_at && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 3 }}
+          action={
+            <Button color="inherit" size="small" onClick={handleRestore} disabled={restoring}>
+              {restoring ? 'Restoring…' : 'Restore'}
+            </Button>
+          }
+        >
+          This deck is in the trash. It still counts in game history and stats but is hidden
+          from deck pickers.
         </Alert>
       )}
 
@@ -536,8 +565,9 @@ export default function DeckDetailPage() {
         <DialogTitle>Delete Deck?</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete {deck.name}? This will also remove it from all game
-            results.
+            Move {deck.name} to the trash? It leaves the deck pickers but keeps its place in
+            every game and in the stats. You can restore it from the Decks page.
+            {deck.total_games === 0 && ' Decks that were never played are removed for good after 30 days.'}
           </Typography>
         </DialogContent>
         <DialogActions>

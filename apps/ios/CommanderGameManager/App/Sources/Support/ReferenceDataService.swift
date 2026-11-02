@@ -15,6 +15,12 @@ enum ReferenceDataService {
         let decks = try await fetchDecks(client)
 
         let existingPlayers = try context.fetch(FetchDescriptor<CachedPlayer>())
+        // A server that answers with no players at all while the cache has some is
+        // far more likely a hiccup than a real wipe: keep the cache rather than
+        // reconcile it down to nothing.
+        if players.isEmpty && !existingPlayers.isEmpty {
+            throw SessionError.server("the server returned no players; cache kept")
+        }
         var playersById = Dictionary(uniqueKeysWithValues: existingPlayers.map { ($0.id, $0) })
         for p in players {
             if let cached = playersById.removeValue(forKey: p.id) {
@@ -43,6 +49,14 @@ enum ReferenceDataService {
 
         try context.save()
         return Summary(players: players.count, decks: decks.count)
+    }
+
+    /// Drops every cached player and deck. The next refresh repopulates them;
+    /// finished games in the outbox and the in-progress game are untouched.
+    static func clearCache(in context: ModelContext) throws {
+        try context.delete(model: CachedDeck.self)
+        try context.delete(model: CachedPlayer.self)
+        try context.save()
     }
 
     struct PlayerRow { var id: String; var name: String; var userId: String? }

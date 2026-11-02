@@ -27,6 +27,14 @@ $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
 $id = isset($_GET['id']) ? (string)$_GET['id'] : null;
 $playerId = isset($_GET['player_id']) ? (string)$_GET['player_id'] : null;
+$action = isset($_GET['action']) ? (string)$_GET['action'] : null;
+$wantTrash = isset($_GET['trash']) && $_GET['trash'] !== '0';
+
+// Decks are soft-deleted (deleted_at, v4.8.0 trash). Collection reads skip
+// trashed decks; the by-id read still returns one so game history and stats
+// keep resolving the deck that was played. cleanup-trash.php purges trashed
+// decks that have no game results after 30 days; a deck that was ever played
+// is never hard-deleted.
 
 switch ($method) {
     case 'GET':
@@ -69,12 +77,39 @@ switch ($method) {
                 FROM decks d
                 JOIN players p ON d.player_id = p.id
                 LEFT JOIN game_results gr ON gr.deck_id = d.id
-                WHERE d.player_id = ?
+                WHERE d.player_id = ? AND d.deleted_at IS NULL
                 GROUP BY d.id
                 ORDER BY d.name ASC
             ");
             $stmt->execute([$playerId]);
             sendJSON(castStatRows($stmt->fetchAll()));
+        } elseif ($wantTrash) {
+            // Trash: the caller's soft-deleted decks (every user's for admins),
+            // newest deletion first, with what a restore would bring back.
+            $sql = "
+                SELECT
+                    d.id, d.player_id, d.name, d.commander, d.partner, d.colors, d.deleted_at,
+                    p.name as player_name,
+                    (SELECT COUNT(DISTINCT gr.game_id) FROM game_results gr WHERE gr.deck_id = d.id) AS total_games,
+                    (SELECT COALESCE(SUM(lc.quantity), 0)
+                       FROM list_cards lc
+                       JOIN lists l ON l.id = lc.list_id
+                       WHERE l.deck_id = d.id AND l.role = 'main' AND l.deleted_at IS NULL) AS card_count,
+                    (SELECT COUNT(*) FROM lists l WHERE l.deck_id = d.id AND l.deleted_at IS NULL) AS attached_list_count
+                FROM decks d
+                JOIN players p ON d.player_id = p.id
+                WHERE d.deleted_at IS NOT NULL" . (isAdmin($currentUser) ? '' : ' AND p.user_id = ?') . "
+                ORDER BY d.deleted_at DESC";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute(isAdmin($currentUser) ? [] : [$currentUser['sub']]);
+            $rows = $stmt->fetchAll();
+            foreach ($rows as &$r) {
+                $r['total_games'] = (int)$r['total_games'];
+                $r['card_count'] = (int)$r['card_count'];
+                $r['attached_list_count'] = (int)$r['attached_list_count'];
+            }
+            unset($r);
+            sendJSON($rows);
         } else {
             // Get all decks with player info
             $stmt = $pdo->query("
@@ -91,6 +126,7 @@ switch ($method) {
                 FROM decks d
                 JOIN players p ON d.player_id = p.id
                 LEFT JOIN game_results gr ON gr.deck_id = d.id
+                WHERE d.deleted_at IS NULL
                 GROUP BY d.id
                 ORDER BY d.name ASC
             ");
@@ -99,6 +135,31 @@ switch ($method) {
         break;
 
     case 'POST':
+        if ($action === 'restore') {
+            // POST /decks?id=<uuid>&action=restore — take a deck out of the trash.
+            if (!$id) {
+                sendError('Deck ID is required');
+            }
+            $row = $pdo->prepare('SELECT id, deleted_at FROM decks WHERE id = ?');
+            $row->execute([$id]);
+            $deck = $row->fetch();
+            if (!$deck) {
+                sendError('Deck not found', 404);
+            }
+            if (!isAdmin($currentUser) && !userOwnsDeck($pdo, $id, $currentUser['sub'])) {
+                sendError('You can only restore your own decks', 403);
+            }
+            if ($deck['deleted_at'] === null) {
+                sendError('Deck is not in the trash', 409);
+            }
+            $stmt = $pdo->prepare('UPDATE decks SET deleted_at = NULL WHERE id = ?');
+            $stmt->execute([$id]);
+            sendJSON(['success' => true]);
+        }
+        if ($action !== null) {
+            sendError('Unknown action', 400);
+        }
+
         $data = getJSONInput();
 
         if (empty($data['player_id'])) {
@@ -242,11 +303,13 @@ switch ($method) {
             sendError('You can only delete your own decks', 403);
         }
 
-        $stmt = $pdo->prepare('DELETE FROM decks WHERE id = ?');
+        // Soft delete: the row and its game results stay so games and stats
+        // keep their history. Restore with POST ?id=&action=restore.
+        $stmt = $pdo->prepare('UPDATE decks SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL');
         $stmt->execute([$id]);
 
         if ($stmt->rowCount() === 0) {
-            sendError('Deck not found', 404);
+            sendError('Deck is already in the trash', 409);
         }
 
         sendJSON(['success' => true]);

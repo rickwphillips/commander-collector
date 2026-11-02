@@ -14,7 +14,8 @@ declare(strict_types=1);
  *
  * Peers rule: decks and lists are independent. Purging expired decks never
  * touches lists, and vice versa. Cascading FK deletes handle child rows
- * (deck_cards, game_results for decks; list_cards for lists).
+ * (deck_cards for decks; list_cards for lists). Decks with game results are
+ * never purged: game_results.deck_id cascades, and history must keep its seats.
  *
  * system_state schema (v4.8.0):
  *   k VARCHAR(64) PRIMARY KEY, v TEXT NULL,
@@ -158,11 +159,14 @@ class CleanupTrash {
     private static function performCleanup(PDO $pdo): array {
         $retentionSql = 'NOW() - INTERVAL ' . self::RETENTION_DAYS . ' DAY';
 
-        // Purge decks — peers rule: independent of lists.
+        // Purge decks — peers rule: independent of lists. A deck that was ever
+        // played is kept forever (trashed, hidden from pickers) so game
+        // history and stats never lose a seat; only unplayed decks are purged.
         $stmtDecks = $pdo->prepare(
             "DELETE FROM decks
              WHERE deleted_at IS NOT NULL
-               AND deleted_at < {$retentionSql}"
+               AND deleted_at < {$retentionSql}
+               AND NOT EXISTS (SELECT 1 FROM game_results gr WHERE gr.deck_id = decks.id)"
         );
         $stmtDecks->execute();
         $decksPurged = $stmtDecks->rowCount();
