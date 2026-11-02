@@ -206,16 +206,20 @@ struct CommanderSnapshotOverlay: View {
                         .strikethrough(src.isEliminated)
                 }
                 Divider()
-                HStack {
-                    Text("☠ \(src.poison)").foregroundStyle(src.poison >= 10 ? Theme.danger : src.poison > 0 ? Theme.poisonGreen : .secondary)
+                // The same counter glyphs the damage rows use.
+                HStack(spacing: 4) {
+                    CounterGlyph(kind: .poison, size: sizes.source, poison: src.poison, poisonDanger: 10)
+                    Text("\(src.poison)").foregroundStyle(src.poison >= 10 ? Theme.danger : src.poison > 0 ? Theme.poisonGreen : .secondary)
                     Spacer()
-                    Text("⚡ \(src.energy)").foregroundStyle(src.energy > 0 ? Theme.energyCyan : .secondary)
+                    CounterGlyph(kind: .energy, size: sizes.source)
+                    Text("\(src.energy)").foregroundStyle(src.energy > 0 ? Theme.energyCyan : .secondary)
                     Spacer()
-                    Text("XP \(src.experience)").foregroundStyle(src.experience > 0 ? Theme.gold : .secondary)
+                    CounterGlyph(kind: .xp, size: sizes.source)
+                    Text("\(src.experience)").foregroundStyle(src.experience > 0 ? Theme.gold : .secondary)
                     Spacer()
-                    // One tax per commander: "Tax +2 / +4" for a partner pair.
-                    Text(src.partner == nil ? "Tax +\(src.commanderTax * 2)" : "Tax +\(src.commanderTax * 2) / +\(src.partnerCommanderTax * 2)")
-                        .foregroundStyle(.secondary)
+                    // One tax medallion per commander.
+                    CounterGlyph(kind: .tax, size: sizes.source, taxValue: src.commanderTax)
+                    if src.partner != nil { CounterGlyph(kind: .tax, size: sizes.source, taxValue: src.partnerCommanderTax) }
                 }
                 .font(.system(size: sizes.source, weight: .bold))
                 .padding(.horizontal, 8).padding(.vertical, 4)
