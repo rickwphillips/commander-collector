@@ -85,10 +85,13 @@ struct StepperControl<Label: View>: View {
     /// Accessibility prefix for UI tests: `<id>-dec`, `<id>-value`, `<id>-inc`.
     var identifier: String? = nil
     @Binding var overlay: SeatOverlay?
+    /// An extra line under the stepper, inside the same backing.
+    var footer: AnyView? = nil
     let onChange: (Int) -> Void
     @ViewBuilder let label: () -> Label
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
         HStack(spacing: 4) {
             label()
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -109,6 +112,8 @@ struct StepperControl<Label: View>: View {
             } else if reserveMax {
                 Text("/00").font(.system(size: size.labelFont)).hidden().fixedSize()
             }
+        }
+        if let footer { footer }
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 2)

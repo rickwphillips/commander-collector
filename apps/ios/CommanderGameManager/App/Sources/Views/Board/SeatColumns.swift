@@ -99,6 +99,7 @@ struct CommanderDamageRow: View {
             StepperControl(value: damage.fromCommander, color: valueColor(damage.fromCommander),
                            max: 21, disableDec: source.isEliminated, glass: glass, size: sizes.damageStepper,
                            focus: .commanderDamage(sourceIdx: sourceIdx, partner: false), identifier: "s\(targetIdx)-cmd-\(sourceIdx)", overlay: $overlay,
+                           footer: AnyView(statusLine),
                            onChange: { session.dispatch(.commanderDamageChange(targetIdx: targetIdx, sourceIdx: sourceIdx, isPartner: false, delta: $0)) }) {
                 HStack(spacing: 8) {
                     Text("♥\(source.life)").font(.system(size: sizes.source * 1.15, weight: .heavy))
@@ -113,12 +114,6 @@ struct CommanderDamageRow: View {
                 .contentShape(Rectangle())
                 .onTapGesture { overlay = .snapshot(sourceIdx: sourceIdx, partner: false) }
             }
-            // Their other statuses on a line beneath.
-            PlayerStatusBadges(player: source, size: sizes.badge, startingLife: state.startingLife, showLife: false, showTax: false, showPoison: !state.isTwoHeadedGiant, poisonDanger: state.isTwoHeadedGiant ? GameReducer.twoHeadedGiantPoisonThreshold : 10)
-                .padding(.horizontal, 8).padding(.top, -4).padding(.bottom, 2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture { overlay = .snapshot(sourceIdx: sourceIdx, partner: false) }
             if let partner = source.partner {
                 nameLine(partner.name, partner: true)
                 StepperControl(value: damage.fromPartner, color: valueColor(damage.fromPartner),
@@ -132,11 +127,21 @@ struct CommanderDamageRow: View {
         }
     }
 
+    /// Their other statuses, on a line beneath the stepper inside its backing.
+    private var statusLine: some View {
+        PlayerStatusBadges(player: source, size: sizes.badge, startingLife: state.startingLife, showLife: false, showTax: false, showPoison: !state.isTwoHeadedGiant, poisonDanger: state.isTwoHeadedGiant ? GameReducer.twoHeadedGiantPoisonThreshold : 10)
+            .padding(.horizontal, 4).padding(.top, -3).padding(.bottom, 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture { overlay = .snapshot(sourceIdx: sourceIdx, partner: false) }
+    }
+
     private func nameLine(_ name: String, partner: Bool) -> some View {
         HStack(spacing: 4) {
             if isActive && !partner { Circle().fill(Color.accentColor).frame(width: 7, height: 7).shadow(color: .accentColor.opacity(0.7), radius: 2) }
             Text(name)
-                .font(.system(size: sizes.source, weight: isActive && !partner ? .bold : .regular))
+                // Bolder over the glass backing so the title holds up against the art.
+                .font(.system(size: sizes.source, weight: isActive && !partner ? .bold : glass ? .semibold : .regular))
                 .foregroundStyle(source.isEliminated ? .secondary : isActive && !partner ? Color.accentColor : .secondary)
                 .strikethrough(source.isEliminated).lineLimit(1).truncationMode(.tail)
                 .accessibilityIdentifier(partner ? "s\(targetIdx)-cmd-\(sourceIdx)-partner-name" : "s\(targetIdx)-cmd-\(sourceIdx)-name")
