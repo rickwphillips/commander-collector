@@ -125,6 +125,16 @@ struct HomeView: View {
                 } footer: {
                     Text("Seating uses the cached players and decks, so the game works with no network.")
                 }
+                Section {
+                    Link(destination: CommanderWeb.games) { Label("Games", systemImage: "list.bullet.rectangle") }
+                        .accessibilityIdentifier("webGames")
+                    Link(destination: CommanderWeb.decks) { Label("Decks", systemImage: "rectangle.stack") }
+                        .accessibilityIdentifier("webDecks")
+                } header: {
+                    Text("Commander Collector on the web")
+                } footer: {
+                    Text("Opens in Safari. Game history, stats and deck editing live on the website.")
+                }
                 if !outbox.isEmpty {
                     Section("Finished games") {
                         ForEach(outbox) { game in
