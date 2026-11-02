@@ -323,10 +323,10 @@ struct SeatPanel: View {
         }
     }
 
-    /// A phone has checked in for this seat within the last 15 s (web rule).
+    /// A phone has checked in for this seat within the last 20 s (web rule; one dropped 9 s heartbeat tolerated).
     private var remoteConnected: Bool {
         guard let ts = state.remoteCheckins?[player.position.rawValue] else { return false }
-        return GameReducer.nowMillis() - ts < 15_000
+        return GameReducer.nowMillis() - ts < 20_000
     }
 
     @ViewBuilder private func focusModal(_ target: FocusTarget) -> some View {

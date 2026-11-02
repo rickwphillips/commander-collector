@@ -42,10 +42,10 @@ struct TeamPanel: View {
     private var glassActive: Bool { cityBlessingVisible || members.contains { state.players[$0].hasInitiative } || poisonProgress >= 0.6 }
     private var timer: TimerTokens { TimerTokens(elapsed: isActive ? elapsedSeconds : 0, total: state.turnTimerSeconds, isActive: isActive && turnIndicatorOn) }
     private var teamName: String { Teams.name(teamNumber, teamNames: state.teamNames) }
-    /// A phone has checked in for the team's primary seat within the last 15 s (web rule).
+    /// A phone has checked in for the team's primary seat within the last 20 s (web rule; one dropped 9 s heartbeat tolerated).
     private var remoteConnected: Bool {
         guard let ts = state.remoteCheckins?[state.players[primary].position.rawValue] else { return false }
-        return GameReducer.nowMillis() - ts < 15_000
+        return GameReducer.nowMillis() - ts < 20_000
     }
     private var killPrompt: GameSession.PendingKill? {
         guard let p = session.pendingKillAttribution, members.contains(p.targetIdx) else { return nil }

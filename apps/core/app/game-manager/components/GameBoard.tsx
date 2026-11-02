@@ -27,6 +27,10 @@ import {
 } from '../remoteTransforms';
 import { detectSideEffects, type SideEffect } from '../detectSideEffects';
 
+// A seat counts as connected while its last check-in is younger than this.
+// The web remote heartbeats every 9 s, so this allows one dropped beat without flicker.
+const REMOTE_CONNECTED_WINDOW_MS = 20000;
+
 type RollPhase = 'idle' | 'rolling' | 'done';
 
 interface RollState {
@@ -773,7 +777,7 @@ export function GameBoard({
     const teamSeatCode = primaryPos ? state.sessionSeats?.[primaryPos] ?? undefined : undefined;
     const teamRemoteConnected = nowMs > 0 && members.some((m) => {
       const c = state.remoteCheckins?.[m.player.position];
-      return !!c && nowMs - c < 15000;
+      return !!c && nowMs - c < REMOTE_CONNECTED_WINDOW_MS;
     });
     return (
     <Box
@@ -911,7 +915,7 @@ export function GameBoard({
                 startingLife={startingLife}
                 highlightMode={highlightMode}
                 seatCode={state.gameType === '2hg' ? undefined : (state.sessionSeats?.[player.position] ?? undefined)}
-                remoteConnected={state.gameType !== '2hg' && nowMs > 0 && !!state.remoteCheckins?.[player.position] && nowMs - (state.remoteCheckins[player.position] ?? 0) < 15000}
+                remoteConnected={state.gameType !== '2hg' && nowMs > 0 && !!state.remoteCheckins?.[player.position] && nowMs - (state.remoteCheckins[player.position] ?? 0) < REMOTE_CONNECTED_WINDOW_MS}
                 onLifeChange={handleLifeChange}
                 onPoisonChange={handlePoisonChange}
                 onCommanderTaxChange={handleCommanderTaxChange}
