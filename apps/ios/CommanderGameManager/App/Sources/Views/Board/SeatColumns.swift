@@ -101,11 +101,11 @@ struct CommanderDamageRow: View {
                            focus: .commanderDamage(sourceIdx: sourceIdx, partner: false), identifier: "s\(targetIdx)-cmd-\(sourceIdx)", overlay: $overlay,
                            onChange: { session.dispatch(.commanderDamageChange(targetIdx: targetIdx, sourceIdx: sourceIdx, isPartner: false, delta: $0)) }) {
                 HStack(spacing: 8) {
-                    Text("♥\(source.life)").font(.system(size: sizes.badge, weight: .heavy))
+                    Text("♥\(source.life)").font(.system(size: sizes.source * 1.15, weight: .heavy))
                         .foregroundStyle(Theme.lifeColor(source.life, startingLife: state.startingLife) ?? .accentColor)
                     if dealt.total > 0 {
                         Text("\u{2694}\u{FE0E}\(viewer.partner != nil ? "\(dealt.fromCommander)/\(dealt.fromPartner)" : "\(dealt.total)")")
-                            .font(.system(size: sizes.badge, weight: .black))
+                            .font(.system(size: sizes.source * 1.15, weight: .black))
                             .foregroundStyle(dealt.total >= 21 ? Theme.danger : Theme.dealtOrange)
                     }
                 }
@@ -115,7 +115,7 @@ struct CommanderDamageRow: View {
             }
             // Their other statuses on a line beneath.
             PlayerStatusBadges(player: source, size: sizes.badge, startingLife: state.startingLife, showLife: false, showTax: false, showPoison: !state.isTwoHeadedGiant, poisonDanger: state.isTwoHeadedGiant ? GameReducer.twoHeadedGiantPoisonThreshold : 10)
-                .padding(.horizontal, 8).padding(.bottom, 3)
+                .padding(.horizontal, 8).padding(.top, -4).padding(.bottom, 2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
                 .onTapGesture { overlay = .snapshot(sourceIdx: sourceIdx, partner: false) }
@@ -146,7 +146,7 @@ struct CommanderDamageRow: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 8)
-        .padding(.top, 3)
+        .padding(.top, 2).padding(.bottom, -3)
         .contentShape(Rectangle())
         .onTapGesture { overlay = .snapshot(sourceIdx: sourceIdx, partner: partner) }
     }
