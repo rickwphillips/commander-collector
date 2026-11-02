@@ -173,6 +173,8 @@ struct CommanderSnapshotOverlay: View {
         let d = state.commanderDamage[viewerIdx, sourceIdx]
         return partner ? d.fromPartner : d.fromCommander
     }
+    /// Damage the viewer's commanders have dealt to this player.
+    private var dealtByViewer: CommanderDamage { state.commanderDamage[sourceIdx, viewerIdx] }
 
     var body: some View {
         ZStack {
@@ -235,18 +237,31 @@ struct CommanderSnapshotOverlay: View {
                 if viewerIdx != sourceIdx {
                     let me = state.players[viewerIdx]
                     let lethal = dealtToViewer >= 21
+                    let out = dealtByViewer
+                    let outLethal = out.fromCommander >= 21 || out.fromPartner >= 21
+                    // Both directions between the viewer and this player:
+                    // what the shown commander has dealt them, and what they
+                    // have dealt this player with their own commander(s).
                     HStack(spacing: 10) {
                         CommanderArt(name: me.commander.name, height: 34)
                             .onTapGesture { overlay = .preview(name: me.commander.name, back: self.current) }
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(me.playerName).font(.system(size: sizes.source, weight: .bold)).foregroundStyle(Color.accentColor).lineLimit(1)
-                            Text("Commander damage from \(shownCommander)").font(.system(size: sizes.label - 1)).foregroundStyle(.secondary).lineLimit(2)
+                        Text(me.playerName).font(.system(size: sizes.source, weight: .bold)).foregroundStyle(Color.accentColor).lineLimit(1)
+                        Spacer(minLength: 4)
+                        VStack(alignment: .trailing, spacing: 0) {
+                            Text("\(dealtToViewer)")
+                                .font(.system(size: sizes.value * 1.4, weight: .black).monospacedDigit())
+                                .foregroundStyle(lethal ? Theme.danger : Color.accentColor)
+                                .accessibilityIdentifier("snapshotDealtToMe")
+                            Text("taken from \(shownCommander)").font(.system(size: sizes.label - 2)).foregroundStyle(.secondary).lineLimit(1)
                         }
-                        Spacer()
-                        Text("\(dealtToViewer)")
-                            .font(.system(size: sizes.value * 1.5, weight: .black).monospacedDigit())
-                            .foregroundStyle(lethal ? Theme.danger : Color.accentColor)
-                            .accessibilityIdentifier("snapshotDealtToMe")
+                        Divider().frame(height: sizes.value * 1.6)
+                        VStack(alignment: .trailing, spacing: 0) {
+                            Text(me.partner != nil ? "\(out.fromCommander)/\(out.fromPartner)" : "\(out.total)")
+                                .font(.system(size: sizes.value * 1.4, weight: .black).monospacedDigit())
+                                .foregroundStyle(outLethal ? Theme.danger : out.total > 0 ? Theme.dealtOrange : .secondary)
+                                .accessibilityIdentifier("snapshotDealtByMe")
+                            Text("dealt to \(src.playerName)").font(.system(size: sizes.label - 2)).foregroundStyle(.secondary).lineLimit(1)
+                        }
                     }
                     .padding(.horizontal, 10).padding(.vertical, 8)
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.1)))
