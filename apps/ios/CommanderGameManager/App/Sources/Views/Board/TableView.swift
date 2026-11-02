@@ -19,7 +19,9 @@ struct TableView: View {
     @State private var host: TableHost?
     @State private var webHost: WebTableHost?
 
-    private static let revealStep = 0.9
+    /// Gap between one seat's introduction and the next; the next begins
+    /// while the previous art is still landing so the round keeps moving.
+    private static let revealStep = 1.4
     private static let fadeSeconds = CommanderBackdrop.fadeSeconds
 
     private func idx(_ position: SeatPosition) -> Int? {

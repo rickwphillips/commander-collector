@@ -59,8 +59,10 @@ struct CommanderArt: View {
 /// (no first player yet); a number reveals it after that delay with the web's
 /// fade + slight scale-down, and `flash` punctuates the end of the fade.
 struct CommanderBackdrop: View {
-    /// The intro fade; the flash crests slowly across it and dies with it.
-    static let fadeSeconds = 1.2
+    /// The intro fade; the flash swells in its last stretch and dies with it.
+    static let fadeSeconds = 2.2
+    /// How long before the fade ends the flash begins (rise + fall).
+    static let flashSeconds = 0.8
     let name: String
     let revealDelay: Double?
     var flash = false
@@ -86,13 +88,17 @@ struct CommanderBackdrop: View {
                             .frame(width: geo.size.width, height: geo.size.height)
                     }
                 }
-                if flash {
-                    RadialGradient(colors: [Color(hex: 0xFFF1D6), Color(hex: 0xFFE6BC).opacity(0)], center: .init(x: 0.5, y: 0.45), startRadius: 0, endRadius: max(geo.size.width, geo.size.height) * 0.6)
-                        .opacity(flashing ? 0.42 : 0)
-                }
             }
             .opacity(shown ? 1 : 0)
             .scaleEffect(shown ? 1 : 1.06)
+            .overlay {
+                // Drawn over the fade, not inside it, so it is not dimmed by
+                // the art's own opacity while the art is still arriving.
+                if flash {
+                    RadialGradient(colors: [Color(hex: 0xFFF1D6), Color(hex: 0xFFE6BC).opacity(0)], center: .init(x: 0.5, y: 0.45), startRadius: 0, endRadius: max(geo.size.width, geo.size.height) * 0.6)
+                        .opacity(flashing ? 0.48 : 0)
+                }
+            }
             .clipped()
             .allowsHitTesting(false)
         }
@@ -102,12 +108,14 @@ struct CommanderBackdrop: View {
             try? await Task.sleep(for: .milliseconds(Int(delay * 1000)))
             withAnimation(.easeInOut(duration: Self.fadeSeconds)) { shown = true }
             guard flash else { return }
-            // One slow swell of light across the whole fade: a long rise to
-            // the crest, then a shorter fall that ends as the art lands.
-            let rise = Self.fadeSeconds * 0.65
-            withAnimation(.easeInOut(duration: rise)) { flashing = true }
+            // The art fades in slowly on its own; near the end a swell of
+            // light rises and falls so the flash and the art land together.
+            let rise = Self.flashSeconds * 0.4
+            let fall = Self.flashSeconds - rise
+            try? await Task.sleep(for: .milliseconds(Int((Self.fadeSeconds - Self.flashSeconds) * 1000)))
+            withAnimation(.easeIn(duration: rise)) { flashing = true }
             try? await Task.sleep(for: .milliseconds(Int(rise * 1000)))
-            withAnimation(.easeOut(duration: Self.fadeSeconds - rise)) { flashing = false }
+            withAnimation(.easeOut(duration: fall)) { flashing = false }
         }
     }
 }
