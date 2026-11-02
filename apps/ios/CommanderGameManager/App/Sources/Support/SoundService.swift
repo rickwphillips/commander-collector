@@ -48,7 +48,8 @@ final class SoundService {
 
     /// A soft whoosh under each seat's intro flash: band-passed noise that
     /// sweeps up and swells over `rise`, then sinks and darkens over `fall`,
-    /// so it peaks with the light and goes quiet as the art lands.
+    /// so it peaks with the light and goes quiet as the art lands. A bright
+    /// twinkle stab rings out at the crest and shimmers away through the fall.
     func playRevealWhoosh(rise: Double, fall: Double) {
         guard enabled else { return }
         let sampleRate = 44_100.0
@@ -71,10 +72,27 @@ final class SoundService {
             lp2 += a2 * (noise - lp2)
             let band = lp - lp2
             let env = t < rise ? pow(t / rise, 2) : pow(max(0, 1 - (t - rise) / fall), 1.6)
-            data[i] = band * Float(env) * 0.22
+            var sample = band * Float(env) * 0.22
+            // Twinkle: a chord of high partials struck at the crest, each
+            // with its own slow tremolo so the tail glitters rather than rings.
+            let st = t - rise
+            if st >= 0 {
+                let attack = st < 0.012 ? st / 0.012 : 1
+                let decay = exp(-st * 3.2)
+                var tw = 0.0
+                for (k, f) in Self.twinkleHz.enumerated() {
+                    let shimmer = 0.7 + 0.3 * sin(st * (5.5 + Double(k) * 1.7) * 2 * .pi)
+                    tw += sin(st * f * 2 * .pi) * shimmer * exp(-st * Double(k) * 0.5)
+                }
+                sample += Float(tw / Double(Self.twinkleHz.count) * attack * decay) * 0.26
+            }
+            data[i] = sample
         }
         playBuffer(buffer, format: format)
     }
+
+    /// E6, G#6, B6, E7, G#7: a bright major chord, high enough to sparkle.
+    private static let twinkleHz: [Double] = [1318.5, 1661.2, 1975.5, 2637.0, 3322.4]
 
     // MARK: Poison ambience (web usePoisonSound)
 
