@@ -96,21 +96,27 @@ struct CommanderDamageRow: View {
             // The name has the whole row width so more of the title shows;
             // the badges, dealt figure and stepper sit underneath.
             nameLine(showPlayer ? source.playerName : source.commander.name, partner: false)
+            // Their statuses on a line of their own, then life and the
+            // damage this seat has dealt them on the stepper line.
+            PlayerStatusBadges(player: source, size: sizes.badge, startingLife: state.startingLife, showLife: false, showTax: false, showPoison: !state.isTwoHeadedGiant, poisonDanger: state.isTwoHeadedGiant ? GameReducer.twoHeadedGiantPoisonThreshold : 10)
+                .padding(.horizontal, 8).padding(.top, 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .onTapGesture { overlay = .snapshot(sourceIdx: sourceIdx, partner: false) }
             StepperControl(value: damage.fromCommander, color: valueColor(damage.fromCommander),
                            max: 21, disableDec: source.isEliminated, glass: glass, size: sizes.stepper,
                            focus: .commanderDamage(sourceIdx: sourceIdx, partner: false), identifier: "s\(targetIdx)-cmd-\(sourceIdx)", overlay: $overlay,
                            onChange: { session.dispatch(.commanderDamageChange(targetIdx: targetIdx, sourceIdx: sourceIdx, isPartner: false, delta: $0)) }) {
-                HStack(spacing: 6) {
-                    PlayerStatusBadges(player: source, size: sizes.badge, startingLife: state.startingLife, showTax: false, showPoison: !state.isTwoHeadedGiant, poisonDanger: state.isTwoHeadedGiant ? GameReducer.twoHeadedGiantPoisonThreshold : 10, singleLine: true)
-                    // Damage this seat has dealt them (once there is any):
-                    // one number, or "commander/partner" when this seat runs partners.
+                HStack(spacing: 8) {
+                    Text("♥\(source.life)").font(.system(size: sizes.badge, weight: .heavy))
+                        .foregroundStyle(Theme.lifeColor(source.life, startingLife: state.startingLife) ?? .accentColor)
                     if dealt.total > 0 {
                         Text("\u{2694}\u{FE0E}\(viewer.partner != nil ? "\(dealt.fromCommander)/\(dealt.fromPartner)" : "\(dealt.total)")")
-                            .font(.system(size: sizes.source, weight: .black))
+                            .font(.system(size: sizes.badge, weight: .black))
                             .foregroundStyle(dealt.total >= 21 ? Theme.danger : Theme.dealtOrange)
-                            .fixedSize()
                     }
                 }
+                .lineLimit(1).minimumScaleFactor(0.7)
                 .contentShape(Rectangle())
                 .onTapGesture { overlay = .snapshot(sourceIdx: sourceIdx, partner: false) }
             }
@@ -157,16 +163,9 @@ struct PlayerStatusBadges: View {
     var showTax = true
     var showPoison = true
     var poisonDanger = 10
-    /// One line that scrolls sideways when crowded (damage rows) instead
-    /// of wrapping or truncating.
-    var singleLine = false
 
     var body: some View {
-        if singleLine {
-            ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 5) { badges }.lineLimit(1).fixedSize() }
-        } else {
-            FlowLayout(spacing: 5, rowSpacing: 1) { badges }.lineLimit(1)
-        }
+        FlowLayout(spacing: 5, rowSpacing: 1) { badges }.lineLimit(1)
     }
 
     @ViewBuilder private var badges: some View {

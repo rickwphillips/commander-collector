@@ -254,7 +254,7 @@ struct CommanderSnapshotOverlay: View {
                             .onTapGesture { overlay = .preview(name: me.commander.name, back: self.current) }
                         Text(me.playerName).font(.system(size: sizes.source, weight: .bold)).foregroundStyle(Color.accentColor).lineLimit(1)
                         Spacer(minLength: 4)
-                        VStack(alignment: .trailing, spacing: 0) {
+                        VStack(alignment: .center, spacing: 0) {
                             Text(me.partner != nil ? "\(out.fromCommander)/\(out.fromPartner)" : "\(out.total)")
                                 .font(.system(size: sizes.value * 1.4, weight: .black).monospacedDigit())
                                 .foregroundStyle(outLethal ? Theme.danger : out.total > 0 ? Theme.dealtOrange : .secondary)
@@ -262,7 +262,7 @@ struct CommanderSnapshotOverlay: View {
                             Text("Dealt to").font(.system(size: sizes.label - 2)).foregroundStyle(.secondary).lineLimit(1)
                         }
                         Divider().frame(height: sizes.value * 1.6)
-                        VStack(alignment: .trailing, spacing: 0) {
+                        VStack(alignment: .center, spacing: 0) {
                             Text("\(dealtToViewer)")
                                 .font(.system(size: sizes.value * 1.4, weight: .black).monospacedDigit())
                                 .foregroundStyle(Theme.commanderDamageColor(dealtToViewer))
