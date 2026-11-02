@@ -143,7 +143,7 @@ struct CommanderDamageRow: View {
 }
 
 /// Status glyph row for a player (web `PlayerStatusBadges`): monarch, city's
-/// blessing, initiative, then ♥life, tax, poison, energy, XP. Zero counters hide.
+/// ♥life first, then monarch, blessing, initiative, tax, poison, energy, XP. Zero counters hide.
 struct PlayerStatusBadges: View {
     let player: PlayerState
     var size: CGFloat = 10
@@ -155,10 +155,10 @@ struct PlayerStatusBadges: View {
 
     var body: some View {
         FlowLayout(spacing: 5, rowSpacing: 1) {
+            if showLife { Text("♥\(player.life)").font(.system(size: size, weight: .heavy)).foregroundStyle(Theme.lifeColor(player.life, startingLife: startingLife) ?? .accentColor) }
             if player.isMonarch { ShimmerCrown(size: size, active: true).frame(width: size, height: size) }
             if player.hasCitysBlessing { CityGlyph(active: true).frame(width: size, height: size) }
             if player.hasInitiative { InitiativeGlyph().foregroundStyle(Theme.initiativeBlue).frame(width: size, height: size) }
-            if showLife { Text("♥\(player.life)").font(.system(size: size, weight: .heavy)).foregroundStyle(Theme.lifeColor(player.life, startingLife: startingLife) ?? .accentColor) }
             if showTax && player.commanderTax > 0 {
                 HStack(spacing: 2) { CounterGlyph(kind: .tax, size: size, taxValue: player.commanderTax); Text("\(player.commanderTax)").font(.system(size: size, weight: .heavy)).foregroundStyle(.orange) }
             }
