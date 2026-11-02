@@ -258,7 +258,7 @@ struct CommanderSnapshotOverlay: View {
                         VStack(alignment: .trailing, spacing: 0) {
                             Text("\(dealtToViewer)")
                                 .font(.system(size: sizes.value * 1.4, weight: .black).monospacedDigit())
-                                .foregroundStyle(lethal ? Theme.danger : Color.accentColor)
+                                .foregroundStyle(Theme.commanderDamageColor(dealtToViewer))
                                 .accessibilityIdentifier("snapshotDealtToMe")
                             Text("Dealt from").font(.system(size: sizes.label - 2)).foregroundStyle(.secondary).lineLimit(1)
                         }

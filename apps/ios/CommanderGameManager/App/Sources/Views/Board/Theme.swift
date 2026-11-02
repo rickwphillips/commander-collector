@@ -43,6 +43,21 @@ enum Theme {
         return Color(r: 180 + 71 * ratio, g: 120 - 120 * ratio, b: 60 - 60 * ratio)
     }
 
+    /// Commander damage taken, shifting from the calm blue through amber to
+    /// red as it closes on the lethal 21; `danger` at 21 and above.
+    static func commanderDamageColor(_ dmg: Int) -> Color {
+        if dmg >= 21 { return danger }
+        if dmg <= 0 { return Color(hex: 0x1E88E5) }
+        let t = Double(dmg) / 21
+        // Blue (30,136,229) → amber (230,126,34) → red (229,57,53).
+        if t < 0.5 {
+            let u = t / 0.5
+            return Color(r: 30 + 200 * u, g: 136 - 10 * u, b: 229 - 195 * u)
+        }
+        let u = (t - 0.5) / 0.5
+        return Color(r: 230 - 1 * u, g: 126 - 69 * u, b: 34 + 19 * u)
+    }
+
     /// Share of starting life lost, 0...1 (1 at or below zero).
     static func lostRatio(_ life: Int, startingLife: Int) -> Double {
         if life <= 0 { return 1 }
