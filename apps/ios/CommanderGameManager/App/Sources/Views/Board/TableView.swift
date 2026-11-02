@@ -12,7 +12,8 @@ struct TableView: View {
     let onBack: () -> Void
     @Environment(GameSettingsStore.self) private var settings
     @Environment(\.colorScheme) private var scheme
-    @State private var seatingIdx: Int?
+    /// Seats whose picker is open; several players can pick at once.
+    @State private var seatingOpen: Set<Int> = []
     @State private var showLog = false
     @State private var turnIndicatorOn = false
     @State private var introStarted = false
@@ -182,14 +183,14 @@ extension TableView {
     @ViewBuilder
     fileprivate func seatingCard(_ i: Int) -> some View {
         ZStack {
-            SeatingPanel(player: session.state.players[i], teamNumber: session.state.players[i].teamNumber) { seatingIdx = i }
-            if seatingIdx == i {
-                SeatPickerSheet(session: session, idx: i, taken: Set(session.state.players.map(\.playerId))) { seatingIdx = nil }
+            SeatingPanel(player: session.state.players[i], teamNumber: session.state.players[i].teamNumber) { seatingOpen.insert(i) }
+            if seatingOpen.contains(i) {
+                SeatPickerSheet(session: session, idx: i, taken: Set(session.state.players.map(\.playerId))) { seatingOpen.remove(i) }
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .transition(.opacity)
             }
         }
-        .animation(.easeOut(duration: 0.15), value: seatingIdx)
+        .animation(.easeOut(duration: 0.15), value: seatingOpen.contains(i))
     }
 }
 
