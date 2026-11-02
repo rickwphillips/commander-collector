@@ -157,12 +157,13 @@ struct PlayerStatusBadges: View {
     var showTax = true
     var showPoison = true
     var poisonDanger = 10
-    /// One line that shrinks to fit (damage rows) instead of wrapping.
+    /// One line that scrolls sideways when crowded (damage rows) instead
+    /// of wrapping or truncating.
     var singleLine = false
 
     var body: some View {
         if singleLine {
-            HStack(spacing: 5) { badges }.lineLimit(1).minimumScaleFactor(0.7)
+            ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 5) { badges }.lineLimit(1).fixedSize() }
         } else {
             FlowLayout(spacing: 5, rowSpacing: 1) { badges }.lineLimit(1)
         }
