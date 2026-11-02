@@ -67,7 +67,7 @@ struct CommanderDamageColumn: View {
     }
 }
 
-/// One opponent in the commander damage column: name (or player), `⚔` damage
+/// One opponent in the commander damage column: name (or player), `↗` damage
 /// you dealt them, their status badges, and `− n/21 +` for each of their
 /// commanders. Tapping the name opens the commander snapshot.
 struct CommanderDamageRow: View {
@@ -81,6 +81,7 @@ struct CommanderDamageRow: View {
 
     private var state: GameState { session.state }
     private var source: PlayerState { state.players[sourceIdx] }
+    private var viewer: PlayerState { state.players[targetIdx] }
     private var isActive: Bool { state.firstPlayerIdx != nil && state.currentPlayerIdx == sourceIdx }
     private var damage: CommanderDamage { state.commanderDamage[targetIdx, sourceIdx] }
     private var dealt: CommanderDamage { state.commanderDamage[sourceIdx, targetIdx] }
@@ -100,10 +101,15 @@ struct CommanderDamageRow: View {
                             .strikethrough(source.isEliminated).lineLimit(1).truncationMode(.tail)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .accessibilityIdentifier("s\(targetIdx)-cmd-\(sourceIdx)-name")
-                        Text("\u{2694}\u{FE0E}\(source.partner != nil ? "\(dealt.fromCommander)/\(dealt.fromPartner)" : "\(dealt.total)")")
-                            .font(.system(size: sizes.source, weight: .black))
-                            .foregroundStyle(dealt.total >= 21 ? Theme.danger : dealt.total > 0 ? Theme.dealtOrange : Color.secondary.opacity(0.5))
-                            .fixedSize()
+                        // Damage this seat has dealt them: one number, or
+                        // "commander/partner" when this seat runs partners.
+                        HStack(spacing: 2) {
+                            Image(systemName: "arrow.up.right").font(.system(size: sizes.source * 0.75, weight: .black))
+                            Text(viewer.partner != nil ? "\(dealt.fromCommander)/\(dealt.fromPartner)" : "\(dealt.total)")
+                                .font(.system(size: sizes.source, weight: .black))
+                        }
+                        .foregroundStyle(dealt.total >= 21 ? Theme.danger : dealt.total > 0 ? Theme.dealtOrange : Color.secondary.opacity(0.5))
+                        .fixedSize()
                     }
                     .contentShape(Rectangle())
                     .onTapGesture { overlay = .snapshot(sourceIdx: sourceIdx, partner: false) }
