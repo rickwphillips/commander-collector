@@ -42,6 +42,11 @@ struct TeamPanel: View {
     private var glassActive: Bool { cityBlessingVisible || members.contains { state.players[$0].hasInitiative } || poisonProgress >= 0.6 }
     private var timer: TimerTokens { TimerTokens(elapsed: isActive ? elapsedSeconds : 0, total: state.turnTimerSeconds, isActive: isActive && turnIndicatorOn) }
     private var teamName: String { Teams.name(teamNumber, teamNames: state.teamNames) }
+    /// A phone has checked in for the team's primary seat within the last 15 s (web rule).
+    private var remoteConnected: Bool {
+        guard let ts = state.remoteCheckins?[state.players[primary].position.rawValue] else { return false }
+        return GameReducer.nowMillis() - ts < 15_000
+    }
     private var killPrompt: GameSession.PendingKill? {
         guard let p = session.pendingKillAttribution, members.contains(p.targetIdx) else { return nil }
         return p
@@ -119,6 +124,9 @@ struct TeamPanel: View {
                         .onTapGesture { nameDraft = teamName; editingName = true }
                 }
                 if isActive && !eliminated { Text("ACTIVE").font(.system(size: 10, weight: .bold)).kerning(0.5).foregroundStyle(Color.accentColor) }
+                if remoteConnected && !session.isRemote {
+                    Image(systemName: "iphone").font(.system(size: 12)).foregroundStyle(.green).symbolEffect(.pulse)
+                }
                 Button { withAnimation(.easeOut(duration: 0.15)) { overlay = overlay == .stateMenu ? nil : .stateMenu } } label: {
                     Image(systemName: "gearshape").font(.system(size: 14)).foregroundStyle(.secondary).frame(width: 28, height: 28).contentShape(Rectangle())
                 }
@@ -348,7 +356,7 @@ struct TeamPanel: View {
         case .focus(let target): focusModal(target)
         case .snapshot(let src, let partner): CommanderSnapshotOverlay(session: session, viewerIdx: primary, sourceIdx: src, partner: partner, overlay: $overlay, sizes: sz)
         case .preview(let name, let back): CardPreviewOverlay(name: name) { overlay = back }
-        case .qr: SeatQROverlay(gameId: session.clientGameId, seat: state.players[primary].position, connected: false) { overlay = nil }
+        case .qr: SeatQROverlay(gameId: session.clientGameId, seat: state.players[primary].position, connected: remoteConnected) { overlay = nil }
         }
     }
 

@@ -6,6 +6,4 @@
   - [ ] Grant the `workflow` OAuth scope so `.github/workflows/` can be pushed. Without it the `php-lint` CI step that actually runs `endpoint-auth.test.php` cannot be added, and an auth-enforcement regression can land green (snippet in #61).
 - [ ] Create a game manager diagram
 - [ ] Selecting the autosearch results of a commander on the create deck page is not registering in the input field when selected. #bug
-- [~] Update the game manager to accommodate 2HG. (first pass done: shared life/poison, team roll, collective team turns, two-panel left/right layout, remote disabled)
-  - [ ] 2HG team panel: keep each player's individual counters (energy, XP) and the ability menu (monarch, initiative, city's blessing) per player, not just shared life/poison + tax
-  - [ ] Revisit team-panel orientation/density once individual counters are restored
+- [x] Update the game manager to accommodate 2HG. (shared life/poison, team roll, collective team turns, per-player energy/XP and monarch/initiative/City's Blessing toggles, per-team remote QR; web v5.16–v5.20, iPad TeamPanel.swift)
