@@ -252,7 +252,7 @@ struct CommanderSnapshotOverlay: View {
                                 .font(.system(size: sizes.value * 1.4, weight: .black).monospacedDigit())
                                 .foregroundStyle(lethal ? Theme.danger : Color.accentColor)
                                 .accessibilityIdentifier("snapshotDealtToMe")
-                            Text("taken from \(shownCommander)").font(.system(size: sizes.label - 2)).foregroundStyle(.secondary).lineLimit(1)
+                            Text("Dealt from").font(.system(size: sizes.label - 2)).foregroundStyle(.secondary).lineLimit(1)
                         }
                         Divider().frame(height: sizes.value * 1.6)
                         VStack(alignment: .trailing, spacing: 0) {
@@ -260,7 +260,7 @@ struct CommanderSnapshotOverlay: View {
                                 .font(.system(size: sizes.value * 1.4, weight: .black).monospacedDigit())
                                 .foregroundStyle(outLethal ? Theme.danger : out.total > 0 ? Theme.dealtOrange : .secondary)
                                 .accessibilityIdentifier("snapshotDealtByMe")
-                            Text("dealt to \(src.playerName)").font(.system(size: sizes.label - 2)).foregroundStyle(.secondary).lineLimit(1)
+                            Text("Dealt to").font(.system(size: sizes.label - 2)).foregroundStyle(.secondary).lineLimit(1)
                         }
                     }
                     .padding(.horizontal, 10).padding(.vertical, 8)
