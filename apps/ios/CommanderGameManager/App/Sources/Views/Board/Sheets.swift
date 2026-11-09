@@ -9,7 +9,8 @@ struct GameLogSheet: View {
 
     var body: some View {
         NavigationStack {
-            List(Array(log.enumerated()), id: \.offset) { _, e in
+            // Newest first: at the table you want what just happened.
+            List(Array(log.enumerated().reversed()), id: \.offset) { _, e in
                 VStack(alignment: .leading, spacing: 2) {
                     Text(describe(e)).font(.body)
                     Text(e.type).font(.caption2).foregroundStyle(.tertiary)

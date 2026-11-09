@@ -15,6 +15,7 @@ struct TeamPanel: View {
     let turnIndicatorOn: Bool
     @Environment(GameSettingsStore.self) private var settings
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.compactTable) private var compact
 
     @State private var overlay: SeatOverlay?
     @State private var editingName = false
@@ -65,12 +66,14 @@ struct TeamPanel: View {
                 VStack(spacing: 0) {
                     header(sz)
                     Divider()
-                    HStack(alignment: .top, spacing: 12) {
-                        opposingSection(sz).frame(maxWidth: .infinity)
+                    // A phone team panel is short: the shared life stays put
+                    // and the two side sections scroll.
+                    HStack(alignment: .top, spacing: compact ? 6 : 12) {
+                        scrollsOnPhone(opposingSection(sz)).frame(maxWidth: .infinity)
                         sharedLife(sz).frame(maxWidth: .infinity)
-                        pilotsSection(sz).frame(maxWidth: .infinity)
+                        scrollsOnPhone(pilotsSection(sz)).frame(maxWidth: .infinity)
                     }
-                    .padding(10)
+                    .padding(compact ? 4 : 10)
                 }
                 .shadow(color: Theme.energyCyan.opacity(min(Double(teamEnergy) / 8, 1) * 0.9), radius: 4 + min(Double(teamEnergy) / 8, 1) * 14)
                 if eliminated { EliminatedOverlay(conceded: conceded, poisoned: poison >= 15) }
@@ -104,6 +107,14 @@ struct TeamPanel: View {
                 SoundService.shared.setCitysBlessingActive(false)
                 Task { try? await Task.sleep(for: .milliseconds(3800)); if !members.contains(where: { state.players[$0].hasCitysBlessing }) { cityBlessingVisible = false; cityBlessingExiting = false } }
             }
+        }
+    }
+
+    @ViewBuilder private func scrollsOnPhone<V: View>(_ section: V) -> some View {
+        if compact {
+            ScrollView(.vertical, showsIndicators: false) { section }
+        } else {
+            section
         }
     }
 
@@ -357,6 +368,7 @@ struct TeamPanel: View {
         case .snapshot(let src, let partner): CommanderSnapshotOverlay(session: session, viewerIdx: primary, sourceIdx: src, partner: partner, overlay: $overlay, sizes: sz)
         case .preview(let name, let back): CardPreviewOverlay(name: name) { overlay = back }
         case .qr: SeatQROverlay(gameId: session.clientGameId, seat: state.players[primary].position, connected: remoteConnected) { overlay = nil }
+        case .drawer: EmptyView()
         }
     }
 

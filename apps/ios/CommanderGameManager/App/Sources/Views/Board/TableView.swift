@@ -14,29 +14,90 @@ struct TableView: View {
     @Environment(\.colorScheme) private var scheme
     /// Seats whose picker is open; several players can pick at once.
     @State private var seatingOpen: Set<Int> = []
+    /// Phone: the seat whose picker is up as a sheet (a seat card is far too
+    /// small to hold the picker form).
+    @State private var sheetPickerSeat: Int?
+    @State private var isCompact = false
     @State private var showLog = false
     @State private var turnIndicatorOn = false
     @State private var introStarted = false
     @State private var host: TableHost?
     @State private var webHost: WebTableHost?
+    /// Phone: which long edge the Dynamic Island is on right now (nil in
+    /// portrait or on an iPad). The table runs to the other edges.
+    @State private var islandEdge: Edge? = islandEdge()
 
     /// Gap between one seat's introduction and the next; the next begins
     /// while the previous art is still landing so the round keeps moving.
     private static let revealStep = 1.4
     private static let fadeSeconds = CommanderBackdrop.fadeSeconds
+    /// Short edge (pt) below which the table lays out for a phone.
+    static let compactShortEdge: CGFloat = 500
 
     private func idx(_ position: SeatPosition) -> Int? {
         session.state.players.firstIndex { $0.position == position }
     }
 
     var body: some View {
+        GeometryReader { outer in
+            // A phone is judged by its safe area; the table then ignores it,
+            // keeping clear only of the island (the home indicator is hidden
+            // while the board is up).
+            let compact = min(outer.size.width, outer.size.height) < Self.compactShortEdge
+            // The extra edge margin on a phone keeps the active seat's glow on screen.
+            table
+                .padding(.leading, compact ? (islandEdge == .leading ? Self.islandInset : 6) : 0)
+                .padding(.trailing, compact ? (islandEdge == .trailing ? Self.islandInset : 6) : 0)
+                .padding(.vertical, compact ? 4 : 0)
+                .ignoresSafeArea(edges: compact ? .all : [])
+                .onChange(of: compact, initial: true) { _, c in isCompact = c }
+                // The board forces landscape as it appears, so the first read
+                // of the island side can happen while still in portrait; the
+                // size change when the rotation lands is the moment to re-read.
+                // The scene reports the new orientation a little after the size
+                // changes, so keep re-reading briefly until it settles.
+                .task(id: outer.size) {
+                    for _ in 0..<15 {
+                        let edge = Self.islandEdge()
+                        if edge != islandEdge { islandEdge = edge }
+                        try? await Task.sleep(for: .milliseconds(200))
+                    }
+                }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in islandEdge = Self.islandEdge() }
+        .sheet(item: $sheetPickerSeat) { i in
+            SeatPickerSheet(session: session, idx: i, taken: Set(session.state.players.map(\.playerId))) { sheetPickerSeat = nil }
+                .presentationDetents([.large])
+        }
+    }
+
+    /// Room left for the Dynamic Island on its edge: its depth, plus a hair.
+    private static let islandInset: CGFloat = 40
+
+    @MainActor private static func islandEdge() -> Edge? {
+        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { return nil }
+        switch scene.effectiveGeometry.interfaceOrientation {
+        // Home indicator on the left means the island (the device's top) is on the right.
+        case .landscapeLeft: return .trailing
+        case .landscapeRight: return .leading
+        default: return nil
+        }
+    }
+
+    private var table: some View {
         GeometryReader { geo in
             let w = geo.size.width, h = geo.size.height
             let count = session.state.players.count
-            let sideW = min(max(w * 0.21, 160), 300)
-            let leftW: CGFloat = count >= 3 ? (count == 3 ? min(max(w * 0.25, 200), 380) : sideW) : 0
+            // A phone lying flat: the same table, with thinner side seats
+            // and a one-row centre strip so the top and bottom seats keep
+            // room for a readable life total.
+            let compact = min(w, h) < Self.compactShortEdge
+            // Whole points only: a rotated seat placed at a fractional offset
+            // is resampled and its text goes soft.
+            let sideW = (compact ? min(max(w * 0.19, 150), 300) : min(max(w * 0.21, 160), 300)).rounded(.down)
+            let leftW: CGFloat = count >= 3 ? (count == 3 ? min(max(w * 0.25, 200), 380).rounded(.down) : sideW) : 0
             let rightW: CGFloat = count >= 4 ? sideW : 0
-            let centerH = min(max(h * 0.18, 120), 220)
+            let centerH = compact ? (session.isSeating ? 124 : 68) : min(max(h * 0.18, 120), 220).rounded(.down)
             let gap: CGFloat = 4
             TimelineView(.periodic(from: .now, by: 1)) { ctx in
                 let elapsed = session.elapsedSeconds(now: ctx.date)
@@ -78,6 +139,7 @@ struct TableView: View {
                 }
             }
             .padding(gap)
+            .environment(\.compactTable, compact)
         }
         .background(Theme.tableBackground(scheme))
         .preferredColorScheme(settings.darkMode ? .dark : .light)
@@ -183,7 +245,9 @@ extension TableView {
     @ViewBuilder
     fileprivate func seatingCard(_ i: Int) -> some View {
         ZStack {
-            SeatingPanel(player: session.state.players[i], teamNumber: session.state.players[i].teamNumber) { seatingOpen.insert(i) }
+            SeatingPanel(player: session.state.players[i], teamNumber: session.state.players[i].teamNumber) {
+                if isCompact { sheetPickerSeat = i } else { seatingOpen.insert(i) }
+            }
             if seatingOpen.contains(i) {
                 SeatPickerSheet(session: session, idx: i, taken: Set(session.state.players.map(\.playerId))) { seatingOpen.remove(i) }
                     .clipShape(RoundedRectangle(cornerRadius: 12))

@@ -136,3 +136,18 @@ extension EnvironmentValues {
         set { self[MotionEnabledKey.self] = newValue }
     }
 }
+
+/// True on a phone-sized table (short edge under 500 pt): the seats keep
+/// their rotation but open with the drawers closed and the life buttons
+/// beside the number, the centre strip collapses to one row, and the
+/// centre's panels present as sheets.
+private struct CompactTableKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var compactTable: Bool {
+        get { self[CompactTableKey.self] }
+        set { self[CompactTableKey.self] = newValue }
+    }
+}

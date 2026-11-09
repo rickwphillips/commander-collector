@@ -16,8 +16,12 @@ struct CenterZoneView: View {
     @Environment(GameSettingsStore.self) private var settings
     @Environment(Session.self) private var account
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.compactTable) private var compact
 
     @State private var panel: Panel?
+    /// Phone: a dialog or sheet a panel button asks for must wait until the
+    /// panel's sheet has gone, or the system drops it.
+    @State private var afterPanel: (() -> Void)?
     @State private var confirmEnd = false
     @State private var confirmRestart = false
     @State private var notesDraft = ""
@@ -29,7 +33,7 @@ struct CenterZoneView: View {
     @State private var dice = DiceModel()
     @State private var rules = RulesGuruChat()
 
-    enum Panel { case dice, settings, notes, pick }
+    enum Panel { case dice, settings, notes, pick, houseRules }
 
     private var state: GameState { session.state }
     private var is2hg: Bool { state.isTwoHeadedGiant }
@@ -39,19 +43,17 @@ struct CenterZoneView: View {
         ZStack {
             RoundedRectangle(cornerRadius: 12).fill(Theme.tableBackground(scheme))
                 .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.12)))
-            if session.isSeating { seatingControls } else { playControls }
-            cornerButtons
-            if let panel {
-                switch panel {
-                case .dice: diceOverlay
-                case .settings: settingsOverlay
-                case .notes: notesOverlay
-                case .pick: pickOverlay
-                }
-            }
+            if session.isSeating { seatingControls } else if compact { compactPlayRow } else { playControls }
+            if !compact || session.isSeating { cornerButtons }
+            // On a phone the strip is one row tall, so its panels open as
+            // sheets instead (see below).
+            if let panel, !compact { panelView(panel) }
             if let w = session.winnerIdx, !session.isSeating { winnerBanner(w) }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .sheet(isPresented: Binding(get: { compact && panel != nil }, set: { if !$0 { panel = nil } }), onDismiss: { afterPanel?(); afterPanel = nil }) {
+            if let panel { panelView(panel).presentationDetents([.medium, .large]) }
+        }
         .sheet(isPresented: Binding(get: { rules.isPresented }, set: { if !$0 { rules.minimize() } })) { RulesGuruSheet(chat: rules) }
         .onChange(of: elapsedSeconds) { _, secs in rules.push(state: state, elapsedSeconds: secs) }
         .onAppear {
@@ -81,32 +83,55 @@ struct CenterZoneView: View {
         }
     }
 
+    /// Closes the panel, then runs `action` (at once on the iPad, where the
+    /// panel is an in-strip overlay; after the sheet is dismissed on a phone).
+    private func closePanel(then action: @escaping () -> Void) {
+        panel = nil
+        if compact { afterPanel = action } else { action() }
+    }
+
+    @ViewBuilder private func panelView(_ panel: Panel) -> some View {
+        switch panel {
+        case .dice: diceOverlay
+        case .settings: settingsOverlay
+        case .notes: notesOverlay
+        case .pick: pickOverlay
+        case .houseRules: houseRulesOverlay
+        }
+    }
+
     // MARK: Seating
 
     private var seatingControls: some View {
-        HStack(spacing: 16) {
+        // Phone: tighter spacing and no minimum widths, or the strip's own
+        // width exceeds the centre column and shoves a side seat off screen.
+        HStack(spacing: compact ? 8 : 16) {
             Button { onBack() } label: {
-                VStack(spacing: 2) { Image(systemName: "chevron.left").font(.system(size: 22, weight: .semibold)); Text("Back").font(.caption.bold()) }.frame(width: 44, height: 70)
+                VStack(spacing: 2) { Image(systemName: "chevron.left").font(.system(size: 22, weight: .semibold)); Text("Back").font(.caption.bold()) }.frame(width: compact ? 40 : 44, height: 70)
             }
             .buttonStyle(.bordered)
             .accessibilityIdentifier("backToSetup")
             VStack(spacing: 6) {
                 Button { startRoll() } label: {
-                    VStack(spacing: 2) { D20Icon(size: 34); Text("Roll").font(.caption.bold()) }.frame(width: 70, height: 70)
+                    VStack(spacing: 2) { D20Icon(size: compact ? 28 : 34); Text("Roll").font(.caption.bold()) }.frame(width: compact ? 60 : 70, height: compact ? 60 : 70)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!session.allSeatsFilled || rollOff.phase == .rolling || rollOff.phase == .tie)
                 .accessibilityIdentifier("rollForFirst")
-                Button("Pick") { panel = .pick }.buttonStyle(.bordered).frame(width: 70)
+                Button("Pick") { panel = .pick }.buttonStyle(.bordered).frame(width: compact ? 60 : 70)
                     .disabled(!session.allSeatsFilled || rollOff.phase == .rolling || rollOff.phase == .tie)
                     .accessibilityIdentifier("pickFirst")
             }
             if !is2hg {
-                VStack(alignment: .leading, spacing: 2) {
-                    houseRule("Aces High", $rollOff.acesHigh) { on in rollOff.elevenBeatsAces = on; if on { rollOff.adamsRule = false } }
-                    houseRule("Eleven Beats Aces", $rollOff.elevenBeatsAces, disabled: !rollOff.acesHigh) { on in if on { rollOff.adamsRule = false } }
-                    houseRule("No Loners", $rollOff.noLoners) { on in if on { rollOff.adamsRule = false } }
-                    houseRule("Adam's House Rules", $rollOff.adamsRule) { on in if on { rollOff.acesHigh = false; rollOff.elevenBeatsAces = false; rollOff.noLoners = false } }
+                if compact {
+                    // No room for the labels in a phone strip: the rules open as a sheet.
+                    Button { panel = .houseRules } label: {
+                        VStack(spacing: 2) { Image(systemName: "list.bullet.clipboard").font(.system(size: 22)); Text("Rules").font(.caption.bold()) }.frame(width: 48, height: 60)
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("houseRules")
+                } else {
+                    houseRuleList
                 }
             }
             VStack(spacing: 6) {
@@ -114,16 +139,18 @@ struct CenterZoneView: View {
                     Text("\(state.players[first].playerName) goes first").font(.subheadline.bold())
                 }
                 Button { session.start() } label: {
-                    Label("Start game", systemImage: "play.fill").font(.headline).frame(minWidth: 150)
+                    Label("Start game", systemImage: "play.fill").font(.headline).frame(minWidth: compact ? 0 : 150)
                 }
-                .buttonStyle(.borderedProminent).controlSize(.large)
+                .buttonStyle(.borderedProminent).controlSize(compact ? .regular : .large)
                 .disabled(!session.allSeatsFilled || !firstPlayerSet)
                 .accessibilityIdentifier("startGame")
                 Text(!session.allSeatsFilled ? "Seat every player to start" : !firstPlayerSet ? "Roll or pick who goes first" : "")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
             }
+            .layoutPriority(-1)
         }
-        .padding(.horizontal, 12)
+        // The corner buttons share the strip on a phone; keep clear of them.
+        .padding(.horizontal, compact ? 44 : 12)
     }
 
     private func houseRule(_ label: String, _ on: Binding<Bool>, disabled: Bool = false, change: @escaping (Bool) -> Void) -> some View {
@@ -132,6 +159,21 @@ struct CenterZoneView: View {
         }
         .toggleStyle(CheckboxToggleStyle())
         .disabled(disabled)
+    }
+
+    private var houseRuleList: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            houseRule("Aces High", $rollOff.acesHigh) { on in rollOff.elevenBeatsAces = on; if on { rollOff.adamsRule = false } }
+            houseRule("Eleven Beats Aces", $rollOff.elevenBeatsAces, disabled: !rollOff.acesHigh) { on in if on { rollOff.adamsRule = false } }
+            houseRule("No Loners", $rollOff.noLoners) { on in if on { rollOff.adamsRule = false } }
+            houseRule("Adam's House Rules", $rollOff.adamsRule) { on in if on { rollOff.acesHigh = false; rollOff.elevenBeatsAces = false; rollOff.noLoners = false } }
+        }
+    }
+
+    private var houseRulesOverlay: some View {
+        overlayFrame(title: "Roll-off house rules") {
+            houseRuleList.frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private var pickOverlay: some View {
@@ -167,6 +209,27 @@ struct CenterZoneView: View {
             turnTracker.rotationEffect(.degrees(is2hg ? 0 : -90)).frame(width: 110)
         }
         .padding(.horizontal, 44)
+    }
+
+    /// Phone: log and rules on the left, the turn in one upright block with
+    /// a short Next Turn beside it, settings and dice on the right.
+    private var compactPlayRow: some View {
+        HStack(spacing: 4) {
+            cornerButton("list.bullet.rectangle") { showLog = true }.accessibilityIdentifier("openLog")
+            rulesButton.accessibilityIdentifier("openRules")
+            Spacer(minLength: 2)
+            VStack(spacing: 0) {
+                Text("Turn \(state.turnNumber)").font(.system(size: 17, weight: .black)).foregroundStyle(Color.accentColor).accessibilityIdentifier("turnLabel")
+                Text(turnCommanderLabel).font(.system(size: 11, weight: .semibold)).lineLimit(1)
+                Text(turnPlayerLabel).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+            }
+            .frame(maxWidth: 170)
+            NextTurnButton(remaining: remaining, compact: true, onNext: { session.dispatch(.passTurn) }, onPrev: { session.dispatch(.prevTurn) })
+            Spacer(minLength: 2)
+            cornerButton("gearshape") { panel = .settings }.accessibilityIdentifier("openSettings")
+            cornerButton("dice") { panel = .dice }.accessibilityIdentifier("openDice")
+        }
+        .padding(.horizontal, 6)
     }
 
     private var turnTracker: some View {
@@ -274,9 +337,9 @@ struct CenterZoneView: View {
                 HStack(spacing: 8) {
                     Button { notesDraft = state.notes; panel = .notes } label: { Label("Notes", systemImage: "note.text").frame(maxWidth: .infinity) }
                         .tint(state.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : .accentColor)
-                    Button { panel = nil; showLog = true } label: { Label("Game Log", systemImage: "list.bullet").frame(maxWidth: .infinity) }
-                    Button { panel = nil; confirmRestart = true } label: { Label("Restart", systemImage: "arrow.counterclockwise").frame(maxWidth: .infinity) }.accessibilityIdentifier("restartGame")
-                    Button(role: .destructive) { panel = nil; confirmEnd = true } label: { Label("End Game", systemImage: "flag.fill").frame(maxWidth: .infinity) }.accessibilityIdentifier("endGame")
+                    Button { closePanel { showLog = true } } label: { Label("Game Log", systemImage: "list.bullet").frame(maxWidth: .infinity) }
+                    Button { closePanel { confirmRestart = true } } label: { Label("Restart", systemImage: "arrow.counterclockwise").frame(maxWidth: .infinity) }.accessibilityIdentifier("restartGame")
+                    Button(role: .destructive) { closePanel { confirmEnd = true } } label: { Label("End Game", systemImage: "flag.fill").frame(maxWidth: .infinity) }.accessibilityIdentifier("endGame")
                 }
                 .buttonStyle(.bordered).controlSize(.small).font(.system(size: 11))
             }
@@ -376,6 +439,8 @@ struct CenterZoneView: View {
 struct NextTurnButton: View {
     @Environment(\.motionEnabled) private var motion
     let remaining: Int?
+    /// One short row (phone) instead of the big square.
+    var compact = false
     let onNext: () -> Void
     let onPrev: () -> Void
     @State private var tip = false
@@ -388,10 +453,10 @@ struct NextTurnButton: View {
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / 20, paused: (pulse == nil) || !motion)) { ctx in
             let p = pulse.map { (sin(ctx.date.timeIntervalSinceReferenceDate / $0 * 2 * .pi) + 1) / 2 } ?? 0
-            Text("Next\nTurn")
-                .font(.system(size: 22, weight: .bold)).multilineTextAlignment(.center)
+            Text(compact ? "Next Turn" : "Next\nTurn")
+                .font(.system(size: compact ? 15 : 22, weight: .bold)).multilineTextAlignment(.center)
                 .foregroundStyle(Color.accentColor)
-                .frame(width: 120, height: 120)
+                .frame(width: compact ? 96 : 120, height: compact ? 50 : 120)
                 .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(p > 0.5 ? Theme.danger : Color.accentColor, lineWidth: 2))
                 .shadow(color: Color(red: 1, green: 80/255, blue: 30/255).opacity(p * (remaining.map { $0 <= 10 } ?? false ? 0.9 : 0.5)), radius: 12)
                 .contentShape(Rectangle())

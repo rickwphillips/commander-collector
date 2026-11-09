@@ -10,6 +10,7 @@ struct HomeView: View {
     @Environment(GameSettingsStore.self) private var settings
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var context
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @Query(sort: \CachedPlayer.name) private var players: [CachedPlayer]
     @Query(sort: \CachedDeck.name) private var decks: [CachedDeck]
     @Query(sort: \OutboxGame.createdAt, order: .reverse) private var outbox: [OutboxGame]
@@ -33,12 +34,35 @@ struct HomeView: View {
     @State private var showNewDeck = false
 
     private static let lifePresets = [20, 30, 40]
+
+    private var startingLifeControls: some View {
+        HStack {
+            Picker("Starting life", selection: Binding(get: { Self.lifePresets.contains(startingLife) && customLife.isEmpty ? startingLife : 0 }, set: { v in if v > 0 { startingLife = v; customLife = "" } })) {
+                ForEach(Self.lifePresets, id: \.self) { Text("\($0)").tag($0) }
+            }
+            .pickerStyle(.segmented).frame(width: 180)
+            TextField("Custom", text: $customLife).keyboardType(.numberPad).textFieldStyle(.roundedBorder).frame(width: 80)
+                .onChange(of: customLife) { _, v in if let n = Int(v), n > 0 { startingLife = n } }
+        }
+    }
+
+    private var continueButton: some View {
+        Button("Continue to seating") { start(prefill: random ? randomPrefill() : []) }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("continueToSeating")
+            .disabled(players.isEmpty || decks.isEmpty)
+    }
     private var seatCount: Int { gameType == .twoHeadedGiant ? 4 : playerCount }
     private var lastGame: RematchStore.Entry? { RematchStore.load() }
 
     var body: some View {
         NavigationStack {
             Form {
+                // A phone's narrow bar folds trailing buttons into "…": give
+                // the primary action its own row at the top instead.
+                if sizeClass == .compact {
+                    Section { continueButton.frame(maxWidth: .infinity).controlSize(.large) }
+                }
                 if let game = activeGame {
                     Section("Game in progress") {
                         LabeledContent("Started", value: game.startedAt.formatted(date: .abbreviated, time: .shortened))
@@ -66,15 +90,11 @@ struct HomeView: View {
                     if gameType == .twoHeadedGiant {
                         Text("Two-Headed Giant is always 4 players (two teams of two).").font(.footnote).foregroundStyle(.secondary)
                     }
-                    HStack {
-                        Text("Starting life")
-                        Spacer()
-                        Picker("Starting life", selection: Binding(get: { Self.lifePresets.contains(startingLife) && customLife.isEmpty ? startingLife : 0 }, set: { v in if v > 0 { startingLife = v; customLife = "" } })) {
-                            ForEach(Self.lifePresets, id: \.self) { Text("\($0)").tag($0) }
-                        }
-                        .pickerStyle(.segmented).frame(width: 180)
-                        TextField("Custom", text: $customLife).keyboardType(.numberPad).textFieldStyle(.roundedBorder).frame(width: 80)
-                            .onChange(of: customLife) { _, v in if let n = Int(v), n > 0 { startingLife = n } }
+                    // A phone in portrait has no room beside the label: the
+                    // controls drop under it instead of wrapping the label.
+                    ViewThatFits(in: .horizontal) {
+                        HStack { Text("Starting life"); Spacer(); startingLifeControls }
+                        VStack(alignment: .leading, spacing: 6) { Text("Starting life"); startingLifeControls }
                     }
                     HStack {
                         Text("Turn timer")
@@ -182,11 +202,8 @@ struct HomeView: View {
                         Button("Sign out", role: .destructive) { session.signOut() }
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Continue to seating") { start(prefill: random ? randomPrefill() : []) }
-                        .buttonStyle(.borderedProminent)
-                        .accessibilityIdentifier("continueToSeating")
-                        .disabled(players.isEmpty || decks.isEmpty)
+                if sizeClass != .compact {
+                    ToolbarItem(placement: .topBarTrailing) { continueButton }
                 }
             }
             .task {

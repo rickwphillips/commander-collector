@@ -12,7 +12,11 @@ struct CommanderDamageColumn: View {
     let glass: Bool
     let threat: ThreatSource?
     let sizes: SeatPanel.Sizes
+    /// False when the column fills a phone overlay and has no rail to close.
+    var showRail = true
     @Environment(GameSettingsStore.self) private var settings
+    @Environment(\.compactTable) private var compact
+    @Environment(\.colorScheme) private var scheme
     @State private var threatArt = CommanderArtLoader()
 
     private var state: GameState { session.state }
@@ -40,21 +44,70 @@ struct CommanderDamageColumn: View {
                                     .font(.system(size: 9, weight: .semibold)).buttonStyle(.bordered).controlSize(.mini)
                             }
                             .padding(.horizontal, 4).padding(.top, 3)
-                        CenteredOrScrolling { compact in
-                            VStack(spacing: compact ? SeatPanel.compactDrawerRowSpacing : SeatPanel.drawerRowSpacing) {
+                        if compact {
+                            // A phone seat is too short for the rows, and a scroll
+                            // view inside a rotated seat renders soft: one chip per
+                            // commander instead (name opens the snapshot, value the modal).
+                            FlowLayout(spacing: 8, rowSpacing: 6) {
                                 ForEach(state.players.indices.filter { $0 != targetIdx }, id: \.self) { src in
-                                    CommanderDamageRow(session: session, targetIdx: targetIdx, sourceIdx: src, showPlayer: showPlayer, glass: glass, overlay: $overlay, sizes: sizes)
+                                    damageChip(src, partner: false)
+                                    if state.players[src].partner != nil { damageChip(src, partner: true) }
                                 }
                             }
-                            .padding(.bottom, 3)
+                            .padding(6)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        } else {
+                            CenteredOrScrolling { compact in
+                                VStack(spacing: compact ? SeatPanel.compactDrawerRowSpacing : SeatPanel.drawerRowSpacing) {
+                                    ForEach(state.players.indices.filter { $0 != targetIdx }, id: \.self) { src in
+                                        CommanderDamageRow(session: session, targetIdx: targetIdx, sourceIdx: src, showPlayer: showPlayer, glass: glass, overlay: $overlay, sizes: sizes)
+                                    }
+                                }
+                                .padding(.bottom, 3)
+                            }
                         }
                     }
                 }
                 .clipped()
                 .task(id: threat?.commanderName) { if let n = threat?.commanderName { threatArt.load(n) } }
             }
-            rail
+            if showRail { rail }
         }
+    }
+
+    private func damageChip(_ src: Int, partner: Bool) -> some View {
+        let source = state.players[src]
+        let dmg = state.commanderDamage[targetIdx, src]
+        let value = partner ? dmg.fromPartner : dmg.fromCommander
+        let name = partner ? (source.partner?.name ?? "Partner") : showPlayer ? source.playerName : source.commander.name
+        let isActive = state.firstPlayerIdx != nil && state.currentPlayerIdx == src && !partner
+        let id = "s\(targetIdx)-cmd-\(src)" + (partner ? "-partner" : "")
+        let art = partner ? (source.partner?.name ?? source.commander.name) : source.commander.name
+        // Art, name, value: the opponent's commander is recognisable at a glance.
+        return VStack(spacing: 3) {
+            CommanderArt(name: art, height: 30)
+                .opacity(source.isEliminated ? 0.5 : 1)
+                .onTapGesture { overlay = .preview(name: art, back: .drawer(.commanderDamage)) }
+            Text(name)
+                .font(.system(size: 10, weight: isActive ? .bold : .regular))
+                .foregroundStyle(source.isEliminated ? .secondary : isActive ? Color.accentColor : .primary)
+                .strikethrough(source.isEliminated).lineLimit(1).truncationMode(.tail)
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+                .accessibilityIdentifier("\(id)-name")
+                .onTapGesture { overlay = .snapshot(sourceIdx: src, partner: partner) }
+            Text("\(value)")
+                .font(.system(size: sizes.value, weight: .bold).monospacedDigit())
+                .foregroundStyle(source.isEliminated && value < 21 ? .secondary : Theme.commanderDamageValueColor(value, scheme: scheme))
+                .frame(maxWidth: .infinity, minHeight: 26)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.08)))
+                .contentShape(Rectangle())
+                .accessibilityIdentifier("\(id)-value")
+                .onTapGesture { overlay = .focus(.commanderDamage(sourceIdx: src, partner: partner)) }
+        }
+        .frame(width: 84)
+        .padding(4)
+        .background(GlassBacking(active: glass))
     }
 
     private var rail: some View {
@@ -64,6 +117,7 @@ struct CommanderDamageColumn: View {
                 .frame(width: 24).frame(maxHeight: .infinity).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("s\(targetIdx)-cmd-rail")
     }
 }
 
@@ -202,6 +256,8 @@ struct CountersColumn: View {
     let glass: Bool
     let poisonLethal: Int
     let sizes: SeatPanel.Sizes
+    var showRail = true
+    @Environment(\.compactTable) private var compact
 
     private var p: PlayerState { session.state.players[idx] }
     private var poisonProgress: Double { min(Double(p.poison) / Double(poisonLethal), 1) }
@@ -209,10 +265,25 @@ struct CountersColumn: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            rail
+            if showRail { rail }
             if open {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("COUNTERS").font(.system(size: sizes.label, weight: .semibold)).kerning(0.5).foregroundStyle(.secondary).padding(.horizontal, 6).padding(.top, 3)
+                    if compact {
+                        // Phone: glyph + value chips that wrap (see CommanderDamageColumn).
+                        FlowLayout(spacing: 14, rowSpacing: 12) {
+                            chip(CounterGlyph(kind: .tax, size: sizes.source * 1.3, taxValue: p.commanderTax), value: p.commanderTax, color: p.commanderTax > 0 ? .orange : .secondary, focus: .tax(partner: false))
+                            if p.partner != nil {
+                                chip(CounterGlyph(kind: .tax, size: sizes.source * 1.3, taxValue: p.partnerCommanderTax), value: p.partnerCommanderTax, color: p.partnerCommanderTax > 0 ? .orange : .secondary, focus: .tax(partner: true))
+                            }
+                            chip(CounterGlyph(kind: .energy, size: sizes.source * 1.3), value: p.energy, color: p.energy > 0 ? Theme.energyCyan : .secondary, focus: .energy)
+                            chip(CounterGlyph(kind: .xp, size: sizes.source * 1.3), value: p.experience, color: p.experience > 0 ? Theme.gold : .secondary, focus: .experience)
+                            chip(CounterGlyph(kind: .poison, size: sizes.source * 1.3, poison: p.poison, poisonDanger: poisonLethal), value: p.poison,
+                                 color: p.poison >= poisonLethal ? Theme.danger : p.poison > 0 ? Theme.poisonGreen : .secondary, focus: .poison, max: poisonLethal)
+                        }
+                        .padding(10)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    } else {
                     CenteredOrScrolling { compact in
                         VStack(spacing: compact ? SeatPanel.compactDrawerRowSpacing : SeatPanel.drawerRowSpacing) {
                             row("Commander Tax", glyph: CounterGlyph(kind: .tax, size: sizes.source, taxValue: p.commanderTax), value: p.commanderTax, color: p.commanderTax > 0 ? .orange : .secondary, focus: .tax(partner: false)) {
@@ -236,9 +307,29 @@ struct CountersColumn: View {
                         }
                         .padding(.horizontal, 2).padding(.bottom, 3)
                     }
+                    }
                 }
             }
         }
+    }
+
+    /// One counter as a tappable chip; the tap opens its focus modal.
+    private func chip(_ glyph: CounterGlyph, value: Int, color: Color, focus: FocusTarget, max: Int? = nil) -> some View {
+        HStack(spacing: 8) {
+            glyph
+            Text("\(value)")
+                .font(.system(size: sizes.value * 1.35, weight: .bold).monospacedDigit())
+                .foregroundStyle(color)
+                .blur(radius: blur)
+                .accessibilityIdentifier("s\(idx)-\(focus.id)-value")
+            if let max { Text("/\(max)").font(.system(size: sizes.label * 1.1)).foregroundStyle(.secondary) }
+        }
+        .frame(minWidth: 72, minHeight: 40)
+        .padding(.horizontal, 12).padding(.vertical, 6)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.08)))
+        .background(GlassBacking(active: glass))
+        .contentShape(Rectangle())
+        .onTapGesture { overlay = .focus(focus) }
     }
 
     private func row(_ label: String, glyph: CounterGlyph, value: Int, color: Color, focus: FocusTarget, max: Int? = nil, pulse: Bool = false, xpGlow: Bool = false, onChange: @escaping (Int) -> Void) -> some View {
@@ -270,6 +361,7 @@ struct CountersColumn: View {
             .frame(width: 24).frame(maxHeight: .infinity).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("s\(idx)-counters-rail")
     }
 
     private var miniSummary: [(String, AnyView, String, Color)] {

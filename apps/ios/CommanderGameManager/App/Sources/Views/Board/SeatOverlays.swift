@@ -10,7 +10,10 @@ struct StateMenuOverlay: View {
     @Binding var overlay: SeatOverlay?
     @Binding var concedeTurn: String
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.compactTable) private var compact
     @State private var rulesOpen: String?
+    /// Row height: a phone seat fits the five rows only with half the padding.
+    private var rowPad: CGFloat { compact ? 5 : 10 }
 
     private var p: PlayerState { session.state.players[idx] }
     private var confirming: Bool { overlay == .concedeConfirm }
@@ -36,7 +39,7 @@ struct StateMenuOverlay: View {
                     if !session.isRemote {
                         Divider()
                         HStack(spacing: 10) { Image(systemName: "qrcode"); Text("Pair a phone").font(.system(size: 13)) }
-                            .foregroundStyle(.secondary).padding(.horizontal, 12).padding(.vertical, 10).frame(maxWidth: .infinity, alignment: .leading)
+                            .foregroundStyle(.secondary).padding(.horizontal, 12).padding(.vertical, rowPad).frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                             .onTapGesture { overlay = .qr }
                     }
@@ -44,9 +47,9 @@ struct StateMenuOverlay: View {
                 .frame(maxWidth: 240)
                 .background(RoundedRectangle(cornerRadius: 10).fill(Theme.menuBackground(scheme)))
                 .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.primary.opacity(0.12)))
-                Text("tap outside to close").font(.caption2).foregroundStyle(.tertiary)
+                if !compact { Text("tap outside to close").font(.caption2).foregroundStyle(.tertiary) }
             }
-            .padding(12)
+            .padding(compact ? 4 : 12)
         }
     }
 
@@ -62,7 +65,7 @@ struct StateMenuOverlay: View {
                 .buttonStyle(.plain)
                 if active { Circle().fill(color).frame(width: 6, height: 6) }
             }
-            .padding(.horizontal, 12).padding(.vertical, 10)
+            .padding(.horizontal, 12).padding(.vertical, rowPad)
             .contentShape(Rectangle())
             .accessibilityIdentifier("menu-\(label)")
             .onTapGesture { toggle(); overlay = nil }
@@ -77,7 +80,7 @@ struct StateMenuOverlay: View {
             HStack(spacing: 10) {
                 Image(systemName: "person.fill.xmark"); Text("Undo Concede").font(.system(size: 13, weight: .bold))
             }
-            .foregroundStyle(Theme.danger).padding(.horizontal, 12).padding(.vertical, 10).frame(maxWidth: .infinity, alignment: .leading)
+            .foregroundStyle(Theme.danger).padding(.horizontal, 12).padding(.vertical, rowPad).frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .accessibilityIdentifier("menu-UndoConcede")
             .onTapGesture { session.dispatch(.undoEliminate(playerIdx: idx)); overlay = nil }
@@ -96,7 +99,7 @@ struct StateMenuOverlay: View {
             HStack(spacing: 10) {
                 Image(systemName: "person.fill.xmark"); Text("Concede").font(.system(size: 13))
             }
-            .foregroundStyle(.secondary).padding(.horizontal, 12).padding(.vertical, 10).frame(maxWidth: .infinity, alignment: .leading)
+            .foregroundStyle(.secondary).padding(.horizontal, 12).padding(.vertical, rowPad).frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .accessibilityIdentifier("menu-Concede")
             .onTapGesture { overlay = .concedeConfirm }
@@ -230,6 +233,7 @@ struct CommanderSnapshotOverlay: View {
                         CommanderArt(name: tgt.commander.name, height: 30).opacity(0.75)
                             .onTapGesture { overlay = .preview(name: tgt.commander.name, back: self.current) }
                         Text(tgt.playerName).font(.system(size: sizes.source)).foregroundStyle(.secondary).lineLimit(1)
+                            .accessibilityIdentifier("snapshotRow-\(row.idx)")
                         Spacer()
                         Text(src.partner != nil ? "\(row.dmg.fromCommander)/\(row.dmg.fromPartner)" : "\(row.dmg.fromCommander)")
                             .font(.system(size: sizes.source, weight: .bold))

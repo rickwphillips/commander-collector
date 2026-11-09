@@ -8,6 +8,12 @@ import SwiftUI
 /// commander's art (stolen by the biggest commander-damage threat as that
 /// damage climbs). `exiting` runs the fade-out tail.
 struct CityBlessing: View {
+    /// The launchers' cycles (seconds after the scene starts, period, size),
+    /// shared with `SoundService` so each thud lands on its burst: a launcher
+    /// bursts at `delay + dur × (n + 0.82)`.
+    static let fireworkBursts: [(delay: Double, dur: Double, scale: Double)] = Scene.fwConfigs.map { ($0.delay, $0.dur, $0.scale) }
+    static let burstPhase = 0.82
+
     let exiting: Bool
     let commanders: [String]
     let threat: ThreatSource?

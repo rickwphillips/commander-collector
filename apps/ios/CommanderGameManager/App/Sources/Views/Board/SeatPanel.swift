@@ -17,6 +17,7 @@ struct SeatPanel: View {
     let turnIndicatorOn: Bool
     @Environment(GameSettingsStore.self) private var settings
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.compactTable) private var compact
     private var motion: Bool { settings.animationsEnabled }
 
     @State private var overlay: SeatOverlay?
@@ -114,6 +115,12 @@ struct SeatPanel: View {
             }
         }
         .onChange(of: player.isEliminated) { _, _ in overlay = nil }
+        // Phone: a modal opened from a drawer overlay hands back to that drawer
+        // when it closes, instead of dropping the player back on the life row.
+        .onChange(of: overlay) { old, new in
+            guard compact, new == nil, let back = Self.drawerBehind(old) else { return }
+            overlay = back
+        }
         .task(id: backdropDelay) {
             // Only the intro sequence (first player chosen at this table) dims
             // the seats; a resume or a remote view shows everything at once.
@@ -236,15 +243,21 @@ struct SeatPanel: View {
     private func columns(_ sz: Sizes) -> some View {
         GeometryReader { geo in
             let rail: CGFloat = 24
+            // Phone: the drawers never open in place (that would shove the life
+            // row along the seat); a rail tap shows the drawer over the seat.
+            let cmdDmgOpen = compact ? false : cmdDmgOpen
+            let countersOpen = compact ? false : countersOpen
             let open = (cmdDmgOpen ? 1 : 0) + (countersOpen ? 1 : 0)
-            let share = (geo.size.width - CGFloat(2 - open) * rail) / CGFloat(open + 1)
+            // Whole points: in a rotated side seat a drawer at a fractional
+            // offset is resampled and everything in it goes soft.
+            let share = ((geo.size.width - CGFloat(2 - open) * rail) / CGFloat(open + 1)).rounded(.down)
             HStack(spacing: 0) {
-                CommanderDamageColumn(session: session, targetIdx: idx, open: $cmdDmgOpen, overlay: $overlay, glass: glassActive, threat: threat, sizes: sz)
+                CommanderDamageColumn(session: session, targetIdx: idx, open: drawerBinding(.commanderDamage, inPlace: $cmdDmgOpen), overlay: $overlay, glass: glassActive, threat: threat, sizes: sz)
                     .frame(width: cmdDmgOpen ? share : rail).clipped()
                 Divider()
-                lifeColumn(sz)
+                lifeColumn(sz, width: open == 2 ? share : geo.size.width - CGFloat(2 - open) * rail - CGFloat(open) * share)
                 Divider()
-                CountersColumn(session: session, idx: idx, open: $countersOpen, overlay: $overlay, glass: glassActive, poisonLethal: poisonLethal, sizes: sz)
+                CountersColumn(session: session, idx: idx, open: drawerBinding(.counters, inPlace: $countersOpen), overlay: $overlay, glass: glassActive, poisonLethal: poisonLethal, sizes: sz)
                     .frame(width: countersOpen ? share : rail).clipped()
             }
             .animation(.easeInOut(duration: 0.2), value: cmdDmgOpen)
@@ -252,25 +265,47 @@ struct SeatPanel: View {
         }
     }
 
-    private func lifeColumn(_ sz: Sizes) -> some View {
+    /// The drawer a closing overlay was opened from, if any.
+    static func drawerBehind(_ overlay: SeatOverlay?) -> SeatOverlay? {
+        switch overlay {
+        case .snapshot: return .drawer(.commanderDamage)
+        case .focus(.commanderDamage): return .drawer(.commanderDamage)
+        case .focus(.poison), .focus(.energy), .focus(.experience), .focus(.tax): return .drawer(.counters)
+        default: return nil
+        }
+    }
+
+    /// The rail's binding: the in-place drawer on the iPad, the overlay on a phone.
+    private func drawerBinding(_ drawer: SeatDrawer, inPlace: Binding<Bool>) -> Binding<Bool> {
+        guard compact else { return inPlace }
+        return Binding(get: { false }, set: { _ in withAnimation(.easeOut(duration: 0.15)) { overlay = .drawer(drawer) } })
+    }
+
+    private func lifeColumn(_ sz: Sizes, width: CGFloat) -> some View {
         let closed = (cmdDmgOpen ? 0 : 1) + (countersOpen ? 0 : 1)
-        let fontSize = closed == 0 ? sz.life : closed == 1 ? sz.life * 1.5 : sz.life * 2
+        let grown = closed == 0 ? sz.life : closed == 1 ? sz.life * 1.5 : sz.life * 2
+        let buttonW: CGFloat = compact ? 44 : 60
+        // A phone seat is short, and with a drawer open its life row is narrow:
+        // the number must fit beside its buttons as well as under the header.
+        let digits = CGFloat(max(2, String(player.life).count))
+        let fitsWidth = (width - 2 * buttonW - 28) / (digits * 0.62)
+        let fontSize = compact ? max(28, min(grown, sz.panelHeight * 0.42, fitsWidth)) : grown
         let lost = Theme.lostRatio(player.life, startingLife: state.startingLife)
+        let lifeButton = StepperSize(buttonFont: sz.lifeBtn, buttonWidth: buttonW, buttonHeight: compact ? 48 : 50)
+        let dec = StepButton(symbol: "minus", size: lifeButton, id: "s\(idx)-life-dec") { session.dispatch(.lifeChange(playerIdx: idx, delta: $0 ? -5 : -1)) }
+        let inc = StepButton(symbol: "plus", size: lifeButton, id: "s\(idx)-life-inc") { session.dispatch(.lifeChange(playerIdx: idx, delta: $0 ? 5 : 1)) }
         return ZStack {
             LifeCracks(fingerprint: idx, lostRatio: lost)
             if let threat, threat.intensity > 0, motion { ThreatNames(name: threat.commanderName, intensity: threat.intensity, fingerprint: idx) }
-            VStack(spacing: 10) {
-                LifeNumber(value: player.life, fontSize: fontSize, color: lifeColor, damageFlash: damageFlash, energy: player.energy, poison: player.poison, poisonLethal: poisonLethal)
-                    .accessibilityIdentifier("s\(idx)-life")
-                    .accessibilityValue("\(player.life)")
-                    .onTapGesture { overlay = .focus(.life) }
-                    .overlay(alignment: .topLeading) {
-                        MonarchCrown(isMonarch: player.isMonarch, transferHint: session.monarchTransferRecent, size: fontSize * 0.55)
-                            .offset(x: -fontSize * 0.3, y: -fontSize * 0.3)
+            Group {
+                if compact {
+                    // Phone: `− life +` in one row.
+                    HStack(spacing: 8) { dec; lifeNumber(fontSize); inc }
+                } else {
+                    VStack(spacing: 10) {
+                        lifeNumber(fontSize)
+                        HStack(spacing: 22) { dec; inc }
                     }
-                HStack(spacing: 22) {
-                    StepButton(symbol: "minus", size: StepperSize(buttonFont: sz.lifeBtn, buttonWidth: 60, buttonHeight: 50), id: "s\(idx)-life-dec") { session.dispatch(.lifeChange(playerIdx: idx, delta: $0 ? -5 : -1)) }
-                    StepButton(symbol: "plus", size: StepperSize(buttonFont: sz.lifeBtn, buttonWidth: 60, buttonHeight: 50), id: "s\(idx)-life-inc") { session.dispatch(.lifeChange(playerIdx: idx, delta: $0 ? 5 : 1)) }
                 }
             }
             .padding(6)
@@ -280,6 +315,17 @@ struct SeatPanel: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
+    }
+
+    private func lifeNumber(_ fontSize: CGFloat) -> some View {
+        LifeNumber(value: player.life, fontSize: fontSize, color: lifeColor, damageFlash: damageFlash, energy: player.energy, poison: player.poison, poisonLethal: poisonLethal)
+            .accessibilityIdentifier("s\(idx)-life")
+            .accessibilityValue("\(player.life)")
+            .onTapGesture { overlay = .focus(.life) }
+            .overlay(alignment: .topLeading) {
+                MonarchCrown(isMonarch: player.isMonarch, transferHint: session.monarchTransferRecent, size: fontSize * 0.55)
+                    .offset(x: -fontSize * 0.3, y: -fontSize * 0.3)
+            }
     }
 
     // MARK: Border
@@ -292,7 +338,8 @@ struct SeatPanel: View {
             if timer.isExpired {
                 BlinkingStroke(shape: shape)
             } else {
-                shape.strokeBorder(timer.color, lineWidth: 3).shadow(color: timer.color.opacity(0.53), radius: 8)
+                // A phone seat sits close to the screen edge: a tighter glow stays on screen.
+                shape.strokeBorder(timer.color, lineWidth: 3).shadow(color: timer.color.opacity(0.53), radius: compact ? 4 : 8)
             }
         } else if isWarning {
             shape.strokeBorder(Theme.danger, lineWidth: 2)
@@ -320,7 +367,33 @@ struct SeatPanel: View {
             CardPreviewOverlay(name: name) { overlay = back }
         case .qr:
             SeatQROverlay(gameId: session.clientGameId, seat: player.position, connected: remoteConnected) { overlay = nil }
+        case .drawer(let drawer):
+            drawerOverlay(drawer, sz)
         }
+    }
+
+    /// Phone: the drawer over the whole seat; the life row underneath stays put.
+    private func drawerOverlay(_ drawer: SeatDrawer, _ sz: Sizes) -> some View {
+        ZStack(alignment: .topTrailing) {
+            Theme.overlayBackground(scheme).onTapGesture { overlay = nil }
+            Group {
+                switch drawer {
+                case .commanderDamage:
+                    CommanderDamageColumn(session: session, targetIdx: idx, open: .constant(true), overlay: $overlay, glass: false, threat: threat, sizes: sz, showRail: false)
+                case .counters:
+                    CountersColumn(session: session, idx: idx, open: .constant(true), overlay: $overlay, glass: false, poisonLethal: poisonLethal, sizes: sz, showRail: false)
+                }
+            }
+            .padding(.trailing, 28)
+            Button { overlay = nil } label: {
+                Image(systemName: "xmark").font(.system(size: 14, weight: .bold)).foregroundStyle(.secondary)
+                    .frame(width: 30, height: 30).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("s\(idx)-drawer-close")
+            .padding(2)
+        }
+        .transition(.opacity)
     }
 
     /// A phone has checked in for this seat within the last 20 s (web rule; one dropped 9 s heartbeat tolerated).
@@ -358,20 +431,40 @@ struct SeatPanel: View {
         let poison = kill.cause == .poison
         let tint: Color = poison ? Color(hex: 0x7FFF7F) : .white
         let living = opponents.filter { !state.players[$0].isEliminated && (state.players[$0].teamNumber == nil || state.players[$0].teamNumber != player.teamNumber) }
+        let title = Text(poison ? "Who poisoned \(player.playerName)?" : "Who brought \(player.playerName) to 0?")
+            .font(.system(size: sz.kill, weight: .bold)).foregroundStyle(tint).multilineTextAlignment(.center)
         return ZStack {
             (poison ? Color(red: 0, green: 40/255, blue: 0).opacity(0.78) : Color.black.opacity(0.72))
-            VStack(spacing: 8) {
-                Text(poison ? "Who poisoned \(player.playerName)?" : "Who brought \(player.playerName) to 0?")
-                    .font(.system(size: sz.kill, weight: .bold)).foregroundStyle(tint).multilineTextAlignment(.center)
-                ForEach(living, id: \.self) { s in
-                    Button(state.players[s].playerName) { session.attributeKill(kill, sourceIdx: s) }
-                        .frame(maxWidth: .infinity).padding(.vertical, 6)
-                        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(tint.opacity(0.5)))
+            if compact {
+                // A phone seat is too short for a stacked list: the names wrap
+                // into rows beside each other, Skip among them.
+                VStack(spacing: 6) {
+                    title.lineLimit(1).minimumScaleFactor(0.7)
+                    FlowLayout(spacing: 8, rowSpacing: 6) {
+                        ForEach(living, id: \.self) { s in
+                            Button(state.players[s].playerName) { session.attributeKill(kill, sourceIdx: s) }
+                                .padding(.horizontal, 12).padding(.vertical, 8)
+                                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(tint.opacity(0.5)))
+                        }
+                        Button("Skip") { session.attributeKill(kill, sourceIdx: nil) }
+                            .foregroundStyle(tint.opacity(0.6)).padding(.horizontal, 12).padding(.vertical, 8)
+                    }
                 }
-                Button("Skip") { session.attributeKill(kill, sourceIdx: nil) }.foregroundStyle(tint.opacity(0.5)).font(.system(size: sz.kill))
+                .foregroundStyle(tint)
+                .padding(8)
+            } else {
+                VStack(spacing: 8) {
+                    title
+                    ForEach(living, id: \.self) { s in
+                        Button(state.players[s].playerName) { session.attributeKill(kill, sourceIdx: s) }
+                            .frame(maxWidth: .infinity).padding(.vertical, 6)
+                            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(tint.opacity(0.5)))
+                    }
+                    Button("Skip") { session.attributeKill(kill, sourceIdx: nil) }.foregroundStyle(tint.opacity(0.5)).font(.system(size: sz.kill))
+                }
+                .foregroundStyle(tint)
+                .padding(16)
             }
-            .foregroundStyle(tint)
-            .padding(16)
         }
         .transition(.opacity)
     }
@@ -387,12 +480,15 @@ struct SeatPanel: View {
 
     struct Sizes {
         let name, deck, pass, icon, menu, art, life, lifeBtn, crown, label, source, badge, value, kill: CGFloat
+        /// The short edge the sizes were derived from.
+        let panelHeight: CGFloat
         let stepper: StepperSize
         /// Commander damage rows have the room for larger buttons.
         let damageStepper: StepperSize
         /// `panelWidth` is the long edge: a side seat is thin but long, and its
         /// drawers have the room of a top or bottom seat.
         init(panelHeight h: CGFloat, panelWidth w: CGFloat = 0) {
+            panelHeight = h
             let k = min(max(max(h, w * 0.4) / 360, 0.75), 1.1)
             // The player name and commander line read the same in every seat:
             // the side seats are narrow, not small.

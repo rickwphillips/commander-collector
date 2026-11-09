@@ -128,15 +128,25 @@ struct CardPreviewOverlay: View {
     let onClose: () -> Void
     @State private var loader = CommanderArtLoader()
     @State private var zoomed = false
+    @Environment(\.compactTable) private var compact
+
+    /// Zoomed size: 1.2× the image on the iPad; on a phone a card wide enough
+    /// to read the rules text, which the image's own size overshoots.
+    private func zoomedSize(_ img: UIImage) -> CGSize {
+        let w = compact ? Self.phoneZoomWidth : img.size.width * 1.2
+        return CGSize(width: w, height: w * img.size.height / img.size.width)
+    }
+    private static let phoneZoomWidth: CGFloat = 400
 
     var body: some View {
         ZStack {
             Color.black.opacity(0.88).onTapGesture(perform: onClose)
             if let img = loader.image {
                 if zoomed {
+                    let size = zoomedSize(img)
                     ScrollView([.horizontal, .vertical]) {
                         Image(uiImage: img).resizable().scaledToFit()
-                            .frame(width: img.size.width * 1.2, height: img.size.height * 1.2)
+                            .frame(width: size.width, height: size.height)
                             .clipShape(RoundedRectangle(cornerRadius: 18))
                             .onTapGesture { zoomed = false }
                     }

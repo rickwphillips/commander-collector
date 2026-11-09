@@ -1,6 +1,7 @@
 import AVFoundation
 import AudioToolbox
 import Foundation
+import UIKit
 
 /// The board's sounds. The four web mp3s ship in the bundle; the poison
 /// drone and the firework loop are synthesised with AVAudioEngine like the
@@ -226,48 +227,66 @@ final class SoundService {
     // MARK: City's Blessing fireworks (web useSounds)
 
     /// After the intro fanfare (~33 s), a firework whoosh + thud every 7 to 15 s.
+    /// Starts (or stops) the firework booms. They follow the scene's own
+    /// launcher cycles, so each boom lands on a burst drawn in `CityBlessing`,
+    /// which starts its clock at the same moment this is called. Every
+    /// launcher booms, but a boom close on the heels of another is softer,
+    /// and one inside half a second of the last is dropped.
     func setCitysBlessingActive(_ active: Bool) {
         guard active, enabled else { fireworkTask?.cancel(); fireworkTask = nil; return }
         guard fireworkTask == nil else { return }
+        let launchers = CityBlessing.fireworkBursts
         fireworkTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(33 + Double.random(in: 0...4)))
-            while !Task.isCancelled {
-                playFirework()
-                try? await Task.sleep(for: .seconds(7 + Double.random(in: 0...8)))
+            let start = Date()
+            var next = launchers.map { $0.delay + $0.dur * CityBlessing.burstPhase - Self.thudOffset }
+            var lastBoom: Date?
+            while !Task.isCancelled, let i = next.indices.min(by: { next[$0] < next[$1] }) {
+                let wait = next[i] - Date().timeIntervalSince(start)
+                if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
+                if Task.isCancelled { return }
+                next[i] += launchers[i].dur
+                let gap = lastBoom.map { Date().timeIntervalSince($0) } ?? .infinity
+                if gap < Self.minBoomGap { continue }
+                // Full voice after a quiet spell, down to a third right after another boom.
+                let attenuation = max(0.33, min(1, gap / Self.fullVoiceGap))
+                playFirework(scale: launchers[i].scale, attenuation: attenuation)
+                lastBoom = Date()
             }
         }
     }
 
-    private func playFirework() {
-        // A short synthesised whoosh (rising band-passed noise) then a sine thud.
+    /// Booms closer together than this are dropped.
+    private static let minBoomGap = 0.5
+    /// Gap after which a boom is back at full voice.
+    private static let fullVoiceGap = 3.0
+
+    /// The boom starts at the top of the sound.
+    private static let thudOffset = 0.0
+
+    private func playFirework(scale: Double = 1, attenuation: Double = 1) {
+        // Quieter on a phone, whose speaker sits right by the players; the
+        // bigger launcher booms harder; a boom right after another is softer.
+        let gain = Float(UIDevice.current.userInterfaceIdiom == .phone ? 0.22 : 0.45) * Float((0.7 + 0.2 * scale) * attenuation)
+        // Just the boom: a falling sine thud, no launch hiss.
         let sampleRate = 44_100.0
-        let duration = 0.95
+        let duration = 0.6
         let frames = Int(sampleRate * duration)
         guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1),
               let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)) else { return }
         buffer.frameLength = AVAudioFrameCount(frames)
         let data = buffer.floatChannelData![0]
-        var bp: Float = 0
         var thudPhase: Double = 0
         for i in 0..<frames {
             let t = Double(i) / sampleRate
             var sample: Float = 0
-            if t < 0.45 {
-                let noise = Float.random(in: -1...1)
-                let cutoff = Float(250 * pow(1800 / 250, t / 0.45))
-                let alpha = cutoff / Float(sampleRate) * 2 * .pi
-                bp += alpha * (noise - bp)
-                let env = Float(t < 0.06 ? t / 0.06 : 1 - (t - 0.06) / 0.39)
-                sample += (noise - bp) * env * 0.3
-            }
-            let bt = t - 0.37
-            if bt >= 0 {
+            let bt = t
+            do {
                 let freq = 120 * pow(45 / 120, min(bt / 0.3, 1))
                 thudPhase += freq / sampleRate
                 let env = Float(exp(-bt * 9)) * (bt < 0.006 ? Float(bt / 0.006) : 1)
                 sample += Float(sin(thudPhase * 2 * .pi)) * env * 0.9
             }
-            data[i] = sample * 0.5
+            data[i] = sample * gain
         }
         playBuffer(buffer, format: format)
     }

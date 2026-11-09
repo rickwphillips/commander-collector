@@ -55,14 +55,52 @@ final class BoardFlowUITests: XCTestCase {
     /// The Random switch on the setup screen; the row's switch is what toggles.
     private func turnOnRandom() {
         let sw = app.switches["randomToggle"].firstMatch
-        XCTAssertTrue(sw.waitForExistence(timeout: 15), "Random toggle missing")
+        // The setup form is a List: on a phone the row may be below the fold
+        // and does not exist until the form is scrolled to it.
+        XCTAssertTrue(app.navigationBars["New game"].waitForExistence(timeout: 15), "setup screen missing")
+        var swipes = 0
+        while !sw.waitForExistence(timeout: 1) && swipes < 8 { app.collectionViews.firstMatch.swipeUp(velocity: .slow); swipes += 1 }
+        XCTAssertTrue(sw.exists, "Random toggle missing")
         if (sw.value as? String) != "1" { sw.tap() }
         if (sw.value as? String) != "1" { sw.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.5)).tap() }
         XCTAssertEqual(sw.value as? String, "1", "Random did not switch on")
+        // On a compact-width phone the Continue button is the form's first row;
+        // scroll back up to it if the Random row was below the fold.
+        var back = 0
+        while !el("continueToSeating").exists && back < 8 { app.collectionViews.firstMatch.swipeDown(velocity: .slow); back += 1 }
     }
 
     /// The seat panel's counters report their value through the `-value` text.
     private func value(_ id: String) -> String { el("\(id)-value").label }
+
+    /// A phone table opens with both drawers on their rails and shows no
+    /// `−`/`+` in the drawers: every counter is edited in the focus modal.
+    private var phone: Bool { UIDevice.current.userInterfaceIdiom == .phone }
+
+    /// Opens a seat's drawer (`cmd` or `counters`) where the table starts
+    /// with it closed.
+    private func openDrawer(_ seat: Int, _ drawer: String) {
+        guard phone else { return }
+        waitFor("s\(seat)-\(drawer)-rail").tap()
+        // The drawer fades in over the seat; let it settle before querying it.
+        usleep(400_000)
+    }
+
+    /// Changes a drawer counter by `delta`: inline buttons on the iPad, the
+    /// focus modal on a phone.
+    private func step(_ id: String, _ delta: Int) {
+        if phone {
+            // The focus modal replaces the drawer overlay; bring the drawer back if needed.
+            if !el("\(id)-value").exists { openDrawer(0, id.contains("-cmd-") ? "cmd" : "counters") }
+            waitFor("\(id)-value").tap()
+            waitFor("focus-value")
+            for _ in 0..<abs(delta) { el(delta > 0 ? "focus-inc" : "focus-dec").tap() }
+            el("focus-close").tap()
+            XCTAssertFalse(el("focus-value").waitForExistence(timeout: 2))
+        } else {
+            for _ in 0..<abs(delta) { el(delta > 0 ? "\(id)-inc" : "\(id)-dec").tap() }
+        }
+    }
 
     // MARK: Setup → seating → roll → play
 
@@ -134,15 +172,17 @@ final class BoardFlowUITests: XCTestCase {
 
     func testCountersAndFocusModal() {
         launch(["-demoBoard"])
-        waitFor("s0-poison-inc")
-        for _ in 0..<3 { el("s0-poison-inc").tap() }
+        openDrawer(0, "counters")
+        waitFor("s0-poison-value")
+        // A phone shows no inline buttons in the drawers.
+        XCTAssertEqual(el("s0-poison-inc").exists, !phone)
+        step("s0-poison", 3)
         XCTAssertEqual(value("s0-poison"), "3")
-        el("s0-energy-inc").tap()
+        step("s0-energy", 1)
         XCTAssertEqual(value("s0-energy"), "1")
-        el("s0-xp-inc").tap()
-        el("s0-xp-inc").tap()
+        step("s0-xp", 2)
         XCTAssertEqual(value("s0-xp"), "2")
-        el("s0-tax-false-inc").tap()
+        step("s0-tax-false", 1)
         XCTAssertEqual(value("s0-tax-false"), "1")
 
         // Tap the poison value: the focus modal opens inside the panel.
@@ -160,20 +200,22 @@ final class BoardFlowUITests: XCTestCase {
 
     func testCommanderDamage() {
         launch(["-demoBoard"])
+        openDrawer(0, "cmd")
         // Seat 1 (Sam / Thraximundar) hits seat 0.
-        waitFor("s0-cmd-1-inc")
-        for _ in 0..<4 { el("s0-cmd-1-inc").tap() }
+        waitFor("s0-cmd-1-value")
+        step("s0-cmd-1", 4)
         XCTAssertEqual(value("s0-cmd-1"), "4")
-        el("s0-cmd-1-dec").tap()
+        step("s0-cmd-1", -1)
         XCTAssertEqual(value("s0-cmd-1"), "3")
         // The partner row exists for Jo (Tymna / Thrasios), seat 3.
-        XCTAssertTrue(el("s0-cmd-3-partner-inc").exists)
-        el("s0-cmd-3-partner-inc").tap()
+        XCTAssertTrue(el("s0-cmd-3-partner-value").exists)
+        step("s0-cmd-3-partner", 1)
         XCTAssertEqual(value("s0-cmd-3-partner"), "1")
     }
 
     func testCommanderSnapshot() {
         launch(["-demoBoard"])
+        openDrawer(0, "cmd")
         // Tap an opponent's name in the commander damage drawer: their snapshot
         // opens in the panel, stats and dealt-damage table left, card right.
         waitFor("s0-cmd-1-name").tap()
@@ -193,8 +235,9 @@ final class BoardFlowUITests: XCTestCase {
         waitFor("snapshotPartner").tap()
         XCTAssertTrue(app.staticTexts["CMD DEALT"].waitForExistence(timeout: 5), "partner view did not open")
         waitFor("snapshotCommander").tap()
-        // Hop to another seat's snapshot from its row, then close.
-        app.staticTexts["Amy"].firstMatch.tap()
+        // Hop to another seat's snapshot from its row (Amy is seat 2), then close.
+        // The row is addressed by id: "Amy" also names her seat's header.
+        waitFor("snapshotRow-2").tap()
         XCTAssertTrue(app.staticTexts["Atraxa, Praetors' Voice"].firstMatch.waitForExistence(timeout: 5))
         waitFor("snapshotClose").tap()
         XCTAssertFalse(app.staticTexts["CMD DEALT"].waitForExistence(timeout: 2), "snapshot did not close")
@@ -289,9 +332,8 @@ final class BoardFlowUITests: XCTestCase {
 
         waitFor("openLog").tap()
         XCTAssertTrue(app.navigationBars["Game log"].waitForExistence(timeout: 5))
-        // Newest entries are last; scroll the list down to them.
+        // Newest entries come first, so the roll is at the top.
         let rolled = text(containing: "Rolled")
-        for _ in 0..<6 where !rolled.exists { app.swipeUp() }
         XCTAssertTrue(rolled.waitForExistence(timeout: 5), "the dice roll was not logged")
         app.buttons["Done"].tap()
     }
@@ -303,7 +345,12 @@ final class BoardFlowUITests: XCTestCase {
         let confirm = app.buttons.matching(NSPredicate(format: "label == 'End game' AND identifier != 'endGame'")).firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "end confirmation did not appear")
         confirm.tap()
-        XCTAssertTrue(app.staticTexts["Final life"].firstMatch.waitForExistence(timeout: 10), "end summary did not appear")
+        // The board hides the navigation bar, so look for the summary's own text.
+        XCTAssertTrue(text(containing: "placements").waitForExistence(timeout: 10), "end summary did not appear")
+        // The summary is a List: on a phone the player cards start below the fold.
+        let finalLife = app.staticTexts["Final life"].firstMatch
+        for _ in 0..<6 where !finalLife.exists { app.swipeUp() }
+        XCTAssertTrue(finalLife.waitForExistence(timeout: 5), "player results did not appear")
         let discard = el("discardGame")
         for _ in 0..<6 where !discard.exists { app.swipeUp() }
         XCTAssertTrue(discard.waitForExistence(timeout: 5), "discardGame did not appear")

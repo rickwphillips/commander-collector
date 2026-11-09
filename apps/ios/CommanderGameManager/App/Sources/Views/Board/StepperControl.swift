@@ -14,6 +14,8 @@ indirect enum SeatOverlay: Equatable, Identifiable {
     case preview(name: String, back: SeatOverlay? = nil)
     case concedeConfirm
     case qr
+    /// Phone: a drawer opened over the seat, so the life row never moves.
+    case drawer(SeatDrawer)
 
     var id: String {
         switch self {
@@ -24,9 +26,12 @@ indirect enum SeatOverlay: Equatable, Identifiable {
         case .preview(let n, _): "preview-\(n)"
         case .concedeConfirm: "concede"
         case .qr: "qr"
+        case .drawer(let d): "drawer-\(d)"
         }
     }
 }
+
+enum SeatDrawer: String { case commanderDamage, counters }
 
 /// Which counter a focus modal edits.
 enum FocusTarget: Equatable {
@@ -89,24 +94,29 @@ struct StepperControl<Label: View>: View {
     var footer: AnyView? = nil
     let onChange: (Int) -> Void
     @ViewBuilder let label: () -> Label
+    /// Phone: the drawers are too narrow for `− value +`, so the row shows
+    /// the value alone as a button and every change goes through the focus
+    /// modal. (The life total keeps its own buttons; see `SeatPanel`.)
+    @Environment(\.compactTable) private var compact
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
         HStack(spacing: 4) {
             label()
                 .frame(maxWidth: .infinity, alignment: .leading)
-            StepButton(symbol: "minus", size: size, disabled: disableDec, id: identifier.map { "\($0)-dec" }) { onChange($0 ? -5 : -1) }
+            if !compact { StepButton(symbol: "minus", size: size, disabled: disableDec, id: identifier.map { "\($0)-dec" }) { onChange($0 ? -5 : -1) } }
             Text("\(value)")
-                .font(.system(size: size.valueFont, weight: .bold).monospacedDigit())
+                .font(.system(size: compact ? size.valueFont * 1.15 : size.valueFont, weight: .bold).monospacedDigit())
                 .foregroundStyle(color)
-                .frame(minWidth: size.valueWidth)
+                .frame(minWidth: compact ? size.valueWidth * 1.6 : size.valueWidth, minHeight: compact ? size.buttonHeight : 0)
+                .background { if compact { RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.08)) } }
                 .blur(radius: valueBlur)
                 .contentTransition(.numericText(value: Double(value)))
                 .animation(.snappy(duration: 0.25), value: value)
                 .contentShape(Rectangle())
                 .accessibilityIdentifier(identifier.map { "\($0)-value" } ?? "")
                 .onTapGesture { if let focus { overlay = .focus(focus) } }
-            StepButton(symbol: "plus", size: size, disabled: false, id: identifier.map { "\($0)-inc" }) { onChange($0 ? 5 : 1) }
+            if !compact { StepButton(symbol: "plus", size: size, disabled: false, id: identifier.map { "\($0)-inc" }) { onChange($0 ? 5 : 1) } }
             if let max {
                 Text("/\(max)").font(.system(size: size.labelFont)).foregroundStyle(.secondary).fixedSize().layoutPriority(1)
             } else if reserveMax {
@@ -180,11 +190,12 @@ struct FocusModal: View {
     let onChange: (Int) -> Void
     let onClose: () -> Void
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.compactTable) private var compact
 
     var body: some View {
         ZStack {
             Color.black.opacity(0.6).onTapGesture(perform: onClose)
-            VStack(spacing: 10) {
+            VStack(spacing: compact ? 4 : 10) {
                 HStack {
                     Text(title).font(.system(size: 15, weight: .bold))
                     Spacer()
@@ -193,7 +204,7 @@ struct FocusModal: View {
                 HStack(spacing: 14) {
                     bigButton("minus", disabled: disableDec) { SoundService.shared.playClick(); onChange(-1) }.accessibilityIdentifier("focus-dec")
                     Text("\(value)")
-                        .font(.system(size: 64, weight: .black).monospacedDigit())
+                        .font(.system(size: compact ? 44 : 64, weight: .black).monospacedDigit())
                         .foregroundStyle(color)
                         .frame(minWidth: 90)
                         .contentTransition(.numericText(value: Double(value)))
@@ -208,7 +219,7 @@ struct FocusModal: View {
                 }
                 .font(.footnote.bold())
             }
-            .padding(16)
+            .padding(compact ? 8 : 16)
             .frame(minWidth: 220)
             .background(RoundedRectangle(cornerRadius: 14).fill(Theme.menuBackground(scheme)).shadow(radius: 16))
             .padding(12)
@@ -217,7 +228,7 @@ struct FocusModal: View {
 
     private func bigButton(_ symbol: String, disabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol).font(.system(size: 30, weight: .bold)).frame(width: 64, height: 64)
+            Image(systemName: symbol).font(.system(size: compact ? 24 : 30, weight: .bold)).frame(width: compact ? 48 : 64, height: compact ? 48 : 64)
         }
         .buttonStyle(.plain)
         .disabled(disabled)
