@@ -97,6 +97,7 @@ export function ControlFocusModal({
               size="medium"
               onClick={onDec5}
               disabled={disableDec}
+              aria-label={`Decrease ${label} by 5`}
               sx={{ width: 56, height: 36 }}
             >
               <Typography sx={{ fontWeight: 700, fontSize: 14, lineHeight: 1 }}>−5</Typography>
@@ -107,6 +108,7 @@ export function ControlFocusModal({
             <IconButton
               size="medium"
               onClick={onInc5}
+              aria-label={`Increase ${label} by 5`}
               sx={{ width: 56, height: 36 }}
             >
               <Typography sx={{ fontWeight: 700, fontSize: 14, lineHeight: 1 }}>+5</Typography>
