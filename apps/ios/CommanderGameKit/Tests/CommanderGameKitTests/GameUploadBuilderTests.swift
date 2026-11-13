@@ -48,4 +48,36 @@ final class GameUploadBuilderTests: XCTestCase {
         XCTAssertEqual(started["startingLife"] as? Int, 40)
         XCTAssertEqual((started["players"] as? [[String: Any]])?.count, 3)
     }
+
+    /// 1v1 2HG plays as 2HG (four seats, two heads per team) and is saved as
+    /// its own game type with one player on both rows of a team.
+    func testOneVsOneTwoHeadedGiantUpload() throws {
+        var s = GameSetup.seatingState(playerCount: 4, startingLife: 30, turnTimerSeconds: 0, gameType: .twoHeadedGiant, onePilotPerTeam: true)
+        XCTAssertEqual(s.players.map(\.teamNumber), [1, 1, 2, 2])
+        for (i, (player, deck)) in [("Alice", "A1"), ("Alice", "A2"), ("Bob", "B1"), ("Bob", "B2")].enumerated() {
+            s = GameSetup.seating(s, idx: i, seat: GameSetup.Seat(playerId: "p-\(player)", playerName: player, deckId: "d-\(deck)", deckName: deck, commander: CommanderInfo(name: "\(deck) Cmdr")))
+        }
+        // The start-of-game roll is one die per player, not one per head.
+        XCTAssertEqual(GameOutcome.rollOffSeats(s), [0, 2])
+        s = GameSetup.start(GameSetup.chooseFirstPlayer(s, idx: 0), now: 0)
+        // Unchanged 2HG rules: poison is shared and a team falls at 15, not 10.
+        s = GameReducer.applyEvent(s, LiveGameEvent(seat: "host", ts: 1, kind: .poisonChange(playerIdx: 0, delta: 10)), now: 0)
+        XCTAssertNil(GameOutcome.winnerIdx(s))
+        s = GameReducer.applyEvent(s, LiveGameEvent(seat: "host", ts: 2, kind: .poisonChange(playerIdx: 1, delta: 5)), now: 0)
+        XCTAssertEqual(GameOutcome.winnerIdx(s).map { s.players[$0].teamNumber }, 2)
+        XCTAssertEqual(Teams.label(1, players: s.players, teamNames: nil), "Team 1 (Alice)")
+
+        let body = try GameUploadBuilder.createGameInput(clientGameId: "11111111-2222-4333-8444-555555555555", playedAt: Date(timeIntervalSince1970: 0), state: s, log: [])
+        XCTAssertEqual(body.gameType?.rawValue, "1v1-2hg")
+        XCTAssertEqual(body.results.map(\.playerId), ["p-Alice", "p-Alice", "p-Bob", "p-Bob"])
+        XCTAssertEqual(body.results.map(\.deckId), ["d-A1", "d-A2", "d-B1", "d-B2"])
+        XCTAssertEqual(body.results.map(\.finishPosition), [2, 2, 1, 1])
+        XCTAssertEqual(body.results.map(\.teamNumber), [1, 1, 2, 2])
+
+        // A plain 2HG game is still saved as 2hg, and the flag survives a save/resume.
+        XCTAssertEqual(try JSONDecoder().decode(GameState.self, from: JSONEncoder().encode(s)).onePilotPerTeam, true)
+        let plain = GameSetup.seatingState(playerCount: 4, startingLife: 30, turnTimerSeconds: 0, gameType: .twoHeadedGiant)
+        XCTAssertNil(plain.onePilotPerTeam)
+        XCTAssertNil(String(data: try JSONEncoder().encode(plain), encoding: .utf8)!.range(of: "onePilotPerTeam"))
+    }
 }

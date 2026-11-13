@@ -14,7 +14,9 @@ public enum Teams {
 
     /// "Name (A / B)".
     public static func label(_ teamNumber: Int?, players: [PlayerState], teamNames: [Int: String]?) -> String {
-        let members = players.filter { $0.teamNumber == teamNumber }.map(\.playerName)
+        // One pilot on both heads (1v1 2HG) is named once.
+        var members: [String] = []
+        for name in players.filter({ $0.teamNumber == teamNumber }).map(\.playerName) where !members.contains(name) { members.append(name) }
         return "\(name(teamNumber, teamNames: teamNames)) (\(members.joined(separator: " / ")))"
     }
 }

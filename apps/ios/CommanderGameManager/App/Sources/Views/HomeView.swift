@@ -19,7 +19,11 @@ struct HomeView: View {
     @State private var startingLife = 40
     @State private var customLife = ""
     @State private var timerSeconds = 300
-    @State private var gameType: GameType = .standard
+    /// What the setup offers. 1v1 2HG is a 2HG table where one player pilots
+    /// both heads of a team.
+    private enum TableMode: Hashable { case standard, twoHeadedGiant, oneVsOne2hg }
+    @State private var mode: TableMode = .standard
+    private var gameType: GameType { mode == .standard ? .standard : .twoHeadedGiant }
     @State private var random = false
     @State private var refreshing = false
     @State private var refreshMessage: String?
@@ -72,23 +76,28 @@ struct HomeView: View {
                     }
                 }
                 Section("Table") {
-                    Picker("Game type", selection: $gameType) {
-                        Text("Standard").tag(GameType.standard)
-                        Text("Two-Headed Giant").tag(GameType.twoHeadedGiant)
+                    Picker("Game type", selection: $mode) {
+                        Text("Standard").tag(TableMode.standard)
+                        Text("Two-Headed Giant").tag(TableMode.twoHeadedGiant)
+                        Text("1v1 2HG").tag(TableMode.oneVsOne2hg)
                     }
                     .pickerStyle(.segmented)
-                    .onChange(of: gameType) { _, type in
-                        if type == .twoHeadedGiant { playerCount = 4 }
-                        if customLife.isEmpty { startingLife = type == .twoHeadedGiant ? 30 : playerCount == 2 ? 30 : 40 }
+                    .accessibilityIdentifier("gameType")
+                    .onChange(of: mode) { _, mode in
+                        if mode != .standard { playerCount = 4 }
+                        if customLife.isEmpty { startingLife = mode != .standard ? 30 : playerCount == 2 ? 30 : 40 }
                     }
                     Picker("Players", selection: $playerCount) {
                         ForEach(2...4, id: \.self) { Text("\($0)").tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    .disabled(gameType == .twoHeadedGiant)
-                    .onChange(of: playerCount) { _, n in if customLife.isEmpty && gameType == .standard { startingLife = n == 2 ? 30 : 40 } }
-                    if gameType == .twoHeadedGiant {
+                    .disabled(mode != .standard)
+                    .onChange(of: playerCount) { _, n in if customLife.isEmpty && mode == .standard { startingLife = n == 2 ? 30 : 40 } }
+                    if mode == .twoHeadedGiant {
                         Text("Two-Headed Giant is always 4 players (two teams of two).").font(.footnote).foregroundStyle(.secondary)
+                    }
+                    if mode == .oneVsOne2hg {
+                        Text("1v1 2HG is a Two-Headed Giant game for two players: each plays both decks of a team. Four seats, same rules.").font(.footnote).foregroundStyle(.secondary)
                     }
                     // A phone in portrait has no room beside the label: the
                     // controls drop under it instead of wrapping the label.
@@ -105,7 +114,9 @@ struct HomeView: View {
                     Toggle(isOn: $random) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Random: auto-fill seats with players and their decks")
-                            Text("Each seat gets a different player and one of their own decks. You can still change any seat before starting.").font(.footnote).foregroundStyle(.secondary)
+                            Text(mode == .oneVsOne2hg
+                                 ? "Each team gets a different player and two of their own decks. You can still change any seat before starting."
+                                 : "Each seat gets a different player and one of their own decks. You can still change any seat before starting.").font(.footnote).foregroundStyle(.secondary)
                         }
                     }
                     .accessibilityIdentifier("randomToggle")
@@ -118,7 +129,7 @@ struct HomeView: View {
                 if let last = lastGame {
                     Section("Rematch") {
                         Button {
-                            gameType = last.gameType
+                            mode = last.gameType != .twoHeadedGiant ? .standard : last.onePilotPerTeam == true ? .oneVsOne2hg : .twoHeadedGiant
                             playerCount = last.seats.count
                             startingLife = last.startingLife
                             customLife = Self.lifePresets.contains(last.startingLife) ? "" : String(last.startingLife)
@@ -254,7 +265,7 @@ struct HomeView: View {
     }
 
     private func start(prefill: [GameSetup.Seat?]) {
-        setup = GameSetupInput(playerCount: seatCount, startingLife: startingLife, turnTimerSeconds: max(0, timerSeconds), gameType: gameType, prefill: prefill)
+        setup = GameSetupInput(playerCount: seatCount, startingLife: startingLife, turnTimerSeconds: max(0, timerSeconds), gameType: gameType, onePilotPerTeam: mode == .oneVsOne2hg, prefill: prefill)
     }
 
     /// Web `buildRandomPrefill`: up to `seatCount` unique players, each with
@@ -262,6 +273,14 @@ struct HomeView: View {
     private func randomPrefill() -> [GameSetup.Seat?] {
         var byPlayer: [String: [CachedDeck]] = [:]
         for d in decks { byPlayer[d.playerId, default: []].append(d) }
+        func seat(_ deck: CachedDeck) -> GameSetup.Seat {
+            GameSetup.Seat(playerId: deck.playerId, playerName: deck.playerName, deckId: deck.id, deckName: deck.name,
+                           commander: CommanderInfo(name: deck.commander), partner: deck.partner.map { CommanderInfo(name: $0) })
+        }
+        // 1v1 2HG: two players with at least two decks each; seats run team 1, team 1, team 2, team 2.
+        if mode == .oneVsOne2hg {
+            return byPlayer.values.filter { $0.count >= 2 }.shuffled().prefix(2).flatMap { $0.shuffled().prefix(2).map(seat) }
+        }
         let chosen = byPlayer.keys.shuffled().prefix(seatCount)
         return chosen.map { pid in
             let deck = byPlayer[pid]!.randomElement()!
@@ -304,6 +323,8 @@ struct GameSetupInput: Hashable {
     var startingLife: Int
     var turnTimerSeconds: Int
     var gameType: GameType
+    /// 1v1 2HG: one player pilots both heads of a team.
+    var onePilotPerTeam = false
     /// Seats to pre-fill (Random or Rematch); nil entries stay empty.
     var prefill: [GameSetup.Seat?] = []
 }
@@ -314,6 +335,7 @@ enum RematchStore {
         var seats: [GameSetup.Seat?]
         var startingLife: Int
         var gameType: GameType
+        var onePilotPerTeam: Bool?
     }
     private static let key = "rematch.last"
 
@@ -321,7 +343,7 @@ enum RematchStore {
         let seats: [GameSetup.Seat?] = state.players.map { p in
             GameSetup.isSeatFilled(p) ? GameSetup.Seat(playerId: p.playerId, playerName: p.playerName, deckId: p.deckId, deckName: p.deckName, commander: p.commander, partner: p.partner) : nil
         }
-        let entry = Entry(seats: seats, startingLife: state.startingLife, gameType: state.gameType ?? .standard)
+        let entry = Entry(seats: seats, startingLife: state.startingLife, gameType: state.gameType ?? .standard, onePilotPerTeam: state.onePilotPerTeam)
         if let data = try? JSONEncoder().encode(entry) { UserDefaults.standard.set(data, forKey: key) }
     }
 

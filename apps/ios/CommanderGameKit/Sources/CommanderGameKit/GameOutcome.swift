@@ -96,6 +96,14 @@ public enum GameOutcome {
         public var rolls: [Roll]
     }
 
+    /// Who rolls in the standard roll-off: every living seat, or in 1v1 2HG
+    /// one seat per team, since each player pilots both heads.
+    public static func rollOffSeats(_ state: GameState) -> [Int] {
+        guard state.isOneVsOneTwoHeadedGiant else { return activeSeats(state) }
+        var teams = Set<Int?>()
+        return activeSeats(state).filter { teams.insert(state.players[$0].teamNumber).inserted }
+    }
+
     /// Standard start-of-game roll-off: every seat rolls a d20, highest goes
     /// first, ties among the top rollers are re-rolled between them.
     public static func rollForFirstPlayer(_ state: GameState, using rng: inout some RandomNumberGenerator) -> RollResult {

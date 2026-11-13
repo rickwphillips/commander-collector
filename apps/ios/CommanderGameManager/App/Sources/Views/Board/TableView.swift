@@ -17,6 +17,10 @@ struct TableView: View {
     /// Phone: the seat whose picker is up as a sheet (a seat card is far too
     /// small to hold the picker form).
     @State private var sheetPickerSeat: Int?
+    /// 1v1 2HG: teams whose picker (one player, two decks) is open, and the
+    /// team whose picker is up as a sheet on a phone.
+    @State private var teamPickerOpen: Set<Int> = []
+    @State private var sheetPickerTeam: Int?
     @State private var isCompact = false
     @State private var showLog = false
     @State private var turnIndicatorOn = false
@@ -67,6 +71,10 @@ struct TableView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in islandEdge = Self.islandEdge() }
         .sheet(item: $sheetPickerSeat) { i in
             SeatPickerSheet(session: session, idx: i, taken: Set(session.state.players.map(\.playerId))) { sheetPickerSeat = nil }
+                .presentationDetents([.large])
+        }
+        .sheet(item: $sheetPickerTeam) { team in
+            TeamSeatPickerSheet(session: session, teamNumber: team) { sheetPickerTeam = nil }
                 .presentationDetents([.large])
         }
     }
@@ -167,7 +175,8 @@ struct TableView: View {
         // with the visuals, Motion on brings them back.
         .onChange(of: settings.animationsEnabled) { _, _ in applyEffectSounds() }
         .onDisappear {
-            SoundService.shared.stopPoison()
+            // Leaving the board (game ended or backed out) silences its effects.
+            SoundService.shared.stopAll()
             host?.end(); host = nil
             webHost?.end(); webHost = nil; WebTableHost.current = nil
             session.onStateChanged = nil
@@ -217,15 +226,26 @@ struct TableView: View {
     /// cards side by side while seating.
     @ViewBuilder
     private func teamPanel(_ team: Int, elapsed: Int) -> some View {
-        if session.isSeating {
+        if session.isSeating && session.state.isOneVsOneTwoHeadedGiant {
+            teamSeatingCard(team)
+        } else if session.isSeating {
             HStack(spacing: 4) {
                 ForEach(session.state.players.indices.filter { session.state.players[$0].teamNumber == team }, id: \.self) { i in
                     seatingCard(i)
                 }
             }
         } else {
-            TeamPanel(session: session, teamNumber: team, elapsedSeconds: elapsed, turnIndicatorOn: turnIndicatorOn)
+            TeamPanel(session: session, teamNumber: team, elapsedSeconds: elapsed, turnIndicatorOn: turnIndicatorOn,
+                      backdropDelays: teamBackdropDelays(team), backdropFlash: session.firstPlayerChosenThisSession)
         }
+    }
+
+    /// 2HG seat reveals: the team going first introduces its two heads, then
+    /// the other team its two, one `revealStep` apart. A resume shows all at once.
+    private func teamBackdropDelays(_ team: Int) -> [Double] {
+        guard session.firstPlayerChosenThisSession, let first = session.state.firstPlayerIdx else { return [0, 0] }
+        let lead: Double = session.state.players[first].teamNumber == team ? 0 : 2
+        return [lead * Self.revealStep, (lead + 1) * Self.revealStep]
     }
 
     @ViewBuilder
@@ -240,6 +260,23 @@ struct TableView: View {
 }
 
 extension TableView {
+    /// 1v1 2HG: one seating card for the whole team, with its picker (one
+    /// player, two decks) rendered inside it so it faces that player.
+    @ViewBuilder
+    fileprivate func teamSeatingCard(_ team: Int) -> some View {
+        ZStack {
+            TeamSeatingPanel(members: session.state.players.filter { $0.teamNumber == team }, teamNumber: team) {
+                if isCompact { sheetPickerTeam = team } else { teamPickerOpen.insert(team) }
+            }
+            if teamPickerOpen.contains(team) {
+                TeamSeatPickerSheet(session: session, teamNumber: team) { teamPickerOpen.remove(team) }
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: teamPickerOpen.contains(team))
+    }
+
     /// A seating card with its picker rendered inside it, so the picker turns
     /// with the seat and faces the player who opened it.
     @ViewBuilder
@@ -302,5 +339,50 @@ struct SeatingPanel: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("seat-\(player.position.rawValue)")
+    }
+}
+
+/// 1v1 2HG seating card for a whole team: its one player and their two decks.
+struct TeamSeatingPanel: View {
+    let members: [PlayerState]
+    let teamNumber: Int
+    let onTap: () -> Void
+    @Environment(\.colorScheme) private var scheme
+
+    private var filled: Bool { !members.isEmpty && members.allSatisfy(GameSetup.isSeatFilled) }
+    private var teamColor: Color { teamNumber == 1 ? .accentColor : .purple }
+
+    var body: some View {
+        Button(action: onTap) {
+            ZStack(alignment: .topLeading) {
+                VStack(spacing: 6) {
+                    if filled {
+                        Text(members[0].playerName).font(.system(size: 28, weight: .bold))
+                        HStack(alignment: .top, spacing: 24) {
+                            ForEach(Array(members.enumerated()), id: \.offset) { _, p in
+                                VStack(spacing: 2) {
+                                    Text(p.deckName).font(.headline)
+                                    Text(p.partner.map { "\(p.commander.name) / \($0.name)" } ?? p.commander.name)
+                                        .font(.subheadline).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        Text("Tap to edit").font(.caption).foregroundStyle(.tertiary).padding(.top, 2)
+                    } else {
+                        Text("Tap to choose a player and two decks").font(.system(size: 18, weight: .semibold)).foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .multilineTextAlignment(.center)
+                Text("TEAM \(teamNumber)").font(.system(size: 10, weight: .bold)).kerning(0.5).foregroundStyle(.white)
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(RoundedRectangle(cornerRadius: 4).fill(teamColor))
+                    .padding(6)
+            }
+            .background(RoundedRectangle(cornerRadius: 12).fill(filled ? teamColor.opacity(0.08) : Theme.panelBackground(scheme)))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [8, 6])).foregroundStyle(filled ? teamColor : Color.primary.opacity(0.2)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("team-\(teamNumber)")
     }
 }

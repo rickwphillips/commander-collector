@@ -155,6 +155,9 @@ public struct GameState: Hashable, Sendable, Codable {
     public var gameType: GameType?
     /// 2HG only: custom team names keyed by team number; "Team N" when absent.
     public var teamNames: [Int: String]?
+    /// 1v1 2HG: a 2HG game where one player pilots both heads of a team.
+    /// Play is plain 2HG; only seating and the saved record differ.
+    public var onePilotPerTeam: Bool?
     /// Seat index of the player who went first; nil until chosen.
     public var firstPlayerIdx: Int?
     /// Seat → last heartbeat timestamp (ms) from a remote seat.
@@ -165,7 +168,7 @@ public struct GameState: Hashable, Sendable, Codable {
         currentPlayerIdx: Int = 0, turnNumber: Int = 1, startingLife: Int = 40,
         phase: GamePhase = .playing, turnTimerSeconds: Int = 300, turnStartTime: Double = 0,
         notes: String = "", gameType: GameType? = nil, teamNames: [Int: String]? = nil,
-        firstPlayerIdx: Int? = nil, remoteCheckins: [String: Double]? = nil
+        firstPlayerIdx: Int? = nil, remoteCheckins: [String: Double]? = nil, onePilotPerTeam: Bool? = nil
     ) {
         self.players = players
         self.commanderDamage = commanderDamage ?? .empty(seatCount: players.count)
@@ -174,13 +177,15 @@ public struct GameState: Hashable, Sendable, Codable {
         self.turnTimerSeconds = turnTimerSeconds; self.turnStartTime = turnStartTime
         self.notes = notes; self.gameType = gameType; self.teamNames = teamNames
         self.firstPlayerIdx = firstPlayerIdx; self.remoteCheckins = remoteCheckins
+        self.onePilotPerTeam = onePilotPerTeam
     }
 
     public var isTwoHeadedGiant: Bool { gameType == .twoHeadedGiant }
+    public var isOneVsOneTwoHeadedGiant: Bool { isTwoHeadedGiant && onePilotPerTeam == true }
 
     private enum CodingKeys: String, CodingKey {
         case players, commanderDamage, currentPlayerIdx, turnNumber, startingLife, phase
-        case turnTimerSeconds, turnStartTime, notes, gameType, teamNames, firstPlayerIdx, remoteCheckins
+        case turnTimerSeconds, turnStartTime, notes, gameType, teamNames, firstPlayerIdx, remoteCheckins, onePilotPerTeam
     }
 
     public init(from decoder: Decoder) throws {
@@ -202,6 +207,7 @@ public struct GameState: Hashable, Sendable, Codable {
         }
         firstPlayerIdx = try c.decodeIfPresent(Int.self, forKey: .firstPlayerIdx)
         remoteCheckins = try c.decodeIfPresent([String: Double].self, forKey: .remoteCheckins)
+        onePilotPerTeam = try c.decodeIfPresent(Bool.self, forKey: .onePilotPerTeam)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -221,6 +227,7 @@ public struct GameState: Hashable, Sendable, Codable {
         }
         try c.encodeIfPresent(firstPlayerIdx, forKey: .firstPlayerIdx)
         try c.encodeIfPresent(remoteCheckins, forKey: .remoteCheckins)
+        try c.encodeIfPresent(onePilotPerTeam, forKey: .onePilotPerTeam)
     }
 }
 

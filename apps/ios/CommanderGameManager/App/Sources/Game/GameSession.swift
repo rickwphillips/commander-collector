@@ -33,6 +33,14 @@ final class GameSession {
     /// game), which stagger-reveals the seat backdrops in turn order. A resumed
     /// game fades them all in together.
     private(set) var firstPlayerChosenThisSession = false
+    /// Bumped when a seat's own pass button goes back a turn. That button
+    /// leaves with the turn, so the centre Next Turn button shows the
+    /// "Previous Turn" bubble for it.
+    private(set) var previousTurnSignal = 0
+    func previousTurnFromSeat() {
+        dispatch(.prevTurn)
+        previousTurnSignal += 1
+    }
 
     /// Remote mode (a phone at a seat): events go to the table over the local
     /// link instead of the reducer, and the state arrives back from the host.
@@ -56,7 +64,7 @@ final class GameSession {
     init(setup: GameSetupInput) {
         var s = GameSetup.seatingState(
             playerCount: setup.playerCount, startingLife: setup.startingLife,
-            turnTimerSeconds: setup.turnTimerSeconds, gameType: setup.gameType)
+            turnTimerSeconds: setup.turnTimerSeconds, gameType: setup.gameType, onePilotPerTeam: setup.onePilotPerTeam)
         for (i, seat) in setup.prefill.enumerated() where i < s.players.count {
             if let seat { s = GameSetup.seating(s, idx: i, seat: seat) }
         }
@@ -110,11 +118,13 @@ final class GameSession {
         state = GameSetup.seating(state, idx: idx, seat: seat)
     }
 
+    /// Choosing who goes first is the last step of seating, so it also starts
+    /// the game: there is no separate Start button.
     func chooseFirstPlayer(_ idx: Int, note: String?) {
         let prev = state
         state = GameSetup.chooseFirstPlayer(state, idx: idx)
         firstPlayerChosenThisSession = true
-        if isPlaying { appendLog(GameLog.diff(prev, state)) }
+        if isSeating { start() } else if isPlaying { appendLog(GameLog.diff(prev, state)) }
         if let note { appendLog([GameLogEvent(type: "first_player_roll", payload: ["note": .string(note)])]) }
         persist()
     }
@@ -130,7 +140,8 @@ final class GameSession {
     /// Back to seating with the same players (web Restart).
     func restartKeepingSeats() -> GameState {
         var fresh = GameSetup.seatingState(playerCount: state.players.count, startingLife: state.startingLife,
-                                           turnTimerSeconds: state.turnTimerSeconds, gameType: state.gameType ?? .standard)
+                                           turnTimerSeconds: state.turnTimerSeconds, gameType: state.gameType ?? .standard,
+                                           onePilotPerTeam: state.isOneVsOneTwoHeadedGiant)
         for (i, p) in state.players.enumerated() where GameSetup.isSeatFilled(p) {
             fresh = GameSetup.seating(fresh, idx: i, seat: GameSetup.Seat(playerId: p.playerId, playerName: p.playerName, deckId: p.deckId, deckName: p.deckName, commander: p.commander, partner: p.partner))
         }

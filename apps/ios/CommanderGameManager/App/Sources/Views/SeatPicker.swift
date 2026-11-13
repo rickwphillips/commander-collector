@@ -119,6 +119,103 @@ struct SeatPickerSheet: View {
     }
 }
 
+/// 1v1 2HG team picker: one player and the two decks they pilot, saved to
+/// both seats of the team at once. Commanders come from the decks.
+struct TeamSeatPickerSheet: View {
+    @Bindable var session: GameSession
+    let teamNumber: Int
+    let onDone: () -> Void
+    @Query(sort: \CachedPlayer.name) private var players: [CachedPlayer]
+    @Query(sort: \CachedDeck.name) private var decks: [CachedDeck]
+
+    @State private var playerId = ""
+    /// Chosen decks in order: first head, second head.
+    @State private var deckIds: [String] = []
+    @State private var error: String?
+    @State private var deckSearch = ""
+
+    private var seats: [Int] { session.state.players.indices.filter { session.state.players[$0].teamNumber == teamNumber } }
+    private var otherTeam: [PlayerState] { session.state.players.filter { $0.teamNumber != teamNumber } }
+    private var takenPlayers: Set<String> { Set(otherTeam.map(\.playerId)) }
+    private var takenDecks: Set<String> { Set(otherTeam.map(\.deckId)) }
+    private var ownDecks: [CachedDeck] { decks.filter { $0.playerId == playerId && matches($0) } }
+    private var otherDecks: [CachedDeck] { decks.filter { $0.playerId != playerId && matches($0) } }
+    private func matches(_ d: CachedDeck) -> Bool {
+        deckSearch.isEmpty || d.name.localizedCaseInsensitiveContains(deckSearch) || d.commander.localizedCaseInsensitiveContains(deckSearch) || d.playerName.localizedCaseInsensitiveContains(deckSearch)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            OverlayHeader(title: "Choose player & two decks", cancelId: "teamPickerCancel", confirmId: "teamPickerSave", confirmLabel: "Save team", onCancel: onDone, onConfirm: confirm)
+            Form {
+                Section {
+                    PlayerChips(players: players, selection: $playerId, seated: takenPlayers)
+                } header: {
+                    Text("Team \(teamNumber)")
+                } footer: {
+                    Text("1v1 2HG: one player pilots both decks of the team.")
+                }
+                Section {
+                    TextField("Search decks", text: $deckSearch)
+                    if !ownDecks.isEmpty { deckRows(ownDecks, header: "Player's decks") }
+                    deckRows(otherDecks, header: ownDecks.isEmpty ? nil : "Other decks")
+                } header: {
+                    Text("Decks (\(deckIds.count) of 2 chosen)")
+                }
+                if let error { Section { Text(error).foregroundStyle(.red) } }
+            }
+            .onAppear {
+                let members = seats.map { session.state.players[$0] }
+                playerId = members.first { !$0.playerId.isEmpty }?.playerId ?? ""
+                deckIds = members.map(\.deckId).filter { !$0.isEmpty }
+            }
+        }
+    }
+
+    @ViewBuilder private func deckRows(_ list: [CachedDeck], header: String?) -> some View {
+        if let header { Text(header).font(.caption).foregroundStyle(.secondary) }
+        ForEach(list) { d in
+            let slot = deckIds.firstIndex(of: d.id)
+            let unavailable = takenDecks.contains(d.id) || (slot == nil && deckIds.count >= 2)
+            Button { toggle(d) } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(d.name).foregroundStyle(unavailable ? .secondary : .primary)
+                        Text(d.partner.map { "\(d.commander) / \($0)" } ?? d.commander).font(.caption).foregroundStyle(.secondary)
+                        if d.playerId != playerId { Text(d.playerName).font(.caption2).foregroundStyle(.tertiary) }
+                    }
+                    Spacer()
+                    if let slot { Label("Deck \(slot + 1)", systemImage: "checkmark").font(.caption.bold()).foregroundStyle(Color.accentColor) }
+                }
+            }
+            .disabled(unavailable)
+            .accessibilityIdentifier("teamDeck-\(d.id)")
+        }
+    }
+
+    /// Tap to choose, tap again to drop. The first deck chosen fills the
+    /// player with its owner when no player is picked yet and they are free.
+    private func toggle(_ d: CachedDeck) {
+        error = nil
+        if let slot = deckIds.firstIndex(of: d.id) { deckIds.remove(at: slot); return }
+        guard deckIds.count < 2 else { return }
+        deckIds.append(d.id)
+        if playerId.isEmpty, !takenPlayers.contains(d.playerId) { playerId = d.playerId }
+    }
+
+    private func confirm() {
+        guard let player = players.first(where: { $0.id == playerId }) else { error = "Pick a player."; return }
+        let chosen = deckIds.compactMap { id in decks.first { $0.id == id } }
+        guard chosen.count == 2, seats.count == 2 else { error = "Pick two decks."; return }
+        for (seat, deck) in zip(seats, chosen) {
+            session.seat(seat, GameSetup.Seat(
+                playerId: player.id, playerName: player.name, deckId: deck.id, deckName: deck.name,
+                commander: CommanderInfo(name: deck.commander), partner: deck.partner.map { CommanderInfo(name: $0) }))
+        }
+        onDone()
+    }
+}
+
 /// The player choice as a row of chips, so it draws inside the seat and
 /// turns with it (a system popover would not). Seated players are shown but
 /// cannot be chosen twice.

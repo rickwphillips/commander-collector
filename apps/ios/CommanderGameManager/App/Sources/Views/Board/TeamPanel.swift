@@ -13,6 +13,10 @@ struct TeamPanel: View {
     let teamNumber: Int
     let elapsedSeconds: Int
     let turnIndicatorOn: Bool
+    /// Per head, the delay (s) before its commander backdrop reveals, and
+    /// whether the reveal flashes (the intro after a first player is chosen).
+    var backdropDelays: [Double] = [0, 0]
+    var backdropFlash = false
     @Environment(GameSettingsStore.self) private var settings
     @Environment(\.colorScheme) private var scheme
     @Environment(\.compactTable) private var compact
@@ -58,6 +62,7 @@ struct TeamPanel: View {
             let sz = SeatPanel.Sizes(panelHeight: geo.size.height, panelWidth: geo.size.width)
             ZStack {
                 Theme.panelBackground(scheme)
+                TeamBackdrop(names: members.map { state.players[$0].commander.name }, revealDelays: backdropDelays, flash: backdropFlash)
                 if settings.animationsEnabled {
                     if members.contains(where: { state.players[$0].hasInitiative }) { InitiativeTorch().transition(.opacity) }
                     PoisonOverlay(poison: poison, progress: poisonProgress).transition(.opacity)
@@ -247,6 +252,16 @@ struct TeamPanel: View {
     private func sharedLife(_ sz: SeatPanel.Sizes) -> some View {
         let lost = Theme.lostRatio(life, startingLife: state.startingLife)
         return VStack(spacing: 4) {
+            StepperControl(value: poison, color: poison >= 15 ? Color(hex: 0x2E7D32) : .primary, max: 15, glass: glassActive, size: sz.stepper,
+                           valueBlur: CGFloat(pow(poisonProgress, 2.5) * 1.5), focus: .poison, overlay: $overlay,
+                           onChange: { session.dispatch(.poisonChange(playerIdx: primary, delta: $0)) }) {
+                HStack(spacing: 4) {
+                    CounterGlyph(kind: .poison, size: sz.label, poison: poison, poisonDanger: 15)
+                    Text("Poison").font(.system(size: sz.label)).foregroundStyle(.secondary)
+                }
+            }
+            .modifier(PoisonPulse(active: poison == 14))
+            .fixedSize()
             ZStack {
                 LifeCracks(fingerprint: teamNumber, lostRatio: lost)
                 if let threat, threat.intensity > 0, settings.animationsEnabled { ThreatNames(name: threat.commanderName, intensity: threat.intensity, fingerprint: teamNumber) }
@@ -267,23 +282,9 @@ struct TeamPanel: View {
             .frame(minHeight: sz.life * 1.3)
             .clipped()
             Text("SHARED LIFE").font(.system(size: sz.label)).kerning(1).foregroundStyle(.secondary)
-            StepperControl(value: poison, color: poison >= 15 ? Color(hex: 0x2E7D32) : .primary, max: 15, glass: glassActive, size: sz.stepper,
-                           valueBlur: CGFloat(pow(poisonProgress, 2.5) * 1.5), focus: .poison, overlay: $overlay,
-                           onChange: { session.dispatch(.poisonChange(playerIdx: primary, delta: $0)) }) {
-                HStack(spacing: 4) {
-                    CounterGlyph(kind: .poison, size: sz.label, poison: poison, poisonDanger: 15)
-                    Text("Poison").font(.system(size: sz.label)).foregroundStyle(.secondary)
-                }
-            }
-            .modifier(PoisonPulse(active: poison == 14))
-            .fixedSize()
             if isActive && !eliminated {
-                Button { session.dispatch(.passTurn) } label: {
-                    Text("PASS TURN").font(.system(size: sz.label, weight: .heavy)).kerning(1)
-                        .padding(.horizontal, 12).padding(.vertical, 4)
-                        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.accentColor, lineWidth: 2))
-                }
-                .buttonStyle(.plain).foregroundStyle(Color.accentColor)
+                PassTurnButton(title: "PASS TURN", fontSize: max(sz.label * 1.6, 20),
+                               onNext: { session.dispatch(.passTurn) }, onPrev: { session.previousTurnFromSeat() })
             }
         }
     }

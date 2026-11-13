@@ -35,7 +35,7 @@ public enum GameSetup {
     }
 
     /// The state the board starts seating from.
-    public static func seatingState(playerCount: Int, startingLife: Int, turnTimerSeconds: Int, gameType: GameType) -> GameState {
+    public static func seatingState(playerCount: Int, startingLife: Int, turnTimerSeconds: Int, gameType: GameType, onePilotPerTeam: Bool = false) -> GameState {
         let is2hg = gameType == .twoHeadedGiant
         let players = positions(forPlayerCount: playerCount, gameType: gameType).map { position in
             emptySeat(at: position, startingLife: startingLife, teamNumber: is2hg ? team(for: position) : nil)
@@ -45,7 +45,7 @@ public enum GameSetup {
             commanderDamage: .empty(seatCount: players.count),
             currentPlayerIdx: 0, turnNumber: 1, startingLife: startingLife,
             phase: .seating, turnTimerSeconds: turnTimerSeconds, turnStartTime: 0,
-            notes: "", gameType: gameType
+            notes: "", gameType: gameType, onePilotPerTeam: is2hg && onePilotPerTeam ? true : nil
         )
     }
 

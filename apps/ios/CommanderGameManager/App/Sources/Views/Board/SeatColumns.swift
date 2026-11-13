@@ -156,8 +156,11 @@ struct CommanderDamageRow: View {
                            footer: AnyView(statusLine),
                            onChange: { session.dispatch(.commanderDamageChange(targetIdx: targetIdx, sourceIdx: sourceIdx, isPartner: false, delta: $0)) }) {
                 HStack(spacing: 8) {
-                    Text("♥\(source.life)").font(.system(size: sizes.source * 1.15, weight: .heavy))
-                        .foregroundStyle(Theme.lifeColor(source.life, startingLife: state.startingLife) ?? .accentColor)
+                    // 2HG: life is shared, and the team total is already on the panel.
+                    if !state.isTwoHeadedGiant {
+                        Text("♥\(source.life)").font(.system(size: sizes.source * 1.15, weight: .heavy))
+                            .foregroundStyle(Theme.lifeColor(source.life, startingLife: state.startingLife) ?? .accentColor)
+                    }
                     if dealt.total > 0 {
                         Text("\u{2694}\u{FE0E}\(viewer.partner != nil ? "\(dealt.fromCommander)/\(dealt.fromPartner)" : "\(dealt.total)")")
                             .font(.system(size: sizes.source * 1.15, weight: .black))

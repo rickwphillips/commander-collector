@@ -147,12 +147,8 @@ struct SeatPanel: View {
                 }
                 XpBadge(experience: player.experience)
                 if isActive && !state.isTwoHeadedGiant && !session.isRemote {
-                    Button { session.dispatch(.passTurn) } label: {
-                        Text("PASS").font(.system(size: sz.pass, weight: .bold))
-                            .padding(.horizontal, 10).padding(.vertical, 3)
-                            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.accentColor, lineWidth: 2))
-                    }
-                    .buttonStyle(.plain).foregroundStyle(Color.accentColor)
+                    PassTurnButton(title: "PASS", fontSize: sz.pass * 1.4,
+                                   onNext: { session.dispatch(.passTurn) }, onPrev: { session.previousTurnFromSeat() })
                 }
                 Spacer()
                 statusIcons(sz)

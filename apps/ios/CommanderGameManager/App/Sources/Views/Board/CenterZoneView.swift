@@ -37,7 +37,9 @@ struct CenterZoneView: View {
 
     private var state: GameState { session.state }
     private var is2hg: Bool { state.isTwoHeadedGiant }
-    private var firstPlayerSet: Bool { state.firstPlayerIdx != nil }
+    /// 2HG rolls as teams with no house rules. 1v1 2HG is two players, so it
+    /// uses the ordinary roll-off (one die each) and its house rules.
+    private var teamRoll: Bool { is2hg && !state.isOneVsOneTwoHeadedGiant }
 
     var body: some View {
         ZStack {
@@ -122,32 +124,11 @@ struct CenterZoneView: View {
                     .disabled(!session.allSeatsFilled || rollOff.phase == .rolling || rollOff.phase == .tie)
                     .accessibilityIdentifier("pickFirst")
             }
-            if !is2hg {
-                if compact {
-                    // No room for the labels in a phone strip: the rules open as a sheet.
-                    Button { panel = .houseRules } label: {
-                        VStack(spacing: 2) { Image(systemName: "list.bullet.clipboard").font(.system(size: 22)); Text("Rules").font(.caption.bold()) }.frame(width: 48, height: 60)
-                    }
-                    .buttonStyle(.bordered)
-                    .accessibilityIdentifier("houseRules")
-                } else {
-                    houseRuleList
-                }
-            }
-            VStack(spacing: 6) {
-                if let first = state.firstPlayerIdx {
-                    Text("\(state.players[first].playerName) goes first").font(.subheadline.bold())
-                }
-                Button { session.start() } label: {
-                    Label("Start game", systemImage: "play.fill").font(.headline).frame(minWidth: compact ? 0 : 150)
-                }
-                .buttonStyle(.borderedProminent).controlSize(compact ? .regular : .large)
-                .disabled(!session.allSeatsFilled || !firstPlayerSet)
-                .accessibilityIdentifier("startGame")
-                Text(!session.allSeatsFilled ? "Seat every player to start" : !firstPlayerSet ? "Roll or pick who goes first" : "")
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
-            }
-            .layoutPriority(-1)
+            // No Start button: choosing who goes first starts the game.
+            Text(session.allSeatsFilled ? "Roll or pick who goes first to start" : "Seat every player to start")
+                .font(.caption).foregroundStyle(.secondary).lineLimit(2).minimumScaleFactor(0.7).multilineTextAlignment(.center)
+                .accessibilityIdentifier("seatingHint")
+                .layoutPriority(-1)
         }
         // The corner buttons share the strip on a phone; keep clear of them.
         .padding(.horizontal, compact ? 44 : 12)
@@ -179,7 +160,7 @@ struct CenterZoneView: View {
     private var pickOverlay: some View {
         overlayFrame(title: "Who goes first?") {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
-                ForEach(state.players.indices, id: \.self) { i in
+                ForEach(GameOutcome.rollOffSeats(state), id: \.self) { i in
                     Button(state.players[i].playerName.isEmpty ? "Seat \(i + 1)" : state.players[i].playerName) {
                         session.chooseFirstPlayer(i, note: nil); panel = nil
                     }
@@ -197,7 +178,11 @@ struct CenterZoneView: View {
         return state.players[state.currentPlayerIdx].commander.name
     }
     private var turnPlayerLabel: String {
-        if let t = activeTeam { return state.players.filter { $0.teamNumber == t }.map(\.playerName).joined(separator: " & ") }
+        if let t = activeTeam {
+            var names: [String] = []
+            for name in state.players.filter({ $0.teamNumber == t }).map(\.playerName) where !names.contains(name) { names.append(name) }
+            return names.joined(separator: " & ")
+        }
         return state.players[state.currentPlayerIdx].playerName
     }
     private var remaining: Int? { state.turnTimerSeconds > 0 ? max(0, state.turnTimerSeconds - elapsedSeconds) : nil }
@@ -205,10 +190,10 @@ struct CenterZoneView: View {
     private var playControls: some View {
         HStack(spacing: 10) {
             turnTracker.rotationEffect(.degrees(is2hg ? 180 : 90)).frame(width: 110)
-            NextTurnButton(remaining: remaining, onNext: { session.dispatch(.passTurn) }, onPrev: { session.dispatch(.prevTurn) })
+            NextTurnButton(remaining: remaining, tipSignal: session.previousTurnSignal, onNext: { session.dispatch(.passTurn) }, onPrev: { session.dispatch(.prevTurn) })
             turnTracker.rotationEffect(.degrees(is2hg ? 0 : -90)).frame(width: 110)
         }
-        .padding(.horizontal, 44)
+        .padding(.horizontal, 44).padding(.vertical, 10)
     }
 
     /// Phone: log and rules on the left, the turn in one upright block with
@@ -224,7 +209,7 @@ struct CenterZoneView: View {
                 Text(turnPlayerLabel).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
             }
             .frame(maxWidth: 170)
-            NextTurnButton(remaining: remaining, compact: true, onNext: { session.dispatch(.passTurn) }, onPrev: { session.dispatch(.prevTurn) })
+            NextTurnButton(remaining: remaining, compact: true, tipSignal: session.previousTurnSignal, onNext: { session.dispatch(.passTurn) }, onPrev: { session.dispatch(.prevTurn) })
             Spacer(minLength: 2)
             cornerButton("gearshape") { panel = .settings }.accessibilityIdentifier("openSettings")
             cornerButton("dice") { panel = .dice }.accessibilityIdentifier("openDice")
@@ -335,6 +320,11 @@ struct CenterZoneView: View {
                         .disabled(settings.motionSettling)
                 }
                 HStack(spacing: 8) {
+                    // Only while a roll-off can still happen: seating, and not a 2HG team roll.
+                    if session.isSeating && !teamRoll {
+                        Button { panel = .houseRules } label: { Label("Roll Rules", systemImage: "list.bullet.clipboard").frame(maxWidth: .infinity) }
+                            .accessibilityIdentifier("houseRules")
+                    }
                     Button { notesDraft = state.notes; panel = .notes } label: { Label("Notes", systemImage: "note.text").frame(maxWidth: .infinity) }
                         .tint(state.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : .accentColor)
                     Button { closePanel { showLog = true } } label: { Label("Game Log", systemImage: "list.bullet").frame(maxWidth: .infinity) }
@@ -363,13 +353,13 @@ struct CenterZoneView: View {
 
     private func startRoll() {
         panel = .dice
-        if is2hg {
+        if teamRoll {
             var rng = SystemRandomNumberGenerator()
             let r = GameOutcome.rollForFirstTeam(state, using: &rng)
             session.logRollForFirst(r.rolls.map { (state.players[$0.idx].playerName, $0.roll) }, tiebreak: false)
             rollOff.startTeamRoll(result: r, names: state.players.map(\.playerName), teamLabel: Teams.name(state.players[r.winnerIdx].teamNumber, teamNames: state.teamNames))
         } else {
-            rollOff.start(GameOutcome.activeSeats(state), names: state.players.map(\.playerName)) { rolls, tiebreak in
+            rollOff.start(GameOutcome.rollOffSeats(state), names: state.players.map(\.playerName)) { rolls, tiebreak in
                 session.logRollForFirst(rolls, tiebreak: tiebreak)
             }
         }
@@ -441,9 +431,10 @@ struct NextTurnButton: View {
     let remaining: Int?
     /// One short row (phone) instead of the big square.
     var compact = false
+    /// Changes when a seat's own button went back a turn: show the bubble here.
+    var tipSignal = 0
     let onNext: () -> Void
     let onPrev: () -> Void
-    @State private var tip = false
 
     private var pulse: Double? {
         guard let r = remaining, r <= 30 else { return nil }
@@ -454,25 +445,78 @@ struct NextTurnButton: View {
         TimelineView(.animation(minimumInterval: 1 / 20, paused: (pulse == nil) || !motion)) { ctx in
             let p = pulse.map { (sin(ctx.date.timeIntervalSinceReferenceDate / $0 * 2 * .pi) + 1) / 2 } ?? 0
             Text(compact ? "Next Turn" : "Next\nTurn")
-                .font(.system(size: compact ? 15 : 22, weight: .bold)).multilineTextAlignment(.center)
+                .font(.system(size: compact ? 15 : 30, weight: .bold)).multilineTextAlignment(.center)
                 .foregroundStyle(Color.accentColor)
-                .frame(width: compact ? 96 : 120, height: compact ? 50 : 120)
+                // iPad: wide, and as tall as the centre strip allows.
+                .frame(width: compact ? 96 : 180)
+                .frame(minHeight: 50, maxHeight: compact ? 50 : .infinity)
                 .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(p > 0.5 ? Theme.danger : Color.accentColor, lineWidth: 2))
                 .shadow(color: Color(red: 1, green: 80/255, blue: 30/255).opacity(p * (remaining.map { $0 <= 10 } ?? false ? 0.9 : 0.5)), radius: 12)
                 .contentShape(Rectangle())
                 .accessibilityIdentifier("nextTurn")
-                .overlay(alignment: .top) {
-                    if tip { Text("Previous Turn").font(.caption2.bold()).padding(6).background(Capsule().fill(Color(.systemGray))).foregroundStyle(.white).offset(y: -30) }
-                }
         }
-        .overlay {
-            HoldOrTap(onTap: onNext) {
-                onPrev()
-                withAnimation { tip = true }
-                Task { try? await Task.sleep(for: .milliseconds(700)); withAnimation { tip = false } }
-            }
-        }
+        .modifier(TurnHold(onNext: onNext, onPrev: onPrev, tipSignal: tipSignal))
         .sensoryFeedback(.impact, trigger: remaining == nil ? 0 : 1)
+    }
+}
+
+/// Tap passes the turn; a long press goes back a turn and says so. The
+/// "Previous Turn" bubble is drawn on top of the button, inside its bounds,
+/// so nothing around it can cover or clip it. `showsTip` false leaves the
+/// bubble to another button; `tipSignal` shows it here on that button's behalf.
+struct TurnHold: ViewModifier {
+    let onNext: () -> Void
+    let onPrev: () -> Void
+    var showsTip = true
+    var tipSignal = 0
+    @State private var tip = false
+
+    private func showTip() {
+        withAnimation { tip = true }
+        Task { try? await Task.sleep(for: .milliseconds(900)); withAnimation { tip = false } }
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                HoldOrTap(onTap: onNext) {
+                    onPrev()
+                    if showsTip { showTip() }
+                }
+            }
+            .onChange(of: tipSignal) { _, _ in showTip() }
+            .overlay {
+                if tip {
+                    Text("Previous Turn").font(.caption.bold()).lineLimit(1).fixedSize()
+                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .background(Capsule().fill(Color(.systemGray))).foregroundStyle(.white)
+                        .allowsHitTesting(false).transition(.opacity)
+                }
+            }
+            .sensoryFeedback(.impact, trigger: tip) { _, on in on }
+    }
+}
+
+/// A seat's or team's own pass-turn button: the centre Next Turn button's
+/// behaviour (tap to pass, hold to go back) at the player's edge of the table.
+struct PassTurnButton: View {
+    let title: String
+    let fontSize: CGFloat
+    let onNext: () -> Void
+    let onPrev: () -> Void
+
+    var body: some View {
+        Text(title).font(.system(size: fontSize, weight: .heavy)).kerning(1)
+            .padding(.horizontal, fontSize).padding(.vertical, fontSize * 0.45)
+            .foregroundStyle(Color.accentColor)
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.accentColor, lineWidth: 2))
+            .contentShape(Rectangle())
+            // This button leaves when the turn goes back, so the centre button shows the bubble.
+            .modifier(TurnHold(onNext: onNext, onPrev: onPrev, showsTip: false))
+            .accessibilityElement()
+            .accessibilityLabel(title)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier("passTurn")
     }
 }
 

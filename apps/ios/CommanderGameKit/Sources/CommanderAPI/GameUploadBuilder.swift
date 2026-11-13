@@ -6,6 +6,9 @@ import CommanderGameKit
 /// web's handleSaveGame sends, plus the client game id (idempotency) and the
 /// whole event log so the web's log view shows the game.
 public enum GameUploadBuilder {
+    /// The server's game type for 1v1 2HG; on the table it is a 2HG game.
+    static let oneVsOneTwoHeadedGiant = "1v1-2hg"
+
     public static func playedAtString(_ date: Date, calendar: Calendar = .current) -> String {
         let c = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", c.year ?? 1970, c.month ?? 1, c.day ?? 1)
@@ -17,7 +20,7 @@ public enum GameUploadBuilder {
         try Components.Schemas.CreateGameInput(
             playedAt: playedAtString(playedAt),
             notes: GameOutcome.cleanNotes(state.notes),
-            gameType: .init(rawValue: (state.gameType ?? .standard).rawValue),
+            gameType: .init(rawValue: state.isOneVsOneTwoHeadedGiant ? oneVsOneTwoHeadedGiant : (state.gameType ?? .standard).rawValue),
             results: GameOutcome.results(state, survivorOrder: survivorOrder).map {
                 .init(deckId: $0.deckId, playerId: $0.playerId, finishPosition: $0.finishPosition,
                       eliminatedTurn: $0.eliminatedTurn, teamNumber: $0.teamNumber)

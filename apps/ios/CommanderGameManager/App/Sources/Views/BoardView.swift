@@ -21,7 +21,11 @@ struct BoardView: View {
             if session.hasEnded {
                 EndSummaryView(session: session, onDone: { dismiss() })
             } else {
-                TableView(session: session, onRestart: { session = GameSession(seating: session.restartKeepingSeats()) }, onBack: { dismiss() })
+                TableView(session: session, onRestart: {
+                    // The old game's effect sounds must not play on over the fresh seating screen.
+                    SoundService.shared.stopAll()
+                    session = GameSession(seating: session.restartKeepingSeats())
+                }, onBack: { dismiss() })
             }
         }
         .navigationBarBackButtonHidden(session.isPlaying)

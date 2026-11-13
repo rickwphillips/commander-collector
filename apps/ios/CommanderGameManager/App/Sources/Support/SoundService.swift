@@ -323,7 +323,9 @@ final class SoundService {
         player.play()
     }
 
-    private func stopAll() {
+    /// Silences everything in flight: one-shots (dice, the blessing fanfare),
+    /// loops, the poison drone, reveal whooshes and firework booms.
+    func stopAll() {
         players.values.forEach { $0.stop() }
         loops.keys.forEach(stopLoop)
         stopDrone()

@@ -109,13 +109,12 @@ final class BoardFlowUITests: XCTestCase {
         turnOnRandom()
         waitFor("continueToSeating").tap()
 
-        // Random fill seated every demo player; the Start button is still gated on a first player.
-        let start = waitFor("startGame")
+        // Random fill seated every demo player; the game waits for a first player.
+        waitFor("seatingHint")
         XCTAssertTrue(text(containing: "Rick").waitForExistence(timeout: 10))
         XCTAssertTrue(text(containing: "Sam").exists)
         XCTAssertTrue(text(containing: "Amy").exists)
         XCTAssertTrue(text(containing: "Jo").exists)
-        XCTAssertFalse(start.isEnabled)
 
         // The seat picker opens inside the seat card, not as a sheet: the card
         // for the top seat is rotated, so the picker's Cancel sits where the
@@ -127,15 +126,12 @@ final class BoardFlowUITests: XCTestCase {
         cancel.tap()
         XCTAssertFalse(app.staticTexts["Top seat"].waitForExistence(timeout: 2))
 
-        // Roll for first: every seat rolls, the winner is accepted, Start enables.
+        // Roll for first: every seat rolls, and accepting the winner starts the game.
         waitFor("rollForFirst").tap()
         let accept = waitFor("acceptFirst", timeout: 20)
         XCTAssertTrue(expect(accept, "isEnabled == true", timeout: 15))
         XCTAssertTrue(text(containing: "goes first").exists)
         accept.tap()
-        XCTAssertTrue(start.waitForExistence(timeout: 5))
-        XCTAssertTrue(expect(start, "isEnabled == true", timeout: 5))
-        start.tap()
 
         // Playing: turn 1, the turn button and the first seat's life number.
         waitFor("nextTurn")
@@ -149,9 +145,9 @@ final class BoardFlowUITests: XCTestCase {
         waitFor("continueToSeating").tap()
         waitFor("pickFirst").tap()
         app.buttons["Amy"].firstMatch.tap()
-        XCTAssertTrue(text(containing: "Amy goes first").waitForExistence(timeout: 5))
-        let start = el("startGame")
-        XCTAssertTrue(expect(start, "isEnabled == true", timeout: 5))
+        // Picking who goes first starts the game straight away.
+        waitFor("nextTurn")
+        XCTAssertTrue(text(containing: "Turn 1").waitForExistence(timeout: 5))
     }
 
     // MARK: Seat panel
