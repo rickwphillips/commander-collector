@@ -93,7 +93,7 @@ struct EndSummaryView: View {
                 HStack(spacing: 6) {
                     Text(p.playerName).font(.headline)
                     if let t = p.teamNumber {
-                        Text("Team \(t)").font(.caption2.bold()).foregroundStyle(.white).padding(.horizontal, 6).padding(.vertical, 2)
+                        TeamNameText.name(t, teamNames: state.teamNames, size: 11).foregroundStyle(.white).padding(.horizontal, 6).padding(.vertical, 2)
                             .background(RoundedRectangle(cornerRadius: 4).fill(t == 1 ? Color.accentColor : .purple))
                     }
                 }

@@ -37,6 +37,11 @@ final class GameSession {
     /// leaves with the turn, so the centre Next Turn button shows the
     /// "Previous Turn" bubble for it.
     private(set) var previousTurnSignal = 0
+    /// A team panel's inline name form is open. The table then puts a layer
+    /// over everything so a tap anywhere closes the form and does nothing else.
+    var teamNameFormOpen = false
+    private(set) var closeTeamNameFormSignal = 0
+    func closeTeamNameForm() { closeTeamNameFormSignal += 1 }
     /// Bumped from the settings menu to send a bug across the board now.
     private(set) var bugSignal = 0
     func spawnBug() { bugSignal += 1 }
@@ -185,10 +190,25 @@ final class GameSession {
         if case .checkin = kind { persist(); return }
         events.append(event)
         appendLog(GameLog.diff(prev, state, reverse: { if case .prevTurn = kind { true } else { false } }()))
+        logTeamNameChanges(prev: prev, next: state)
         noteKillsNeedingAttribution(prev: prev, next: state, kind: kind)
         noteMonarchTransfer(prev: prev, next: state)
         if case .commanderDamageChange(let target, let source, _, _) = kind { lastCmdDmgSource[target] = source }
         persist()
+    }
+
+    /// A team being renamed, or its name cleared, goes in the game log.
+    private func logTeamNameChanges(prev: GameState, next: GameState) {
+        guard prev.teamNames != next.teamNames else { return }
+        let teams = Set((prev.teamNames ?? [:]).keys).union((next.teamNames ?? [:]).keys).sorted()
+        for team in teams where prev.teamNames?[team] != next.teamNames?[team] {
+            let from = Teams.name(team, teamNames: prev.teamNames)
+            if let to = next.teamNames?[team] {
+                appendLog([GameLogEvent(type: "team_renamed", payload: ["team": .int(team), "from": .string(from), "to": .string(to)])])
+            } else {
+                appendLog([GameLogEvent(type: "team_name_cleared", payload: ["team": .int(team), "from": .string(from)])])
+            }
+        }
     }
 
     private func noteMonarchTransfer(prev: GameState, next: GameState) {

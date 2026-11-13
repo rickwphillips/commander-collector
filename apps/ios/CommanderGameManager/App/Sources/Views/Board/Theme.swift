@@ -151,3 +151,47 @@ extension EnvironmentValues {
         set { self[CompactTableKey.self] = newValue }
     }
 }
+
+/// How a team's name is drawn. A name the players chose is set in a Magic
+/// card-title style face (Cinzel Bold, a free lookalike); the default
+/// "Team N" stays in the system face.
+enum TeamNameText {
+    static let customFace = "Cinzel-Bold"
+
+    /// The name alone.
+    static func name(_ team: Int?, teamNames: [Int: String]?, size: CGFloat, weight: Font.Weight = .bold, uppercase: Bool = false) -> Text {
+        let name = Teams.name(team, teamNames: teamNames)
+        let shown = uppercase ? name.uppercased() : name
+        return Teams.hasCustomName(team, teamNames: teamNames)
+            ? warped(shown, size: size * customScale)
+            : Text(shown).font(.system(size: size, weight: weight))
+    }
+
+    /// A custom name is drawn larger than the text around it.
+    static let customScale = 1.3
+    /// How much taller the middle letters are than the first and last.
+    static let bulge = 0.24
+
+    /// The name with a slight warp, like lettering on a banner: the letters
+    /// swell towards the middle and sink a little so the line stays centred.
+    /// Built letter by letter so it is still a `Text` and can sit in a sentence.
+    private static func warped(_ name: String, size: CGFloat) -> Text {
+        let letters = Array(name)
+        return letters.enumerated().reduce(Text("")) { text, item in
+            let t = letters.count > 1 ? Double(item.offset) / Double(letters.count - 1) : 0.5
+            let swell = sin(.pi * t)
+            let letterSize = size * (1 + bulge * swell)
+            return text + Text(String(item.element))
+                .font(.custom(customFace, size: letterSize))
+                .baselineOffset(-(letterSize - size) * 0.3)
+        }
+    }
+
+    /// The name and its members, "Name (A / B)"; only the name takes the
+    /// face. A custom name stands alone: the players are not listed after it.
+    static func label(_ team: Int?, players: [PlayerState], teamNames: [Int: String]?, size: CGFloat, weight: Font.Weight = .bold) -> Text {
+        if Teams.hasCustomName(team, teamNames: teamNames) { return name(team, teamNames: teamNames, size: size, weight: weight) }
+        let members = String(Teams.label(team, players: players, teamNames: teamNames).dropFirst(Teams.name(team, teamNames: teamNames).count))
+        return name(team, teamNames: teamNames, size: size, weight: weight) + Text(members).font(.system(size: size, weight: weight))
+    }
+}

@@ -54,6 +54,10 @@ export function describeLogEntry(entry: GameLogEntry): string {
       return `${str('player')}'s ${str('cause')} kill credited to ${str('source') || 'unknown'}`;
     case 'concede':
       return `${str('player')} conceded${p.turn ? `, turn ${str('turn')}` : ''}`;
+    case 'team_renamed':
+      return `Team ${str('team')} renamed: ${str('from')} → ${str('to')}`;
+    case 'team_name_cleared':
+      return `Team ${str('team')} name cleared (was ${str('from')})`;
     case 'manual_entry':
       return `Manual entry by ${str('created_by') || 'unknown'}`;
     default:

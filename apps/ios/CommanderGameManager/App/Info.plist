@@ -36,6 +36,10 @@
 	<string>Scan a seat's QR code to join a table.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Phones at the table join a seat over the local network.</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Cinzel-Bold.ttf</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiresFullScreen</key>

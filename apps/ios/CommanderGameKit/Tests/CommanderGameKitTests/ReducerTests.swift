@@ -41,4 +41,22 @@ final class ReducerTests: XCTestCase {
         XCTAssertEqual(map[1]?.keys.sorted(), [0, 2])
         XCTAssertEqual(map[1, 2], .zero)
     }
+
+    func testTeamNameSetAndClear() throws {
+        var s = GameSetup.seatingState(playerCount: 4, startingLife: 30, turnTimerSeconds: 0, gameType: .twoHeadedGiant)
+        XCTAssertFalse(Teams.hasCustomName(1, teamNames: s.teamNames))
+        s = GameReducer.applyEvent(s, LiveGameEvent(seat: "host", ts: 1, kind: .setTeamName(team: 1, name: "  Goblins  ")), now: 0)
+        XCTAssertEqual(Teams.name(1, teamNames: s.teamNames), "Goblins")
+        XCTAssertTrue(Teams.hasCustomName(1, teamNames: s.teamNames))
+        XCTAssertFalse(Teams.hasCustomName(2, teamNames: s.teamNames))
+        // A blank rename is still ignored (as on the web); clearing is its own event.
+        s = GameReducer.applyEvent(s, LiveGameEvent(seat: "host", ts: 2, kind: .setTeamName(team: 1, name: "   ")), now: 0)
+        XCTAssertEqual(Teams.name(1, teamNames: s.teamNames), "Goblins")
+        let clear = LiveGameEvent(seat: "host", ts: 3, kind: .clearTeamName(team: 1))
+        let decoded = try JSONDecoder().decode(LiveGameEvent.self, from: JSONEncoder().encode(clear))
+        XCTAssertEqual(decoded.typeName, "clear_team_name")
+        s = GameReducer.applyEvent(s, decoded, now: 0)
+        XCTAssertEqual(Teams.name(1, teamNames: s.teamNames), "Team 1")
+        XCTAssertNil(s.teamNames)
+    }
 }

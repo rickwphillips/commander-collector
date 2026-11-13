@@ -278,8 +278,9 @@ struct CommanderSnapshotOverlay: View {
                     VStack(alignment: .leading, spacing: 5) {
                         HStack(spacing: 4) {
                             // 2HG: the team is one unit, whether it has two players or one.
-                            Text(state.isTwoHeadedGiant ? Teams.label(src.teamNumber, players: state.players, teamNames: state.teamNames) : src.playerName)
-                                .font(.system(size: sizes.source, weight: .heavy)).lineLimit(1)
+                            (state.isTwoHeadedGiant
+                             ? TeamNameText.label(src.teamNumber, players: state.players, teamNames: state.teamNames, size: sizes.source, weight: .heavy)
+                             : Text(src.playerName).font(.system(size: sizes.source, weight: .heavy))).lineLimit(1)
                             if sourceSeats.contains(where: { state.players[$0].isMonarch }) { Image(systemName: "crown.fill").foregroundStyle(Theme.gold).font(.system(size: sizes.badge)) }
                             if sourceSeats.contains(where: { state.players[$0].hasInitiative }) { InitiativeGlyph().foregroundStyle(Theme.initiativeBlue).frame(width: sizes.badge, height: sizes.badge) }
                         }

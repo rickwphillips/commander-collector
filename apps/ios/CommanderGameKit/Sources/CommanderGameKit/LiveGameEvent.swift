@@ -21,6 +21,8 @@ public struct LiveGameEvent: Hashable, Sendable, Codable {
         case passTurn
         case prevTurn
         case setTeamName(team: Int, name: String)
+        /// Back to the default "Team N".
+        case clearTeamName(team: Int)
         case checkin
         case lifeKillAttr(playerIdx: Int, sourcePlayerIdx: Int?)
         case poisonKillAttr(playerIdx: Int, sourcePlayerIdx: Int?)
@@ -59,6 +61,7 @@ public struct LiveGameEvent: Hashable, Sendable, Codable {
         case .passTurn: "pass_turn"
         case .prevTurn: "prev_turn"
         case .setTeamName: "set_team_name"
+        case .clearTeamName: "clear_team_name"
         case .checkin: "checkin"
         case .lifeKillAttr: "life_kill_attr"
         case .poisonKillAttr: "poison_kill_attr"
@@ -97,6 +100,7 @@ public struct LiveGameEvent: Hashable, Sendable, Codable {
         case "prev_turn": kind = .prevTurn
         case "set_team_name":
             kind = .setTeamName(team: try c.decode(Int.self, forKey: .team), name: try c.decode(String.self, forKey: .name))
+        case "clear_team_name": kind = .clearTeamName(team: try c.decode(Int.self, forKey: .team))
         case "checkin": kind = .checkin
         case "life_kill_attr": kind = .lifeKillAttr(playerIdx: try idx(), sourcePlayerIdx: try sourcePlayer())
         case "poison_kill_attr": kind = .poisonKillAttr(playerIdx: try idx(), sourcePlayerIdx: try sourcePlayer())
@@ -121,6 +125,8 @@ public struct LiveGameEvent: Hashable, Sendable, Codable {
             try c.encode(p, forKey: .isPartner); try c.encode(d, forKey: .delta)
         case .setTeamName(let team, let name):
             try c.encode(team, forKey: .team); try c.encode(name, forKey: .name)
+        case .clearTeamName(let team):
+            try c.encode(team, forKey: .team)
         case .lifeKillAttr(let i, let s), .poisonKillAttr(let i, let s):
             try c.encode(i, forKey: .playerIdx); try c.encode(s, forKey: .sourcePlayerIdx)
         case .passTurn, .prevTurn, .checkin, .unknown:

@@ -388,6 +388,15 @@ public enum GameReducer {
         return out
     }
 
+    /// Drops a team's custom name, so it reads "Team N" again.
+    static func applyClearTeamName(_ state: GameState, team: Int) -> GameState {
+        guard var names = state.teamNames, names[team] != nil else { return state }
+        names[team] = nil
+        var out = state
+        out.teamNames = names.isEmpty ? nil : names
+        return out
+    }
+
     static func applySetTeamName(_ state: GameState, team: Int, name: String) -> GameState {
         let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(32))
         if trimmed.isEmpty { return state }
@@ -433,6 +442,7 @@ public enum GameReducer {
         case .passTurn: return applyPassTurn(state, now: now)
         case .prevTurn: return applyPrevTurn(state, now: now)
         case .setTeamName(let team, let name): return applySetTeamName(state, team: team, name: name)
+        case .clearTeamName(let team): return applyClearTeamName(state, team: team)
         case .checkin: return applyCheckin(state, seat: event.seat, ts: event.ts)
         case .lifeKillAttr(let i, let s): return applyLifeKillAttr(state, targetIdx: i, sourcePlayerIdx: s)
         case .poisonKillAttr(let i, let s): return applyPoisonKillAttr(state, targetIdx: i, sourcePlayerIdx: s)

@@ -57,6 +57,8 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         UIRequiresFullScreen: true
         ITSAppUsesNonExemptEncryption: false
+        # Cinzel Bold (SIL Open Font License): custom team names.
+        UIAppFonts: [Cinzel-Bold.ttf]
         NSLocalNetworkUsageDescription: Phones at the table join a seat over the local network.
         NSBonjourServices: [_cmdr-game._tcp, _cmdr-game._udp]
         NSCameraUsageDescription: Scan a seat's QR code to join a table.
@@ -69,7 +71,7 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: true
         ENABLE_USER_SCRIPT_SANDBOXING: false
-        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: ""
   CommanderGameManagerUITests:
     type: bundle.ui-testing

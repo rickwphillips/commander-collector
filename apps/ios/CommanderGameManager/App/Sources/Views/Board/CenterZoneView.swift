@@ -177,6 +177,14 @@ struct CenterZoneView: View {
         if let t = activeTeam { return Teams.name(t, teamNames: state.teamNames).uppercased() }
         return state.players[state.currentPlayerIdx].commander.name
     }
+    /// Whose turn it is: the team (2HG, its custom name in the team-name
+    /// face) or the commander.
+    private func turnTitle(size: CGFloat) -> Text {
+        if let t = activeTeam { return TeamNameText.name(t, teamNames: state.teamNames, size: size, weight: .semibold, uppercase: true) }
+        return Text(turnCommanderLabel).font(.system(size: size, weight: .semibold))
+    }
+    /// A team with a name of its own goes by that name alone.
+    private var showsTurnPlayers: Bool { !Teams.hasCustomName(activeTeam, teamNames: state.teamNames) }
     private var turnPlayerLabel: String {
         if let t = activeTeam {
             var names: [String] = []
@@ -205,8 +213,8 @@ struct CenterZoneView: View {
             Spacer(minLength: 2)
             VStack(spacing: 0) {
                 Text("Turn \(state.turnNumber)").font(.system(size: 17, weight: .black)).foregroundStyle(Color.accentColor).accessibilityIdentifier("turnLabel")
-                Text(turnCommanderLabel).font(.system(size: 11, weight: .semibold)).lineLimit(1)
-                Text(turnPlayerLabel).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+                turnTitle(size: 11).lineLimit(1)
+                if showsTurnPlayers { Text(turnPlayerLabel).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1) }
             }
             .frame(maxWidth: 170)
             NextTurnButton(remaining: remaining, compact: true, tipSignal: session.previousTurnSignal, onNext: { session.dispatch(.passTurn) }, onPrev: { session.dispatch(.prevTurn) })
@@ -220,8 +228,8 @@ struct CenterZoneView: View {
     private var turnTracker: some View {
         VStack(spacing: 2) {
             Text("Turn \(state.turnNumber)").font(.system(size: 26, weight: .black)).foregroundStyle(Color.accentColor).accessibilityIdentifier("turnLabel")
-            Text(turnCommanderLabel).font(.system(size: 12, weight: .semibold)).lineLimit(2).multilineTextAlignment(.center)
-            Text(turnPlayerLabel).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+            turnTitle(size: 12).lineLimit(2).multilineTextAlignment(.center)
+            if showsTurnPlayers { Text(turnPlayerLabel).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1) }
         }
         .frame(width: 110)
         .fixedSize()
@@ -274,7 +282,10 @@ struct CenterZoneView: View {
         return VStack {
             Spacer()
             HStack(spacing: 12) {
-                Text("🏆 \(name) wins" + (winnerCountdown.map { " — ending in \($0)s" } ?? "")).font(.system(size: 16, weight: .black)).lineLimit(1)
+                (Text("🏆 ").font(.system(size: 16, weight: .black))
+                 + (is2hg ? TeamNameText.label(state.players[w].teamNumber, players: state.players, teamNames: state.teamNames, size: 16, weight: .black)
+                          : Text(name).font(.system(size: 16, weight: .black)))
+                 + Text(" wins" + (winnerCountdown.map { " — ending in \($0)s" } ?? "")).font(.system(size: 16, weight: .black))).lineLimit(1)
                 Spacer()
                 Button("End now") { session.endGame() }.buttonStyle(.borderedProminent).controlSize(.small)
                 Button("Keep playing") { countdownTask?.cancel(); winnerCountdown = nil }.buttonStyle(.bordered).controlSize(.small)

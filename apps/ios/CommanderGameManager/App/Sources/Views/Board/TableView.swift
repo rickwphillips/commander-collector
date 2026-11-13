@@ -150,6 +150,9 @@ struct TableView: View {
             .environment(\.compactTable, compact)
         }
         .background(Theme.tableBackground(scheme))
+        // A team's name form is open: a tap anywhere on the table closes it
+        // (keeping the name, or the default if it was left empty) and goes no further.
+        .overlay { if session.teamNameFormOpen { Color.clear.contentShape(Rectangle()).onTapGesture { session.closeTeamNameForm() } } }
         // A rare visitor during play. With Bugs or Motion off the view is not
         // there at all: no checks run and none are sent in. A phone's remote
         // view never has one.

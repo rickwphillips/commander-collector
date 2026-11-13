@@ -29,6 +29,9 @@ struct TeamPanel: View {
     @State private var cityBlessingVisible = false
     @State private var cityBlessingExiting = false
     @State private var concedeTurn = ""
+    /// The team menu's rename editor is open.
+    @State private var renaming = false
+    @FocusState private var nameFocused: Bool
 
     private var state: GameState { session.state }
     private var members: [Int] { state.players.indices.filter { state.players[$0].teamNumber == teamNumber } }
@@ -47,6 +50,7 @@ struct TeamPanel: View {
     private var glassActive: Bool { cityBlessingVisible || members.contains { state.players[$0].hasInitiative } || poisonProgress >= 0.6 }
     private var timer: TimerTokens { TimerTokens(elapsed: isActive ? elapsedSeconds : 0, total: state.turnTimerSeconds, isActive: isActive && turnIndicatorOn) }
     private var teamName: String { Teams.name(teamNumber, teamNames: state.teamNames) }
+    private var hasCustomName: Bool { Teams.hasCustomName(teamNumber, teamNames: state.teamNames) }
     /// A phone has checked in for the team's primary seat within the last 20 s (web rule; one dropped 9 s heartbeat tolerated).
     private var remoteConnected: Bool {
         guard let ts = state.remoteCheckins?[state.players[primary].position.rawValue] else { return false }
@@ -132,16 +136,27 @@ struct TeamPanel: View {
             HStack(spacing: 6) {
                 RoundedRectangle(cornerRadius: 2).fill(teamColor).frame(width: 12, height: 12)
                 if editingName {
-                    TextField("Team name", text: $nameDraft, onCommit: commitName)
+                    TextField("Team name", text: $nameDraft)
                         .textFieldStyle(.roundedBorder).frame(width: 160).font(.system(size: 14, weight: .heavy))
+                        .focused($nameFocused)
+                        .submitLabel(.done)
                         .onSubmit(commitName)
+                        .onChange(of: nameFocused) { _, focused in if !focused { commitName() } }
+                        .accessibilityIdentifier("teamNameInline")
                 } else {
-                    Text(teamName.uppercased()).font(.system(size: 14, weight: .heavy)).kerning(0.5).lineLimit(1)
-                        .onTapGesture { nameDraft = teamName; editingName = true }
+                    TeamNameText.name(teamNumber, teamNames: state.teamNames, size: 14, weight: .heavy, uppercase: true).kerning(0.5).lineLimit(1)
+                        .onTapGesture { nameDraft = hasCustomName ? teamName : ""; editingName = true; nameFocused = true }
+                        .accessibilityIdentifier("teamName-\(teamNumber)")
                 }
-                // 1v1 2HG: the one player behind both heads is named here, once.
-                if state.isOneVsOneTwoHeadedGiant { Text(state.players[primary].playerName).font(.system(size: 14, weight: .semibold)).foregroundStyle(teamColor).lineLimit(1) }
-                if isActive && !eliminated { Text("ACTIVE").font(.system(size: 10, weight: .bold)).kerning(0.5).foregroundStyle(Color.accentColor) }
+                // 1v1 2HG: the one player behind both heads is named here, once
+                // (a custom team name stands in for the player's).
+                if state.isOneVsOneTwoHeadedGiant && !hasCustomName { Text(state.players[primary].playerName).font(.system(size: 14, weight: .semibold)).foregroundStyle(teamColor).lineLimit(1) }
+                // White on a dark pill: readable over the header's turn colours.
+                if isActive && !eliminated {
+                    Text("ACTIVE").font(.system(size: 11, weight: .heavy)).kerning(0.5).foregroundStyle(.white)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Capsule().fill(Color.black.opacity(0.55)))
+                }
                 if remoteConnected && !session.isRemote {
                     Image(systemName: "iphone").font(.system(size: 12)).foregroundStyle(.green).symbolEffect(.pulse)
                 }
@@ -149,18 +164,43 @@ struct TeamPanel: View {
                     Image(systemName: "gearshape").font(.system(size: 14)).foregroundStyle(.secondary).frame(width: 28, height: 28).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("teamMenu-\(teamNumber)")
             }
             Spacer()
             if members.count > 1 { brief(members[1], sz: sz, trailing: true) }
         }
         .padding(.horizontal, 10).padding(.vertical, 4)
         .background(headerBackground)
+        // The table closes the form on a tap anywhere outside it.
+        .onChange(of: editingName) { _, open in session.teamNameFormOpen = open }
+        .onChange(of: session.closeTeamNameFormSignal) { _, _ in commitName() }
     }
 
+    /// What either name form does when it closes: a name is set (and
+    /// logged); an empty form puts the default "Team N" back.
+    private func applyNameDraft() {
+        let trimmed = String(nameDraft.trimmingCharacters(in: .whitespaces).prefix(32))
+        if trimmed.isEmpty {
+            if hasCustomName { session.dispatch(.clearTeamName(team: teamNumber)) }
+        } else if trimmed != teamName || !hasCustomName {
+            session.dispatch(.setTeamName(team: teamNumber, name: trimmed))
+        }
+    }
+
+    /// The team menu's Save.
+    private func saveName() {
+        renaming = false
+        applyNameDraft()
+        overlay = nil
+    }
+
+    /// The header's inline form closing: Return, a tap outside it, or the
+    /// keyboard going away.
     private func commitName() {
+        guard editingName else { return }
         editingName = false
-        let trimmed = nameDraft.trimmingCharacters(in: .whitespaces)
-        if !trimmed.isEmpty, trimmed != teamName { session.dispatch(.setTeamName(team: teamNumber, name: String(trimmed.prefix(32)))) }
+        nameFocused = false
+        applyNameDraft()
     }
 
     @ViewBuilder private var headerBackground: some View {
@@ -204,8 +244,8 @@ struct TeamPanel: View {
         return VStack(alignment: .leading, spacing: 4) {
             // One line for the other team: name, shared life, poison, statuses.
             HStack(alignment: .center, spacing: 10) {
-                Text(Teams.name(Teams.other(teamNumber), teamNames: state.teamNames).uppercased())
-                    .font(.system(size: sz.name, weight: .bold)).kerning(0.5).foregroundStyle(teamNumber == 1 ? .purple : .accentColor).lineLimit(1)
+                TeamNameText.name(Teams.other(teamNumber), teamNames: state.teamNames, size: sz.name, uppercase: true)
+                    .kerning(0.5).foregroundStyle(teamNumber == 1 ? .purple : .accentColor).lineLimit(1)
                 LifeNumber(value: opp.life, fontSize: sz.life * 0.42, color: Theme.lifeColor(opp.life, startingLife: state.startingLife), damageFlash: 0, energy: oppEnergy, poison: opp.poison, poisonLethal: 15)
                 if opp.poison > 0 {
                     HStack(spacing: 3) {
@@ -391,8 +431,33 @@ struct TeamPanel: View {
     /// Team options: concede (a team action, both heads) and undo.
     private var teamMenu: some View {
         ZStack {
-            Theme.overlayBackground(scheme).onTapGesture { overlay = nil }
+            // A tap outside the menu closes it, and the name form with it.
+            Theme.overlayBackground(scheme).onTapGesture { renaming = false; overlay = nil }
             VStack(spacing: 0) {
+                // The team's name: set it, change it, or go back to "Team N".
+                // Each of these is recorded in the game log.
+                if renaming {
+                    VStack(alignment: .leading, spacing: 6) {
+                        TextField("Team name", text: $nameDraft).textFieldStyle(.roundedBorder).font(.system(size: 14, weight: .semibold))
+                            .submitLabel(.done).onSubmit(saveName)
+                            .accessibilityIdentifier("teamNameField")
+                        HStack(spacing: 6) {
+                            // Saving it empty puts the default name back.
+                            Button("Save", action: saveName).buttonStyle(.borderedProminent).controlSize(.small)
+                                .accessibilityIdentifier("teamNameSave")
+                            Button("Cancel") { renaming = false }.buttonStyle(.bordered).controlSize(.small)
+                        }
+                    }
+                    .padding(12)
+                } else {
+                    menuRow(hasCustomName ? "Rename team" : "Name team", symbol: "pencil", color: .secondary) { nameDraft = hasCustomName ? teamName : ""; renaming = true }
+                        .accessibilityIdentifier("teamRename")
+                    if hasCustomName {
+                        menuRow("Clear team name", symbol: "xmark.circle", color: .secondary) { session.dispatch(.clearTeamName(team: teamNumber)); overlay = nil }
+                            .accessibilityIdentifier("teamNameClear")
+                    }
+                }
+                Divider()
                 if eliminated {
                     menuRow("Undo concede", symbol: "arrow.uturn.backward", color: Theme.danger) { session.dispatch(.undoEliminate(playerIdx: primary)); overlay = nil }
                 } else if overlay == .concedeConfirm {
@@ -458,7 +523,9 @@ struct TeamPanel: View {
         return ZStack {
             (poisonKill ? Color(red: 0, green: 40/255, blue: 0).opacity(0.78) : Color.black.opacity(0.72))
             VStack(spacing: 8) {
-                Text(poisonKill ? "Who poisoned \(teamName)?" : "Who brought \(teamName) to 0?").font(.system(size: sz.kill, weight: .bold)).foregroundStyle(tint)
+                (Text(poisonKill ? "Who poisoned " : "Who brought ").font(.system(size: sz.kill, weight: .bold))
+                 + TeamNameText.name(teamNumber, teamNames: state.teamNames, size: sz.kill)
+                 + Text(poisonKill ? "?" : " to 0?").font(.system(size: sz.kill, weight: .bold))).foregroundStyle(tint)
                 HStack(spacing: 8) {
                     ForEach(living, id: \.self) { s in
                         Button(state.headName(s)) { session.attributeKill(kill, sourceIdx: s) }

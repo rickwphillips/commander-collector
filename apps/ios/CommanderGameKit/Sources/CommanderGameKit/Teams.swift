@@ -10,6 +10,12 @@ public enum Teams {
     }
 
     /// The opposing team's number in a two-team game.
+    /// Whether the team has been given a name of its own.
+    public static func hasCustomName(_ teamNumber: Int?, teamNames: [Int: String]?) -> Bool {
+        guard let t = teamNumber, let custom = teamNames?[t] else { return false }
+        return !custom.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     public static func other(_ teamNumber: Int) -> Int { teamNumber == 1 ? 2 : 1 }
 
     /// "Name (A / B)".

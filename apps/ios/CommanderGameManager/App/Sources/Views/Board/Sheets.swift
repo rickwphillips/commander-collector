@@ -67,6 +67,8 @@ struct GameLogSheet: View {
             let total = p["total"].map { str($0) } ?? ""
             return "Rolled \(str(p["die"])): \(str(p["rolls"]))" + (total.isEmpty ? "" : " (total \(total))")
         case "kill_attribution": return "\(str(p["player"]))'s \(str(p["cause"])) kill credited to \(str(p["source"]).isEmpty ? "unknown" : str(p["source"]))"
+        case "team_renamed": return "Team \(str(p["team"])) renamed: \(str(p["from"])) → \(str(p["to"]))"
+        case "team_name_cleared": return "Team \(str(p["team"])) name cleared (was \(str(p["from"])))"
         case "game_ended": return "Game ended on turn \(str(p["turn"]))"
         default: return e.type
         }
