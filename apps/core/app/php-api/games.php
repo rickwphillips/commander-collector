@@ -131,7 +131,7 @@ switch ($method) {
             sendError('Game results are required');
         }
         $gameType = isset($data['game_type']) ? $data['game_type'] : 'standard';
-        if (!in_array($gameType, ['standard', '2hg'])) {
+        if (!in_array($gameType, ['standard', '2hg', '1v1-2hg'])) {
             sendError('Invalid game type');
         }
 
@@ -141,17 +141,21 @@ switch ($method) {
         if ($gameType === 'standard' && count($data['results']) > 8) {
             sendError('Maximum 8 players allowed');
         }
-        if ($gameType === '2hg') {
+        // 1v1 2HG is a 2HG game with one pilot per team: same pairs of result
+        // rows (one per deck), but both rows of a team carry the same player.
+        if ($gameType === '2hg' || $gameType === '1v1-2hg') {
             if (count($data['results']) < 4 || count($data['results']) % 2 !== 0) {
                 sendError('2HG requires at least 4 players in pairs');
             }
             $teamCounts = [];
+            $teamPlayers = [];
             foreach ($data['results'] as $result) {
                 if (!isset($result['team_number']) || !is_numeric($result['team_number']) || (int)$result['team_number'] < 1) {
                     sendError('Each player in 2HG must be assigned to a team');
                 }
                 $tn = (int)$result['team_number'];
                 $teamCounts[$tn] = ($teamCounts[$tn] ?? 0) + 1;
+                $teamPlayers[$tn][(string)($result['player_id'] ?? '')] = true;
             }
             if (count($teamCounts) < 2) {
                 sendError('2HG requires at least 2 teams');
@@ -159,6 +163,18 @@ switch ($method) {
             foreach ($teamCounts as $count) {
                 if ($count !== 2) {
                     sendError('Each team must have exactly 2 players in 2HG');
+                }
+            }
+            if ($gameType === '1v1-2hg') {
+                $pilots = [];
+                foreach ($teamPlayers as $playersOnTeam) {
+                    if (count($playersOnTeam) !== 1) {
+                        sendError('Each team must have a single player in 1v1 2HG');
+                    }
+                    $pilots[array_key_first($playersOnTeam)] = true;
+                }
+                if (count($pilots) !== count($teamPlayers)) {
+                    sendError('Each team must have a different player in 1v1 2HG');
                 }
             }
         }

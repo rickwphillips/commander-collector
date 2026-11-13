@@ -200,8 +200,9 @@ export function ComparisonBuilder({
             { value: 'all', label: 'All' },
             { value: 'standard', label: 'Commander' },
             { value: '2hg', label: '2HG' },
+            { value: '1v1-2hg', label: '1v1 2HG' },
           ]}
-          onChange={(v) => setCond('game_type', v as 'all' | 'standard' | '2hg')}
+          onChange={(v) => setCond('game_type', v as NonNullable<ComparisonConditions['game_type']>)}
         />
 
         <ChipGroup

@@ -18,6 +18,9 @@ $_totalGamesD = totalGamesDistinct();
 $_totalGamesR = totalGames();
 $_wins        = winsExpr();
 $_wrDistinct  = winRateDistinct();
+// Player rows count each game once (a 1v1 2HG pilot has two result rows).
+$_winsByGame  = winsDistinctExpr();
+$_wrByGame    = winRateByGame();
 $_wrRows      = winRateRows();
 $_avgFinish   = avgFinishExpr();
 $_deckCount   = deckCountExpr('decks_using');
@@ -29,8 +32,8 @@ if ($playerId) {
             p.id as player_id,
             p.name as player_name,
             $_totalGamesD,
-            $_wins,
-            $_wrDistinct,
+            $_winsByGame,
+            $_wrByGame,
             $_avgFinish
         FROM players p
         LEFT JOIN game_results gr ON gr.player_id = p.id
@@ -91,8 +94,8 @@ $topPlayers = $pdo->query("
         p.id as player_id,
         p.name as player_name,
         $_totalGamesD,
-        $_wins,
-        $_wrDistinct
+        $_winsByGame,
+        $_wrByGame
     FROM players p
     JOIN game_results gr ON gr.player_id = p.id
     GROUP BY p.id

@@ -49,9 +49,9 @@ $playerId = (string)$player['id'];
 $stmt = $db->prepare("
     SELECT
         COUNT(DISTINCT gr.game_id) AS total_games,
-        COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) AS wins,
+        COUNT(DISTINCT CASE WHEN gr.finish_position = 1 THEN gr.game_id END) AS wins,
         ROUND(
-            COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 /
+            COUNT(DISTINCT CASE WHEN gr.finish_position = 1 THEN gr.game_id END) * 100.0 /
             NULLIF(COUNT(DISTINCT gr.game_id), 0), 1
         ) AS win_rate,
         ROUND(AVG(gr.finish_position), 2) AS avg_finish,

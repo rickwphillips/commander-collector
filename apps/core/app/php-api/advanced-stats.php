@@ -36,6 +36,9 @@ $colorMeta = $pdo->query("
 // B) Performance by Game Size (pod size)
 $_tgD = totalGamesDistinct();
 $_pod = podSizeSubquery();
+// Per-player rows count each game once (a 1v1 2HG pilot has two result rows).
+$_wByGame  = winsDistinctExpr();
+$_wrByGame = winRateByGame();
 
 $gameSizeRaw = $pdo->query("
     SELECT
@@ -43,9 +46,9 @@ $gameSizeRaw = $pdo->query("
         $_tgD,
         gr.player_id,
         p.name as player_name,
-        COUNT(gr.id) as games_played,
-        $_w,
-        $_wr,
+        COUNT(DISTINCT gr.game_id) as games_played,
+        $_wByGame,
+        $_wrByGame,
         $_af
     FROM game_results gr
     JOIN players p ON gr.player_id = p.id
@@ -78,7 +81,7 @@ $gameSizeStats = array_values($gameSizeStats);
 
 // C) Win Streaks & Trends — per player
 $playerResults = $pdo->query('
-    SELECT
+    SELECT DISTINCT
         gr.player_id,
         p.name as player_name,
         gr.finish_position,

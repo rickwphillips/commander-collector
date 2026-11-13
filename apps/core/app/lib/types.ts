@@ -4,7 +4,10 @@ export type { Card } from './cards/types';
 export { toApiCard, fromApiCard } from './cards/types';
 
 // Game type
-export type GameType = 'standard' | '2hg';
+export type GameType = 'standard' | '2hg' | '1v1-2hg';
+
+/** Team formats: Two-Headed Giant, and 1v1 2HG (one player pilots both heads of a team). */
+export const isTeamGame = (gameType?: string | null): boolean => gameType === '2hg' || gameType === '1v1-2hg';
 
 // Scan draft (cross-device persistence)
 /** @deprecated Use Card from './cards/types' instead. */
@@ -406,7 +409,7 @@ export type ComparisonMetric =
   | 'first_elimination_rate';
 
 export interface ComparisonConditions {
-  game_type?: 'all' | 'standard' | '2hg';
+  game_type?: 'all' | GameType;
   pod_size?: number;
   min_winning_turn?: number;
   max_winning_turn?: number;

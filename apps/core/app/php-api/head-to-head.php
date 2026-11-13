@@ -26,6 +26,7 @@ if ($player1Id && $player2Id) {
         JOIN game_results gr1 ON gr1.game_id = g.id AND gr1.player_id = ?
         JOIN game_results gr2 ON gr2.game_id = g.id AND gr2.player_id = ?
         WHERE g.game_type != \'2hg\'
+        GROUP BY g.id, g.played_at, gr1.finish_position, gr2.finish_position
         ORDER BY g.played_at DESC
     ');
     $stmt->execute([$player1Id, $player2Id]);
@@ -49,23 +50,24 @@ if ($player1Id && $player2Id) {
     ]);
 }
 
-// Head-to-head records for 1v1 (2-player) games
+// Head-to-head records for 1v1 games: two-player games and 1v1 2HG (one
+// pilot per team, two result rows each), every game counted once
 $twoPlayer = $pdo->query('
     SELECT
         p1.id as player1_id,
         p1.name as player1_name,
         p2.id as player2_id,
         p2.name as player2_name,
-        COUNT(*) as total_games,
-        SUM(CASE WHEN gr1.finish_position < gr2.finish_position THEN 1 ELSE 0 END) as player1_wins,
-        SUM(CASE WHEN gr2.finish_position < gr1.finish_position THEN 1 ELSE 0 END) as player2_wins
+        COUNT(DISTINCT g.id) as total_games,
+        COUNT(DISTINCT CASE WHEN gr1.finish_position < gr2.finish_position THEN g.id END) as player1_wins,
+        COUNT(DISTINCT CASE WHEN gr2.finish_position < gr1.finish_position THEN g.id END) as player2_wins
     FROM games g
     JOIN game_results gr1 ON gr1.game_id = g.id
     JOIN players p1 ON gr1.player_id = p1.id
     JOIN game_results gr2 ON gr2.game_id = g.id AND gr1.id != gr2.id
     JOIN players p2 ON gr2.player_id = p2.id
     WHERE p1.id < p2.id AND g.game_type != \'2hg\'
-    AND (SELECT COUNT(*) FROM game_results gr WHERE gr.game_id = g.id) = 2
+    AND (g.game_type = \'1v1-2hg\' OR (SELECT COUNT(*) FROM game_results gr WHERE gr.game_id = g.id) = 2)
     GROUP BY p1.id, p2.id
     ORDER BY total_games DESC
 ')->fetchAll();
@@ -85,7 +87,7 @@ $multiplayer = $pdo->query('
     JOIN players p1 ON gr1.player_id = p1.id
     JOIN game_results gr2 ON gr2.game_id = g.id AND gr1.id != gr2.id
     JOIN players p2 ON gr2.player_id = p2.id
-    WHERE p1.id < p2.id AND g.game_type != \'2hg\'
+    WHERE p1.id < p2.id AND g.game_type NOT IN (\'2hg\', \'1v1-2hg\')
     AND (SELECT COUNT(*) FROM game_results gr WHERE gr.game_id = g.id) >= 3
     GROUP BY p1.id, p2.id
     ORDER BY total_games DESC

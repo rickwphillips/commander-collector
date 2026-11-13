@@ -80,7 +80,7 @@ function ConditionsSummary({
   const chips: string[] = [];
 
   if (conditions.game_type && conditions.game_type !== 'all') {
-    chips.push(conditions.game_type === '2hg' ? '2HG' : 'Standard');
+    chips.push(conditions.game_type === '2hg' ? '2HG' : conditions.game_type === '1v1-2hg' ? '1v1 2HG' : 'Standard');
   }
   if (conditions.pod_size != null) {
     chips.push(conditions.pod_size >= 5 ? '5+-player' : `${conditions.pod_size}-player`);

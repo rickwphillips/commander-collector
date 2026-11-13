@@ -23,8 +23,8 @@ switch ($method) {
         } else {
             // Get all players with stats
             $_tg = totalGamesDistinct();
-            $_w  = winsExpr();
-            $_wr = winRateDistinct();
+            $_w  = winsDistinctExpr();
+            $_wr = winRateByGame();
             $stmt = $pdo->query("
                 SELECT
                     p.*,

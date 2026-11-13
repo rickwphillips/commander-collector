@@ -26,6 +26,14 @@ function winsExpr(string $alias = 'wins'): string {
     return "COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) AS $alias";
 }
 
+/**
+ * Count games won, one per game. Use when grouping by player: a 1v1 2HG pilot
+ * has two result rows (one per deck) in the same game.
+ */
+function winsDistinctExpr(string $alias = 'wins'): string {
+    return "COUNT(DISTINCT CASE WHEN gr.finish_position = 1 THEN gr.game_id END) AS $alias";
+}
+
 /** SUM-style wins (returns integer, used in comparison metric expressions). */
 function winsSumExpr(): string {
     return 'SUM(gr.finish_position = 1)';
@@ -45,6 +53,18 @@ function deckCountExpr(string $alias = 'deck_count'): string {
 function winRateDistinct(string $alias = 'win_rate'): string {
     return "ROUND(
         COUNT(CASE WHEN gr.finish_position = 1 THEN 1 END) * 100.0 /
+        NULLIF(COUNT(DISTINCT gr.game_id), 0),
+        1
+    ) AS $alias";
+}
+
+/**
+ * Per-player win rate: games won over games played, each game counted once
+ * (see winsDistinctExpr).
+ */
+function winRateByGame(string $alias = 'win_rate'): string {
+    return "ROUND(
+        COUNT(DISTINCT CASE WHEN gr.finish_position = 1 THEN gr.game_id END) * 100.0 /
         NULLIF(COUNT(DISTINCT gr.game_id), 0),
         1
     ) AS $alias";

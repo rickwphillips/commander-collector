@@ -530,7 +530,7 @@ components:
         error: { type: string }
     GameType:
       type: string
-      enum: [standard, 2hg]
+      enum: [standard, 2hg, 1v1-2hg]
     AuthUser:
       type: object
       required: [id, username, display_name, role]

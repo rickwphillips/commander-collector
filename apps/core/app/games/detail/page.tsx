@@ -33,7 +33,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { RematchButton } from '@/components/RematchButton';
 import { api } from '@/lib/api';
 import { getOrdinalSuffix } from '@/lib/utils';
-import type { GameWithResults } from '@/lib/types';
+import { isTeamGame, type GameWithResults } from '@/lib/types';
 
 export default function GameDetailPage() {
   const searchParams = useSearchParams();
@@ -94,7 +94,7 @@ export default function GameDetailPage() {
     );
   }
 
-  const is2HG = game.game_type === '2hg';
+  const is2HG = isTeamGame(game.game_type);
 
   return (
     <PageContainer
@@ -152,7 +152,7 @@ export default function GameDetailPage() {
               {is2HG && (
                 <Chip
                   icon={<GroupsIcon />}
-                  label="2-Headed Giant"
+                  label={game.game_type === '1v1-2hg' ? '1v1 2-Headed Giant' : '2-Headed Giant'}
                   color="secondary"
                   variant="outlined"
                 />

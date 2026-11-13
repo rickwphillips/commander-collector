@@ -145,10 +145,11 @@ export function buildQuerySentence({
   if (conditions.my_games_only) {
     const typeLabel =
       conditions.game_type === '2hg' ? '2HG' :
+      conditions.game_type === '1v1-2hg' ? '1v1 2HG' :
       conditions.game_type === 'standard' ? 'Commander' : '';
     condClauses.push(typeLabel ? `in my ${typeLabel} games` : 'in my games');
   } else if (conditions.game_type && conditions.game_type !== 'all') {
-    condClauses.push(`in ${conditions.game_type === '2hg' ? '2HG' : 'Commander'} games`);
+    condClauses.push(`in ${conditions.game_type === '2hg' ? '2HG' : conditions.game_type === '1v1-2hg' ? '1v1 2HG' : 'Commander'} games`);
   }
   if (conditions.pod_size != null) {
     condClauses.push(`in ${conditions.pod_size >= 5 ? '5+' : conditions.pod_size}-player pods`);

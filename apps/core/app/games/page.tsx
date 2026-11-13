@@ -27,7 +27,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { EmptyState } from '@/components/EmptyState';
 import { RematchButton } from '@/components/RematchButton';
 import { api } from '@/lib/api';
-import type { GameWithResults } from '@/lib/types';
+import { isTeamGame, type GameWithResults } from '@/lib/types';
 
 export default function GamesPage() {
   const [games, setGames] = useState<GameWithResults[]>([]);
@@ -129,7 +129,7 @@ export default function GamesPage() {
           {filteredGames.map((game, index) => {
             const winners = game.results?.filter((r) => r.finish_position === 1) || [];
             const winner = winners[0];
-            const is2HG = game.game_type === '2hg';
+            const is2HG = isTeamGame(game.game_type);
 
             return (
               <Grow key={game.id} in timeout={600 + index * 50}>
@@ -153,7 +153,7 @@ export default function GamesPage() {
                               <EmojiEventsIcon sx={{ color: '#DAA520', fontSize: 24 }} />
                               <Typography variant="h6" sx={{ fontWeight: 600 }}>
                                 {is2HG
-                                  ? winners.map((w) => w.player_name).join(' & ')
+                                  ? [...new Set(winners.map((w) => w.player_name))].join(' & ')
                                   : winner?.player_name || 'Unknown'}
                               </Typography>
                               {!is2HG && winner && (
@@ -171,6 +171,7 @@ export default function GamesPage() {
                                 {game.results
                                   .filter((r) => r.finish_position !== 1)
                                   .map((r) => r.player_name)
+                                  .filter((name, i, all) => all.indexOf(name) === i)
                                   .join(', ')}
                               </Typography>
                             )}
@@ -178,10 +179,10 @@ export default function GamesPage() {
 
                           <Stack direction="row" spacing={1} alignItems="center">
                             {is2HG && (
-                              <Chip label="2HG" size="small" variant="outlined" color="secondary" />
+                              <Chip label={game.game_type === '1v1-2hg' ? '1v1 2HG' : '2HG'} size="small" variant="outlined" color="secondary" />
                             )}
                             <Chip
-                              label={`${game.results?.length || 0} players`}
+                              label={`${new Set(game.results?.map((r) => r.player_id)).size} players`}
                               size="small"
                               variant="outlined"
                             />

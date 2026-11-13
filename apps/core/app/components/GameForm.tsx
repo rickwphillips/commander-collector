@@ -26,12 +26,13 @@ import Link from 'next/link';
 import { ColorIdentityChips } from './ColorIdentityChips';
 import { LoadingSpinner } from './LoadingSpinner';
 import { api } from '@/lib/api';
-import type {
-  Player,
-  DeckWithPlayer,
-  GameResultInput,
-  GameType,
-  GameWithResults,
+import {
+  isTeamGame,
+  type Player,
+  type DeckWithPlayer,
+  type GameResultInput,
+  type GameType,
+  type GameWithResults,
 } from '@/lib/types';
 import type { GameManagerPrefill } from '@/game-manager/types';
 
@@ -82,6 +83,8 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
   const [notes, setNotes] = useState('');
   const [results, setResults] = useState<PlayerResult[]>(defaultResults);
   const [gameType, setGameType] = useState<GameType>('standard');
+  const isTeam = isTeamGame(gameType);
+  const isOneVsOne = gameType === '1v1-2hg';
   const [winningTeam, setWinningTeam] = useState<number>(1);
   const [teamElimTurns, setTeamElimTurns] = useState<Record<number, number | ''>>({ 2: '' });
 
@@ -102,7 +105,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
         }));
       setResults(formResults);
 
-      if (gameData.game_type === '2hg') {
+      if (isTeamGame(gameData.game_type)) {
         const winner = gameData.results.find((r) => r.finish_position === 1);
         const winTeam = winner?.team_number ?? 1;
         setWinningTeam(winTeam);
@@ -210,7 +213,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
       newResults[index].eliminated_turn = value as number | '';
     } else if (field === 'team_number') {
       newResults[index].team_number = value as number | null;
-      if (gameType === '2hg') {
+      if (isTeam) {
         newResults.forEach((r) => {
           if (r.team_number === winningTeam) {
             r.finish_position = 1;
@@ -226,7 +229,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
   const handleGameTypeChange = (_: React.MouseEvent<HTMLElement>, newType: GameType | null) => {
     if (newType === null) return;
     setGameType(newType);
-    if (newType === '2hg') {
+    if (isTeamGame(newType)) {
       setResults(default2hgResults);
       setWinningTeam(1);
       setTeamElimTurns({ 2: '' });
@@ -269,7 +272,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
     }
 
     const playerIds = validResults.map((r) => r.player_id).filter((id) => id !== '');
-    if (new Set(playerIds).size !== playerIds.length) {
+    if (!isOneVsOne && new Set(playerIds).size !== playerIds.length) {
       setError('Each player can only appear once per game');
       return;
     }
@@ -286,7 +289,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
       }
     }
 
-    if (gameType === '2hg') {
+    if (isTeam) {
       const teamNums = [
         ...new Set(validResults.map((r) => r.team_number).filter(Boolean)),
       ] as number[];
@@ -300,6 +303,15 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
           return;
         }
       }
+      if (isOneVsOne) {
+        const pilots = teamNums.map((teamNum) => [
+          ...new Set(validResults.filter((r) => r.team_number === teamNum).map((r) => r.player_id)),
+        ]);
+        if (pilots.some((p) => p.length !== 1) || new Set(pilots.flat()).size !== teamNums.length) {
+          setError('1v1 2HG needs one player per team, playing both of that team\'s decks');
+          return;
+        }
+      }
     }
 
     setSubmitting(true);
@@ -308,7 +320,7 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
     try {
       // For 2HG: compute finish_position per team (winner=1, others ordered by elim turn desc)
       const teamPositions: Record<number, number> = {};
-      if (gameType === '2hg') {
+      if (isTeam) {
         teamPositions[winningTeam] = 1;
         const losingTeams = [
           ...new Set(validResults.map((r) => r.team_number).filter((n) => n !== winningTeam)),
@@ -323,16 +335,16 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
       const gameResults: GameResultInput[] = validResults.map((r) => ({
         deck_id: r.deck_id as string,
         player_id: r.player_id as string,
-        finish_position: gameType === '2hg' ? (teamPositions[r.team_number ?? 0] ?? 2) : (r.finish_position as number),
+        finish_position: isTeam ? (teamPositions[r.team_number ?? 0] ?? 2) : (r.finish_position as number),
         eliminated_turn:
-          gameType === '2hg'
+          isTeam
             ? r.team_number !== winningTeam
               ? (teamElimTurns[r.team_number ?? 0] ?? '') === ''
                 ? null
                 : Number(teamElimTurns[r.team_number ?? 0])
               : null
             : r.eliminated_turn === '' ? null : Number(r.eliminated_turn),
-        team_number: gameType === '2hg' ? r.team_number : null,
+        team_number: isTeam ? r.team_number : null,
       }));
 
       const gameData = {
@@ -407,7 +419,12 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
               <MenuItem
                 key={player.id}
                 value={player.id}
-                disabled={results.some((r, i) => i !== index && r.player_id === player.id)}
+                disabled={results.some(
+                  (r, i) =>
+                    i !== index &&
+                    r.player_id === player.id &&
+                    !(isOneVsOne && r.team_number === result.team_number),
+                )}
               >
                 {player.name}
               </MenuItem>
@@ -705,6 +722,10 @@ export function GameForm({ mode, gameId, onSuccess }: GameFormProps) {
                     <ToggleButton value="2hg">
                       <GroupsIcon sx={{ mr: 0.5, fontSize: 18 }} />
                       2-Headed Giant
+                    </ToggleButton>
+                    <ToggleButton value="1v1-2hg">
+                      <GroupsIcon sx={{ mr: 0.5, fontSize: 18 }} />
+                      1v1 2HG
                     </ToggleButton>
                   </ToggleButtonGroup>
                 </Stack>

@@ -16,7 +16,7 @@ $metricsParam   = $_GET['metrics'] ?? 'win_rate,total_games,wins';
 $metrics        = array_filter(explode(',', $metricsParam));
 
 // Conditions
-$gameType        = $_GET['game_type'] ?? null;        // 'standard' or '2hg'
+$gameType        = $_GET['game_type'] ?? null;        // 'standard', '2hg' or '1v1-2hg'
 $podSize         = isset($_GET['pod_size']) ? (int)$_GET['pod_size'] : null;
 $minWinTurn      = isset($_GET['min_winning_turn']) ? (int)$_GET['min_winning_turn'] : null;
 $maxWinTurn      = isset($_GET['max_winning_turn']) ? (int)$_GET['max_winning_turn'] : null;
@@ -100,7 +100,7 @@ if (in_array($groupBy, ['opponent_player', 'opponent_commander'], true)) {
 $where  = ['1=1'];
 $params = [];
 
-if ($gameType && in_array($gameType, ['standard', '2hg'], true)) {
+if ($gameType && in_array($gameType, ['standard', '2hg', '1v1-2hg'], true)) {
     $where[] = 'g.game_type = ?';
     $params[] = $gameType;
 }
