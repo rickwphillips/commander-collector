@@ -17,6 +17,10 @@ final class GameSettingsStore {
     var darkMode: Bool { didSet { save() } }
     /// Local only: turn every board animation off (still frames, no transitions).
     var animationsEnabled: Bool { didSet { save() } }
+    /// Local only: whether the board bug may visit. It also needs Motion on.
+    var bugsEnabled: Bool { didSet { save() } }
+    /// Bugs are checked for and sent in only while both switches are on.
+    var bugsAllowed: Bool { bugsEnabled && animationsEnabled }
     /// True while the effects fade out (Motion off) or come back in (Motion
     /// on); the switch is held until the board has fully settled either way.
     private(set) var motionSettling = false
@@ -49,6 +53,7 @@ final class GameSettingsStore {
         turnTimerSeconds = defaults.object(forKey: "settings.timerSeconds") as? Int ?? 300
         darkMode = defaults.object(forKey: "settings.dark") as? Bool ?? true
         animationsEnabled = defaults.object(forKey: "settings.motion") as? Bool ?? true
+        bugsEnabled = defaults.object(forKey: "settings.bugs") as? Bool ?? true
         showPlayerNamesInCmdDamage = Set(defaults.stringArray(forKey: "settings.cmdShowPlayer") ?? [])
         loaded = true
         SoundService.shared.enabled = soundEnabled
@@ -62,6 +67,7 @@ final class GameSettingsStore {
         defaults.set(turnTimerSeconds, forKey: "settings.timerSeconds")
         defaults.set(darkMode, forKey: "settings.dark")
         defaults.set(animationsEnabled, forKey: "settings.motion")
+        defaults.set(bugsEnabled, forKey: "settings.bugs")
         defaults.set(Array(showPlayerNamesInCmdDamage), forKey: "settings.cmdShowPlayer")
     }
 

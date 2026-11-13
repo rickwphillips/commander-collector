@@ -182,6 +182,12 @@ public struct GameState: Hashable, Sendable, Codable {
 
     public var isTwoHeadedGiant: Bool { gameType == .twoHeadedGiant }
     public var isOneVsOneTwoHeadedGiant: Bool { isTwoHeadedGiant && onePilotPerTeam == true }
+    /// What to call one seat on its own. Normally the player; in 1v1 2HG both
+    /// seats of a team share a player, so the seat goes by its commander.
+    public func headName(_ idx: Int) -> String {
+        guard let p = players[safe: idx] else { return "" }
+        return isOneVsOneTwoHeadedGiant ? p.commander.name : p.playerName
+    }
 
     private enum CodingKeys: String, CodingKey {
         case players, commanderDamage, currentPlayerIdx, turnNumber, startingLife, phase

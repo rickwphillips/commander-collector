@@ -132,6 +132,9 @@ struct CommanderDamageRow: View {
     let glass: Bool
     @Binding var overlay: SeatOverlay?
     let sizes: SeatPanel.Sizes
+    /// One line per commander: the name shares the stepper's row instead of
+    /// sitting above it (the 2HG team panel, which is short of height).
+    var inline = false
     @Environment(\.colorScheme) private var scheme
 
     private var state: GameState { session.state }
@@ -146,6 +149,45 @@ struct CommanderDamageRow: View {
     }
 
     var body: some View {
+        if inline { inlineBody } else { stackedBody }
+    }
+
+    /// Name, statuses and the dealt figure on the left, the stepper on the right.
+    private var inlineBody: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            inlineRow(partner: false)
+            if source.partner != nil { inlineRow(partner: true) }
+        }
+    }
+
+    private func inlineRow(partner: Bool) -> some View {
+        let value = partner ? damage.fromPartner : damage.fromCommander
+        let name = partner ? (source.partner?.name ?? "") : (showPlayer ? source.playerName : source.commander.name)
+        return StepperControl(value: value, color: valueColor(value),
+                              max: 21, disableDec: source.isEliminated, glass: glass, size: sizes.damageStepper,
+                              focus: .commanderDamage(sourceIdx: sourceIdx, partner: partner),
+                              identifier: partner ? "s\(targetIdx)-cmd-\(sourceIdx)-partner" : "s\(targetIdx)-cmd-\(sourceIdx)", overlay: $overlay,
+                              onChange: { session.dispatch(.commanderDamageChange(targetIdx: targetIdx, sourceIdx: sourceIdx, isPartner: partner, delta: $0)) }) {
+            HStack(spacing: 6) {
+                nameLabel(name, partner: partner)
+                if !partner {
+                    PlayerStatusBadges(player: source, size: sizes.badge, startingLife: state.startingLife, showLife: false, showTax: false, showPoison: !state.isTwoHeadedGiant, poisonDanger: state.isTwoHeadedGiant ? GameReducer.twoHeadedGiantPoisonThreshold : 10)
+                        .fixedSize()
+                    if dealt.total > 0 {
+                        Text("\u{2694}\u{FE0E}\(viewer.partner != nil ? "\(dealt.fromCommander)/\(dealt.fromPartner)" : "\(dealt.total)")")
+                            .font(.system(size: sizes.source, weight: .black))
+                            .foregroundStyle(dealt.total >= 21 ? Theme.danger : Theme.dealtOrange)
+                            .fixedSize()
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { overlay = .snapshot(sourceIdx: sourceIdx, partner: partner) }
+        }
+    }
+
+    private var stackedBody: some View {
         VStack(alignment: .leading, spacing: 0) {
             // The name has the whole row width so more of the title shows;
             // the badges, dealt figure and stepper sit underneath.
@@ -184,6 +226,21 @@ struct CommanderDamageRow: View {
         }
     }
 
+    /// The active dot, the name (which gives way first when space is short)
+    /// and that commander's tax medallion.
+    @ViewBuilder private func nameLabel(_ name: String, partner: Bool) -> some View {
+        if isActive && !partner { Circle().fill(Color.accentColor).frame(width: 7, height: 7).shadow(color: .accentColor.opacity(0.7), radius: 2) }
+        Text(name)
+            // Bolder over the glass backing so the title holds up against the art.
+            .font(.system(size: sizes.source, weight: isActive && !partner ? .bold : glass ? .semibold : .regular))
+            .foregroundStyle(source.isEliminated ? .secondary : isActive && !partner ? Color.accentColor : .secondary)
+            .strikethrough(source.isEliminated).lineLimit(1).truncationMode(.tail)
+            .accessibilityIdentifier(partner ? "s\(targetIdx)-cmd-\(sourceIdx)-partner-name" : "s\(targetIdx)-cmd-\(sourceIdx)-name")
+        // That commander's tax medallion sits right after its name.
+        let tax = partner ? source.partnerCommanderTax : source.commanderTax
+        if tax > 0 { CounterGlyph(kind: .tax, size: sizes.badge, taxValue: tax) }
+    }
+
     /// Their other statuses, on a line beneath the stepper inside its backing.
     private var statusLine: some View {
         PlayerStatusBadges(player: source, size: sizes.badge, startingLife: state.startingLife, showLife: false, showTax: false, showPoison: !state.isTwoHeadedGiant, poisonDanger: state.isTwoHeadedGiant ? GameReducer.twoHeadedGiantPoisonThreshold : 10)
@@ -195,16 +252,7 @@ struct CommanderDamageRow: View {
 
     private func nameLine(_ name: String, partner: Bool) -> some View {
         HStack(spacing: 4) {
-            if isActive && !partner { Circle().fill(Color.accentColor).frame(width: 7, height: 7).shadow(color: .accentColor.opacity(0.7), radius: 2) }
-            Text(name)
-                // Bolder over the glass backing so the title holds up against the art.
-                .font(.system(size: sizes.source, weight: isActive && !partner ? .bold : glass ? .semibold : .regular))
-                .foregroundStyle(source.isEliminated ? .secondary : isActive && !partner ? Color.accentColor : .secondary)
-                .strikethrough(source.isEliminated).lineLimit(1).truncationMode(.tail)
-                .accessibilityIdentifier(partner ? "s\(targetIdx)-cmd-\(sourceIdx)-partner-name" : "s\(targetIdx)-cmd-\(sourceIdx)-name")
-            // That commander's tax medallion sits right after its name.
-            let tax = partner ? source.partnerCommanderTax : source.commanderTax
-            if tax > 0 { CounterGlyph(kind: .tax, size: sizes.badge, taxValue: tax) }
+            nameLabel(name, partner: partner)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 8)

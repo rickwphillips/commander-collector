@@ -294,7 +294,10 @@ struct CenterZoneView: View {
                 HStack {
                     Text(title.uppercased()).font(.system(size: 11, weight: .bold)).kerning(0.5).foregroundStyle(.secondary)
                     Spacer()
-                    Button { onClose?(); panel = nil } label: { Image(systemName: "xmark").font(.system(size: 14)) }.buttonStyle(.plain).foregroundStyle(.secondary).accessibilityIdentifier("closeOverlay")
+                    Button { onClose?(); panel = nil } label: {
+                        Image(systemName: "xmark").font(.system(size: 22, weight: .semibold)).frame(width: 40, height: 34).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain).foregroundStyle(.secondary).accessibilityIdentifier("closeOverlay")
                 }
                 content()
             }
@@ -306,18 +309,12 @@ struct CenterZoneView: View {
     private var settingsOverlay: some View {
         overlayFrame(title: "Settings") {
             VStack(spacing: 8) {
-                HStack(spacing: 16) {
-                    SettingSwitch("Timer", id: "timerToggle", isOn: Binding(get: { state.turnTimerSeconds > 0 }, set: { on in
-                        let secs = on ? (settings.turnTimerSeconds > 0 ? settings.turnTimerSeconds : 300) : 0
-                        session.setTurnTimer(seconds: secs)
-                        settings.turnTimerEnabled = on
-                        settings.push(using: account.client)
-                    }))
-                    SettingSwitch("Highlight", id: "highlightToggle", isOn: Binding(get: { settings.highlightMode }, set: { settings.highlightMode = $0; settings.push(using: account.client) }))
-                    SettingSwitch("Sound", id: "soundToggle", isOn: Binding(get: { settings.soundEnabled }, set: { settings.soundEnabled = $0; settings.push(using: account.client) }))
-                    SettingSwitch("Dark", id: "darkToggle", isOn: Binding(get: { settings.darkMode }, set: { settings.darkMode = $0 }))
-                    SettingSwitch("Motion", id: "motionToggle", isOn: Binding(get: { settings.animationsEnabled }, set: { settings.setAnimations($0) }))
-                        .disabled(settings.motionSettling)
+                // One line, whatever the strip's width: the row is tried at
+                // full size first and then at smaller sizes until it fits.
+                ViewThatFits(in: .horizontal) {
+                    ForEach([1, 0.86, 0.74, 0.64, 0.56], id: \.self) { scale in
+                        settingSwitches(scale: scale)
+                    }
                 }
                 HStack(spacing: 8) {
                     // Only while a roll-off can still happen: seating, and not a 2HG team roll.
@@ -325,14 +322,40 @@ struct CenterZoneView: View {
                         Button { panel = .houseRules } label: { Label("Roll Rules", systemImage: "list.bullet.clipboard").frame(maxWidth: .infinity) }
                             .accessibilityIdentifier("houseRules")
                     }
+                    // The board bug is an effect of play: offered only where one could appear.
+                    // Needs the Bugs switch and Motion on, as the bugs themselves do.
+                    if session.isPlaying && !session.isRemote {
+                        Button { session.spawnBug(); panel = nil } label: { Label("Bug", systemImage: "ladybug").frame(maxWidth: .infinity) }
+                            .disabled(!settings.bugsAllowed)
+                            .accessibilityIdentifier("spawnBug")
+                    }
                     Button { notesDraft = state.notes; panel = .notes } label: { Label("Notes", systemImage: "note.text").frame(maxWidth: .infinity) }
                         .tint(state.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : .accentColor)
                     Button { closePanel { showLog = true } } label: { Label("Game Log", systemImage: "list.bullet").frame(maxWidth: .infinity) }
                     Button { closePanel { confirmRestart = true } } label: { Label("Restart", systemImage: "arrow.counterclockwise").frame(maxWidth: .infinity) }.accessibilityIdentifier("restartGame")
                     Button(role: .destructive) { closePanel { confirmEnd = true } } label: { Label("End Game", systemImage: "flag.fill").frame(maxWidth: .infinity) }.accessibilityIdentifier("endGame")
                 }
-                .buttonStyle(.bordered).controlSize(.small).font(.system(size: 11))
+                // Labels shrink to stay on one line; they never wrap.
+                .buttonStyle(.bordered).controlSize(.small).font(.system(size: 11)).lineLimit(1).minimumScaleFactor(0.55)
             }
+        }
+    }
+
+    /// Every switch on one line, Bugs at the far left.
+    private func settingSwitches(scale: Double) -> some View {
+        HStack(spacing: 16 * scale) {
+            SettingSwitch("Bugs", id: "bugsToggle", scale: scale, isOn: Binding(get: { settings.bugsEnabled }, set: { settings.bugsEnabled = $0 }))
+            SettingSwitch("Timer", id: "timerToggle", scale: scale, isOn: Binding(get: { state.turnTimerSeconds > 0 }, set: { on in
+                let secs = on ? (settings.turnTimerSeconds > 0 ? settings.turnTimerSeconds : 300) : 0
+                session.setTurnTimer(seconds: secs)
+                settings.turnTimerEnabled = on
+                settings.push(using: account.client)
+            }))
+            SettingSwitch("Highlight", id: "highlightToggle", scale: scale, isOn: Binding(get: { settings.highlightMode }, set: { settings.highlightMode = $0; settings.push(using: account.client) }))
+            SettingSwitch("Sound", id: "soundToggle", scale: scale, isOn: Binding(get: { settings.soundEnabled }, set: { settings.soundEnabled = $0; settings.push(using: account.client) }))
+            SettingSwitch("Dark", id: "darkToggle", scale: scale, isOn: Binding(get: { settings.darkMode }, set: { settings.darkMode = $0 }))
+            SettingSwitch("Motion", id: "motionToggle", scale: scale, isOn: Binding(get: { settings.animationsEnabled }, set: { settings.setAnimations($0) }))
+                .disabled(settings.motionSettling)
         }
     }
 
@@ -479,7 +502,9 @@ struct TurnHold: ViewModifier {
     func body(content: Content) -> some View {
         content
             .overlay {
-                HoldOrTap(onTap: onNext) {
+                // Both directions click like the counters' plus and minus.
+                HoldOrTap(onTap: { SoundService.shared.playClick(); onNext() }) {
+                    SoundService.shared.playClick()
                     onPrev()
                     if showsTip { showTip() }
                 }
@@ -544,11 +569,19 @@ struct SettingSwitch: View {
     let label: String
     let id: String
     let isOn: Binding<Bool>
-    init(_ label: String, id: String, isOn: Binding<Bool>) { self.label = label; self.id = id; self.isOn = isOn }
+    /// Below 1 the whole switch, label included, is drawn smaller so a row of
+    /// them fits a narrow strip.
+    var scale: Double = 1
+    /// A switch's own size at full scale.
+    private static let switchSize = CGSize(width: 64, height: 30)
+    init(_ label: String, id: String, scale: Double = 1, isOn: Binding<Bool>) { self.label = label; self.id = id; self.scale = scale; self.isOn = isOn }
     var body: some View {
-        HStack(spacing: 5) {
-            Text(label).font(.system(size: 12))
+        HStack(spacing: 5 * scale) {
+            Text(label).font(.system(size: max(12 * scale, 9.5)))
             Toggle(label, isOn: isOn).labelsHidden().toggleStyle(.switch).controlSize(.mini).accessibilityIdentifier(id)
+                .fixedSize()
+                .scaleEffect(scale)
+                .frame(width: Self.switchSize.width * scale, height: Self.switchSize.height * scale)
         }
         .fixedSize()
     }

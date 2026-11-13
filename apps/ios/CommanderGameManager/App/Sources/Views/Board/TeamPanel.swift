@@ -139,6 +139,8 @@ struct TeamPanel: View {
                     Text(teamName.uppercased()).font(.system(size: 14, weight: .heavy)).kerning(0.5).lineLimit(1)
                         .onTapGesture { nameDraft = teamName; editingName = true }
                 }
+                // 1v1 2HG: the one player behind both heads is named here, once.
+                if state.isOneVsOneTwoHeadedGiant { Text(state.players[primary].playerName).font(.system(size: 14, weight: .semibold)).foregroundStyle(teamColor).lineLimit(1) }
                 if isActive && !eliminated { Text("ACTIVE").font(.system(size: 10, weight: .bold)).kerning(0.5).foregroundStyle(Color.accentColor) }
                 if remoteConnected && !session.isRemote {
                     Image(systemName: "iphone").font(.system(size: 12)).foregroundStyle(.green).symbolEffect(.pulse)
@@ -177,13 +179,16 @@ struct TeamPanel: View {
             if !trailing { CommanderArt(name: p.commander.name, height: sz.art).onTapGesture { overlay = .preview(name: p.commander.name) } }
             VStack(alignment: trailing ? .trailing : .leading, spacing: 0) {
                 HStack(spacing: 4) {
-                    Text(p.playerName).font(.system(size: sz.name, weight: .bold)).foregroundStyle(teamColor).lineLimit(1)
+                    Text(state.headName(idx)).font(.system(size: sz.name, weight: .bold)).foregroundStyle(teamColor).lineLimit(1)
                     XpBadge(experience: p.experience)
                     ForEach([(p.commander.name, p.commanderTax), (p.partner?.name ?? "", p.partnerCommanderTax)].filter { $0.1 > 0 && !$0.0.isEmpty }, id: \.0) { m in
                         TaxMedallion(tax: m.1, size: 20).onTapGesture { overlay = .rules(title: "Commander tax", text: RulesText.commanderTax(name: m.0, tax: m.1)) }
                     }
                 }
-                Text("\(p.deckName) · \(p.commander.name)\(p.partner.map { " / \($0.name)" } ?? "")").font(.system(size: sz.deck)).foregroundStyle(.secondary).lineLimit(1)
+                // 1v1 2HG heads the line with the commander, so it is not repeated here.
+                Text(state.isOneVsOneTwoHeadedGiant
+                     ? "\(p.deckName)\(p.partner.map { " · \($0.name)" } ?? "")"
+                     : "\(p.deckName) · \(p.commander.name)\(p.partner.map { " / \($0.name)" } ?? "")").font(.system(size: sz.deck)).foregroundStyle(.secondary).lineLimit(1)
             }
             if trailing { CommanderArt(name: p.commander.name, height: sz.art).onTapGesture { overlay = .preview(name: p.commander.name) } }
         }
@@ -196,36 +201,45 @@ struct TeamPanel: View {
         let opp = state.players[oppPrimary]
         let oppEliminated = opponents.allSatisfy { state.players[$0].isEliminated }
         let oppEnergy = opponents.map { state.players[$0].energy }.max() ?? 0
-        return VStack(alignment: .leading, spacing: 6) {
-            VStack(alignment: .leading, spacing: 2) {
+        return VStack(alignment: .leading, spacing: 4) {
+            // One line for the other team: name, shared life, poison, statuses.
+            HStack(alignment: .center, spacing: 10) {
                 Text(Teams.name(Teams.other(teamNumber), teamNames: state.teamNames).uppercased())
                     .font(.system(size: sz.name, weight: .bold)).kerning(0.5).foregroundStyle(teamNumber == 1 ? .purple : .accentColor).lineLimit(1)
-                HStack(alignment: .center, spacing: 10) {
-                    LifeNumber(value: opp.life, fontSize: sz.life * 0.6, color: Theme.lifeColor(opp.life, startingLife: state.startingLife), damageFlash: 0, energy: oppEnergy, poison: opp.poison, poisonLethal: 15)
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(dealtToOpponents, id: \.name) { r in
-                            HStack(spacing: 4) {
-                                Text(r.name).font(.system(size: sz.badge)).foregroundStyle(.secondary).lineLimit(1)
-                                Text("\(r.value)").font(.system(size: sz.badge, weight: .heavy)).foregroundStyle(r.value >= 21 ? Color(hex: 0xB71C1C) : .primary) + Text("/21").font(.system(size: sz.badge)).foregroundStyle(.secondary)
-                            }
-                            .onTapGesture { overlay = .preview(name: r.name) }
-                        }
+                LifeNumber(value: opp.life, fontSize: sz.life * 0.42, color: Theme.lifeColor(opp.life, startingLife: state.startingLife), damageFlash: 0, energy: oppEnergy, poison: opp.poison, poisonLethal: 15)
+                if opp.poison > 0 {
+                    HStack(spacing: 3) {
+                        CounterGlyph(kind: .poison, size: sz.badge, poison: opp.poison, poisonDanger: 15)
+                        Text("\(opp.poison)/15").font(.system(size: sz.badge, weight: .heavy)).foregroundStyle(opp.poison >= 15 ? Theme.danger : Theme.poisonGreen)
                     }
                 }
-                HStack(spacing: 6) {
-                    if opp.poison > 0 { CounterGlyph(kind: .poison, size: sz.badge, poison: opp.poison, poisonDanger: 15); Text("\(opp.poison)/15").font(.system(size: sz.badge, weight: .heavy)).foregroundStyle(opp.poison >= 15 ? Theme.danger : Theme.poisonGreen) }
-                    ForEach(opponents, id: \.self) { o in
-                        PlayerStatusBadges(player: state.players[o], size: sz.badge, startingLife: state.startingLife, showLife: false, showPoison: false)
-                    }
+                ForEach(opponents, id: \.self) { o in
+                    PlayerStatusBadges(player: state.players[o], size: sz.badge, startingLife: state.startingLife, showLife: false, showPoison: false).fixedSize()
                 }
+                Spacer(minLength: 0)
             }
             .opacity(oppEliminated ? 0.5 : 1)
+            // What this team's commanders have dealt them, only once there is some.
+            if !dealtToOpponents.isEmpty {
+                HStack(spacing: 10) {
+                    ForEach(dealtToOpponents, id: \.name) { r in
+                        HStack(spacing: 4) {
+                            Text(r.name).font(.system(size: sz.badge)).foregroundStyle(.secondary).lineLimit(1)
+                            Text("\(r.value)").font(.system(size: sz.badge, weight: .heavy)).foregroundStyle(r.value >= 21 ? Color(hex: 0xB71C1C) : .primary) + Text("/21").font(.system(size: sz.badge)).foregroundStyle(.secondary)
+                        }
+                        .onTapGesture { overlay = .preview(name: r.name) }
+                    }
+                }
+                .opacity(oppEliminated ? 0.5 : 1)
+            }
             Divider()
-            Text("CMD DAMAGE TAKEN").font(.system(size: sz.label, weight: .semibold)).kerning(0.5).foregroundStyle(.secondary)
+            Text("CMD DAMAGE TAKEN").font(.system(size: sz.label * 0.85, weight: .semibold)).kerning(0.5).foregroundStyle(.secondary)
+            // One line per commander (name, then its stepper), so both heads
+            // and their partners fit without scrolling where there is room.
             ScrollView(.vertical) {
-                VStack(spacing: 2) {
+                VStack(spacing: 0) {
                     ForEach(opponents, id: \.self) { src in
-                        CommanderDamageRow(session: session, targetIdx: primary, sourceIdx: src, showPlayer: false, glass: glassActive, overlay: $overlay, sizes: sz)
+                        CommanderDamageRow(session: session, targetIdx: primary, sourceIdx: src, showPlayer: false, glass: glassActive, overlay: $overlay, sizes: sz, inline: true)
                     }
                 }
             }
@@ -299,7 +313,8 @@ struct TeamPanel: View {
                     CommanderArt(name: p.commander.name, height: sz.art * 1.2).onTapGesture { overlay = .preview(name: p.commander.name) }
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 8) {
-                            Text(p.playerName).font(.system(size: sz.name, weight: .bold)).foregroundStyle(teamColor).lineLimit(1)
+                            // A commander name (1v1 2HG) is longer than a player's: let it shrink before it is cut off.
+                            Text(state.headName(m)).font(.system(size: sz.name, weight: .bold)).foregroundStyle(teamColor).lineLimit(1).minimumScaleFactor(0.7)
                             taxStepper(m, partner: false, value: p.commanderTax, sz: sz)
                             if p.partner != nil { taxStepper(m, partner: true, value: p.partnerCommanderTax, sz: sz) }
                         }
@@ -418,9 +433,9 @@ struct TeamPanel: View {
         case .poison:
             FocusModal(title: "Poison", value: poison, color: poison >= 15 ? Theme.danger : poison > 0 ? Theme.poisonGreen : .primary, onChange: { session.dispatch(.poisonChange(playerIdx: primary, delta: $0)) }, onClose: close)
         case .memberEnergy(let m):
-            FocusModal(title: "\(state.players[m].playerName): Energy", value: state.players[m].energy, color: Theme.energyCyan, onChange: { session.dispatch(.energyChange(playerIdx: m, delta: $0)) }, onClose: close)
+            FocusModal(title: "\(state.headName(m)): Energy", value: state.players[m].energy, color: Theme.energyCyan, onChange: { session.dispatch(.energyChange(playerIdx: m, delta: $0)) }, onClose: close)
         case .memberExperience(let m):
-            FocusModal(title: "\(state.players[m].playerName): Experience", value: state.players[m].experience, color: Theme.gold, onChange: { session.dispatch(.experienceChange(playerIdx: m, delta: $0)) }, onClose: close)
+            FocusModal(title: "\(state.headName(m)): Experience", value: state.players[m].experience, color: Theme.gold, onChange: { session.dispatch(.experienceChange(playerIdx: m, delta: $0)) }, onClose: close)
         case .memberTax(let m, let partner):
             let p = state.players[m]
             FocusModal(title: partner ? (p.partner?.name ?? "Partner") : "\(p.playerName): Commander Tax", value: partner ? p.partnerCommanderTax : p.commanderTax, color: .orange,
@@ -446,7 +461,7 @@ struct TeamPanel: View {
                 Text(poisonKill ? "Who poisoned \(teamName)?" : "Who brought \(teamName) to 0?").font(.system(size: sz.kill, weight: .bold)).foregroundStyle(tint)
                 HStack(spacing: 8) {
                     ForEach(living, id: \.self) { s in
-                        Button(state.players[s].playerName) { session.attributeKill(kill, sourceIdx: s) }
+                        Button(state.headName(s)) { session.attributeKill(kill, sourceIdx: s) }
                             .padding(.horizontal, 14).padding(.vertical, 6).overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(tint.opacity(0.5)))
                     }
                     Button("Skip") { session.attributeKill(kill, sourceIdx: nil) }.foregroundStyle(tint.opacity(0.5))

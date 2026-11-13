@@ -8,21 +8,22 @@ import CommanderGameKit
 /// real cached players and decks, so a game saved from it is a genuine upload.
 /// Without a token, a throwaway token and in-memory demo players are used
 /// (simulator screenshots). `-demoBoard` also seats a four-player game and
-/// starts it.
+/// starts it; `-demo2hg` makes that a Two-Headed Giant game and `-demo1v1`
+/// a 1v1 2HG game (one player piloting both heads of each team).
 enum DemoMode {
     /// True when there is no real session to reuse.
     static var usesFakeAccount: Bool { isEnabled && KeychainStore.read("jwt") == nil }
 
     static var isEnabled: Bool {
         #if DEBUG
-        CommandLine.arguments.contains("-demo") || CommandLine.arguments.contains("-demoBoard") || CommandLine.arguments.contains("-demo2hg")
+        CommandLine.arguments.contains("-demo") || CommandLine.arguments.contains("-demoBoard") || (CommandLine.arguments.contains("-demo2hg") || CommandLine.arguments.contains("-demo1v1"))
         #else
         false
         #endif
     }
     static var wantsBoard: Bool {
         #if DEBUG
-        CommandLine.arguments.contains("-demoBoard") || CommandLine.arguments.contains("-demo2hg")
+        CommandLine.arguments.contains("-demoBoard") || (CommandLine.arguments.contains("-demo2hg") || CommandLine.arguments.contains("-demo1v1"))
         #else
         false
         #endif
@@ -61,7 +62,15 @@ enum DemoMode {
     }
     static var wantsTwoHeadedGiant: Bool {
         #if DEBUG
-        CommandLine.arguments.contains("-demo2hg")
+        (CommandLine.arguments.contains("-demo2hg") || CommandLine.arguments.contains("-demo1v1"))
+        #else
+        false
+        #endif
+    }
+
+    static var wantsOneVsOne: Bool {
+        #if DEBUG
+        CommandLine.arguments.contains("-demo1v1")
         #else
         false
         #endif
@@ -96,7 +105,7 @@ enum DemoMode {
     /// real cache when it holds enough distinct players with decks.
     @MainActor
     static func board(from context: ModelContext) -> ActiveGame {
-        var s = GameSetup.seatingState(playerCount: 4, startingLife: wantsTwoHeadedGiant ? 30 : 40, turnTimerSeconds: 300, gameType: wantsTwoHeadedGiant ? .twoHeadedGiant : .standard)
+        var s = GameSetup.seatingState(playerCount: 4, startingLife: wantsTwoHeadedGiant ? 30 : 40, turnTimerSeconds: 300, gameType: wantsTwoHeadedGiant ? .twoHeadedGiant : .standard, onePilotPerTeam: wantsOneVsOne)
         var seats: [GameSetup.Seat] = []
         let cached = (try? context.fetch(FetchDescriptor<CachedDeck>(sortBy: [SortDescriptor(\.name)]))) ?? []
         var usedPlayers = Set<String>()
@@ -110,6 +119,15 @@ enum DemoMode {
                 let owner = players.first { $0.0 == d.1 }!
                 return GameSetup.Seat(playerId: owner.0, playerName: owner.1, deckId: d.0, deckName: d.2,
                                       commander: CommanderInfo(name: d.3), partner: d.4.map { CommanderInfo(name: $0) })
+            }
+        }
+        // 1v1 2HG: the first seat's player pilots both heads of team 1, the
+        // third seat's both heads of team 2; each head keeps its own deck.
+        if wantsOneVsOne, seats.count >= 4 {
+            for i in 0..<4 {
+                let pilot = seats[i < 2 ? 0 : 2]
+                seats[i].playerId = pilot.playerId
+                seats[i].playerName = pilot.playerName
             }
         }
         for (i, seat) in seats.prefix(4).enumerated() { s = GameSetup.seating(s, idx: i, seat: seat) }

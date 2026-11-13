@@ -37,6 +37,9 @@ final class GameSession {
     /// leaves with the turn, so the centre Next Turn button shows the
     /// "Previous Turn" bubble for it.
     private(set) var previousTurnSignal = 0
+    /// Bumped from the settings menu to send a bug across the board now.
+    private(set) var bugSignal = 0
+    func spawnBug() { bugSignal += 1 }
     func previousTurnFromSeat() {
         dispatch(.prevTurn)
         previousTurnSignal += 1

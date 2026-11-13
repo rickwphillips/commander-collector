@@ -45,6 +45,15 @@ final class SoundService {
         player.play()
     }
 
+    // MARK: Board bug
+
+    /// The board bug being squished: one of six recorded squishes, picked at
+    /// random each time. The clips are "Squish Sounds Effects" by EZduzziteh
+    /// (opengameart.org/content/squish-sounds-effects), released CC0.
+    func playSquish() {
+        play("squish-\(Int.random(in: 1...6))")
+    }
+
     // MARK: Intro reveal
 
     /// A soft whoosh under each seat's intro flash: band-passed noise that

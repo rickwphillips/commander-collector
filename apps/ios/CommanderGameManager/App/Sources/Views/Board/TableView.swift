@@ -150,6 +150,14 @@ struct TableView: View {
             .environment(\.compactTable, compact)
         }
         .background(Theme.tableBackground(scheme))
+        // A rare visitor during play. With Bugs or Motion off the view is not
+        // there at all: no checks run and none are sent in. A phone's remote
+        // view never has one.
+        .overlay { if session.isPlaying && settings.bugsAllowed && !session.isRemote {
+            BoardBug(spawnSignal: session.bugSignal) {
+                BoardBug.schedule.chance(turnTimerSeconds: session.state.turnTimerSeconds, elapsedSeconds: session.elapsedSeconds(now: .now))
+            }
+        } }
         .preferredColorScheme(settings.darkMode ? .dark : .light)
         .environment(\.motionEnabled, settings.animationsEnabled)
         // Motion off stops every transition, once the effects have faded out.

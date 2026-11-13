@@ -152,10 +152,18 @@ struct CommanderSnapshotOverlay: View {
     private var current: SeatOverlay { .snapshot(sourceIdx: sourceIdx, partner: partner) }
     private var shownCommander: String { partner ? (src.partner?.name ?? src.commander.name) : src.commander.name }
 
-    @ViewBuilder private func commanderChip(_ name: String, active: Bool, id: String, select: @escaping () -> Void) -> some View {
+    /// `taken`, when given (2HG), is what that commander has dealt the
+    /// viewer's team, so every commander of the other team can be watched
+    /// from the chips without opening each one.
+    @ViewBuilder private func commanderChip(_ name: String, active: Bool, id: String, taken: Int? = nil, select: @escaping () -> Void) -> some View {
         HStack(spacing: 5) {
             Image(systemName: "rectangle.portrait.fill").font(.system(size: sizes.label - 2))
             Text(name).lineLimit(1)
+            if let taken {
+                Text("\(taken)").font(.system(size: sizes.source, weight: .heavy).monospacedDigit())
+                    .foregroundStyle(taken >= 21 ? Theme.danger : taken > 0 ? Theme.commanderDamageColor(taken) : .secondary)
+                    .accessibilityIdentifier("\(id)-taken")
+            }
         }
         .font(.system(size: sizes.source, weight: active ? .semibold : .regular))
         .foregroundStyle(active ? Color.accentColor : .secondary)
@@ -167,17 +175,94 @@ struct CommanderSnapshotOverlay: View {
         .accessibilityIdentifier(id)
     }
     /// The other opponents; the viewer gets their own section underneath.
+    /// In 2HG a commander does not damage its own teammate, and the viewer's
+    /// teammate shares the viewer's figure, so neither is listed.
     private var dealtRows: [(idx: Int, dmg: CommanderDamage)] {
-        state.players.indices.filter { $0 != sourceIdx && $0 != viewerIdx }
+        let sides = state.isTwoHeadedGiant ? [state.players[sourceIdx].teamNumber, state.players[viewerIdx].teamNumber] : []
+        return state.players.indices
+            .filter { $0 != sourceIdx && $0 != viewerIdx && !sides.contains(state.players[$0].teamNumber) }
             .map { ($0, state.commanderDamage[$0, sourceIdx]) }
     }
-    /// Damage the shown commander (or partner) has dealt to the viewer.
-    private var dealtToViewer: Int {
-        let d = state.commanderDamage[viewerIdx, sourceIdx]
-        return partner ? d.fromPartner : d.fromCommander
+    private func team(of idx: Int) -> [Int] {
+        state.players.indices.filter { state.players[$0].teamNumber == state.players[idx].teamNumber }
     }
-    /// Damage the viewer's commanders have dealt to this player.
-    private var dealtByViewer: CommanderDamage { state.commanderDamage[sourceIdx, viewerIdx] }
+    /// The seats on the viewer's side whose commanders are listed in the
+    /// highlighted section: both heads in 2HG, the viewer alone otherwise.
+    private var viewerSeats: [Int] { state.isTwoHeadedGiant ? team(of: viewerIdx) : [viewerIdx] }
+    /// Every head of the shown player's side (2HG), for the commander chips.
+    private var sourceSeats: [Int] { state.isTwoHeadedGiant ? team(of: sourceIdx) : [sourceIdx] }
+    /// Damage one commander has dealt to the viewer. In 2HG that is the
+    /// viewer's team: the figure is summed across its heads.
+    private func taken(from seat: Int, partner: Bool) -> Int {
+        viewerSeats.reduce(0) { sum, target in
+            let d = state.commanderDamage[target, seat]
+            return sum + (partner ? d.fromPartner : d.fromCommander)
+        }
+    }
+    /// Damage the shown commander (or partner) has dealt to the viewer.
+    private var dealtToViewer: Int { taken(from: sourceIdx, partner: partner) }
+    /// Damage one seat's commanders have dealt to this player. In 2HG that
+    /// is this player's team: the figure is summed across its heads.
+    private func dealt(by seat: Int) -> CommanderDamage {
+        sourceSeats.reduce(CommanderDamage()) { sum, target in
+            let d = state.commanderDamage[target, seat]
+            return CommanderDamage(sum.fromCommander + d.fromCommander, sum.fromPartner + d.fromPartner)
+        }
+    }
+
+    /// 2HG: what the shown commander has dealt the team looking at this
+    /// panel, of 21. The row names that commander; the panel is about the
+    /// other team only, so the viewer's own team is not mentioned on it.
+    private var teamTakenRow: some View {
+        HStack(spacing: 10) {
+            Text(shownCommander).font(.system(size: sizes.source, weight: .bold)).foregroundStyle(Color.accentColor).lineLimit(1)
+            Spacer(minLength: 4)
+            VStack(alignment: .center, spacing: 0) {
+                (Text("\(dealtToViewer)").font(.system(size: sizes.value * 1.4, weight: .black).monospacedDigit())
+                    .foregroundStyle(Theme.commanderDamageColor(dealtToViewer))
+                 + Text("/21").font(.system(size: sizes.label)).foregroundStyle(.secondary))
+                    .accessibilityIdentifier("snapshotDealtToMe")
+                Text("Dealt from").font(.system(size: sizes.label - 2)).foregroundStyle(.secondary).lineLimit(1)
+            }
+        }
+    }
+
+    /// One seat on the viewer's side: its commander, and what its commanders
+    /// have dealt the shown player's side. `showTaken` adds, once, what the
+    /// shown commander has dealt the viewer's side.
+    @ViewBuilder private func viewerRow(_ seat: Int, showTaken: Bool) -> some View {
+        let me = state.players[seat]
+        let out = dealt(by: seat)
+        let outLethal = out.fromCommander >= 21 || out.fromPartner >= 21
+        HStack(spacing: 10) {
+            CommanderArt(name: me.commander.name, height: 34)
+                .onTapGesture { overlay = .preview(name: me.commander.name, back: self.current) }
+            Text(state.headName(seat)).font(.system(size: sizes.source, weight: .bold)).foregroundStyle(Color.accentColor).lineLimit(1)
+            Spacer(minLength: 4)
+            VStack(alignment: .center, spacing: 0) {
+                Text(me.partner != nil ? "\(out.fromCommander)/\(out.fromPartner)" : "\(out.total)")
+                    .font(.system(size: sizes.value * 1.4, weight: .black).monospacedDigit())
+                    .foregroundStyle(outLethal ? Theme.danger : out.total > 0 ? Theme.dealtOrange : .secondary)
+                    .accessibilityIdentifier("snapshotDealtByMe")
+                // Say whom: this is what the viewer has dealt the player on this screen.
+                Text("Dealt to \(src.playerName)").font(.system(size: sizes.label - 2)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
+            }
+            // Kept in every row (invisible after the first) so the
+            // figures line up in columns.
+            Group {
+                Divider().frame(height: sizes.value * 1.6)
+                VStack(alignment: .center, spacing: 0) {
+                    Text("\(dealtToViewer)")
+                        .font(.system(size: sizes.value * 1.4, weight: .black).monospacedDigit())
+                        .foregroundStyle(Theme.commanderDamageColor(dealtToViewer))
+                        .accessibilityIdentifier("snapshotDealtToMe")
+                    Text("Dealt from").font(.system(size: sizes.label - 2)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
+                }
+            }
+            .opacity(showTaken ? 1 : 0)
+            .accessibilityHidden(!showTaken)
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -192,15 +277,25 @@ struct CommanderSnapshotOverlay: View {
                 HStack(alignment: .top, spacing: 8) {
                     VStack(alignment: .leading, spacing: 5) {
                         HStack(spacing: 4) {
-                            Text(src.playerName).font(.system(size: sizes.source, weight: .heavy)).lineLimit(1)
-                            if src.isMonarch { Image(systemName: "crown.fill").foregroundStyle(Theme.gold).font(.system(size: sizes.badge)) }
-                            if src.hasInitiative { InitiativeGlyph().foregroundStyle(Theme.initiativeBlue).frame(width: sizes.badge, height: sizes.badge) }
+                            // 2HG: the team is one unit, whether it has two players or one.
+                            Text(state.isTwoHeadedGiant ? Teams.label(src.teamNumber, players: state.players, teamNames: state.teamNames) : src.playerName)
+                                .font(.system(size: sizes.source, weight: .heavy)).lineLimit(1)
+                            if sourceSeats.contains(where: { state.players[$0].isMonarch }) { Image(systemName: "crown.fill").foregroundStyle(Theme.gold).font(.system(size: sizes.badge)) }
+                            if sourceSeats.contains(where: { state.players[$0].hasInitiative }) { InitiativeGlyph().foregroundStyle(Theme.initiativeBlue).frame(width: sizes.badge, height: sizes.badge) }
                         }
                         // Each name is a chip that selects which commander the
                         // card on the right shows; the active one is tinted.
-                        commanderChip(src.commander.name, active: !partner, id: "snapshotCommander") { overlay = .snapshot(sourceIdx: sourceIdx, partner: false) }
-                        if let p = src.partner {
-                            commanderChip(p.name, active: partner, id: "snapshotPartner") { overlay = .snapshot(sourceIdx: sourceIdx, partner: true) }
+                        // In 2HG the chips cover both heads of the team, so the
+                        // teammate's commander is one tap away on this screen.
+                        ForEach(sourceSeats, id: \.self) { seat in
+                            let head = state.players[seat]
+                            let own = seat == sourceIdx
+                            commanderChip(head.commander.name, active: own && !partner, id: own ? "snapshotCommander" : "snapshotCommander-\(seat)",
+                                          taken: state.isTwoHeadedGiant ? taken(from: seat, partner: false) : nil) { overlay = .snapshot(sourceIdx: seat, partner: false) }
+                            if let p = head.partner {
+                                commanderChip(p.name, active: own && partner, id: own ? "snapshotPartner" : "snapshotPartner-\(seat)",
+                                              taken: state.isTwoHeadedGiant ? taken(from: seat, partner: true) : nil) { overlay = .snapshot(sourceIdx: seat, partner: true) }
+                            }
                         }
                     }
                     Spacer()
@@ -226,13 +321,13 @@ struct CommanderSnapshotOverlay: View {
                 .font(.system(size: sizes.source, weight: .bold))
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.05)))
-                Text("CMD DEALT").font(.system(size: sizes.label, weight: .semibold)).kerning(0.5).foregroundStyle(.tertiary)
+                if !dealtRows.isEmpty { Text("CMD DEALT").font(.system(size: sizes.label, weight: .semibold)).kerning(0.5).foregroundStyle(.tertiary) }
                 ForEach(dealtRows, id: \.idx) { row in
                     let tgt = state.players[row.idx]
                     HStack(spacing: 10) {
                         CommanderArt(name: tgt.commander.name, height: 30).opacity(0.75)
                             .onTapGesture { overlay = .preview(name: tgt.commander.name, back: self.current) }
-                        Text(tgt.playerName).font(.system(size: sizes.source)).foregroundStyle(.secondary).lineLimit(1)
+                        Text(state.headName(row.idx)).font(.system(size: sizes.source)).foregroundStyle(.secondary).lineLimit(1)
                             .accessibilityIdentifier("snapshotRow-\(row.idx)")
                         Spacer()
                         Text(src.partner != nil ? "\(row.dmg.fromCommander)/\(row.dmg.fromPartner)" : "\(row.dmg.fromCommander)")
@@ -245,33 +340,13 @@ struct CommanderSnapshotOverlay: View {
                 }
                 Spacer(minLength: 0)
                 if viewerIdx != sourceIdx {
-                    let me = state.players[viewerIdx]
                     let lethal = dealtToViewer >= 21
-                    let out = dealtByViewer
-                    let outLethal = out.fromCommander >= 21 || out.fromPartner >= 21
-                    // Both directions between the viewer and this player:
-                    // what the shown commander has dealt them, and what they
-                    // have dealt this player with their own commander(s).
-                    HStack(spacing: 10) {
-                        CommanderArt(name: me.commander.name, height: 34)
-                            .onTapGesture { overlay = .preview(name: me.commander.name, back: self.current) }
-                        Text(me.playerName).font(.system(size: sizes.source, weight: .bold)).foregroundStyle(Color.accentColor).lineLimit(1)
-                        Spacer(minLength: 4)
-                        VStack(alignment: .center, spacing: 0) {
-                            Text(me.partner != nil ? "\(out.fromCommander)/\(out.fromPartner)" : "\(out.total)")
-                                .font(.system(size: sizes.value * 1.4, weight: .black).monospacedDigit())
-                                .foregroundStyle(outLethal ? Theme.danger : out.total > 0 ? Theme.dealtOrange : .secondary)
-                                .accessibilityIdentifier("snapshotDealtByMe")
-                            Text("Dealt to").font(.system(size: sizes.label - 2)).foregroundStyle(.secondary).lineLimit(1)
-                        }
-                        Divider().frame(height: sizes.value * 1.6)
-                        VStack(alignment: .center, spacing: 0) {
-                            Text("\(dealtToViewer)")
-                                .font(.system(size: sizes.value * 1.4, weight: .black).monospacedDigit())
-                                .foregroundStyle(Theme.commanderDamageColor(dealtToViewer))
-                                .accessibilityIdentifier("snapshotDealtToMe")
-                            Text("Dealt from").font(.system(size: sizes.label - 2)).foregroundStyle(.secondary).lineLimit(1)
-                        }
+                    // 2HG: the panel is for watching what the other team's
+                    // commanders have done to the team looking at it, so it
+                    // shows that one figure and nothing about the viewer's side.
+                    // Otherwise: both directions between the viewer and this player.
+                    Group {
+                        if state.isTwoHeadedGiant { teamTakenRow } else { viewerRow(viewerIdx, showTaken: true) }
                     }
                     .padding(.horizontal, 10).padding(.vertical, 8)
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.1)))
