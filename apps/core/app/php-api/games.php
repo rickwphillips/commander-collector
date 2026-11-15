@@ -324,6 +324,14 @@ switch ($method) {
 
         $data = getJSONInput();
 
+        // Same whitelist the POST path enforces. Without it an edit could store
+        // any string in games.game_type, and a value no stats query matches
+        // drops the game out of both the 2HG panels and the head-to-head
+        // tables. Checked before the transaction opens, as POST does.
+        if (isset($data['game_type']) && !in_array($data['game_type'], ['standard', '2hg', '1v1-2hg'])) {
+            sendError('Invalid game type');
+        }
+
         try {
             $pdo->beginTransaction();
 
