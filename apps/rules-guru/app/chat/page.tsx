@@ -275,6 +275,11 @@ export default function ChatPage() {
   const [patternsLoading, setPatternsLoading] = useState(true);
 
   const [sessionFeedbackOpen, setSessionFeedbackOpen] = useState(false);
+  // `showToolDetails` is written by the Ctrl+O shortcut below but never read:
+  // nothing in this app renders tool details yet (apps/core's GuruChat does).
+  // Left wired rather than deleted so the shortcut keeps its state when the
+  // panel is implemented.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showToolDetails, setShowToolDetails] = useState(false);
 
   const [gameContext, setGameContext] = useState<ActiveGameContext | null>(handoff?.ctx ?? null);
