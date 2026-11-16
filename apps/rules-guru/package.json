@@ -22,13 +22,13 @@
     "react-dom": "19.3.1",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-    "sass": "^1.108.0"
+    "sass": "^1.108.2"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.0.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.8",
+    "@testing-library/user-event": "^14.6.10",
     "@types/node": "^22.20.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -38,7 +38,7 @@
     "eslint-config-next": "16.4.5",
     "eslint-config-prettier": "^10.1.8",
     "jsdom": "^29.1.1",
-    "prettier": "^3.9.10",
+    "prettier": "^3.10.1",
     "typescript": "^5",
     "vitest": "^4.1.12"
   }
