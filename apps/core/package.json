@@ -30,16 +30,16 @@
     "qrcode.react": "^4.2.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "react-hook-form": "^7.90.0",
+    "react-hook-form": "^7.92.0",
     "react-window": "^1.8.11",
-    "sass": "^1.108.0",
+    "sass": "^1.108.2",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@playwright/test": "^1.65.0",
+    "@playwright/test": "^1.65.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.8",
+    "@testing-library/user-event": "^14.6.13",
     "@types/node": "^22.20.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -50,7 +50,7 @@
     "eslint-config-next": "16.4.5",
     "eslint-config-prettier": "^10.1.8",
     "jsdom": "^28.1.0",
-    "prettier": "^3.9.10",
+    "prettier": "^3.10.1",
     "typescript": "^5",
     "vitest": "^4.1.12"
   }
